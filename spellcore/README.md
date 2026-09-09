@@ -571,6 +571,30 @@ graph é `graph_check`, registrado pela CLI (só ela conhece o crate `script`), 
 do show aberto e devolve `{nodes, error}` — `error` é texto, não exceção, para o editor mostrar ao
 lado do nó.
 
+### `engine::module` — módulo = app declarado
+
+Um app (o laser, o player de mídia, um Pi na rede) não é código do core: é um `module.json` que
+declara `parameters` (o que se manda), `values` (o que ele devolve, só leitura) e `commands`
+(`context: action | mapping | both`, o `CommandContext` do Chataigne). O endereço textual
+`grupo/nome` é a identidade (regra 2 de `design/FUNCOES/README.md`) e o `type` do parâmetro é o que
+gera o widget (regra 1): `float`, `int`, `bool`, `trigger`, `color`, `string`, `enum` (com
+`options`); `min`/`max` é clamp físico e `norm` é a faixa útil do slider, separada dele. O core só
+guarda a tabela dos módulos vivos deste processo; o PATCHBAY monta o nó a partir dela sem conhecer
+o app, e os valores ao vivo chegam pelo comando `input` com a chave `module:<nome>/<path>`. Esta
+seção é a especificação do formato; o exemplo vivo é `modules/laser.json`, o primeiro módulo
+declarado.
+
+| Comando | Faz | Devolve |
+|---|---|---|
+| `module_add(file="", data={})` | lê o manifesto (`file` = nome em `modules/` ou caminho de um `.json`; ou `data` inteiro), valida (endereço `a/b` sem espaço, `type` e `context` conhecidos, `min < max`, `default` dentro da faixa, `enum` com `options`) e põe na tabela; mesmo `name` substitui. Recusado devolve todos os erros de uma vez, cada um citando o path | `{name, version}` |
+| `module_del(name)` | tira da tabela | o manifesto removido |
+| `module_list()` | módulos vivos | `[{name, type, version}]` |
+| `module_get(name)` | o manifesto inteiro | `{name, type, version, parameters, values, commands}` |
+
+`modules/` resolve pela mesma regra de `profiles/` (`edit::recurso_dir`). Campos alheios do
+manifesto do Chataigne (`hasInput`, `dependency`, `label`, `unit`, `args`) são lidos e
+descartados. Teste: `engine/tests/module.rs`, binário próprio porque a tabela é uma por processo.
+
 ## `script` (crate novo)
 
 ```rust

@@ -154,8 +154,8 @@ fn perfil(dir: &Path, p: &str) -> Result<Perfil, String> {
     })
 }
 
-/// Pasta de recurso do show (`profiles/`, `faces/`): ao lado do .spell, um nivel acima
-/// (`shows/` e `profiles/` irmaos, como no repo e no pendrive), no cwd ou ao lado do
+/// Pasta de recurso do show (`profiles/`, `faces/`, `modules/`): ao lado do .spell, um nivel
+/// acima (`shows/` e `profiles/` irmaos, como no repo e no pendrive), no cwd ou ao lado do
 /// executavel — a primeira que existir.
 pub fn recurso_dir(spell: &str, nome: &str) -> PathBuf {
     let mut c = Vec::new();

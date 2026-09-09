@@ -262,6 +262,7 @@ pub fn base() -> Registry {
         },
     );
     crate::edit::register(&mut r);
+    crate::module::register(&mut r);
     r
 }
 

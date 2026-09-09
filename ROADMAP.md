@@ -190,6 +190,7 @@ CI, sem tocar no que já está conforme):
 |---|---|---|---|
 | Design | rodada 7 (FÓSFORO, PATCHBAY) | voto do dono | voto das rodadas 5 e 6 |
 | F1 serve | crate `spellcore/serve` e `spellcore serve`: HTTP (`/commands`, `/show`, estático), WebSocket JSON-RPC com eventos `show`/`transport`/`log`/`widget`, monitor DMX binário a 40 Hz, MCP streamable em `/mcp`, comandos `input` e `resume`; `--dir` = raiz do repo | feita: `cli/tests/serve.rs` sobe o binário e fecha o contrato ponta a ponta | — |
+| F4 module | `module.json`: `engine::module` (Module/Param/Cmd, `load`, `check`), comandos `module_add/del/list/get`, `modules/laser.json` | `engine/tests/module.rs` verde | — |
 
 Bloqueadas até instalar SDK (decisão do dono, não de agente): R2 (GStreamer + NDI SDK),
 R6 (Godot 4). R9 espera R5.
