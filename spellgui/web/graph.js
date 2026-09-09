@@ -177,6 +177,36 @@ const GM = {
     return [{ op: tinha ? "replace" : "add", path: `/graph/nodes/${i}/${chave}`, value: valor }];
   },
 
+  // Campos que o Inspector mostra para um no': o cfg do TIPO (catalog.js) mais as chaves
+  // universais, cada um com o valor que o no' tem hoje. O cfg mora PLANO no no' — `n.every`, e
+  // nao `n.cfg.every`: e' assim que o runtime le (`n.get("every")` em graph.rs), entao o patch de
+  // um campo e' `/graph/nodes/<i>/<campo>`, que e' o que `opsChave` ja' escreve.
+  campos(doc, id) {
+    const n = GM.no(doc, id);
+    if (!n) return [];
+    const d = GM.def(n);
+    return Object.entries(Object.assign({}, d ? d.cfg : {}, CATALOG.UNIVERSAL))
+      .map(([k, t]) => [k, t, n[k]]);
+  },
+
+  // Texto do campo -> valor gravado, ou {erro}. Campo numerico vazio ou com lixo NAO grava: NaN
+  // vira `null` no JSON e o engine cairia no default sem ninguem ver por que.
+  valor(tipo, bruto) {
+    if (tipo === "bool") return { v: !!bruto };
+    if (tipo === "number") {
+      const v = Number(bruto);
+      return bruto === "" || Number.isNaN(v) ? { erro: `numero invalido: "${bruto}"` } : { v };
+    }
+    if (tipo === "json") {
+      try {
+        return { v: JSON.parse(bruto) };
+      } catch (e) {
+        return { erro: `json invalido: ${e.message}` };
+      }
+    }
+    return { v: String(bruto) };
+  },
+
   opsMove(doc, mov) {
     const ops = [];
     for (const [id, x, y] of mov) {
@@ -232,6 +262,7 @@ const PB = {
   doc: { graph: { nodes: [], edges: [] } },
   ctx: "", sel: new Set(), selEdge: -1, undo: [], redo: [],
   erros: {}, k: null, bus: null, mx: 0, my: 0, el: {},
+  editando: false,      // campo do Inspector no meio de um commit (ver PB.inspetor)
 
   /// Socket aberto? O `Bus` descarta request com o socket fechado; o patchbay prefere nem mandar.
   vivo() { return !!(PB.bus && PB.bus.ws && PB.bus.ws.readyState === 1); },
@@ -279,7 +310,12 @@ const PB = {
 
   // Toda edicao passa por aqui: manda show_patch, empilha o undo, revalida com graph_check.
   aplica(ops, rotulo) {
-    if (!ops.length) return Promise.resolve();
+    // Lista vazia = a edicao nao gerou op nenhuma (no' travado, no' que sumiu). Sai pelo log:
+    // recusa muda vira "clicou e nao aconteceu nada", que e' o que o dono nao pode ver.
+    if (!ops.length) {
+      PB.log("sem efeito: " + (rotulo || "edicao sem op"));
+      return Promise.resolve();
+    }
     ops = GM.comGraph(PB.doc, ops);
     const antes = PB.doc;
     const r = GM.patch(PB.doc, ops);
@@ -581,6 +617,10 @@ function grupoBox(cx, k, gb) {
 
 // ---------------------------------------------------------------- Inspector, catalogo, busca
 
+// Um campo do Inspector. Grava SO' no `change` — Enter ou saida do campo — nunca por tecla: o
+// patch por caractere enche a pilha de undo e manda um show_patch por letra.
+// ponytail: widgets.js nao serve aqui (ele fala JSON Schema do registry e grava no `input`, uma
+// tecla = um patch) ; unificar quando o cfg do catalogo virar schema como o dos comandos.
 function campo(rot, tipo, valor, onSet) {
   const l = document.createElement("label");
   l.textContent = rot;
@@ -592,18 +632,22 @@ function campo(rot, tipo, valor, onSet) {
     i.onchange = () => onSet(i.checked);
   } else if (tipo.startsWith("enum:")) {
     i = document.createElement("select");
-    i.innerHTML = tipo.slice(5).split("|").map(o => `<option>${o}</option>`).join("");
+    // Opcao vazia enquanto o no' nao tem o campo: sem ela o select ja' mostra a primeira opcao e
+    // escolher justo ela nao dispara `change` — o valor nunca chegava a ser gravado.
+    const opts = tipo.slice(5).split("|");
+    if (valor === undefined) opts.unshift("");
+    i.innerHTML = opts.map(o => `<option>${o}</option>`).join("");
     i.value = valor === undefined ? "" : String(valor);
-    i.onchange = () => onSet(i.value);
+    i.onchange = () => { if (i.value !== "") onSet(i.value); };
   } else {
     i = document.createElement("input");
     i.type = tipo === "number" ? "number" : "text";
-    i.value = tipo === "json" ? JSON.stringify(valor === undefined ? null : valor) : (valor === undefined ? "" : valor);
+    i.value = tipo === "json" ? JSON.stringify(valor === undefined ? null : valor)
+      : (valor === undefined ? "" : valor);
     i.onchange = () => {
-      let v = i.value;
-      if (tipo === "number") v = +v;
-      if (tipo === "json") { try { v = JSON.parse(v); } catch (e) { PB.log("json invalido"); return; } }
-      onSet(v);
+      const r = GM.valor(tipo, i.value);
+      if (r.erro) return PB.log(`${rot}: ${r.erro}`);
+      onSet(r.v);
     };
   }
   l.appendChild(i);
@@ -611,6 +655,11 @@ function campo(rot, tipo, valor, onSet) {
 }
 
 PB.inspetor = function () {
+  // Edicao vinda do proprio Inspector NAO redesenha os campos: `PB.aplica` chama daqui e refazer
+  // o DOM no meio do `change` mata o clique que ia para o campo seguinte (o alvo do mouseup some
+  // entre o mousedown e o mouseup). A recusa do engine cai fora deste guarda (e' assincrona) e
+  // redesenha, que e' quando o campo PRECISA voltar ao valor de antes.
+  if (PB.editando) return;
   const box = PB.el.insp;
   box.textContent = "";
   const ids = [...PB.sel];
@@ -622,22 +671,34 @@ PB.inspetor = function () {
   }
   const n = GM.no(PB.doc, ids[0]);
   if (!n) return;
-  const d = GM.def(n);
   const t = Object.assign(document.createElement("div"), { className: "over", textContent: `${n.id} — ${n.type}` });
   box.appendChild(t);
   if (PB.erros[n.id]) {
     box.appendChild(Object.assign(document.createElement("div"), { className: "ruim", textContent: PB.erros[n.id] }));
   }
-  const cfg = Object.assign({}, d ? d.cfg : {}, CATALOG.UNIVERSAL);
-  for (const [chave, tipo] of Object.entries(cfg)) {
-    box.appendChild(campo(chave, tipo, n[chave], v => PB.aplica(GM.opsChave(PB.doc, n.id, chave, v), `${n.id}.${chave} = ${v}`)));
+  for (const [chave, tipo, valor] of GM.campos(PB.doc, n.id)) {
+    box.appendChild(campo(chave, tipo, valor, v => {
+      PB.editando = true;
+      try {
+        return PB.aplica(GM.opsChave(PB.doc, n.id, chave, v), `${n.id}.${chave} = ${v}`);
+      } finally {
+        PB.editando = false;
+      }
+    }));
   }
 };
 
 // A lista de tipos: a coluna da esquerda (q = "") e a busca do Shift+A sao a mesma.
 function lista(box, q, cria) {
   box.textContent = "";
-  for (const t of CATALOG.busca(q, GM.modules)) {
+  const tipos = CATALOG.busca(q, GM.modules);
+  if (!tipos.length) {                      // caixa vazia sem explicacao era o beco sem saida
+    box.appendChild(Object.assign(document.createElement("div"), {
+      className: "over", textContent: `nenhum tipo casa com "${q}"`,
+    }));
+    return;
+  }
+  for (const t of tipos) {
     const b = document.createElement("button");
     b.textContent = t;
     b.onclick = () => cria(t);
@@ -673,7 +734,12 @@ function abreBusca() {
   inp.onkeydown = e => {
     e.stopPropagation();
     if (e.key === "Escape") el.style.display = "none";
-    if (e.key === "Enter" && caixa.firstChild) caixa.firstChild.click();
+    if (e.key !== "Enter") return;
+    // Enter sem item na lista: diz por que. Antes era um no-op mudo — o Enter nao criava nada e
+    // nao havia clique nenhum para dar, porque a lista estava vazia.
+    const b = caixa.querySelector("button");
+    if (b) b.click();
+    else PB.log(`nenhum tipo casa com "${inp.value}"`);
   };
   pinta();
   inp.focus();
