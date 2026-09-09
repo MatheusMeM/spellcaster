@@ -468,16 +468,7 @@ TL.snapT = snapT;
 
 // ---- cores (tokens) -----------------------------------------------------
 function colors() {
-  const cs = getComputedStyle(TL.k.cv);
-  const g = (n, d) => cs.getPropertyValue(n).trim() || d;
-  TL.col = {
-    bg: g("--sc-bg", "#000"), panel: g("--sc-panel", "#0E0E0E"), panel2: g("--sc-panel-2", "#161616"),
-    well: g("--sc-well", "#070707"), line: g("--sc-line", "#262626"),
-    fg: g("--sc-fg", "#F7F5EB"), fg2: g("--sc-fg-2", "#B5B1A9"), fg3: g("--sc-fg-3", "#666361"),
-    accent: g("--sc-accent", "#FFB000"), go: g("--sc-go", "#A8E05E"),
-    live: g("--sc-live", "#FF2D1F"), rehearsal: g("--sc-rehearsal", "#B7AED9"),
-    mono: g("--sc-mono", "Consolas, monospace"), label: g("--sc-label", "Arial Narrow, sans-serif"),
-  };
+  TL.col = CK.cores(TL.k.cv);
   TL.k.dirty = true;
 }
 TL.colors = colors;

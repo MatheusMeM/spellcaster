@@ -216,52 +216,17 @@ const GM = {
   },
 };
 
-// ---------------------------------------------------------------- cliente do barramento
-
-// ponytail: cliente WS de 25 linhas ; troca por `bus.js` (frente face) assim que ele estiver em main
-// — se window.Bus existir, e ele quem e' usado.
-function miniBus(url) {
-  const subs = {}, pend = new Map();
-  let id = 0, ws = null;
-  const b = {
-    aberto: false,
-    on(ev, fn) { (subs[ev] = subs[ev] || []).push(fn); },
-    emit(ev, d) { (subs[ev] || []).forEach(f => f(d)); },
-    call(cmd, args) {
-      if (!b.aberto) return Promise.reject(new Error("sem engine"));
-      return new Promise((res, rej) => {
-        const i = ++id;
-        pend.set(i, { res, rej });
-        ws.send(JSON.stringify({ id: i, cmd, args: args || {} }));
-      });
-    },
-  };
-  try { ws = new WebSocket(url); } catch (e) { return b; }
-  ws.binaryType = "arraybuffer";
-  ws.onopen = () => { b.aberto = true; b.emit("aberto", true); };
-  ws.onclose = () => { b.aberto = false; b.emit("aberto", false); };
-  ws.onerror = () => { b.aberto = false; };
-  ws.onmessage = ev => {
-    if (typeof ev.data !== "string") return;                 // frame binario (dmx): o graph nao usa
-    const m = JSON.parse(ev.data);
-    if (m.id !== undefined) {
-      const p = pend.get(m.id);
-      if (!p) return;
-      pend.delete(m.id);
-      if (m.error) p.rej(new Error(m.error)); else p.res(m.result);
-    } else if (m.event) b.emit(m.event, m.data);
-  };
-  return b;
-}
-
 // ---------------------------------------------------------------- a pagina
 
 const NW = 176, TH = 22, PH = 14, CFGH = 14;   // largura do no, altura do titulo, passo do pino
 
 const PB = {
   doc: { graph: { nodes: [], edges: [] } },
-  ctx: "", sel: new Set(), selEdge: -1, undo: [], redo: [], rev: 0,
+  ctx: "", sel: new Set(), selEdge: -1, undo: [], redo: [],
   erros: {}, k: null, bus: null, mx: 0, my: 0, el: {},
+
+  /// Socket aberto? O `Bus` descarta request com o socket fechado; o patchbay prefere nem mandar.
+  vivo() { return !!(PB.bus && PB.bus.ws && PB.bus.ws.readyState === 1); },
 
   // mundo -> tela
   sx(wx) { return (wx - PB.k.view.x) * PB.k.view.zoom; },
@@ -298,9 +263,9 @@ const PB = {
     PB.k.invalidate();
     PB.inspetor();
     if (rotulo) PB.log(rotulo);
-    if (PB.bus && PB.bus.aberto) {
+    if (PB.vivo()) {
+      // O `rev` da resposta o proprio `Bus` guarda (`bus.rev`); e' contra ele que o evento decide.
       return PB.bus.call("show_patch", { ops })
-        .then(res => { if (res && res.rev !== undefined) PB.rev = res.rev; })
         .catch(e => PB.log("show_patch: " + e.message))
         .then(PB.checa);
     }
@@ -314,7 +279,7 @@ const PB = {
     if (r.error) { PB.log("undo: " + r.error); return; }
     PB.doc = r.doc;
     pilhaB.push(r.undo);
-    if (PB.bus && PB.bus.aberto) PB.bus.call("show_patch", { ops }).catch(e => PB.log(e.message));
+    if (PB.vivo()) PB.bus.call("show_patch", { ops }).catch(e => PB.log(e.message));
     PB.k.invalidate();
     PB.inspetor();
     PB.checa();
@@ -324,7 +289,7 @@ const PB = {
   // ponytail: o engine devolve UM erro ; vira contagem por no quando graph_check devolver lista.
   checa() {
     PB.erros = {};
-    if (!PB.bus || !PB.bus.aberto) return Promise.resolve();
+    if (!PB.vivo()) return Promise.resolve();
     return PB.bus.call("graph_check", { graph: GM.g(PB.doc) }).then(r => {
       const txt = r && r.error;
       if (txt) {
@@ -415,12 +380,15 @@ const PB = {
   // cabo sob o ponto de TELA (px do canvas): o proprio tracado do desenho responde pelo hit-test
   achaCabo(px, py) {
     const g = GM.g(PB.doc), cx = PB.k.cx;
+    cx.save();                                                // o lineWidth abaixo e' do hit-test,
     cx.lineWidth = 10;                                        // tolerancia do clique, em px de tela
-    for (let i = g.edges.length - 1; i >= 0; i--) {
+    let achou = -1;
+    for (let i = g.edges.length - 1; i >= 0 && achou < 0; i--) {
       const p = PB.pontosCabo(g.edges[i]);
-      if (p && cx.isPointInStroke(caminho(p), px * PB.k.dpr, py * PB.k.dpr)) return i;
+      if (p && cx.isPointInStroke(caminho(p), px * PB.k.dpr, py * PB.k.dpr)) achou = i;
     }
-    return -1;
+    cx.restore();                                             // nao do desenho do quadro seguinte.
+    return achou;
   },
 
   pontosCabo(e) {
@@ -443,7 +411,6 @@ function caminho(p) {
 
 // ---------------------------------------------------------------- desenho
 
-function css(v) { return getComputedStyle(document.body).getPropertyValue(v).trim() || "#888"; }
 
 function desenha(k) {
   const cx = k.cx, z = k.view.zoom;
@@ -757,15 +724,7 @@ function enquadra() {
 PB.init = function (opts) {
   PB.el = opts;
   const cv = opts.cv;
-  const c = v => css(v);
-  PB.col = {
-    well: c("--sc-well"), panel: c("--sc-panel"), panel2: c("--sc-panel-2"), line: c("--sc-line"),
-    hair: c("--sc-hair"), fg: c("--sc-fg"), fg2: c("--sc-fg-2"), fg3: c("--sc-fg-3"),
-    accent: c("--sc-accent"), live: c("--sc-live"), rehearsal: c("--sc-rehearsal"),
-    no_in: c("--sc-node-in"), no_logic: c("--sc-node-logic"), no_cmd: c("--sc-node-cmd"),
-    no_out: c("--sc-node-out"), no_module: c("--sc-node-logic"),
-    mono: c("--sc-mono") || "monospace",       // o token ja' resolve numa lista valida para o canvas
-  };
+  PB.col = CK.cores(cv);
 
   const k = CK.attach(cv, desenha);
   PB.k = k;
@@ -864,13 +823,14 @@ PB.init = function (opts) {
 
 // Carrega o show: pelo engine (GET /show) ou por fetch de um .spell (modo offline).
 PB.carrega = function (url) {
-  PB.bus = window.Bus ? window.Bus(location.origin.replace("http", "ws") + "/ws") : miniBus(location.origin.replace("http", "ws") + "/ws");
-  PB.bus.on("log", d => PB.log(d && d.text ? d.text : JSON.stringify(d)));
-  PB.bus.on("show", d => { if (d && d.rev !== PB.rev) PB.recarrega(); });
-  PB.bus.on("aberto", ok => {
-    PB.el.estado.textContent = ok ? "engine" : "offline";
-    if (ok) PB.recarrega();
-  });
+  if (!PB.bus) {
+    PB.bus = new Bus({}).connect();
+    PB.bus.on("log", d => PB.log(d && d.text ? d.text : JSON.stringify(d)));
+    // `bus.rev` e' o maior rev ja' visto numa resposta: evento acima disso e' edicao de fora.
+    PB.bus.on("show", d => { if (d && d.rev > PB.bus.rev) PB.recarrega(); });
+    PB.bus.on("open", () => { PB.el.estado.textContent = "engine"; PB.recarrega(); });
+    PB.bus.on("close", () => { PB.el.estado.textContent = "offline"; });
+  }
   return fetch(url).then(r => r.json()).then(d => {
     PB.doc = d;
     if (!PB.doc.graph) PB.doc.graph = { nodes: [], edges: [] };

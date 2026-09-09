@@ -35,6 +35,25 @@ const CK = {
     return best;
   },
 
+  // Cores do `design/tokens` lidas do elemento (o canvas herda as vars). UMA tabela para as tres
+  // paginas de canvas: o que a pagina nao usa custa uma leitura de var, nao um arquivo a mais.
+  // ponytail: fallback hex embutido ; sai quando o tokens.css for garantido em toda pagina.
+  cores(el) {
+    const cs = getComputedStyle(el || document.documentElement);
+    const g = (n, d) => cs.getPropertyValue(n).trim() || d;
+    return {
+      bg: g("--sc-bg", "#000"), panel: g("--sc-panel", "#0E0E0E"), panel2: g("--sc-panel-2", "#161616"),
+      well: g("--sc-well", "#070707"), line: g("--sc-line", "#262626"), hair: g("--sc-hair", "#222"),
+      fg: g("--sc-fg", "#F7F5EB"), fg2: g("--sc-fg-2", "#B5B1A9"), fg3: g("--sc-fg-3", "#666361"),
+      accent: g("--sc-accent", "#FFB000"), go: g("--sc-go", "#A8E05E"),
+      live: g("--sc-live", "#FF2D1F"), rehearsal: g("--sc-rehearsal", "#B7AED9"),
+      no_in: g("--sc-node-in", "#7FD1FF"), no_logic: g("--sc-node-logic", "#B7AED9"),
+      no_cmd: g("--sc-node-cmd", "#FFB000"), no_out: g("--sc-node-out", "#A8E05E"),
+      no_module: g("--sc-node-logic", "#B7AED9"),
+      mono: g("--sc-mono", "Consolas, monospace"), label: g("--sc-label", "Arial Narrow, sans-serif"),
+    };
+  },
+
   // Selecao esparsa: linha (track/lane) -> Set de indices.
   sel() {
     const m = new Map();

@@ -255,10 +255,10 @@ TEATRO.mount = function (el) {
   function desenha() {
     const w = (cv.width = cv.clientWidth);
     const h = (cv.height = cv.clientHeight);
-    const css = getComputedStyle(document.documentElement);
-    ctx.fillStyle = css.getPropertyValue("--sc-well") || "#070707";
+    const col = CK.cores(cv);
+    ctx.fillStyle = col.well;
     ctx.fillRect(0, 0, w, h);
-    ctx.strokeStyle = css.getPropertyValue("--sc-hair") || "#222";
+    ctx.strokeStyle = col.hair;
     ctx.beginPath();
     ctx.moveTo(0, h * 0.3);
     ctx.lineTo(w, h * 0.3);
@@ -282,10 +282,10 @@ TEATRO.mount = function (el) {
       ctx.fill();
       ctx.lineWidth = f.i === st.sel ? 2 : 1;
       ctx.strokeStyle = f.i === st.sel
-        ? css.getPropertyValue("--sc-accent") || "#FFB000"
-        : css.getPropertyValue("--sc-fg-3") || "#888";
+        ? col.accent
+        : col.fg3;
       ctx.stroke();
-      ctx.fillStyle = css.getPropertyValue("--sc-fg-3") || "#888";
+      ctx.fillStyle = col.fg3;
       ctx.font = "10px monospace";
       ctx.textAlign = "center";
       ctx.fillText(f.name || "?", px, py + 26);
