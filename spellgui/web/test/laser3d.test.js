@@ -71,3 +71,36 @@ test("ILDA: le de volta o frame que escreveu (formato 5, RGB)", () => {
 test("ILDA: dado que nao e' ILDA devolve zero frame, sem estourar", () => {
   assert.deepStrictEqual(ILDA.parse(new Uint8Array(64).buffer).frames, []);
 });
+
+// ---- display e controles (frente ui-3d-usab) ----
+const { oledLines, CONTROLS, kindOf, PAGES } = require("../laser3d/engine.js");
+
+test("oledLines: desligado so' diz que esta' desligado; ligado, a linha grande e' o estado", () => {
+  assert.strictEqual(oledLines({ power: false }, {})[1], "DESLIGADO");
+  const desarm = oledLines({ power: true, key: false, lock: true, page: 0, kpps: 30000, show: [[1, 2, 3]], frame: 0 }, {});
+  assert.strictEqual(desarm[1], "DESARMADO");
+  assert.match(desarm[0], /^STATUS +1\/7$/);
+  assert.strictEqual(oledLines({ power: true, key: true, lock: true, page: 0, kpps: 30000, show: [[]], frame: 0 }, {})[1], "LIVE");
+  assert.strictEqual(oledLines({ power: true, key: true, lock: false, page: 0, kpps: 30000, show: [[]], frame: 0 }, {})[1], "SCAN FAIL");
+});
+
+test("oledLines: campo em edicao leva '>' e a pagina ERRO mostra o ultimo erro", () => {
+  const dmx = oledLines({ power: true, page: PAGES.indexOf("DMX"), edit: true, field: 1, dmx: 7, univ: 3 }, {});
+  assert.strictEqual(dmx[1], "ADDR 007");
+  assert.strictEqual(dmx[2][0], " ", "campo 0 nao esta' selecionado");
+  assert.strictEqual(dmx[3][0], ">", "campo 1 selecionado");
+  const erro = oledLines({ power: true, page: PAGES.indexOf("ERRO"), err: { msg: "laser_open: sem DAC", when: "20:34:00" } }, {});
+  assert.strictEqual(erro[1], "ERRO");
+  assert.strictEqual(erro[2], " LASER_OPEN: SEM DAC");
+  assert.ok(oledLines({ power: true, page: 0 }, {}).every(l => /^[\x20-\x7e]*$/.test(l)), "display so' ASCII");
+});
+
+test("CONTROLS: um controle, uma familia; energia e interlock num ponto so'", () => {
+  const fam = new Set(["toggle", "momentary", "valor", "conector", "navegacao"]);
+  for (const k in CONTROLS) assert.ok(fam.has(CONTROLS[k][0]), k + " tem familia conhecida");
+  assert.strictEqual(kindOf("acin"), "conector", "powerCON e' plugue");
+  assert.strictEqual(kindOf("power"), "toggle", "rocker liga e desliga");
+  const toggles = Object.keys(CONTROLS).filter(k => CONTROLS[k][0] === "toggle");
+  assert.deepStrictEqual(toggles.sort(), ["interlock", "keyswitch", "power"], "cada toggle e' uma funcao unica");
+  assert.strictEqual(kindOf("fusivel"), "", "nao existe fusivel");
+});
