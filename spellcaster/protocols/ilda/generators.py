@@ -1,4 +1,4 @@
-"""Geradores de figura (migrado de seed/ilda_gen.py).
+"""Geradores de figura.
 Coordenadas ILDA +-32767; cores (r, g, b) 0-255.
 Uso: python -m spellcaster.protocols.ilda.generators saida.ild [SX SY]  (regenera o laser MED GRUPO)."""
 import math
@@ -43,7 +43,7 @@ def line(x0, y0, x1, y1, col, k=15):
 
 def blank_to(pts):
     """Ponto apagado no inicio da figura para o salto.
-    Corrigido: o seed passava o alvo a mao e errava quando a fase (ph) girava."""
+    O alvo sai daqui, nao do chamador: passado a mao ele erra quando a fase (ph) gira."""
     return [Point(pts[0].x, pts[0].y, blank=True)] + pts if pts else pts
 
 

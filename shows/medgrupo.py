@@ -1,5 +1,5 @@
-# Show MED GRUPO RJ (plenária, 09/2026) — cópia limpa de seed/show_medgrupo.py só com a lógica (constantes,
-# perfis, look, DUR), sem a seção sACN. O seed continua como referência; este é o que `spell play` carrega.
+# Show MED GRUPO RJ (plenária, 09/2026): constantes, perfis, look, DUR. É o que `spell play` carrega e
+# a fonte do track pyfx de shows/medgrupo.spell.
 # Uso: spell play shows/medgrupo.py [--loop]
 import bisect, math
 

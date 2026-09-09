@@ -58,7 +58,7 @@ def _group(name):
 
 
 def _hold(patch, seconds):
-    """Segura o estado atual do patch em sACN por N s (o loop dos bsw_* do seed)."""
+    """Segura o estado atual do patch em sACN por N s."""
     from ..protocols.sacn import SacnOut
     out = SacnOut(universes=sorted(patch.universes))
     t0 = time.time()
