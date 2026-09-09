@@ -5,7 +5,8 @@
 //   WS    /ws  request  {"id":7,"cmd":"locate","args":{"t":12.5}}
 //              resposta {"id":7,"result":...} | {"id":7,"error":"texto"}
 //              evento   {"event":"transport"|"show"|"log"|"widget","data":...}
-//              binario  topic:u8 | universe:u16 LE | 512 bytes   (topic 1 = dmx de saida)
+//              binario  topic:u8 | universe:u16 LE | 512 bytes   (topic 1 = dmx de saida,
+//                       topic 2 = dmx de entrada, o universo de `show.inputs`)
 //
 // Toda pagina (face, timeline, patchbay, teatro, laser) fala com o engine so' por aqui: quem
 // tem logica e' o registry, isto e' encanamento.
@@ -33,8 +34,8 @@ Bus.SHOW = "/shows/medgrupo.spell";
 Bus.parse = function (m) {
   if (typeof m !== "string") {
     const b = m instanceof Uint8Array ? m : new Uint8Array(m);
-    // topic 1 = dmx de saida, 515 bytes; qualquer outro topico ainda nao tem consumidor
-    if (b.length < 515 || b[0] !== 1) return null;
+    // topic 1 = dmx de saida e topic 2 = dmx de entrada, 515 bytes; outro topico nao tem consumidor
+    if (b.length < 515 || (b[0] !== 1 && b[0] !== 2)) return null;
     return {
       event: "dmx",
       data: { topic: b[0], universe: b[1] | (b[2] << 8), data: b.subarray(3, 515) },

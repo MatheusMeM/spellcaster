@@ -6,11 +6,11 @@ o `spellcore serve` (ou qualquer servidor estático) entrega. Cor e tipografia v
 
 | Arquivo | O que é |
 |---|---|
-| `bus.js` | cliente do barramento: WS `{"id","cmd","args"}` com promessa por id, reconexão, eventos (`transport`, `show`, `log`, `widget`), frames binários `topic\|universe\|512` decodificados em `{universe, data}`. Modo offline embutido |
+| `bus.js` | cliente do barramento: WS `{"id","cmd","args"}` com promessa por id, reconexão, eventos (`transport`, `show`, `log`, `widget`), frames binários `topic\|universe\|512` decodificados em `{topic, universe, data}` (topic 1 = saída, topic 2 = entrada). Modo offline embutido |
 | `widgets.js` | parâmetro tipado → widget (`WG.kindOf`), campos → `args` do request (`WG.args`), formulário de um comando do registry (`WG.form`). Classes para a página estilizar: `.wg`, `.wg-<tipo>`, `.wg-lab`, `.wg-num`, `.wg-form`, `.wg-doc`, `.wg-go`, `.wg-out` |
 | `face.js` + `face.html` | runtime da Face: `faces/<nome>.face.json` vira grade de widgets em modo kiosk |
 | `canvaskit.js` | pan, zoom, hit-test, marquee, DPR, dirty-flag; compartilhado por timeline e graph |
-| `timeline.js` + `index.html` | timeline em canvas |
+| `timeline.js` + `index.html` | timeline em canvas. `R` (botão do cabeçalho, tecla e botão da barra) chama `rec_arm` no engine e o estado do arme vem de `rec_state`; `+Track` abre menu de tipo (`dmx`, `laser` com a lista de `laser_files`, `fx`); `Alt+M` mostra o universo de saída da lane focada, ou o de ENTRADA quando ela está armada |
 | `dev/commands.json` | `Registry::schema()` congelado, usado no modo offline |
 | `test/*.test.js` | `node --test spellgui/web/test/*.test.js` |
 

@@ -96,17 +96,63 @@ test("frame binario do monitor: universo em little endian e 512 canais", () => {
   b[1] = 0x02; b[2] = 0x01;            // universo 258
   b[3] = 255; b[514] = 7;
   const f = TL.frameBin(b.buffer);
+  assert.strictEqual(f.topic, 1);
   assert.strictEqual(f.universe, 258);
   assert.strictEqual(f.data.length, 512);
   assert.strictEqual(f.data[0], 255);
   assert.strictEqual(f.data[511], 7);
 });
 
-test("frame de outro topico ou curto demais e ignorado", () => {
+// topic 2 = dmx de ENTRADA (show.inputs): mesmo formato, outro destino no desenho do monitor.
+test("frame do topico 2 e a entrada, nao a saida", () => {
+  const b = new Uint8Array(515);
+  b[0] = 2; b[1] = 1; b[3] = 99;
+  const f = TL.frameBin(b.buffer);
+  assert.strictEqual(f.topic, 2);
+  assert.strictEqual(f.universe, 1);
+  assert.strictEqual(f.data[0], 99);
+});
+
+test("frame de topico sem consumidor ou curto demais e ignorado", () => {
   const outro = new Uint8Array(515);
-  outro[0] = 2;
+  outro[0] = 3;
   assert.strictEqual(TL.frameBin(outro.buffer), null);
   assert.strictEqual(TL.frameBin(new Uint8Array(10).buffer), null);
+});
+
+// ---- +Track: um menu de tipo em vez de so' dmx ---------------------------
+test("+Track dmx manda os campos de sempre", () => {
+  assert.deepStrictEqual(TL.trackArgs("dmx"), {
+    type: "dmx", universe: 1, address: 1, label: "",
+  });
+  assert.deepStrictEqual(TL.trackArgs(), { type: "dmx", universe: 1, address: 1, label: "" });
+});
+
+test("+Track laser leva o clipe .ild", () => {
+  assert.deepStrictEqual(TL.trackArgs("laser", "medgrupo_laser.ild"), {
+    type: "laser", universe: 1, address: 1, label: "", clip: "medgrupo_laser.ild",
+  });
+});
+
+test("+Track fx leva o script .rhai", () => {
+  assert.deepStrictEqual(TL.trackArgs("fx", "medgrupo.rhai"), {
+    type: "fx", universe: 1, address: 1, label: "", script: "medgrupo.rhai",
+  });
+});
+
+// ---- record arm: o estado vem do engine, nao do .spell -------------------
+test("rec_state marca so' as lanes dos tracks armados", () => {
+  TL.lanes = [{ si: 0, rec: true }, { si: 1, rec: false }, { si: 1, param: "scale", rec: true }];
+  TL.recApply({ recording: true, tracks: [1] });
+  assert.deepStrictEqual(TL.lanes.map(L => L.rec), [false, true, false]);
+});
+
+test("sem nada armado, toda lane desarma", () => {
+  TL.lanes = [{ si: 0, rec: true }, { si: 1, rec: true }];
+  TL.recApply({ recording: false, tracks: [] });
+  assert.deepStrictEqual(TL.lanes.map(L => L.rec), [false, false]);
+  TL.recApply(null);
+  assert.deepStrictEqual(TL.lanes.map(L => L.rec), [false, false]);
 });
 
 // Evento `show`: ha' UM contador, o do engine, e toda resposta do barramento o traz. `TL.rev` e'

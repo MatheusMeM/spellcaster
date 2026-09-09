@@ -19,6 +19,7 @@
 use crate::clock::{Clock, State};
 use crate::cues::CueList;
 use crate::hook::FrameHook;
+use crate::input::Inputs;
 use crate::show::{OutputCfg, Show};
 use crate::timeline::{Side, Timeline, Value};
 use crate::universe::Universes;
@@ -201,6 +202,8 @@ impl Prog {
 
 struct Shared {
     clock: Clock,
+    /// Entradas DMX do show (`show.inputs`): o ultimo frame recebido de cada universo.
+    inputs: Arc<Inputs>,
     ctl: Mutex<Vec<Ctl>>,
     prog: Mutex<Prog>,
     cue: AtomicI32,
@@ -282,6 +285,17 @@ impl Handle {
         lock(&self.s.prog).levels(u)
     }
 
+    /// Ultimo frame recebido no universo de ENTRADA, ou `None` (universo nao declarado em
+    /// `show.inputs`, ou nada chegou ainda). Nao ha merge com a saida.
+    pub fn input_get(&self, universe: u16) -> Option<[u8; 512]> {
+        self.s.inputs.get(universe)
+    }
+
+    /// (universo, frame) de cada entrada que ja' recebeu algo — o monitor do `serve`.
+    pub fn input_frames(&self) -> Vec<(u16, [u8; 512])> {
+        self.s.inputs.frames()
+    }
+
     pub fn state(&self) -> TransportState {
         TransportState {
             t: self.s.clock.time(),
@@ -312,6 +326,7 @@ struct Rt {
     uni: Universes,
     outs: Vec<Box<dyn Output>>,
     osc_out: Option<OscOut>,
+    inputs: Arc<Inputs>,
     looping: bool,
     prev: f64,
     nuni: usize, // quantos universos sairam no ultimo frame (so' a thread de transporte le)
@@ -367,6 +382,7 @@ impl Rt {
             uni,
             outs,
             osc_out,
+            inputs,
             prev,
             nuni,
             ..
@@ -390,7 +406,9 @@ impl Rt {
         for h in hooks.iter_mut() {
             h.frame(t, uni);
         }
-        // 3. efeito colateral: OSC, media nao-Capture e cue
+        // 3. efeito colateral: gravacao (le a ENTRADA e escreve keyframe no show aberto), OSC,
+        // media nao-Capture e cue
+        crate::rec::tick(t, inputs);
         if let Some(o) = osc_out.as_ref() {
             for &i in osc.iter() {
                 send_osc(&mut tracks[i], t, o, false);
@@ -517,6 +535,7 @@ impl Player {
         );
         let outs = open_outputs(&show)?;
         let osc_out = open_osc(&show)?;
+        let inputs = Arc::new(Inputs::open(&show)?);
         let osc_port = show
             .extra
             .get("transport")
@@ -526,6 +545,7 @@ impl Player {
         Ok(Player {
             s: Arc::new(Shared {
                 clock: Clock::new(show.fps),
+                inputs: inputs.clone(),
                 ctl: Mutex::new(Vec::new()),
                 prog: Mutex::new(Prog::default()),
                 cue: AtomicI32::new(-1),
@@ -544,6 +564,7 @@ impl Player {
                 uni: Universes::new(),
                 outs,
                 osc_out,
+                inputs,
                 looping,
                 prev: 0.0,
                 nuni: 0,
@@ -635,6 +656,10 @@ impl Player {
 
     /// Idempotente: para a thread, fecha as saidas e limpa o `current()`.
     pub fn close(&mut self) {
+        // Sem player nao ha gravacao. E' aqui e nao so' no ramo Stop da thread porque `close()`
+        // zera `run` antes do proximo frame: o `play_show` fecha o player no `stop` do operador,
+        // e a thread sai sem passar por aquele ramo.
+        crate::rec::disarm();
         self.s.run.store(false, Ordering::Relaxed);
         self.s.clock.stop();
         self.s.finish();
@@ -674,13 +699,23 @@ fn argf(a: &Arg) -> f64 {
 
 /// Thread de transporte: o `_loop` do Python.
 fn transport(mut rt: Rt, s: Arc<Shared>) {
+    // O relogio nasce em Stop: comeca `parado` para que armar ANTES do primeiro play sobreviva.
+    let mut parado = true;
     while s.run.load(Ordering::Relaxed) {
         if s.clock.state() == State::Stop {
+            // Parar desarma a gravacao, na BORDA de entrada no stop e nao enquanto parado:
+            // armar com o transporte parado e so' depois dar play e' o caminho do operador.
+            // (O outro ponto de desarme e' `Player::close`.)
+            if !parado {
+                crate::rec::disarm();
+                parado = true;
+            }
             let t = s.clock.time();
             rt.drain(&s, t); // locate/stop com o relogio parado tambem zera cues e ganchos
             std::thread::sleep(Duration::from_millis(5));
             continue;
         }
+        parado = false;
         {
             let sc = s.clone();
             s.clock.run(|t| rt.tick(&sc, t), s.duration);

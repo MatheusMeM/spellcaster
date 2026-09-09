@@ -115,6 +115,17 @@ pub struct InputArgs {
     pub value: f64,
 }
 
+#[derive(Deserialize, JsonSchema)]
+pub struct InputGetArgs {
+    /// Universo declarado em `show.inputs`.
+    #[serde(default = "um")]
+    pub universe: u16,
+}
+
+fn um() -> u16 {
+    1
+}
+
 /// Comando sem parametro.
 #[derive(Deserialize, JsonSchema)]
 pub struct NoArgs {}
@@ -284,8 +295,22 @@ pub fn base() -> Registry {
             Ok(json!({"key": a.key, "value": a.value}))
         },
     );
+    r.add::<InputGetArgs>(
+        "input_get",
+        "Ultimo frame DMX recebido no universo de ENTRADA (show.inputs): 512 valores.",
+        |a| {
+            let d = vivo()?.input_get(a.universe).ok_or_else(|| {
+                format!(
+                    "universo {}: sem entrada declarada ou sem frame",
+                    a.universe
+                )
+            })?;
+            Ok(json!({"universe": a.universe, "data": d.to_vec()}))
+        },
+    );
     crate::edit::register(&mut r);
     crate::module::register(&mut r);
+    crate::rec::register(&mut r);
     r
 }
 
@@ -334,6 +359,9 @@ mod tests {
             "cue_go",
             "transport_state",
             "input",
+            "input_get",
+            "rec_arm",
+            "rec_state",
         ];
         for c in esperados {
             assert!(r.get(c).is_some(), "comando {} ausente", c);
@@ -348,6 +376,7 @@ mod tests {
             ("cue_go", json!({})),
             ("transport_state", json!({})),
             ("input", json!({"key": "widget:go", "value": 1.0})),
+            ("input_get", json!({"universe": 1})),
         ] {
             assert_eq!(
                 r.call(c, a).unwrap_err(),

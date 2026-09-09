@@ -25,6 +25,8 @@ use tokio::sync::broadcast;
 
 /// Frame binario do monitor: `topic:u8 | universe:u16 LE | 512 bytes`.
 const TOPIC_DMX: u8 = 1;
+/// Mesmo formato, mas o universo de ENTRADA (`show.inputs`), antes de qualquer edicao.
+const TOPIC_IN: u8 = 2;
 const FRAME: usize = 1 + 2 + 512;
 
 /// Teto do monitor: 40 Hz (um show a 60 fps nao manda 60 frames por universo para a GUI).
@@ -40,11 +42,20 @@ struct St {
     reg: Arc<Registry>,
     tx: broadcast::Sender<Out>,
     dir: PathBuf,
+    /// Ultima `rev` que ja' saiu como evento `show`. Impede o evento em dobro: o comando do WS
+    /// avisa na hora, e a sondagem de `revisao` so' cobre o que muda FORA de um comando.
+    visto: std::sync::atomic::AtomicU64,
 }
 
 impl St {
     fn evento(&self, event: &str, data: Value) {
         let _ = self.tx.send(Out::Text(texto(event, data)));
+    }
+
+    /// `{"event":"show","data":{"rev":n}}`, uma vez por revisao.
+    fn show_ev(&self, rev: u64) {
+        self.visto.store(rev, std::sync::atomic::Ordering::Relaxed);
+        self.evento("show", json!({ "rev": rev }));
     }
 }
 
@@ -173,7 +184,7 @@ async fn request(st: &Arc<St>, txt: &str) -> String {
     match r {
         Ok(Ok(v)) => {
             if depois != antes {
-                st.evento("show", json!({ "rev": depois }));
+                st.show_ev(depois);
             }
             json!({"id": id, "result": v, "rev": depois}).to_string()
         }
@@ -222,6 +233,22 @@ async fn cliente(mut sock: WebSocket, st: Arc<St>) {
     }
 }
 
+/// `show {rev}` de edicao que NAO veio de um comando do WS — hoje so' a gravacao (`rec.rs`),
+/// que escreve keyframe dentro do frame do player. Sem isto a timeline nunca recarregaria
+/// enquanto grava.
+// ponytail: 4 eventos por segundo, nao um por keyframe ; um fader gravando a 60 fps sobe `rev`
+// 60 vezes por segundo e cada evento custa um GET /show inteiro na pagina. Baixar o periodo so'
+// se a lane em gravacao parecer atrasada.
+async fn revisao(st: Arc<St>) {
+    loop {
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        let r = engine::edit::rev();
+        if r != st.visto.load(std::sync::atomic::Ordering::Relaxed) {
+            st.show_ev(r);
+        }
+    }
+}
+
 /// Transporte no WS: a cada mudanca, e a 10 Hz enquanto o player anda (tocando, o `t` muda todo
 /// frame, entao comparar o ultimo JSON ja' da' as duas coisas).
 // ponytail: sondagem a 10 Hz ; virar aviso do proprio player se a GUI pedir menos latencia.
@@ -252,6 +279,17 @@ async fn transporte(st: Arc<St>) {
 struct Monitor {
     tx: broadcast::Sender<Out>,
     at: Instant,
+    /// Handle do player deste frame, achado no primeiro frame (o `start()` publica o CURRENT
+    /// depois de subir a thread, entao no frame 1 ele ainda pode estar vazio).
+    h: Option<engine::player::Handle>,
+}
+
+fn bin(topic: u8, universe: u16, data: &[u8; 512]) -> Vec<u8> {
+    let mut b = Vec::with_capacity(FRAME);
+    b.push(topic);
+    b.extend_from_slice(&universe.to_le_bytes());
+    b.extend_from_slice(data);
+    b
 }
 
 impl FrameHook for Monitor {
@@ -264,11 +302,15 @@ impl FrameHook for Monitor {
         }
         self.at = Instant::now();
         for u in uni.iter() {
-            let mut b = Vec::with_capacity(FRAME);
-            b.push(TOPIC_DMX);
-            b.extend_from_slice(&u.number.to_le_bytes());
-            b.extend_from_slice(&u.data);
-            let _ = self.tx.send(Out::Bin(b));
+            let _ = self.tx.send(Out::Bin(bin(TOPIC_DMX, u.number, &u.data)));
+        }
+        if self.h.is_none() {
+            self.h = engine::player::current();
+        }
+        if let Some(h) = self.h.as_ref() {
+            for (n, d) in h.input_frames() {
+                let _ = self.tx.send(Out::Bin(bin(TOPIC_IN, n, &d)));
+            }
         }
     }
 }
@@ -315,12 +357,14 @@ pub fn serve(reg: Registry, port: u16, dir: PathBuf, show: Option<String>) -> Re
         reg: Arc::new(reg),
         tx: tx.clone(),
         dir,
+        visto: std::sync::atomic::AtomicU64::new(engine::edit::rev()),
     });
     let _ = TX.set(tx.clone());
     engine::player::hook_global(move || {
         Box::new(Monitor {
             tx: tx.clone(),
             at: Instant::now(),
+            h: None,
         })
     });
 
@@ -360,6 +404,7 @@ pub fn serve(reg: Registry, port: u16, dir: PathBuf, show: Option<String>) -> Re
             abre(st.reg.clone(), f);
         }
         tokio::spawn(transporte(st.clone()));
+        tokio::spawn(revisao(st.clone()));
         axum::serve(l, app).await.map_err(|e| e.to_string())
     })
 }
@@ -374,6 +419,7 @@ mod tests {
             reg: Arc::new(engine::registry::base()),
             tx,
             dir: PathBuf::from("."),
+            visto: std::sync::atomic::AtomicU64::new(engine::edit::rev()),
         })
     }
 

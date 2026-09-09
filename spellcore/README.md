@@ -314,7 +314,8 @@ HTTP  GET /commands -> Registry::schema()   GET /show -> show_get full   GET /<a
 WS    /ws  request  {"id":7,"cmd":"locate","args":{"t":12.5}}
            resposta {"id":7,"result":...,"rev":n} | {"id":7,"error":"texto","rev":n}
            evento   {"event":"transport","data":<TransportState>} | {"event":"show","data":{"rev":n}} | {"event":"log","data":{"text":...}} | {"event":"widget","data":{"id","prop","value"}}
-           binário  topic:u8 | universe:u16 LE | 512 bytes   (topic 1 = dmx de saída)
+           binário  topic:u8 | universe:u16 LE | 512 bytes   (topic 1 = dmx de saída,
+                    topic 2 = dmx de ENTRADA, os universos de `show.inputs`)
 Comando `input {key, value}` no registry alimenta FrameHook::input do player vivo (chaves "widget:go", "key:Space", "module:laser/stat/fps").
 ```
 
@@ -328,7 +329,8 @@ Comando `input {key, value}` no registry alimenta FrameHook::input do player viv
 | `rev` | contador único, o do engine (`engine::edit::rev()`). Não há lista de comandos de leitura: o `serve` lê `rev()` antes e depois de cada chamada, **toda** resposta carrega o `rev` de depois, e o broadcast `{"event":"show","data":{"rev":n}}` sai **só** quando o número mudou. `load` e `show_get {file}` trocam o show inteiro e por isso incrementam |
 | `transport` | a cada mudança de estado e a 10 Hz enquanto o player anda (sondagem de `player::current()`) |
 | `widget` | `out.widget` do graph (o `Ev::Widget` que o sink da CLI recebe) vira `{"event":"widget","data":{"id","prop","value"}}` |
-| monitor | um `FrameHook` global copia os universos do frame, no máximo a 40 Hz e só quando há cliente WS; sai como frame binário de 515 bytes |
+| monitor | um `FrameHook` global copia os universos do frame, no máximo a 40 Hz e só quando há cliente WS; sai como frame binário de 515 bytes. No mesmo teto sai o **topic 2**, o último frame recebido em cada universo de `show.inputs` (`Handle::input_frames`) |
+| `show` sem comando | a gravação (`rec.rs`) edita o show DENTRO do frame do player, sem passar por request nenhum. Uma tarefa sonda `edit::rev()` a **4 Hz** e emite `{"event":"show","data":{"rev":n}}` quando o número mudou sem que um comando do WS já tenha avisado (`St::visto` evita o evento em dobro) |
 | `/mcp` | `StreamableHttpService` do `rmcp` (feature `transport-streamable-http-server`) sobre o mesmo `Spell` do stdio, sem sessão e com resposta JSON: `POST /mcp` de um `initialize` devolve o JSON-RPC direto |
 | `--show` | `load` (é o que `GET /show` lê) e o player parado em `t=0`; solta-se com o comando `resume` |
 
@@ -426,8 +428,9 @@ MCP, Rhai e laser.
 
 1. `Timeline::apply(&mut universes, t)` — tracks `dmx` e `artnet`.
 2. Cada `FrameHook` na ordem em que foi registrado (tracks `fx` na ordem do `.spell`, depois o Graph).
-3. Tracks de efeito colateral: `osc` e `media` não-Capture (envia quando o valor muda), `cue`
-   (`crossed(prev, t)` dispara `CueList::go`).
+3. Efeito colateral: a **gravação** (`rec::tick` — track armado lê o universo de entrada e grava
+   keyframe quando o valor muda), depois `osc` e `media` não-Capture (envia quando o valor muda) e
+   `cue` (`crossed(prev, t)` dispara `CueList::go`).
 4. `CueList::update(t)` escreve o snapshot corrente nos Universes.
 5. O programmer (`player::Prog`): o override manual do operador, HTP por canal, por cima da
    timeline **e** da cue viva — o operador sobrepõe o que a cue está segurando.
@@ -450,6 +453,40 @@ Igual ao `_tick` + `_side` do Python.
 | `fixture` | reservado | parseado e ignorado com aviso (a F2 do Python resolve; o Rust não na R1) |
 
 Track de tipo desconhecido continua sendo ignorado com aviso.
+
+## Entrada DMX (`engine::input`) e gravação (`engine::rec`)
+
+O `.spell` ganha `inputs`, irmão de `outputs`:
+
+```json
+"inputs": [{"type": "sacn", "universe": 1}, {"type": "artnet", "universe": 2}]
+```
+
+`Player::new` abre as entradas junto com as saídas: um `SacnIn` com todos os universos `sacn`
+declarados (multicast + o unicast em 127.0.0.1 que o `SacnOut` também manda) e, se houver
+`artnet`, um `ArtNetIn` na 6454. Tipo desconhecido vira aviso, não erro; sem `inputs` nenhum
+socket sobe. A entrada é um buffer PARALELO: não há merge HTP com a saída — o passthrough é da
+lista de "depois" do ROADMAP.
+
+| Comando | Faz | Devolve |
+|---|---|---|
+| `input_get(universe=1)` | último frame recebido naquele universo de entrada | `{universe, data:[512]}` |
+| `rec_arm(track, on=true)` | arma/desarma a gravação de um track `dmx`/`artnet` do show ABERTO | `{track, on, tracks}` |
+| `rec_state()` | tracks armados neste processo | `{recording, tracks}` |
+
+Com o transporte tocando, cada frame lê os canais do track no universo de entrada e, **só quando
+o valor muda**, escreve keyframe por `edit::key_put` — o mesmo funil do comando `key_set`, então
+`rev` sobe e todo cliente do barramento recebe `show {rev}`. A largura (quantos canais) vem do
+primeiro keyframe em lista do track; sem lista, um canal. Curva do keyframe gravado: `linear`.
+Parar o transporte desarma, na borda de entrada em Stop (a thread de transporte) e no `Player::close`. Armar com o transporte parado sobrevive ate o play — e' o caminho normal do operador.
+
+O arme mora no processo, não no `.spell`: `rec_arm` não é edição e não sobe `rev`.
+
+Vídeo (NDI/GStreamer) **não** entra aqui: R2 está bloqueada até os SDKs serem instalados.
+
+Testes: `engine/tests/rec.rs` (binário próprio, `OPEN` e `CURRENT` são globais do processo) grava
+uma fonte sACN de loopback no universo 7 e confere os valores no `show_get`; `protocols`
+tem o `loopback_out_in` do `ArtNetIn`.
 
 ## `engine::hook` (novo módulo)
 
@@ -572,7 +609,7 @@ em `base()` por `edit::register`. Todo comando age no `OPEN`; sem show aberto, a
 | `show_new` | zera: "novo show", sACN no universo 1, 60 s, `patch`/`cues`/`markers` vazios | o show inteiro |
 | `show_set(data)` | substitui pelo JSON dado (objeto ou texto JSON); `migrate`; chaves `_x` caem | o show inteiro |
 | `show_save(file="")` | grava (sem `file`, no caminho do último `load`/`show_get`/`show_save`) | o caminho |
-| `track_add(type="dmx", universe=1, address=1, label="")` | track vazio no fim | índice |
+| `track_add(type="dmx", universe=1, address=1, label="", clip="", script="")` | track vazio no fim; `clip` é o `.ild` do track `laser`, `script` o `.rhai` do track `fx` | índice |
 | `track_del(index)` | remove | o track |
 | `key_set(track, t, value=0, curve="linear")` | cria ou substitui o keyframe em `t` (`\|Δt\| < 1 µs`); `value` texto que é JSON vira JSON; lista ordenada | keys do track |
 | `key_del(track, t)` | apaga em `t` (tolerância 1 ms) | quantos saíram |
@@ -811,7 +848,7 @@ spellcore mcp install --target code [--path P]      # .mcp.json do diretório co
 
 | Superfície | Conteúdo |
 |---|---|
-| tools | uma por comando de `Registry::iter()`: `load`, `show_get`, `resume`, `pause`, `stop`, `locate`, `cue_go`, `transport_state`, `input`, os de edição de `engine::edit` (`show_new`, `show_set`, `show_save`, `track_add`, `track_del`, `key_set`, `key_del`, `cue_set`, `cue_del`, `patch_add`, `patch_del`, `patch_check`, `profiles`, `show_patch`, `graph_get`, `face_get`, `profile_get`, `level_set`, `level_clear`, `level_get`, `cue_capture`, `fixture_set`), os `module_*` de `engine::module` (`module_add`, `module_del`, `module_list`, `module_get`), `play_show`, `net`, `graph_check` e os `laser_*` de `cli/src/laser_cmd.rs` (`laser_dacs`, `laser_open`, `laser_play`, `laser_stop`, `laser_close`, `laser_param`, `laser_stats`, `laser_files`). `inputSchema` = o schema que o `schemars` gerou do struct de argumentos |
+| tools | uma por comando de `Registry::iter()`: `load`, `show_get`, `resume`, `pause`, `stop`, `locate`, `cue_go`, `transport_state`, `input`, `input_get`, `rec_arm`, `rec_state`, os de edição de `engine::edit` (`show_new`, `show_set`, `show_save`, `track_add`, `track_del`, `key_set`, `key_del`, `cue_set`, `cue_del`, `patch_add`, `patch_del`, `patch_check`, `profiles`, `show_patch`, `graph_get`, `face_get`, `profile_get`, `level_set`, `level_clear`, `level_get`, `cue_capture`, `fixture_set`), os `module_*` de `engine::module` (`module_add`, `module_del`, `module_list`, `module_get`), `play_show`, `net`, `graph_check` e os `laser_*` de `cli/src/laser_cmd.rs` (`laser_dacs`, `laser_open`, `laser_play`, `laser_stop`, `laser_close`, `laser_param`, `laser_stats`, `laser_files`). `inputSchema` = o schema que o `schemars` gerou do struct de argumentos |
 | resources | `spell://show` (o `.spell` aberto: fps, duração, saídas, patch, tracks, cues, transporte vivo), `spell://commands` (o registry inteiro em JSON), `spell://graph` (o `graph_get`) e `spell://face` (o `face_get`). Cada resource é uma chamada de comando do registry: o crate `mcp` não tem lógica de produto |
 | erro | erro de comando volta como `isError: true` com o texto (o cliente lê); só rota inexistente vira erro JSON-RPC |
 | `play_show` | bloqueia até o fim do show, então roda em thread e a tool volta na hora (o `BACKGROUND` do Python). Enquanto o MCP roda, a linha de status do `play` vai para o **stderr**: no stdio o stdout é o canal JSON-RPC |
