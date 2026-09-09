@@ -85,3 +85,10 @@ Consequências:
 - **Um verbo por conceito, e `lock` e `solo` ficam de fora do runtime.** `lock` é só edição (congela o valor no editor) e `solo` é o mute dos outros, calculado pelo PATCHBAY: nenhum dos dois precisa de código no engine.
 - **O que o voto decide:** se o estado é exclusivo por grupo (aqui) ou vários ativos ao mesmo tempo (Chataigne), e se `norm` mapeia o sinal 0..1 para a faixa (aqui) ou é só a faixa do slider na GUI.
 - Motivo: são as duas lacunas que `design/FUNCOES/orquestrador.md` aponta contra o Chataigne; sem elas, "no segundo ato este conjunto de rotas passa a valer" vira condição copiada em cada rota, e app separado não vira nó.
+
+## 09/09/2026 · Nó módulo → comando: convenção de nome e paths sem implementação — aguarda voto
+
+- **Convenção.** O nó `module` emite `Ev::Param{target:"<mod>/<path>"}` e `Ev::Cmd{name:"<mod>/<cmd>"}`; o sink da CLI roteia para `<mod>_param {feed:"<mod>", path, value}` e `<mod>_<cmd> {feed:"<mod>", ...}`. Ou seja: **`feed` = nome do módulo**. Com dois lasers abertos, os dois nós `module` teriam que se chamar `laser` e o roteamento colide — a saída é instância nomeada (`laser@palco`), e o voto decide se ela entra agora ou quando aparecer a segunda mesa.
+- **Paths declarados sem implementação.** `modules/laser.json` declara `dev/type`, `dev/host`, `dev/pps`, `ilda/fps`, `curve/r|g|b`, `safe/zone`, `safe/armed` e `test/pattern`; `laser_param` não aceita nenhum deles (`dev/*` e `ilda/*` são argumento de `laser_open`/`laser_play`, o resto espera LUT de cor e `optimize` paramétrico). O manifesto é a declaração do app, não do comando: o voto decide se ele só declara o que já roda, ou se declara o alvo e o comando cresce até ele.
+- **`shutter` está dos dois lados.** É `command` no `modules/laser.json` e `path` no `laser_param`. Uma das duas some.
+- Motivo: a convenção está no código (seis linhas no sink da CLI, com comentário `ponytail:`) e funciona para um laser; registrar aqui evita que ela vire contrato por omissão.

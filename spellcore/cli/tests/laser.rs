@@ -274,6 +274,23 @@ fn ilda_player_do_scan_ao_close() {
         json!({"feed": feed, "path": "shutter", "value": 0}),
     );
 
+    // ---- safe/*: o clamp e' o do modules/laser.json (min_size 0..32767, max_intensity 0..255)
+    m.cmd(
+        "laser_param",
+        json!({"feed": feed, "path": "safe/min_size", "value": 99999}),
+    );
+    m.cmd(
+        "laser_param",
+        json!({"feed": feed, "path": "safe/max_intensity", "value": 900}),
+    );
+    let st = m.cmd("laser_stats", json!({"feed": feed}));
+    assert_eq!(st["safe/min_size"], json!(32767), "{}", st);
+    assert_eq!(st["safe/max_intensity"], json!(255), "{}", st);
+    m.cmd(
+        "laser_param",
+        json!({"feed": feed, "path": "safe/min_size", "value": 2000}),
+    );
+
     // ---- path invalido nomeia os validos e nao mexe em nada
     let e = m.erro(
         "laser_param",

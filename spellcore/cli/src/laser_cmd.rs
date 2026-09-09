@@ -14,9 +14,9 @@
 //! |---|---|---|
 //! | `geo/x`, `geo/y` | `Transform.x`, `Transform.y` | unidades ILDA, +-32767 |
 //! | `geo/scale` | `Transform.scale` | 0..4 |
-//! | `geo/rot` | `Transform.rot` | graus |
+//! | `geo/rot` | `Transform.rot` | graus, +-180 |
 //! | `limit/r`, `limit/g`, `limit/b` | `Transform.color.0/.1/.2` | 0..1 |
-//! | `safe/min_size` | `Safety.min_size` | unidades ILDA |
+//! | `safe/min_size` | `Safety.min_size` | unidades ILDA, 0..32767 |
 //! | `safe/max_intensity` | `Safety.max_intensity` | 0..255 |
 //! | `shutter` | zera `Safety.max_intensity` e devolve o valor guardado ao abrir | 0 ou 1 |
 //!
@@ -305,11 +305,11 @@ fn aplicar(l: &mut Live, path: &str, v: f64) -> Result<(), String> {
         "geo/x" => l.tf.x = v.clamp(-32767.0, 32767.0),
         "geo/y" => l.tf.y = v.clamp(-32767.0, 32767.0),
         "geo/scale" => l.tf.scale = v.clamp(0.0, 4.0),
-        "geo/rot" => l.tf.rot = v,
+        "geo/rot" => l.tf.rot = v.clamp(-180.0, 180.0),
         "limit/r" => l.tf.color.0 = v.clamp(0.0, 1.0),
         "limit/g" => l.tf.color.1 = v.clamp(0.0, 1.0),
         "limit/b" => l.tf.color.2 = v.clamp(0.0, 1.0),
-        "safe/min_size" => l.safety.min_size = v.clamp(0.0, 65535.0) as i32,
+        "safe/min_size" => l.safety.min_size = v.clamp(0.0, 32767.0) as i32,
         // com o obturador fechado o valor pedido fica guardado e vale quando ele abrir
         "safe/max_intensity" => {
             let m = v.clamp(0.0, 255.0) as u8;
