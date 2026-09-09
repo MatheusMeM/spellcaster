@@ -595,6 +595,44 @@ declarado.
 manifesto do Chataigne (`hasInput`, `dependency`, `label`, `unit`, `args`) são lidos e
 descartados. Teste: `engine/tests/module.rs`, binário próprio porque a tabela é uma por processo.
 
+### `laser_*` — ILDA player (registrado pela CLI)
+
+`spellcore/cli/src/laser_cmd.rs`. Mora na CLI, e não no engine, pela mesma razão de `play_show`
+e `net`: o engine não conhece o crate `laser`. Um feed = um DAC aberto; a tabela `FEEDS` é para
+o laser o que `player::current()` é para o transporte (um processo, N feeds).
+
+| Comando | Faz | Devolve |
+|---|---|---|
+| `laser_dacs(timeout=2)` | Ether Dream por beacon (`netscan`) e IDN por scan | lista de `{type, id, host}` |
+| `laser_open(dac, host="", kpps=30, safety?)` | abre o DAC e sobe o `Feed`; `safety` = `{min_size, max_intensity, zone}`, nunca desligável | `{feed, dac, pps}` |
+| `laser_play(feed, file, fps=30, loop=false)` | thread que lê o `.ild` e faz `feed.push` no ritmo (o `.ild` não carrega taxa); sem `loop`, o fim do arquivo desarma o transporte e `laser_stats` volta a `playing:false` | `{feed, file, frames, fps, loop}` |
+| `laser_stop(feed)` | para o playback; o DAC continua aberto | `{feed, playing:false}` |
+| `laser_close(feed)` | para e fecha (o `Drop` do `Feed` apaga o DAC) | `{feed, dac, closed}` |
+| `laser_param(feed, path, value)` | um parâmetro do feed (tabela abaixo) | `{feed, path, value, shutter}` |
+| `laser_stats(feed)` | `playing`, arquivo, `stat/sent`, `stat/dropped`, `stat/errors`, jitter, cpu e a safety corrente | objeto |
+| `laser_files(dir="shows")` | os `.ild` do diretório | `{dir, files:[{name, path, bytes}]}` |
+
+`path` de `laser_param` (os mesmos paths de `modules/laser.json`, a declaração do módulo laser);
+as chaves `stat/*` de `laser_stats` são os `values` do mesmo arquivo, só as que `FeedStats` conta:
+
+| path | campo | faixa |
+|---|---|---|
+| `geo/x`, `geo/y` | `Transform.x`, `Transform.y` | unidades ILDA, ±32767 |
+| `geo/scale` | `Transform.scale` | 0..4 |
+| `geo/rot` | `Transform.rot` | graus, +-180 |
+| `limit/r`, `limit/g`, `limit/b` | `Transform.color.0/.1/.2` | 0..1 |
+| `safe/min_size` | `Safety.min_size` | unidades ILDA, 0..32767 |
+| `safe/max_intensity` | `Safety.max_intensity` | 0..255 |
+| `shutter` | zera `max_intensity` e devolve o valor guardado ao abrir | 0 ou 1 |
+
+`curve/r|g|b`, `Blanking/*` e `Cor/Time Shift` da tabela do `ilda-player` ficam de fora: entram
+quando o `Feed` tiver LUT de cor e o `optimize` for parametrizável em runtime.
+
+Página: `spellgui/web/laser.html` + `laser.js` (DAC, kpps, arquivo, play/stop, sliders de
+`geo/*` e `limit/*`, botão shutter, stats por polling a 4 Hz). Teste: `spellcore/cli/tests/laser.rs`,
+binário próprio, sobe o `Emulator` Ether Dream do crate `laser` e conversa com o registry pelo
+servidor MCP em outro processo (a tabela `FEEDS` é uma por processo).
+
 ## `script` (crate novo)
 
 ```rust
@@ -703,7 +741,7 @@ spellcore mcp install --target code [--path P]      # .mcp.json do diretório co
 
 | Superfície | Conteúdo |
 |---|---|
-| tools | uma por comando de `Registry::iter()`: `load`, `show_get`, `pause`, `stop`, `locate`, `cue_go`, `transport_state`, os de edição de `engine::edit` (`show_new`, `show_set`, `show_save`, `track_add`, `track_del`, `key_set`, `key_del`, `cue_set`, `cue_del`, `patch_add`, `patch_del`, `patch_check`, `profiles`, `show_patch`, `graph_get`, `face_get`), `play_show`, `net`, `graph_check`. `inputSchema` = o schema que o `schemars` gerou do struct de argumentos |
+| tools | uma por comando de `Registry::iter()`: `load`, `show_get`, `resume`, `pause`, `stop`, `locate`, `cue_go`, `transport_state`, `input`, os de edição de `engine::edit` (`show_new`, `show_set`, `show_save`, `track_add`, `track_del`, `key_set`, `key_del`, `cue_set`, `cue_del`, `patch_add`, `patch_del`, `patch_check`, `profiles`, `show_patch`, `graph_get`, `face_get`), os `module_*` de `engine::module` (`module_add`, `module_del`, `module_list`, `module_get`), `play_show`, `net`, `graph_check` e os `laser_*` de `cli/src/laser_cmd.rs` (`laser_dacs`, `laser_open`, `laser_play`, `laser_stop`, `laser_close`, `laser_param`, `laser_stats`, `laser_files`). `inputSchema` = o schema que o `schemars` gerou do struct de argumentos |
 | resources | `spell://show` (o `.spell` aberto: fps, duração, saídas, patch, tracks, cues, transporte vivo), `spell://commands` (o registry inteiro em JSON), `spell://graph` (o `graph_get`) e `spell://face` (o `face_get`). Cada resource é uma chamada de comando do registry: o crate `mcp` não tem lógica de produto |
 | erro | erro de comando volta como `isError: true` com o texto (o cliente lê); só rota inexistente vira erro JSON-RPC |
 | `play_show` | bloqueia até o fim do show, então roda em thread e a tool volta na hora (o `BACKGROUND` do Python). Enquanto o MCP roda, a linha de status do `play` vai para o **stderr**: no stdio o stdout é o canal JSON-RPC |

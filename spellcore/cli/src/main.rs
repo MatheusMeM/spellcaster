@@ -14,6 +14,8 @@
 //! `PlayArgs` e `NetArgs` servem as duas pontas: `clap::Args` para o argv e `JsonSchema` +
 //! `Deserialize` para o registry (e, por ele, para as tools do MCP).
 
+mod laser_cmd;
+
 use clap::{Args, Parser, Subcommand};
 use engine::registry::{NoArgs, Registry};
 use engine::schemars::JsonSchema;
@@ -88,12 +90,27 @@ impl CliSink {
     }
 }
 
+/// `args` do `Ev::Cmd` mais `feed`, para o roteador do no `module`.
+fn com_feed(mut args: Value, feed: &str) -> Value {
+    if let Some(o) = args.as_object_mut() {
+        o.insert("feed".into(), Value::String(feed.into()));
+    }
+    args
+}
+
 impl EventSink for CliSink {
     fn emit(&mut self, e: &Ev) {
         match e {
+            // O no `module` do graph emite `<mod>/<cmd>`; o comando registrado e' `<mod>_<cmd>`,
+            // com `feed` = nome do modulo.
+            // ponytail: convencao feed = nome do modulo ; instancia nomeada quando houver dois lasers.
             Ev::Cmd { name, args } => {
-                if let Err(err) = self.reg.call(name, args.clone()) {
-                    eprintln!("cmd {}: {}", name, err);
+                let (nome, args) = match name.split_once('/') {
+                    Some((m, c)) => (format!("{}_{}", m, c), com_feed(args.clone(), m)),
+                    None => (name.clone(), args.clone()),
+                };
+                if let Err(err) = self.reg.call(&nome, args) {
+                    eprintln!("cmd {}: {}", nome, err);
                 }
             }
             Ev::Osc { address, args } => match &self.osc {
@@ -110,7 +127,15 @@ impl EventSink for CliSink {
                 serve::widget(id, prop, *value);
                 eprintln!("widget {}.{}={}", id, prop, value);
             }
-            Ev::Param { target, value } => eprintln!("param {}={}", target, value),
+            Ev::Param { target, value } => match target.split_once('/') {
+                Some((m, path)) => {
+                    let a = json!({"feed": m, "path": path, "value": value});
+                    if let Err(err) = self.reg.call(&format!("{}_param", m), a) {
+                        eprintln!("param {}: {}", target, err);
+                    }
+                }
+                None => eprintln!("param {}={}", target, value),
+            },
             Ev::Notify { text } => eprintln!("notify {}", text),
         }
     }
@@ -268,6 +293,7 @@ fn registry() -> Registry {
         "Compila o graph do show aberto sem rodar. Devolve {nodes, error}.",
         graph_check,
     );
+    laser_cmd::register(&mut r);
     r
 }
 
