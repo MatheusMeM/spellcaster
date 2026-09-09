@@ -66,6 +66,9 @@ fn texto(event: &str, data: Value) -> String {
 
 /// O sink de evento do graph vive na CLI e nao tem `St`: `out.widget` chega ao WS por aqui.
 /// Sem `serve` no ar, nao faz nada.
+// ponytail: um `serve()` por processo ; um segundo `serve()` no mesmo processo fica com o sender
+// do primeiro (OnceLock nao troca) e seus widgets saem no barramento errado. Passar o `St` ate' o
+// sink da CLI quando houver dois barramentos vivos.
 static TX: OnceLock<broadcast::Sender<Out>> = OnceLock::new();
 
 /// `{"event":"widget","data":{"id","prop","value"}}` para todo cliente do barramento.

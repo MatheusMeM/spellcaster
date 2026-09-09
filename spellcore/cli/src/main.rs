@@ -360,9 +360,9 @@ mod tests {
         Cli::command().debug_assert();
     }
 
-    /// O contrato do argv: os quatro subcomandos e as flags que o operador digita hoje.
+    /// O contrato do argv: os cinco subcomandos e as flags que o operador digita hoje.
     #[test]
-    fn argv_dos_quatro_subcomandos() {
+    fn argv_dos_cinco_subcomandos() {
         let c = Cli::try_parse_from(["spellcore", "play", "shows/x.spell", "--loop", "--osc-port", "9000"])
             .expect("play aceita posicional, --loop e --osc-port");
         match c.cmd {

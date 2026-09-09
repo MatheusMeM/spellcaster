@@ -116,7 +116,7 @@ enum Ctl {
     Go(Option<usize>),
     /// locate/stop: zera cues e ganchos e reancora o `prev` do disparo por borda.
     Reset(f64),
-    /// Evento de entrada para os ganchos ("widget:go", "key:Space", "module:laser/geo/scale").
+    /// Evento de entrada para os ganchos ("widget:go", "key:Space", "module:laser/stat/fps").
     Input(String, f64),
 }
 

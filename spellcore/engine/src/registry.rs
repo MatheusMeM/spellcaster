@@ -108,7 +108,7 @@ pub struct ShowGetArgs {
 
 #[derive(Deserialize, JsonSchema)]
 pub struct InputArgs {
-    /// Chave do evento: "widget:go", "key:Space", "osc:/spell/go", "module:laser/geo/scale".
+    /// Chave do evento: "widget:go", "key:Space", "osc:/spell/go", "module:laser/stat/fps".
     pub key: String,
     /// Valor do evento; trigger manda 1.
     #[serde(default)]

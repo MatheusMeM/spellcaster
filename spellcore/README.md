@@ -78,7 +78,7 @@ C:\Python313\python.exe tests/conformance/capture_sacn.py --secs 3
 |---|---|---|
 | `serde` + `serde_json` | engine, protocols, cli | o `.spell` e o `net --json` são JSON; nada na stdlib lê JSON |
 | `schemars` | engine (registry) | schema JSON de cada comando, consumido pela CLI e pelas tools do MCP; reexportado em `engine::schemars` para que `cli` não pine a própria versão |
-| `clap` (feature `derive`) | cli | parser de argumentos; quatro subcomandos em structs fixas |
+| `clap` (feature `derive`) | cli | parser de argumentos; cinco subcomandos em structs fixas |
 | `rmcp` + `tokio` | mcp | SDK oficial do Model Context Protocol; é async, e o runtime `current_thread` mora só dentro de `mcp::serve_stdio` |
 | `socket2` | protocols | `std::net::UdpSocket` não expõe `IP_MULTICAST_IF` nem `SO_REUSEADDR`, exigidos por sACN |
 | `criterion` | bench, laser, pixelmap (dev) | medida estatística de jitter/latência exigida pelo PRD |
@@ -315,7 +315,7 @@ WS    /ws  request  {"id":7,"cmd":"locate","args":{"t":12.5}}
            resposta {"id":7,"result":...} | {"id":7,"error":"texto"}
            evento   {"event":"transport","data":<TransportState>} | {"event":"show","data":{"rev":n}} | {"event":"log","data":{"text":...}} | {"event":"widget","data":{"id","prop","value"}}
            binário  topic:u8 | universe:u16 LE | 512 bytes   (topic 1 = dmx de saída)
-Comando `input {key, value}` no registry alimenta FrameHook::input do player vivo (chaves "widget:go", "key:Space", "module:laser/geo/scale").
+Comando `input {key, value}` no registry alimenta FrameHook::input do player vivo (chaves "widget:go", "key:Space", "module:laser/stat/fps").
 ```
 
 | Detalhe | Regra |
@@ -362,7 +362,7 @@ spellcore mcp install --target desktop|code [--yes]   registra o servidor no Cla
 spellcore serve [--port N] [--dir D] [--show S]       barramento HTTP + WebSocket + MCP
 ```
 
-Os quatro subcomandos são structs `clap::Args` fixas. `PlayArgs` e `NetArgs` servem as duas
+Os cinco subcomandos são structs `clap::Args` fixas. `PlayArgs` e `NetArgs` servem as duas
 pontas: `clap` para o argv e `JsonSchema` + `Deserialize` para o registry. O transporte
 (`load`, `show_get`, `pause`, `stop`, `locate`, `cue_go`, `transport_state`) continua no
 registry mas **não** é subcomando: ele age no player vivo NESTE processo, e um segundo
