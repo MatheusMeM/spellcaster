@@ -16,6 +16,8 @@ O repo tem duas camadas:
 
 Arquivo de show: `.spell` (JSON, versão 1), o mesmo para os dois lados.
 
+Instalação (pendrive Windows, Lite no Pi, código-fonte): `INSTALL.md`. Licença MIT (`LICENSE`).
+
 ## Estado atual
 
 | Fase | O que é | Estado |
@@ -26,7 +28,10 @@ Arquivo de show: `.spell` (JSON, versão 1), o mesmo para os dois lados.
 | R4 (Rust) | `laser`: optimize/safety, `.ild`, Ether Dream/Helios/IDN, 4 feeds | concluída, 0,83 % de cpu |
 | R2 mídia, R3 pixelmap, R5 GUI Tauri, R6 previz Godot, R7 MCP rmcp, R8 empacotamento, R9 editores | ver `PRD.md` §6 | pendentes |
 
-Design (tokens, princípios, atalhos herdados de Premiere/Resolve, canvas de moodboard) em `design/`.
+Design em `design/` (tokens, princípios, atalhos de Premiere/Resolve) e nas branches `design/*`:
+seis rodadas de protótipo do departamento de design, em que o programa é o modelo 3D do próprio
+aparelho (rodadas 4–6: o projetor de laser em three.js, traseira como menu, bindings de tecla e MIDI,
+Pino como menu, e o laser como módulo `laser/1` do orquestrador). Estado por rodada em `ROADMAP.md` §8.
 
 ## Como rodar no Windows
 
@@ -37,8 +42,8 @@ C:\Python313\python.exe -m spellcaster.cli --version
 C:\Python313\python.exe -m spellcaster.cli commands
 C:\Python313\python.exe -m spellcaster.cli play shows\medgrupo.py --fps 30
 C:\Python313\python.exe -m spellcaster.cli play shows\medgrupo.py --loop --universes 1,2
-C:Python313python.exe -m spellcaster.cli net --timeout 2
-C:Python313python.exe -m spellcaster.cli net --as_json
+C:\Python313\python.exe -m spellcaster.cli net --timeout 2
+C:\Python313\python.exe -m spellcaster.cli net --as_json
 C:\Python313\python.exe -m spellcaster.protocols.ilda.generators saida.ild
 C:\Python313\python.exe -m spellcaster.protocols.ilda.generators saida.ild 20000 10000
 ```
@@ -56,7 +61,7 @@ Com o pacote instalado (`pip install -e .`), `spell` substitui `C:\Python313\pyt
 C:\Python313\python.exe -m unittest discover -s tests -v
 ```
 
-43 testes. Loopback UDP em 127.0.0.1 faz o papel de mock. Os testes não imprimem caracteres fora de ASCII.
+101 testes Python e 105 Rust (`cargo test --workspace`). Loopback UDP em 127.0.0.1 faz o papel de mock. Os testes não imprimem caracteres fora de ASCII.
 
 ## Contratos fixos
 
@@ -125,6 +130,8 @@ ferramenta nenhuma; nunca commitar `target/`, `build/`, `dist/`; o bench é o ga
 
 - `PRD.md`: produto v1 (core Rust, previz Godot, Theme/Face/Graph), tabela de performance, fases R0–R9.
 - `ARCHITECTURE.md`: árvore, fluxo de dados, contratos, conformidade e números medidos.
-- `ROADMAP.md`: decisões de stack, fases F0–F7 do protótipo e estado das fases R0–R9.
-- `design/`: `DECISOES.md`, `PRINCIPIOS.md`, `SHORTCUTS.md`, `tokens/`, `canvas/`.
+- `ROADMAP.md`: decisões de stack, fases F0–F7 do protótipo, estado das fases R0–R9, design e o que falta.
+- `INSTALL.md`: pendrive Windows, Lite no Raspberry Pi, build a partir do código.
+- `design/`: `DECISOES.md`, `PRINCIPIOS.md`, `SHORTCUTS.md`, `TEMAS.md`, `tokens/`, `canvas/`; protótipos nas branches `design/*`.
 - `CLAUDE.md`: regras do repositório.
+- `LICENSE`: MIT.

@@ -143,15 +143,53 @@ F0 começa extraindo `protocols/sacn.py` e `core/clock.py` de `show_medgrupo.py`
 O plano acima (F0–F7) foi o do protótipo Python e está concluído até F6. O produto segue o
 `PRD.md`: core em Rust, previz em Godot, GUI Tauri com Theme/Face/Graph.
 
-| Fase | Aceite (PRD §6) | Estado |
-|---|---|---|
-| R0 core e protocolos | fixtures byte a byte, `bench/jitter` no alvo, CLI `net` | concluída |
-| R1 timeline, cues, .spell, fx, Graph, OSC | graph de 500 nós < 0,1 ms/frame; player headless | concluída (8,4 µs) |
-| R2 mídia (GStreamer, NDI, RTSP, Spout) | 1080p60 no alvo de CPU | pendente (GStreamer não instalado) |
-| R3 pixel mapping wgpu + rayon | 100 000 px a 60 Hz < 2 ms | pendente |
-| R4 laser multi-feed | Ether Dream, Helios, IDN; safety no engine; 4 feeds | concluída (0,83 % cpu) |
-| R5 GUI Tauri | show de 3 min do zero; Face em modo performance | pendente; base em `design/` |
-| R6 previz Godot | 60 fps, 64 fixtures, 2 LED walls | pendente (Godot não instalado) |
-| R7 MCP com rmcp | sessão de IA monta e toca um show sem GUI | pendente (o Python já tem MCP) |
-| R8 empacotamento | onedir, Linux, Pi estático; CI com bench como gate | parcial: CI e artefatos prontos, Pi estático pendente |
-| R9 editores de Face/Graph + painel Agent | operador monta uma Face em 10 min | pendente |
+| Fase | Aceite (PRD §6) | Estado | Bloqueio |
+|---|---|---|---|
+| R0 core e protocolos | fixtures byte a byte, `bench/jitter` no alvo, CLI `net` | concluída | — |
+| R1 timeline, cues, .spell, fx, Graph, OSC | graph de 500 nós < 0,1 ms/frame; player headless | concluída (8,4 µs) | — |
+| R2 mídia (GStreamer, NDI, RTSP, Spout) | 1080p60 no alvo de CPU | pendente | SDKs não instalados (GStreamer, NDI) |
+| R3 pixel mapping wgpu + rayon | 100 000 px a 60 Hz < 2 ms | pendente | nenhum: Rust puro |
+| R4 laser multi-feed | Ether Dream, Helios, IDN; safety no engine; 4 feeds | concluída (0,83 % cpu) | — |
+| R5 GUI Tauri | show de 3 min do zero; Face em modo performance | pendente | voto das rodadas 5 e 6 do design |
+| R6 previz Godot | 60 fps, 64 fixtures, 2 LED walls | pendente | Godot não instalado |
+| R7 MCP com rmcp | sessão de IA monta e toca um show sem GUI | pendente | nenhum: registry pronto |
+| R8 empacotamento | onedir, Linux, Pi estático; CI com bench como gate | parcial | Pi estático (musl) pendente; só CI |
+| R9 editores de Face/Graph + painel Agent | operador monta uma Face em 10 min | pendente | depende de R5 |
+
+## 8. Design — rodadas e branches (09/09/2026)
+
+O departamento de design trabalha em branches próprias e publica cada rodada como protótipo
+HTML (three.js) num artifact; o voto do dono decide o que entra. Regra: função antes de UI, e
+o programa é o modelo 3D fotorrealista do aparelho que ele controla.
+
+| Rodada | O quê | Branch | Estado |
+|---|---|---|---|
+| 1 | moodboard estático | `design/0.1.2` | reprovada |
+| 2 | vidro em GLSL, cubo raymarched, splash, skins `.wmz`, tema GELO | `design/0.1.2` | votada |
+| 3 | ILDA player em tema LASER, Aprendiz como menu, `TEMAS.md` mapa função→tema | `design/0.1.2` | votada; virada para o aparelho |
+| 4 | o programa é o projetor 3D (PBR), traseira = menu, tampa = preferências, Pino no lugar do Aprendiz | `design/0.1.2` | votada |
+| 5 | traseira real, mesa óptica e feixe em GLSL, splash na parede, câmera SolidWorks, bindings tecla + MIDI, Pino 3D, design system do laser (`design/laser/SISTEMA.md`) | `design/0.1.2` | publicada, aguardando voto |
+| 6 | o laser como módulo `laser/1` do orquestrador: endereços, `module.json`, `graph.json`, painel ORQUESTRADOR, teste em `tests/test_laser_graph.py` | `design/0.1.3` | publicada, aguardando voto |
+| FUNCOES | funções por referência (Blender, TouchDesigner, Resolume, MadMapper, Capture, Chataigne): `ilda-player`, `ndi-ilda`, `orquestrador`, `cenas-cues-dmx`, `cenario-interativo`, `aprendiz-menu` | `design/funcoes-referencia` | em uso pelas rodadas |
+
+Pendências de design: merge de `design/funcoes-referencia` e `design/0.1.3` numa base única;
+mover `design/laser/INTEGRACAO.md` para `design/FUNCOES/integracao-laser.md`; rodada 7 = FÓSFORO
+(conversor NDI/Spout → ILDA na porta NET) e PATCHBAY (UI do orquestrador), após o voto.
+
+## 9. O que falta, e o que roda em paralelo agora
+
+Sem bloqueio externo, cada linha é um agente independente (código novo em crate próprio ou em
+CI, sem tocar no que já está conforme):
+
+| Frente | Entrega | Aceite | Depende de |
+|---|---|---|---|
+| R3 pixel mapping | crate `pixelmap` com rayon (wgpu depois), bench Criterion | 100 000 px a 60 Hz < 2 ms | nada |
+| R7 MCP | crate `mcp` com rmcp (stdio + HTTP), tools do registry, `spellcore mcp install` | sessão de IA escaneia, patcheia, cria timeline e dá play | nada |
+| R8 Pi estático | job de CI `aarch64-unknown-linux-musl`, artefato `spellcore-linux-aarch64-static` | binário roda num Pi limpo sem glibc da versão | nada |
+| R5 base | `canvaskit.js` (pan, zoom, seleção, hit-test por bisect, dirty-flag, DPR) + timeline canvas portada do Python | testes headless no Chrome; timeline abre `medgrupo.spell` | nada (design só define o cromo) |
+| Design | merge das branches de design; rodada 7 | voto do dono | voto das rodadas 5 e 6 |
+
+Bloqueadas até instalar SDK (decisão do dono, não de agente): R2 (GStreamer + NDI SDK),
+R6 (Godot 4). R9 espera R5.
+
+Já feito: F0–F6, R0, R1, R4, CI com release por tag, docs (README, INSTALL, LICENSE, ARCHITECTURE, PRD).

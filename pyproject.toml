@@ -5,7 +5,8 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "spellcaster"
 version = "0.0.1"
-description = "Show-control portátil da Feitiçaria Industrial: sACN / Art-Net / OSC / ILDA"
+description = "Media server de luz e laser portátil: timeline, cues, sACN, Art-Net, OSC e ILDA; GUI web, MCP embutido, Lite para Raspberry Pi"
+license = "MIT"
 requires-python = ">=3.11"
 dependencies = []                    # runtime = stdlib do Python 3.13; pyinstaller e so de build (packaging/build_win.ps1)
 

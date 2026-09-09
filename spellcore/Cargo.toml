@@ -6,6 +6,7 @@ members = ["engine", "protocols", "laser", "script", "cli", "bench"]
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.75"
+license = "MIT"
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
