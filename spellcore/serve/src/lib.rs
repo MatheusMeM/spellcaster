@@ -52,10 +52,13 @@ impl St {
         let _ = self.tx.send(Out::Text(texto(event, data)));
     }
 
-    /// `{"event":"show","data":{"rev":n}}`, uma vez por revisao.
+    /// `{"event":"show","data":{"rev":n}}`, uma vez por revisao. O `swap` e' o que garante a
+    /// unicidade: sem ele a sondagem e a resposta do comando anunciam a MESMA revisao quando o
+    /// `revisao` acorda entre a edicao e a resposta, e o cliente recarrega duas vezes.
     fn show_ev(&self, rev: u64) {
-        self.visto.store(rev, std::sync::atomic::Ordering::Relaxed);
-        self.evento("show", json!({ "rev": rev }));
+        if self.visto.swap(rev, std::sync::atomic::Ordering::Relaxed) != rev {
+            self.evento("show", json!({ "rev": rev }));
+        }
     }
 }
 
@@ -421,6 +424,21 @@ mod tests {
             dir: PathBuf::from("."),
             visto: std::sync::atomic::AtomicU64::new(engine::edit::rev()),
         })
+    }
+
+    /// A mesma revisao anunciada duas vezes (sondagem + resposta) vira um evento so'.
+    #[test]
+    fn show_ev_nao_repete_a_mesma_rev() {
+        let st = st();
+        let mut rx = st.tx.subscribe();
+        let r = engine::edit::rev() + 1;
+        st.show_ev(r);
+        st.show_ev(r);
+        assert!(rx.try_recv().is_ok(), "primeiro anuncio sai");
+        assert!(
+            rx.try_recv().is_err(),
+            "segundo anuncio da mesma rev e' engolido"
+        );
     }
 
     /// A forma da resposta e o contador unico do engine: leitura nao mexe nele, edicao mexe.

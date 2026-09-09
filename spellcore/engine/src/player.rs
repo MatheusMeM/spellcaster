@@ -407,8 +407,12 @@ impl Rt {
             h.frame(t, uni);
         }
         // 3. efeito colateral: gravacao (le a ENTRADA e escreve keyframe no show aberto), OSC,
-        // media nao-Capture e cue
-        crate::rec::tick(t, inputs);
+        // media nao-Capture e cue. So' TOCANDO se grava: em pausa o `Clock::run` continua
+        // chamando o frame com o `t` congelado, e gravar ali reescreveria o mesmo keyframe a
+        // cada mudanca da mesa (o `rec_arm` promete "com o transporte tocando").
+        if s.clock.state() == State::Play {
+            crate::rec::tick(t, inputs);
+        }
         if let Some(o) = osc_out.as_ref() {
             for &i in osc.iter() {
                 send_osc(&mut tracks[i], t, o, false);

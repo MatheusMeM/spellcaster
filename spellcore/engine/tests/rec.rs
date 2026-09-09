@@ -93,6 +93,18 @@ fn track_armado_grava_o_universo_de_entrada() {
     }
     let chegou = espera(2.0, || gravados(&r, 0).len() >= 3);
 
+    // em pausa o frame continua rodando com t congelado: NAO grava
+    h.pause();
+    std::thread::sleep(Duration::from_millis(100));
+    let antes = gravados(&r, 0).len();
+    let mut frame = [0u8; 512];
+    frame[0] = 40;
+    for _ in 0..4 {
+        tx.send(7, &frame);
+        std::thread::sleep(Duration::from_millis(40));
+    }
+    let em_pausa = gravados(&r, 0).len() - antes;
+
     // parar o transporte desarma
     h.stop();
     let desarmou = espera(1.0, || {
@@ -111,5 +123,6 @@ fn track_armado_grava_o_universo_de_entrada() {
     // A entrada nasce em zero: o primeiro frame gravado pode ser o 0 antes do primeiro pacote.
     let vs: Vec<f64> = keys.into_iter().filter(|v| *v > 0.0).collect();
     assert_eq!(vs, vec![10.0, 20.0, 30.0], "valores gravados em ordem");
+    assert_eq!(em_pausa, 0, "gravou em pausa");
     assert!(desarmou, "stop nao desarmou a gravacao");
 }
