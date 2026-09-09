@@ -514,16 +514,17 @@ o laser o que `player::current()` é para o transporte (um processo, N feeds).
 
 | Comando | Faz | Devolve |
 |---|---|---|
-| `laser_dacs(timeout=2)` | Ether Dream por beacon (`netscan`), IDN por scan, Helios por USB | lista de `{type, id, host}` |
+| `laser_dacs(timeout=2)` | Ether Dream por beacon (`netscan`) e IDN por scan | lista de `{type, id, host}` |
 | `laser_open(dac, host="", kpps=30, safety?)` | abre o DAC e sobe o `Feed`; `safety` = `{min_size, max_intensity, zone}`, nunca desligável | `{feed, dac, pps}` |
-| `laser_play(feed, file, fps=30, loop=false)` | thread que lê o `.ild` e faz `feed.push` no ritmo (o `.ild` não carrega taxa) | `{feed, file, frames, fps, loop}` |
+| `laser_play(feed, file, fps=30, loop=false)` | thread que lê o `.ild` e faz `feed.push` no ritmo (o `.ild` não carrega taxa); sem `loop`, o fim do arquivo desarma o transporte e `laser_stats` volta a `playing:false` | `{feed, file, frames, fps, loop}` |
 | `laser_stop(feed)` | para o playback; o DAC continua aberto | `{feed, playing:false}` |
 | `laser_close(feed)` | para e fecha (o `Drop` do `Feed` apaga o DAC) | `{feed, dac, closed}` |
 | `laser_param(feed, path, value)` | um parâmetro do feed (tabela abaixo) | `{feed, path, value, shutter}` |
-| `laser_stats(feed)` | frames, pontos, descartes, erros, jitter, cpu e os parâmetros correntes | objeto |
+| `laser_stats(feed)` | `playing`, arquivo, `stat/sent`, `stat/dropped`, `stat/errors`, jitter, cpu e a safety corrente | objeto |
 | `laser_files(dir="shows")` | os `.ild` do diretório | `{dir, files:[{name, path, bytes}]}` |
 
-`path` de `laser_param` (nomes agrupados por `/` de `design/FUNCOES/ilda-player.md` §1):
+`path` de `laser_param` (os mesmos paths de `modules/laser.json`, a declaração do módulo laser);
+as chaves `stat/*` de `laser_stats` são os `values` do mesmo arquivo, só as que `FeedStats` conta:
 
 | path | campo | faixa |
 |---|---|---|
@@ -531,8 +532,8 @@ o laser o que `player::current()` é para o transporte (um processo, N feeds).
 | `geo/scale` | `Transform.scale` | 0..4 |
 | `geo/rot` | `Transform.rot` | graus |
 | `limit/r`, `limit/g`, `limit/b` | `Transform.color.0/.1/.2` | 0..1 |
-| `safety/min_size` | `Safety.min_size` | unidades ILDA |
-| `safety/max` | `Safety.max_intensity` | 0..255 |
+| `safe/min_size` | `Safety.min_size` | unidades ILDA |
+| `safe/max_intensity` | `Safety.max_intensity` | 0..255 |
 | `shutter` | zera `max_intensity` e devolve o valor guardado ao abrir | 0 ou 1 |
 
 `curve/r|g|b`, `Blanking/*` e `Cor/Time Shift` da tabela do `ilda-player` ficam de fora: entram

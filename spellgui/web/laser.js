@@ -120,13 +120,6 @@ for (const el of document.querySelectorAll("input[type=range]")) el.oninput = ()
 
 // ------------------------------------------------------- stats ao vivo (4 Hz)
 
-const CAMPOS = [
-  ["dac", "dac"], ["arquivo", "file"], ["tocando", "playing"], ["frames", "frames"],
-  ["pontos", "points"], ["enviados", "sent"], ["descartados", "dropped"], ["erros", "errors"],
-  ["jitter p50 ms", "jitter_p50_ms"], ["jitter p99 ms", "jitter_p99_ms"], ["cpu s", "cpu"],
-  ["shutter", "shutter"], ["min_size", "min_size"], ["max_intensity", "max_intensity"],
-];
-
 setInterval(() => {
   if (feed === null) return;
   Bus.call("laser_stats", { feed }).then(s => {
@@ -134,8 +127,8 @@ setInterval(() => {
     obturado = !!s.shutter;
     botoes();
     const n = v => (typeof v === "number" && !Number.isInteger(v) ? v.toFixed(3) : v);
-    q("st").innerHTML = "<tbody>" + CAMPOS.map(
-      ([r, k]) => `<tr><td>${r}</td><td>${s[k] === null ? "-" : n(s[k])}</td></tr>`
+    q("st").innerHTML = "<tbody>" + Object.entries(s).map(
+      ([k, v]) => `<tr><td>${k}</td><td>${v === null ? "-" : n(v)}</td></tr>`
     ).join("") + "</tbody>";
   }).catch(() => {});
 }, 250);

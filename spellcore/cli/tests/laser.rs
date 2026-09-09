@@ -140,7 +140,7 @@ fn largura(emu: &Emulator, desde: usize) -> i32 {
         .unwrap_or(0)
 }
 
-fn espera<F: Fn() -> bool>(f: F) -> bool {
+fn espera<F: FnMut() -> bool>(mut f: F) -> bool {
     for _ in 0..100 {
         if f() {
             return true;
@@ -224,12 +224,12 @@ fn ilda_player_do_scan_ao_close() {
     assert!(espera(|| emu.count() > 0), "nada chegou ao emulador");
     let s = m.cmd("laser_stats", json!({"feed": feed}));
     assert!(
-        s["points"].as_u64().unwrap() > 0,
-        "laser_stats sem pontos: {}",
+        s["stat/sent"].as_u64().unwrap() > 0,
+        "laser_stats sem frames entregues: {}",
         s
     );
     assert_eq!(s["playing"], json!(true));
-    assert_eq!(s["errors"], json!(0));
+    assert_eq!(s["stat/errors"], json!(0));
 
     let cheio = largura(&emu, 0);
     assert!(
@@ -283,6 +283,16 @@ fn ilda_player_do_scan_ao_close() {
         e.contains("geo/scale") && e.contains("shutter"),
         "erro pobre: {}",
         e
+    );
+
+    // ---- sem loop, o fim do arquivo desarma o transporte sozinho (bug 6 da revisao)
+    m.cmd(
+        "laser_play",
+        json!({"feed": feed, "file": arquivo, "fps": 60, "loop": false}),
+    );
+    assert!(
+        espera(|| m.cmd("laser_stats", json!({"feed": feed}))["playing"] == json!(false)),
+        "arquivo sem loop terminou e laser_stats seguiu playing"
     );
 
     // ---- stop mantem o feed; close some com ele
