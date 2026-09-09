@@ -172,7 +172,7 @@ mod sig {
         super::INT.store(true, Ordering::SeqCst);
     }
     pub fn trap() {
-        unsafe { signal(2, on_sigint as usize) }; // SIGINT
+        unsafe { signal(2, on_sigint) }; // SIGINT
     }
 }
 
