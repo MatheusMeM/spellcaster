@@ -1,83 +1,40 @@
-# Temas do Spellcaster
+# Funções e temas do Spellcaster
 
-Ordem de trabalho combinada com o Matheus (voto da rodada 2, 09/09/2026): **temas → destrinchar temas → personas e usos → só então buildar skins**. Este arquivo é o passo 1 e 2. Nada aqui vira código antes de aprovado.
+Regra do Matheus (09/09/2026): **não se desenha UI para software sem função.** Cada tela nasce de uma função concreta; o tema é o material que essa função veste; splash, tela de trabalho e info têm a mesma cara. Tudo o que foi feito nas rodadas 1 e 2 (vidro CSS, SDF 2D, cubo raymarched) está jogado fora como UI e guardado como técnica (ver "Espólio").
 
-Regra que amarra tudo (a "visão central" que faltou no cubo com fogo): **cada tema é um material, e tudo na skin obedece ao material.** A forma da janela, o que acontece dentro dela, como o GO responde, que luz reflete, que som faz, que gel cabe. Fogo dentro de um cubo azul quebrou a regra; gelo rachando não quebra.
+Regra que amarra: **um tema é um material, e tudo na skin obedece ao material** (forma, o que vive dentro, o que o GO faz, como o estado aparece, que som faz).
 
-## O que é um tema
+## As cinco funções
 
-Um tema não é uma paleta. É um objeto físico que a janela finge ser. Ele responde cinco perguntas, sempre as mesmas:
+| # | Função | O que faz (e o comando) | Tema (material) | Rodada |
+|---|---|---|---|---|
+| 1 | **ILDA player** | Abre `.ild` (formatos 0/1/4/5), toca frames, controla kpps, tamanho, cor, shutter. `spell ilda play show.ild --kpps 30`. Saída Ether Dream / Helios. | **LASER**: a UI é a própria projeção numa sala com névoa. Feixes saem do projetor, o galvo tem atraso, o frame pisca se kpps ÷ pontos cair. | 3 (esta) |
+| 2 | **NDI → ILDA** | Recebe vídeo NDI, extrai contornos (Canny + simplificação), vira frame ILDA em tempo real. `spell ilda from-ndi "RESOLUME (out)" --kpps 25`. | **FÓSFORO**: rack de broadcast dos anos 70. À esquerda um CRT raster (o NDI), à direita um osciloscópio vetorial (o ILDA). Fósforo verde, knobs Tektronix, ruído de linha. | 4 |
+| 3 | **Orquestrador** | O modo Chataigne: módulos (sACN, Art-Net, OSC, MIDI, NDI, ILDA), estados, sequências, mapeamentos. É o Graph do `PRINCIPIOS.md §1` visto de frente. `spell graph`. | **PATCHBAY**: central telefônica de 1960. Baquelite, jacks de latão, cabos de pano com física, etiquetas Dymo. Mapear = plugar cabo. Estado = lâmpada de válvula. | 5 |
+| 4 | **Cenas e cues DMX + cenário interativo** | Programa cenas (valores por fixture), cues (cena + fade + follow), e um menu de cenário onde se clica no aparelho na maquete. `spell cue`, `spell scene`, `spell patch`. | **TEATRO DE PAPEL**: maquete de palco de papelão. Aparelhos são recortes que acendem; cenas são bastidores que deslizam; cues são páginas do libreto. GO vira a página. | 6 |
+| 5 | **Aprendiz** (companion) | O Clippy do Spellcaster e o **menu principal** de todas as skins. Sprite pixel (chapéu, vassoura, balde: o aprendiz de feiticeiro). Fala em balão Win98. Sabe o contexto: avisa quando o galvo não acompanha, quando o frame pisca, quando um universo não responde. Lembra a última sessão. | Não tem tema: é o mesmo em todas, como o Clippy era o mesmo em todos os Office. | 3 em diante |
 
-| Pergunta | O que decide |
-|---|---|
-| **Matéria** | De que a carcaça é feita; como a luz entra, reflete, atravessa (o shader). |
-| **Fenômeno** | O que vive dentro ou em cima do material quando o show está parado (idle). |
-| **GO** | O que o material faz quando o operador aperta GO. Sempre um evento físico, nunca "pisca". |
-| **Estado** | Como armado / ao vivo / ensaio / erro aparecem no material (PRINCIPIOS §2: cor é estado). |
-| **Som** | Timbre do jingle de entrada e do blip do GO. Mesmo motor Web Audio, instrumento diferente. |
+Ordem de build: 3 → 4 → 5 → 6, uma função por rodada, cada uma com voto. O Aprendiz cresce a cada rodada.
 
-O que **não** muda entre temas (PRINCIPIOS §5): posição e tamanho dos widgets, atalhos (`SHORTCUTS.md`), nomes de comando, densidade. Um tema veste qualquer Face.
+## As cinco perguntas por tema
 
-## Os temas
+| | LASER | FÓSFORO | PATCHBAY | TEATRO DE PAPEL |
+|---|---|---|---|---|
+| **Matéria** | Feixe em névoa; parede como tela; vetor com glow e persistência | Fósforo P31 em vidro curvo; alumínio escovado; serigrafia | Baquelite preta; latão; cabo de pano; feltro | Papelão, papel kraft, tinta guache, luz de velas |
+| **Fenômeno** | Ponto parado do feixe; névoa se movendo; cantos arredondados pelo galvo | Ruído de linha 60 Hz; retrace; burn-in da imagem antiga | Cabos balançam; lâmpadas piscam quando passa sinal | Papel ondula com o ar; sombra de vela |
+| **GO** | Shutter abre, frame aparece com o traço correndo | Trigger dispara: o CRT congela, o vetor desenha | Relé estala, a lâmpada da rota acende | A página do libreto vira; o bastidor desliza |
+| **Estado** | Armado = ponto parado; ao vivo = traço correndo; erro = SCAN FAIL, shutter fecha | Armado = tela verde vazia; erro = tela cheia de neve | Armado = lâmpada âmbar; erro = fusível queimado | Armado = cortina fechada; erro = a vela apaga |
+| **Som** | Chip com onda quadrada, arpejo rápido (o "canto" do galvo) | Chip com senoide + hum 60 Hz | Chip com pulse + estalos de relé | Chip com triângulo + papel amassando |
 
-### 1. GELO — cubo de gelo (o tema atual, corrigido)
+## Arco 5E em cada função
 
-- **Matéria**: bloco de gelo grosso, bordas redondas, cúpula do GO. Refração dupla, dispersão fraca, tinta ciano pela espessura. Geada opcional (o toggle GEADA vira "gelo mais velho").
-- **Fenômeno**: rachaduras e bolhas congeladas por dentro, quase invisíveis; reflexo de estúdio frio (softboxes azuladas).
-- **GO**: o gelo racha. Uma onda de luz corre pelas fissuras a partir da cúpula e apaga em 2 s. Cúpula acende verde-gelo.
-- **Estado**: armado = gelo limpo; ao vivo = fissuras acesas fracas o tempo todo; erro = uma trinca vermelha fixa atravessa o bloco.
-- **Som**: chiptune com onda triangular e reverb curto (cristal); blip do GO = estalo.
-- **Gel**: sem gel por padrão (voto). Gels frios (Lee 181 Congo, 117 Steel) funcionam; quentes ficam feios de propósito.
-- **Serve para**: operador que quer a tela mais limpa possível. Show parado é um bloco transparente em cima do Resolume.
+Mesma sequência sempre, veste-se de tema: **Excitement** = ligar (o material acorda: feixe parado, CRT aquecendo, lâmpadas de teste, cortina fechada) · **Entry** = splash com o logo desenhado pelo material + jingle no timbre do tema · **Engagement** = a tela de trabalho · **Exit** = o material apaga (shutter, tela para um ponto, cabos desligam, cortina) com o acorde final · **Extension** = o Aprendiz lembra e comenta na próxima abertura.
 
-### 2. BRASA — forja
+## Espólio das rodadas 1 e 2 (técnica reaproveitável, UI descartada)
 
-- **Matéria**: vidro fumê escuro e grosso, quase obsidiana, cantos chanfrados (cubo Enscape). Reflexo quente.
-- **Fenômeno**: brasa fraca no fundo do bloco, fumaça lenta. É o lar do fogo volumétrico que tirei do gelo.
-- **GO**: as chamas sobem pelo bloco inteiro e a face da frente esquenta (bordas laranja por 2 s).
-- **Estado**: armado = brasa; ao vivo = chama baixa constante; erro = a chama apaga e sobra fumaça.
-- **Som**: chiptune com onda quadrada e distorção; blip = sopro.
-- **Gel**: Lee 158 Deep Orange, Rosco 27 Red. Frios não cabem.
-- **Serve para**: show de alto impacto (festival, palco de banda). O operador quer sentir o GO.
-
-### 3. TANQUE — água
-
-- **Matéria**: aquário de acrílico, paredes finas, água até 70% da altura com superfície ondulando devagar. Refração da água diferente da do acrílico.
-- **Fenômeno**: partículas em suspensão, cáustica da superfície projetada no fundo (o desktop).
-- **GO**: uma gota cai na superfície: ondas concêntricas, cáustica corre pelo desktop. O tempo do cue vira boia que sobe.
-- **Estado**: armado = água parada; ao vivo = ondulação leve; erro = água turva.
-- **Som**: chiptune com senoide e portamento (subaquático); blip = gota.
-- **Gel**: Lee 139 Green, 117 Steel. Vira "tanque com corante".
-- **Serve para**: instalação, museu, show contemplativo. Quem opera de longe e olha de vez em quando.
-
-### 4. CROMO — skin de WMP de 2001
-
-- **Matéria**: metal cromado com bisel, botões redondos com LED, LCD verde. É o tema Skins Factory literal, o mais kitsch dos quatro.
-- **Fenômeno**: reflexo do ambiente (softboxes) deslizando no cromo conforme o cubo gira; LED de standby pulsando.
-- **GO**: o botão afunda de verdade (profundidade no shader), o LCD dá flash, o VU estoura.
-- **Estado**: LEDs. Armado = âmbar; ao vivo = vermelho; ensaio = azul; erro = todos piscando.
-- **Som**: chiptune 8-bit puro (pulse 12,5 %); blip = clique de relé.
-- **Gel**: não tem. Cromo não aceita gel; a cor vem dos LEDs.
-- **Serve para**: quem entrou no brief pelo WMP. Também o tema mais fácil de ler à distância.
-
-### 5. FITA — pill compacta (não é tema, é Face)
-
-TAB hoje já reduz a janela a uma fita. Isso é uma **Face** (quais widgets), não um tema: cada tema veste a fita do seu jeito (gelo fino, barra de brasa, tubo de água, régua cromada). Fica registrado para não virar "quinto tema".
-
-## Como destrinchar cada tema (antes de codar)
-
-Para cada tema, uma página com:
-
-1. **Referência física**: foto ou shader de referência do material (Shadertoy IDs em `DECISOES.md`).
-2. **Tabela das cinco perguntas** preenchida como acima, sem adjetivo solto.
-3. **Idle / GO / erro** em três frames desenhados (canvas do Claude Design ou captura do protótipo).
-4. **Custo**: passos de raymarching, buffers extras. Água precisa de 1 buffer para a superfície; fogo e gelo não precisam de nenhum. Fluido MIP (tsKXR3) é 4 buffers: só entra se algum tema justificar.
-5. **Fita** do tema (a Face compacta vestida).
-
-## Personas e usos (passo 3, depois dos temas aprovados)
-
-Esboço para não perder: operador de mesa às 23h (PRINCIPIOS); VJ com Resolume ao lado; artista de instalação que liga e vai embora; técnico no Pi por SSH (não vê tema nenhum). Cada persona escolhe um tema padrão e uma Face. Detalhar só depois do OK nos temas.
-
-## Passo 4: buildar skins
-
-Ordem proposta: GELO (já existe, ajustar) → CROMO (mais kitsch, mais pedido) → BRASA (reaproveita o fogo) → TANQUE (único que precisa de buffer). Uma por rodada, cada uma com voto.
+- Splash cracktro com jingle Web Audio sintetizado (zero mídia): aprovado, vira padrão de Entry.
+- Fragment shader WebGL para material físico (raymarching, refração, dispersão, absorção): guardado para FÓSFORO (vidro do CRT) e PATCHBAY (latão).
+- Face em CSS 3D com a mesma matriz do shader: guardado para qualquer tela com objeto 3D.
+- Leitor `.wmz`: descartado (voto). Fica em `rodada2/` como referência de formato.
+- Gels Lee/Rosco como filtro físico: guardado para TEATRO DE PAPEL (gelatina de verdade na frente do recorte).
+- Voto dentro do protótipo com `db`: padrão de todas as rodadas.
