@@ -184,6 +184,7 @@ CI, sem tocar no que já está conforme):
 | Frente | Entrega | Aceite | Depende de |
 |---|---|---|---|
 | Design | rodada 7 (FÓSFORO, PATCHBAY) | voto do dono | voto das rodadas 5 e 6 |
+| FÓSFORO núcleo | `laser::trace`: RGBA → contornos → frame ILDA (`paths`, `trace`, bin `trace`) | quadro 1080p em < 8 ms em release; quadrado/círculo/dois objetos/max_points nos testes | — (feita: 4,4 ms com 20 objetos; falta o NDI da R2 para alimentar) |
 
 Bloqueadas até instalar SDK (decisão do dono, não de agente): R2 (GStreamer + NDI SDK),
 R6 (Godot 4). R9 espera R5.

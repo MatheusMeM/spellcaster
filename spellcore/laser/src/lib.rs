@@ -21,6 +21,7 @@ pub mod dac;
 pub mod feed;
 pub mod frame;
 pub mod ild;
+pub mod trace;
 
 pub use dac::etherdream::{Emulator, EtherDream};
 pub use dac::helios::Helios;

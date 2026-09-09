@@ -17,6 +17,10 @@ criterion = { workspace = true }
 name = "feeds"
 path = "src/bin/feeds.rs"
 
+[[bin]]
+name = "trace"
+path = "src/bin/trace.rs"
+
 [[bench]]
 name = "laser"
 harness = false
