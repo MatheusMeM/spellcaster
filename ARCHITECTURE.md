@@ -103,7 +103,7 @@ Todas as saídas expõem `send(universe: int, data: bytes)` e `close()`.
 - `suggest(ifaces, windows=WINDOWS) -> list[str]`: regras de subrede para Art-Net, comando `netsh` pronto (texto, não executa), aviso de interfaces na mesma subrede.
 - `scan_all(timeout=2) -> dict`: os três scans em threads. `report(d) -> str`.
 - Sem `ponytail:`. Duplicação declarada no docstring do módulo: `parse_artpollreply` e `parse_sacn_discovery` repetem `artnet.parse` e `sacn.parse`. Unificar quando os dois estiverem estáveis.
-- Não implementado (ROADMAP F1): mDNS `_osc._udp`, discovery IDN, medida de latência, verbo `spell net`.
+- Não implementado (ROADMAP F1): mDNS `_osc._udp`, discovery IDN, medida de latência. Verbo `spell net` existe em `cli.py`.
 
 ### Dois `interfaces()`
 
