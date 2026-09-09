@@ -142,6 +142,29 @@ test("Delete com grupo fechado selecionado apaga os nos do grupo", () => {
   assert.equal(GM.g(r.doc).edges.length, 2);
 });
 
+test("show sem graph: a primeira edicao cria /graph junto, e o undo tira", () => {
+  const sem = { name: "medgrupo", tracks: [] }, antes = JSON.stringify(sem);
+  const node = { id: "toggle", type: "logic.toggle", x: 0, y: 0 };
+
+  // sem o /graph na frente, nem local nem no engine o add acha o pai
+  assert.match(GM.patch(sem, GM.opsAdd(sem, node)).error, /caminho sem pai/);
+
+  const ops = GM.comGraph(sem, GM.opsAdd(sem, node));
+  assert.deepEqual(ops[0], { op: "add", path: "/graph", value: { nodes: [], edges: [] } });
+  assert.equal(ops.length, 2);
+
+  const r = GM.patch(sem, ops);
+  assert.equal(r.error, "");
+  assert.deepEqual(GM.g(r.doc).nodes, [node]);
+  assert.deepEqual(r.undo[0], { op: "remove", path: "/graph/nodes/0" });
+  assert.deepEqual(r.undo[1], { op: "remove", path: "/graph" });
+  assert.equal(JSON.stringify(GM.patch(r.doc, r.undo).doc), antes);   // volta ao show original
+
+  // show que ja' tem graph passa a lista intacta (mesma referencia: nada a acrescentar)
+  const com = demo(), o2 = GM.opsAdd(com, node);
+  assert.equal(GM.comGraph(com, o2), o2);
+});
+
 test("novoId nao repete", () => {
   const d = demo();
   assert.equal(GM.novoId(d, "logic.toggle"), "toggle2");

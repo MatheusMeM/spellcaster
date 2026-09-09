@@ -116,6 +116,14 @@ const GM = {
     return [{ op: "add", path: "/graph/nodes/-", value: node }];
   },
 
+  // Show sem `graph` (o caso do medgrupo.spell): `add /graph/nodes/-` nao acha o pai nem aqui
+  // nem no engine. A PRIMEIRA edicao cria o graph junto, na mesma lista de ops — e o undo do
+  // add (`remove /graph`) devolve o show exatamente como estava.
+  comGraph(doc, ops) {
+    if (doc && doc.graph) return ops;
+    return [{ op: "add", path: "/graph", value: { nodes: [], edges: [] } }].concat(ops);
+  },
+
   // Apaga nos e todo cabo que os toca. Indices em ordem decrescente: o patch e' sequencial.
   opsDel(doc, ids) {
     const g = GM.g(doc), set = new Set(ids), ops = [];
@@ -252,9 +260,28 @@ const PB = {
 
   // ------------------------------------------------------------ edicao (um caminho so')
 
+  // Manda a lista ao engine. Recusa volta o doc local ao estado de antes (`GM.patch` nao mexe
+  // no original: a referencia guardada JA' e' a copia intacta) e `volta` desfaz a pilha — sem
+  // doc local adiantado do engine. Aceita ou recusa, no fim revalida.
+  manda(ops, antes, volta) {
+    if (!PB.vivo()) return Promise.resolve(PB.checa());
+    // O `rev` da resposta o proprio `Bus` guarda (`bus.rev`); e' contra ele que o evento decide.
+    return PB.bus.call("show_patch", { ops })
+      .catch(e => {
+        PB.doc = antes;
+        volta();
+        PB.k.invalidate();
+        PB.inspetor();
+        PB.log("show_patch: " + e.message);
+      })
+      .then(PB.checa);
+  },
+
   // Toda edicao passa por aqui: manda show_patch, empilha o undo, revalida com graph_check.
   aplica(ops, rotulo) {
     if (!ops.length) return Promise.resolve();
+    ops = GM.comGraph(PB.doc, ops);
+    const antes = PB.doc;
     const r = GM.patch(PB.doc, ops);
     if (r.error) { PB.log("erro: " + r.error); return Promise.resolve(); }
     PB.doc = r.doc;
@@ -263,34 +290,36 @@ const PB = {
     PB.k.invalidate();
     PB.inspetor();
     if (rotulo) PB.log(rotulo);
-    if (PB.vivo()) {
-      // O `rev` da resposta o proprio `Bus` guarda (`bus.rev`); e' contra ele que o evento decide.
-      return PB.bus.call("show_patch", { ops })
-        .catch(e => PB.log("show_patch: " + e.message))
-        .then(PB.checa);
-    }
-    return Promise.resolve(PB.checa());
+    return PB.manda(ops, antes, () => PB.undo.pop());
   },
 
   desfaz(pilhaA, pilhaB) {
     const ops = pilhaA.pop();
     if (!ops) return;
+    const antes = PB.doc;
     const r = GM.patch(PB.doc, ops);
     if (r.error) { PB.log("undo: " + r.error); return; }
     PB.doc = r.doc;
     pilhaB.push(r.undo);
-    if (PB.vivo()) PB.bus.call("show_patch", { ops }).catch(e => PB.log(e.message));
     PB.k.invalidate();
     PB.inspetor();
-    PB.checa();
+    PB.manda(ops, antes, () => { pilhaB.pop(); pilhaA.push(ops); });
   },
 
-  // graph_check depois de cada edicao: erro por no, marcado na caixa e no Inspector.
+  // graph_check depois de cada edicao aceita e no recarrega: erro por no, marcado na caixa e no
+  // Inspector. SEM argumento — o comando compila o graph do show ABERTO NO ENGINE, e e' esse o
+  // ponto: depois de um show_patch aceito o doc da pagina e' o do engine, entao a fonte da
+  // validacao e' o engine. Offline (sem bus vivo) nao ha' o que validar.
   // ponytail: o engine devolve UM erro ; vira contagem por no quando graph_check devolver lista.
   checa() {
     PB.erros = {};
-    if (!PB.vivo()) return Promise.resolve();
-    return PB.bus.call("graph_check", { graph: GM.g(PB.doc) }).then(r => {
+    if (!PB.vivo()) {
+      PB.el.aviso.textContent = "";
+      PB.el.aviso.className = "over";
+      PB.k.invalidate();
+      return Promise.resolve();
+    }
+    return PB.bus.call("graph_check", {}).then(r => {
       const txt = r && r.error;
       if (txt) {
         const m = /"([^"]+)"/.exec(txt);              // graph.rs cita o no culpado entre aspas
@@ -821,30 +850,48 @@ PB.init = function (opts) {
   k.loop();
 };
 
-// Carrega o show: pelo engine (GET /show) ou por fetch de um .spell (modo offline).
-PB.carrega = function (url) {
-  if (!PB.bus) {
-    PB.bus = new Bus({}).connect();
-    PB.bus.on("log", d => PB.log(d && d.text ? d.text : JSON.stringify(d)));
-    // `bus.rev` e' o maior rev ja' visto numa resposta: evento acima disso e' edicao de fora.
-    PB.bus.on("show", d => { if (d && d.rev > PB.bus.rev) PB.recarrega(); });
-    PB.bus.on("open", () => { PB.el.estado.textContent = "engine"; PB.recarrega(); });
-    PB.bus.on("close", () => { PB.el.estado.textContent = "offline"; });
+// "Abrir". `path` e' o caminho como o ENGINE ve: "shows/patchbay_demo.spell", relativo a raiz
+// do repo — e' a mesma string que `serve` e `python -m http.server` na raiz servem em "/".
+// Com engine: `load` no engine e depois o show DELE por `show_get`. Sem engine: o arquivo.
+// UM caminho de cada vez — o fetch correndo junto com o show_get era a corrida que deixava a
+// pagina editando um documento e o engine outro.
+PB.carrega = function (path) {
+  if (PB.vivo()) {
+    return PB.bus.call("load", { path })
+      .then(() => PB.recarrega(true))
+      .catch(e => PB.log(`load ${path}: ${e.message}`));
   }
-  return fetch(url).then(r => r.json()).then(d => {
+  return fetch("/" + path).then(r => r.json()).then(d => {
     PB.doc = d;
-    if (!PB.doc.graph) PB.doc.graph = { nodes: [], edges: [] };
     requestAnimationFrame(enquadra);
-    PB.checa();
-    PB.log(`show ${url}: ${GM.g(PB.doc).nodes.length} nos`);
-  }).catch(e => PB.log(`${url}: ${e.message}`));
+    PB.log(`show ${path}: ${GM.g(PB.doc).nodes.length} nos`);
+    return PB.checa();
+  }).catch(e => PB.log(`${path}: ${e.message}`));
 };
 
-PB.recarrega = function () {
+// Boot: liga o bus e deixa o socket decidir a fonte. Abriu -> o show do engine; nao abriu (o
+// `Bus` emite `close` mesmo no socket que nunca subiu) -> o arquivo, uma vez so'.
+PB.liga = function (path) {
+  PB.bus = new Bus({}).connect();
+  PB.bus.on("log", d => PB.log(d && d.text ? d.text : JSON.stringify(d)));
+  // `bus.rev` e' o maior rev ja' visto numa resposta: evento acima disso e' edicao de fora.
+  PB.bus.on("show", d => { if (d && d.rev > PB.bus.rev) PB.recarrega(); });
+  let arquivo = true;                              // o fetch ainda esta' na mesa?
+  PB.bus.on("open", () => {
+    arquivo = false;                               // engine achado: o arquivo nunca mais entra —
+    PB.el.estado.textContent = "engine";           // socket que cai depois nao apaga o que o
+    PB.recarrega(true);                            // engine mandou (ele volta em 1 s).
+  });
+  PB.bus.on("close", () => {
+    PB.el.estado.textContent = "offline";
+    if (arquivo) { arquivo = false; PB.carrega(path); }
+  });
+};
+
+PB.recarrega = function (enquadrar) {
   PB.bus.call("show_get", { full: true }).then(s => {
     PB.doc = s;
-    if (!PB.doc.graph) PB.doc.graph = { nodes: [], edges: [] };
-    PB.k.invalidate();
+    if (enquadrar) requestAnimationFrame(enquadra); else PB.k.invalidate();
     PB.checa();
   }).catch(e => PB.log("show_get: " + e.message));
   PB.bus.call("module_list", {}).then(l => {
