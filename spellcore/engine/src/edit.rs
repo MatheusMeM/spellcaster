@@ -371,6 +371,19 @@ fn patch(a: &ShowPatchArgs) -> Result<Value, String> {
     })
 }
 
+/// Intervalo In-Out do show aberto (`in`/`out`); sem eles, 0..duration. E' o intervalo do loop:
+/// o player guarda so' o par de numeros, e quem sabe onde ele esta' e' o show aberto.
+pub fn intervalo() -> (f64, f64) {
+    com_ro(|_, sh| {
+        let n = |k: &str| sh.extra.get(k).and_then(Value::as_f64);
+        Ok((
+            n("in").unwrap_or(0.0).max(0.0),
+            n("out").or(sh.duration).unwrap_or(0.0),
+        ))
+    })
+    .unwrap_or((0.0, 0.0))
+}
+
 // ------------------------------------------------------------------ graph e face
 
 /// O graph do show aberto (`extra.graph`), vazio quando falta. A CLI le daqui para o

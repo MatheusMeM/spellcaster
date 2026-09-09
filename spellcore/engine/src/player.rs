@@ -82,6 +82,11 @@ pub fn open_outputs(sh: &Show) -> Result<Vec<Box<dyn Output>>, String> {
     Ok(outs)
 }
 
+/// Numero solto do .spell (`in`, `out`): o que nao for numero vale como ausente.
+fn num(sh: &Show, k: &str) -> Option<f64> {
+    sh.extra.get(k).and_then(|v| v.as_f64())
+}
+
 /// Primeira saida `osc` do show (o Python tambem guarda so' uma).
 fn open_osc(sh: &Show) -> Result<Option<OscOut>, String> {
     for c in &sh.outputs {
@@ -109,6 +114,32 @@ pub struct TransportState {
     pub fps: u32,
     pub duration: Option<f64>,
     pub universes: Vec<u16>,
+    /// Loop ligado, e o intervalo em que repete. E' estado do ENGINE: a GUI so' o reflete.
+    #[serde(rename = "loop")]
+    pub looping: bool,
+    pub loop_in: f64,
+    pub loop_out: f64,
+}
+
+/// Loop do transporte: ligado/desligado e o intervalo In-Out onde repete. Mora aqui, e nao no
+/// cliente, porque quem anda no tempo e' a thread de transporte — a GUI simulando o loop por
+/// conta propria voltava para o In enquanto o player seguia tocando ate o fim do show.
+#[derive(Clone, Copy, Debug)]
+struct Loop {
+    on: bool,
+    a: f64,
+    b: f64,
+}
+
+impl Loop {
+    /// Instante para onde voltar quando `t` passou do fim do intervalo; None quando nao ha volta.
+    fn wrap(&self, t: f64) -> Option<f64> {
+        if self.on && self.b > self.a && t >= self.b {
+            Some(self.a)
+        } else {
+            None
+        }
+    }
 }
 
 /// Pedido de outra thread para a thread de transporte, consumido no inicio do frame.
@@ -202,6 +233,7 @@ impl Prog {
 struct Shared {
     clock: Clock,
     ctl: Mutex<Vec<Ctl>>,
+    lp: Mutex<Loop>,
     prog: Mutex<Prog>,
     cue: AtomicI32,
     frames: AtomicU64,
@@ -282,7 +314,17 @@ impl Handle {
         lock(&self.s.prog).levels(u)
     }
 
+    /// Liga/desliga o loop e grava o intervalo (o In-Out do show). Vale no proximo frame.
+    pub fn set_loop(&self, on: bool, a: f64, b: f64) {
+        *lock(&self.s.lp) = Loop {
+            on,
+            a: a.max(0.0),
+            b,
+        };
+    }
+
     pub fn state(&self) -> TransportState {
+        let lp = *lock(&self.s.lp);
         TransportState {
             t: self.s.clock.time(),
             state: match self.s.clock.state() {
@@ -295,6 +337,9 @@ impl Handle {
             fps: self.s.clock.fps(),
             duration: self.s.duration,
             universes: lock(&self.s.universes).clone(),
+            looping: lp.on,
+            loop_in: lp.a,
+            loop_out: lp.b,
         }
     }
 }
@@ -312,7 +357,6 @@ struct Rt {
     uni: Universes,
     outs: Vec<Box<dyn Output>>,
     osc_out: Option<OscOut>,
-    looping: bool,
     prev: f64,
     nuni: usize, // quantos universos sairam no ultimo frame (so' a thread de transporte le)
     pend: Vec<Ctl>, // fila drenada por swap: zero alocacao por frame
@@ -356,6 +400,14 @@ impl Rt {
 
     fn tick(&mut self, s: &Shared, t: f64) {
         self.drain(s, t);
+        // Loop no intervalo In-Out: lido a cada frame, entao ligar/desligar durante o play vale na
+        // hora. O relogio volta para o In e o frame do wrap sai no proximo tick, ja' dentro do
+        // intervalo — nada de escrever um frame de fora dele na rede.
+        if let Some(a) = lock(&s.lp).wrap(t) {
+            s.clock.locate(a);
+            self.reset(a);
+            return;
+        }
         // 1. timeline (dmx/artnet) e media do Capture
         lock(&s.prog).release(&mut self.uni);
         self.tl.apply(&mut self.uni, t);
@@ -523,10 +575,15 @@ impl Player {
             .and_then(|v| v.get("osc_port"))
             .and_then(|v| v.as_u64())
             .map(|p| p as u16);
+        // Intervalo do loop = o In-Out do show; sem eles, 0..duration (o `--loop` da CLI, que
+        // repetia o show inteiro, continua igual). `loop_set` reescreve isto com o player vivo.
+        let a = num(&show, "in").unwrap_or(0.0).max(0.0);
+        let b = num(&show, "out").or(show.duration).unwrap_or(0.0);
         Ok(Player {
             s: Arc::new(Shared {
                 clock: Clock::new(show.fps),
                 ctl: Mutex::new(Vec::new()),
+                lp: Mutex::new(Loop { on: looping, a, b }),
                 prog: Mutex::new(Prog::default()),
                 cue: AtomicI32::new(-1),
                 frames: AtomicU64::new(0),
@@ -544,7 +601,6 @@ impl Player {
                 uni: Universes::new(),
                 outs,
                 osc_out,
-                looping,
                 prev: 0.0,
                 nuni: 0,
                 pend: Vec::new(),
@@ -689,11 +745,13 @@ fn transport(mut rt: Rt, s: Arc<Shared>) {
             break;
         }
         if s.clock.state() != State::Stop {
-            // chegou na duracao: repete do inicio ou para
-            // ponytail: `looping` sem `duration` nao repete — sem fim, o run so' volta no stop.
-            if rt.looping && s.duration.is_some() {
-                s.clock.locate(0.0);
-                rt.reset(0.0);
+            // chegou na duracao: volta para o In do loop, ou para
+            // ponytail: `loop` sem `duration` so' repete quando ha um Out — sem fim nem Out, o run
+            // so' volta no stop.
+            let lp = *lock(&s.lp);
+            if lp.on && s.duration.is_some() {
+                s.clock.locate(lp.a);
+                rt.reset(lp.a);
             } else {
                 s.clock.stop();
                 rt.reset(0.0);

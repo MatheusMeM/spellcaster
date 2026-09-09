@@ -90,6 +90,12 @@ pub struct LocateArgs {
 }
 
 #[derive(Deserialize, JsonSchema)]
+pub struct LoopArgs {
+    /// true liga o loop, false desliga.
+    pub on: bool,
+}
+
+#[derive(Deserialize, JsonSchema)]
 pub struct CueGoArgs {
     /// Indice da cue; ausente = a proxima.
     #[serde(default)]
@@ -262,6 +268,18 @@ pub fn base() -> Registry {
             estado(&h)
         },
     );
+    // O loop e' do PLAYER, no intervalo In-Out do show ABERTO (`edit::intervalo`): quem arrasta o
+    // In na GUI e chama `loop_set` de novo ja' repete no intervalo novo. Sem In/Out, 0..duration.
+    r.add::<LoopArgs>(
+        "loop_set",
+        "Liga ou desliga o loop do player no intervalo In-Out do show aberto.",
+        |a| {
+            let h = vivo()?;
+            let (i, o) = crate::edit::intervalo();
+            h.set_loop(a.on, i, o);
+            estado(&h)
+        },
+    );
     r.add::<CueGoArgs>(
         "cue_go",
         "Dispara a proxima cue (ou a de indice dado).",
@@ -331,6 +349,7 @@ mod tests {
             "pause",
             "stop",
             "locate",
+            "loop_set",
             "cue_go",
             "transport_state",
             "input",
@@ -345,6 +364,7 @@ mod tests {
             ("pause", json!({})),
             ("stop", json!({})),
             ("locate", json!({"t": 3.5})),
+            ("loop_set", json!({"on": true})),
             ("cue_go", json!({})),
             ("transport_state", json!({})),
             ("input", json!({"key": "widget:go", "value": 1.0})),

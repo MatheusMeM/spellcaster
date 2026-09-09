@@ -527,6 +527,9 @@ mod tests {
             fps: 30,
             duration: Some(60.0),
             universes: vec![1, 2],
+            looping: true,
+            loop_in: 1.0,
+            loop_out: 2.0,
         };
         assert_eq!(
             status_line(&st, 0.41),
@@ -541,6 +544,9 @@ mod tests {
             fps: 30,
             duration: None,
             universes: Vec::new(),
+            looping: false,
+            loop_in: 0.0,
+            loop_out: 0.0,
         };
         let l = status_line(&parado, 0.0);
         assert_eq!(l, "t=   0.00s state=stop cue=-1 frames=0 jit_p99=0.00ms u=");

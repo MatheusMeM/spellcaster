@@ -261,3 +261,37 @@ fn locate_zera_cues_e_ganchos() {
     assert!(p.wait(Some(Duration::from_secs(2))), "stop acorda o wait");
     p.close();
 }
+
+/// Loop e' estado do ENGINE, no intervalo In-Out do show: com In=1 e Out=2 o transporte volta
+/// sozinho para o In, e desligar o loop com o player andando solta o tempo no mesmo segundo.
+#[test]
+fn loop_repete_o_intervalo_in_out() {
+    let sh = show(json!({
+        "name": "loop", "fps": 60, "duration": 10.0, "version": 1,
+        "outputs": [], "tracks": [], "in": 1.0, "out": 2.0
+    }));
+    let mut p = Player::new(sh, true).expect("player sem saida");
+    p.start(None).expect("start");
+    let h = p.handle();
+    let st = h.state();
+    assert!(st.looping, "o player nasceu com o loop pedido no play_show");
+    assert_eq!(
+        (st.loop_in, st.loop_out),
+        (1.0, 2.0),
+        "o intervalo do loop e' o In-Out do show"
+    );
+
+    h.locate(1.5);
+    h.play();
+    let voltou = espera(4.0, || h.state().t < 1.4);
+    let t = h.state().t;
+    assert!(voltou, "o transporte nao voltou para o In: t = {}", t);
+    assert!(t > 0.9, "voltou para antes do In: t = {}", t);
+
+    // desligado com o player andando (o `loop_set` do registry), o tempo passa do Out
+    h.set_loop(false, 1.0, 2.0);
+    let passou = espera(4.0, || h.state().t > 2.3);
+    let t = h.state().t;
+    p.close();
+    assert!(passou, "loop desligado ainda prendia o transporte em {}", t);
+}
