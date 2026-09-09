@@ -129,6 +129,16 @@ pub(crate) fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
+/// Caminho do .spell aberto neste processo; vazio quando o show so' existe em memoria. E' a base
+/// dos arquivos que o show cita por nome — o `clip` de um track laser resolve contra a pasta
+/// dele, igual ao `_load_clip` de `spellcaster/player/player.py`.
+pub fn open_path() -> String {
+    lock(&OPEN)
+        .as_ref()
+        .map(|(p, _)| p.clone())
+        .unwrap_or_default()
+}
+
 /// Resumo do show para a IA e para o resource `spell://show` (mesmos campos do `summary()` do
 /// `spellcaster/mcp/tools.py`), mais o transporte vivo quando ha player rodando.
 fn resumo(file: &str, sh: &show::Show) -> Value {
