@@ -1,0 +1,19 @@
+[package]
+name = "gui"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "spellcaster"
+path = "src/main.rs"
+
+[dependencies]
+cli = { workspace = true }
+serve = { workspace = true }
+
+# A janela so' existe no Windows (WebView2 ja' vem no 11); no Pi a Lite abre a GUI pelo
+# navegador. Fora do Windows o binario nao arrasta `wry`/`tao` nem o webkit2gtk que eles pedem,
+# e o `cargo build --workspace` do CI (ubuntu, aarch64-musl) continua passando.
+[target.'cfg(windows)'.dependencies]
+tao = "0.37"
+wry = "0.57"
