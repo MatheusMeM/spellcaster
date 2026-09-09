@@ -83,6 +83,5 @@ sh packaging/build_lite.sh [--no-gui] [saída] # tarball Lite (default /tmp)
 
 ```
 spell mcp                      # stdio, para Claude Desktop / Claude Code
-spell mcp --transport http --port 8765   # HTTP streamable (Pi Lite, remoto)
 spell mcp_install --target desktop       # grava a entrada em claude_desktop_config.json (--target code = .mcp.json); pede confirmação
 ```

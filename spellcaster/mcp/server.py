@@ -2,11 +2,11 @@
 #
 # Metodos: initialize, notifications/initialized, ping, tools/list, tools/call,
 #          resources/list, resources/read, prompts/list, prompts/get.
-# Transportes: stdio (uma linha JSON por mensagem, stderr para log) e HTTP streamable
-#          (POST /mcp com JSON-RPC -> JSON; GET /mcp -> SSE so com notificacoes).
+# Transporte: stdio (uma linha JSON por mensagem, stderr para log).
+# ponytail: so stdio ; se algum cliente exigir HTTP streamable, ele entra aqui.
 #
 # As tools saem do registry: nada de logica de produto aqui (mesmo contrato da GUI).
-# Entradas: `spell mcp [--transport http] [--port 8765]` ou `python -m spellcaster.mcp.server`.
+# Entradas: `spell mcp` ou `python -m spellcaster.mcp.server`.
 import contextlib
 import io
 import json
@@ -14,8 +14,6 @@ import sys
 import threading
 import time
 from collections import deque
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
 
 from .. import __version__
 from ..core import registry
@@ -37,7 +35,6 @@ BACKGROUND = {"play_show", "play", "serve", "mcp", "calib_hold", "calib_sweep"}
 
 _JSON_TYPE = {"str": "string", "int": "integer", "float": "number", "bool": "boolean"}
 LOG = deque(maxlen=200)            # resource spell://log
-_SSE = set()                       # wfile dos clientes SSE do transporte HTTP
 
 INSTRUCTIONS = ("Spellcaster: show control (sACN, Art-Net, OSC, laser ILDA). Ordem util: `net` para achar "
                 "os nos da rede, `show_summary` para ler o show aberto, `play_show` para tocar, "
@@ -308,101 +305,10 @@ def serve_stdio(inp=None, out=None):
     log("MCP stdio: EOF")
 
 
-# ---------------------------------------------------------------- transporte HTTP streamable
-def _local_origin(origin):
-    """Origin ausente (cliente nao-browser) ou de loopback; barra DNS rebinding."""
-    return not origin or urlparse(origin).hostname in ("127.0.0.1", "localhost", "::1")
-
-
-class Handler(BaseHTTPRequestHandler):
-    protocol_version = "HTTP/1.1"
-
-    def log_message(self, *a):
-        pass
-
-    def _send(self, code, body=b"", ctype="application/json"):
-        self.send_response(code)
-        self.send_header("Content-Type", ctype)
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        if body:
-            self.wfile.write(body)
-
-    def do_POST(self):
-        if self.path.split("?")[0] != "/mcp":
-            return self.send_error(404)
-        if not _local_origin(self.headers.get("Origin")):
-            return self.send_error(403, "Origin nao e loopback")
-        n = int(self.headers.get("Content-Length") or 0)
-        try:
-            m = json.loads(self.rfile.read(n) or b"{}")
-        except ValueError as e:
-            return self._send(400, json.dumps(_err(None, -32700, f"parse error: {e}")).encode())
-        r = handle(m)
-        if r is None:                                 # notificacao aceita
-            return self._send(202)
-        self._send(200, json.dumps(r, default=str).encode())
-
-    def do_GET(self):
-        if self.path.split("?")[0] != "/mcp" or "text/event-stream" not in (self.headers.get("Accept") or ""):
-            return self.send_error(405)
-        if not _local_origin(self.headers.get("Origin")):
-            return self.send_error(403, "Origin nao e loopback")
-        self.close_connection = True                  # SSE: stream ate o cliente fechar
-        self.send_response(200)
-        self.send_header("Content-Type", "text/event-stream")
-        self.send_header("Cache-Control", "no-store")
-        self.end_headers()
-        _SSE.add(self.wfile)
-        try:
-            while True:
-                time.sleep(1)
-                self.wfile.write(b": keepalive\n\n")
-                self.wfile.flush()
-        except OSError:
-            pass
-        finally:
-            _SSE.discard(self.wfile)
-    # ponytail: sem Mcp-Session-Id, sem resumo por Last-Event-ID e sem SSE na resposta do POST
-    # ; um POST = um JSON. Adicionar sessao quando houver mais de um cliente por servidor.
-
-
-def _sse_push(msg):
-    data = ("data: " + json.dumps(msg, default=str) + "\n\n").encode()
-    for w in list(_SSE):
-        try:
-            w.write(data)
-            w.flush()
-        except OSError:
-            _SSE.discard(w)
-
-
-def http_server(port=8765, host="127.0.0.1"):
-    """ThreadingHTTPServer com /mcp; use .serve_forever() ou serve_http()."""
-    return ThreadingHTTPServer((host, port), Handler)
-
-
-def serve_http(port=8765, host="127.0.0.1"):
-    srv = http_server(port, host)
-    threading.Thread(target=watch, args=(_sse_push,), daemon=True).start()
-    print(f"MCP HTTP em http://{host}:{srv.server_address[1]}/mcp  (Ctrl+C encerra)", flush=True)
-    try:
-        srv.serve_forever()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        srv.server_close()
-    return srv
-
-
 @command
-def mcp(transport: str = "stdio", port: int = 8765):
-    """Servidor MCP: transport stdio (Claude Desktop/Code) ou http (POST /mcp, SSE no GET /mcp)."""
-    if transport == "stdio":
-        return serve_stdio()
-    if transport == "http":
-        return serve_http(int(port))
-    raise ValueError(f"transport {transport!r}: use stdio ou http")
+def mcp():
+    """Servidor MCP por stdio (Claude Desktop / Claude Code): uma linha JSON por mensagem."""
+    return serve_stdio()
 
 
 if __name__ == "__main__":
