@@ -165,6 +165,8 @@ async fn request(st: &Arc<St>, txt: &str) -> String {
     let (reg, nome) = (st.reg.clone(), cmd.clone());
     // Nao ha' lista de comandos de leitura: quem diz se o show mudou e' o proprio contador do
     // engine. Comando que edita sobe `edit::rev()`; comando que so' le, nao.
+    // ponytail: antes/depois de rev em volta de chamada concorrente: edicao de B durante leitura
+    // de A sai como eco de A ; fila unica de comandos quando duas paginas editarem junto.
     let antes = engine::edit::rev();
     let r = tokio::task::spawn_blocking(move || reg.call(&nome, args)).await;
     let depois = engine::edit::rev();

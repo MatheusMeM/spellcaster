@@ -149,7 +149,7 @@ O plano acima (F0–F7) foi o do protótipo Python e está concluído até F6. O
 | R1 timeline, cues, .spell, fx, Graph, OSC | graph de 500 nós < 0,1 ms/frame; player headless | concluída (8,4 µs) | — |
 | R2 mídia (GStreamer, NDI, RTSP, Spout) | 1080p60 no alvo de CPU | pendente | SDKs não instalados (GStreamer, NDI) |
 | R3 pixel mapping (rayon; wgpu depois) | 100 000 px a 60 Hz < 2 ms | concluída (0,105 ms p50 / 0,316 ms p99 por frame; bilinear 0,196 / 0,493) | crate autônomo: ligar a fonte de frame ao player espera a R2 |
-| R4 laser multi-feed | Ether Dream, Helios, IDN; safety no engine; 4 feeds | concluída (0,83 % cpu) | — |
+| R4 laser multi-feed | Ether Dream, IDN; safety no engine; 4 feeds | concluída (0,83 % cpu) | — |
 | R5 GUI Tauri | show de 3 min do zero; Face em modo performance | base pronta em `main` (`spellgui/web`: canvaskit + timeline); falta Tauri, painéis, Theme/Face | voto das rodadas 5 e 6 do design |
 | R6 previz Godot | 60 fps, 64 fixtures, 2 LED walls | pendente | Godot não instalado |
 | R7 MCP com rmcp | sessão de IA monta e toca um show sem GUI | concluída em stdio; edição de show (patch, track, key, cue) no registry (`engine::edit`) | `spell://face`/`spell://graph` pendentes; transporte HTTP streamable em `/mcp` entregue pela F1 (`serve`) |
@@ -190,6 +190,7 @@ CI, sem tocar no que já está conforme):
 |---|---|---|---|
 | Design | rodada 7 (FÓSFORO, PATCHBAY) | voto do dono | voto das rodadas 5 e 6 |
 | F1 serve | crate `spellcore/serve` e `spellcore serve`: HTTP (`/commands`, `/show`, estático), WebSocket JSON-RPC com eventos `show`/`transport`/`log`/`widget`, monitor DMX binário a 40 Hz, MCP streamable em `/mcp`, comandos `input` e `resume`; `--dir` = raiz do repo | feita: `cli/tests/serve.rs` sobe o binário e fecha o contrato ponta a ponta | — |
+| F2 patch | perfis e patch de fixtures no engine (`patch_add`, `patch_del`, `patch_check`, `profiles`, `profile_get`) e `show_patch`: JSON Patch (RFC 6902) sobre o show aberto, com `rev` e `undo` | feita: `engine/tests/patch.rs` e `engine/tests/edit.rs` verdes | — |
 | F4 module | `module.json`: `engine::module` (Module/Param/Cmd, `load`, `check`), comandos `module_add/del/list/get`, `modules/laser.json` | `engine/tests/module.rs` verde | — |
 | Graph runtime | nós `state` e `module` e as chaves `mute`/`state` em qualquer nó (`script/graph.rs`) | 500 nós continuam < 0,1 ms/frame (8,7 µs); semântica em `design/DECISOES.md` | voto do dono; formato do `module.json` combinado com a frente `module` |
 | F9 LASER app | `laser_*` no registry (dacs, open, play, stop, close, param, stats, files) + página `spellgui/web/laser.html` | `cli/tests/laser.rs` verde contra o `Emulator` Ether Dream | contrato do barramento (F1) para a página |

@@ -3,7 +3,7 @@
   "type": "laser",
   "version": "0.1.0",
   "parameters": {
-    "dev/type": { "type": "enum", "options": ["etherdream", "helios", "idn"], "default": "etherdream" },
+    "dev/type": { "type": "enum", "options": ["etherdream", "idn"], "default": "etherdream" },
     "dev/host": { "type": "string", "default": "" },
     "dev/pps": { "type": "int", "default": 30000, "min": 1000, "max": 100000, "norm": [10000, 40000] },
     "ilda/fps": { "type": "float", "default": 30, "min": 1, "max": 200, "norm": [20, 60] },

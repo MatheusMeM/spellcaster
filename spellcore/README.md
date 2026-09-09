@@ -811,16 +811,17 @@ spellcore mcp install --target code [--path P]      # .mcp.json do diretório co
 
 | Superfície | Conteúdo |
 |---|---|
-| tools | uma por comando de `Registry::iter()`: `load`, `show_get`, `resume`, `pause`, `stop`, `locate`, `cue_go`, `transport_state`, `input`, os de edição de `engine::edit` (`show_new`, `show_set`, `show_save`, `track_add`, `track_del`, `key_set`, `key_del`, `cue_set`, `cue_del`, `patch_add`, `patch_del`, `patch_check`, `profiles`, `show_patch`, `graph_get`, `face_get`), os `module_*` de `engine::module` (`module_add`, `module_del`, `module_list`, `module_get`), `play_show`, `net`, `graph_check` e os `laser_*` de `cli/src/laser_cmd.rs` (`laser_dacs`, `laser_open`, `laser_play`, `laser_stop`, `laser_close`, `laser_param`, `laser_stats`, `laser_files`). `inputSchema` = o schema que o `schemars` gerou do struct de argumentos |
+| tools | uma por comando de `Registry::iter()`: `load`, `show_get`, `resume`, `pause`, `stop`, `locate`, `cue_go`, `transport_state`, `input`, os de edição de `engine::edit` (`show_new`, `show_set`, `show_save`, `track_add`, `track_del`, `key_set`, `key_del`, `cue_set`, `cue_del`, `patch_add`, `patch_del`, `patch_check`, `profiles`, `show_patch`, `graph_get`, `face_get`, `profile_get`, `level_set`, `level_clear`, `level_get`, `cue_capture`, `fixture_set`), os `module_*` de `engine::module` (`module_add`, `module_del`, `module_list`, `module_get`), `play_show`, `net`, `graph_check` e os `laser_*` de `cli/src/laser_cmd.rs` (`laser_dacs`, `laser_open`, `laser_play`, `laser_stop`, `laser_close`, `laser_param`, `laser_stats`, `laser_files`). `inputSchema` = o schema que o `schemars` gerou do struct de argumentos |
 | resources | `spell://show` (o `.spell` aberto: fps, duração, saídas, patch, tracks, cues, transporte vivo), `spell://commands` (o registry inteiro em JSON), `spell://graph` (o `graph_get`) e `spell://face` (o `face_get`). Cada resource é uma chamada de comando do registry: o crate `mcp` não tem lógica de produto |
 | erro | erro de comando volta como `isError: true` com o texto (o cliente lê); só rota inexistente vira erro JSON-RPC |
 | `play_show` | bloqueia até o fim do show, então roda em thread e a tool volta na hora (o `BACKGROUND` do Python). Enquanto o MCP roda, a linha de status do `play` vai para o **stderr**: no stdio o stdout é o canal JSON-RPC |
 
 Fora por enquanto, e por quê:
 
-- **`face_get`/`face_patch`/`graph_get`/`graph_patch`/`theme_set`** (PRD §10). O `engine::show`
-  não tem Face nem Theme serializados, e o Graph só existe compilado dentro do `script`; sem
-  estrutura para ler e aplicar JSON Patch, essas tools não teriam backend.
+- **`face_patch`/`graph_patch`/`theme_set`** (PRD §10). `face_get` e `graph_get` existem (leem
+  o que está no `.spell`), mas o `engine::show` não tem Theme serializado e o Graph só existe
+  compilado dentro do `script`; sem estrutura para aplicar JSON Patch, essas três não teriam
+  backend — quem edita o show inteiro por JSON Patch é o `show_patch`.
 - **`mcp_install` como comando do registry.** No Python ele é `@command` e portanto uma tool.
   Aqui não: uma sessão de IA não deve reescrever a própria configuração — quem instala é o
   operador, pelo terminal.

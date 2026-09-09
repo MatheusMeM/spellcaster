@@ -59,8 +59,9 @@ pub fn rev() -> u64 {
 }
 
 /// Troca o show aberto por inteiro (`load`, `show_get {file}`, `show_new`): grava `OPEN` e sobe
-/// `rev`. Sem isso a `rev` que o cliente segurava continuaria valendo em OUTRO show, e o
-/// `show_patch` dele entraria sem erro no arquivo errado.
+/// `rev`. E' quem TROCA de show; o `get_or_insert_with` do `com_ro` tambem escreve em `OPEN`,
+/// mas so' para encher o slot vazio com `novo()`. Sem isso a `rev` que o cliente segurava
+/// continuaria valendo em OUTRO show, e o `show_patch` dele entraria sem erro no arquivo errado.
 pub(crate) fn abre(path: String, sh: Show) {
     *lock(&OPEN) = Some((path, sh));
     REV.fetch_add(1, Ordering::Relaxed);

@@ -1,7 +1,7 @@
 # Spellcaster
 
 Spellcaster é um media server de luz e laser portátil da Feitiçaria Industrial: timeline, cues,
-sACN, Art-Net, OSC e ILDA (Ether Dream, Helios, IDN), GUI web com skins, MCP embutido, player
+sACN, Art-Net, OSC e ILDA (Ether Dream, IDN), GUI web com skins, MCP embutido, player
 standalone e versão Lite para Raspberry Pi operada por CLI via SSH.
 
 O repo tem duas camadas:
@@ -27,7 +27,7 @@ Instalação (pendrive Windows, Lite no Pi, código-fonte): `INSTALL.md`. Licen�
 | R0 (Rust) | `engine`, `protocols`, `cli net/play`, `bench` jitter/throughput | concluída, dentro do alvo |
 | R1 (Rust) | cues, `.spell` completo, `fx` Rhai, Graph, player + OSC, CLI headless | concluída, conformidade ao vivo 89/89 |
 | R3 (Rust) | `pixelmap`: amostragem nearest/bilinear com rayon, 100 000 px | concluída, 0,316 ms p99 por frame |
-| R4 (Rust) | `laser`: optimize/safety, `.ild`, Ether Dream/Helios/IDN, 4 feeds | concluída, 0,83 % de cpu |
+| R4 (Rust) | `laser`: optimize/safety, `.ild`, Ether Dream/IDN, 4 feeds | concluída, 0,83 % de cpu |
 | R5 base | `spellgui/web`: `canvaskit.js` (pan, zoom, seleção, hit-test) e timeline em canvas | base pronta; falta Tauri, painéis, Theme/Face |
 | R7 (Rust) | `mcp`: rmcp em stdio, uma tool por comando do registry, `spellcore mcp install` | concluída em stdio |
 | R8 | onedir Windows, Linux, `spellcore` estático para Pi (musl), CI com bench como gate | concluída |
