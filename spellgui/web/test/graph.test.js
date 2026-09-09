@@ -165,6 +165,54 @@ test("show sem graph: a primeira edicao cria /graph junto, e o undo tira", () =>
   assert.equal(GM.comGraph(com, o2), o2);
 });
 
+// Shift+A: o Enter e o clique so' criam se a lista tiver item. Digitacao real perde o ponto
+// ("intimer"), troca por espaco ou vem com Caps: a lista ficava VAZIA e o no' nunca nascia.
+test("busca acha o tipo com o separador errado, faltando ou com caixa trocada", () => {
+  const so = q => CATALOG.busca(q, {});
+  assert.deepEqual(so("in.timer"), ["in.timer"]);
+  assert.deepEqual(so("intimer"), ["in.timer"]);
+  assert.deepEqual(so("in timer"), ["in.timer"]);
+  assert.deepEqual(so(" in.timer "), ["in.timer"]);
+  assert.deepEqual(so("IN.TIMER"), ["in.timer"]);
+  assert.deepEqual(so("in,timer"), ["in.timer"]);       // numpad de teclado pt-BR manda virgula
+  assert.deepEqual(so("mathmap"), ["math.map"]);
+  assert.deepEqual(so("logictoggle"), ["logic.toggle"]);
+  assert.deepEqual(so("naoexiste"), []);                // o que nao casa continua sem casar
+  assert.deepEqual(CATALOG.busca("laser", { laser: {} }), ["module:laser"]);
+  assert.equal(so("").length, Object.keys(CATALOG.CAT).length);
+});
+
+test("Inspector: os campos do no' selecionado e o patch de um campo", () => {
+  const d = demo();
+  const c = GM.campos(d, "space");
+  assert.deepEqual(c[0], ["key", "string", "Space"]);   // cfg do tipo vem antes das universais
+  assert.deepEqual(c.map(x => x[0]), ["key", "mute", "lock", "state", "group", "label"]);
+  assert.deepEqual(GM.campos(d, "nao_existe"), []);
+  // math.curve: enum e json juntos, e o campo que o no' nao tem chega undefined
+  const curva = { graph: { nodes: [{ id: "c", type: "math.curve" }], edges: [] } };
+  assert.deepEqual(GM.campos(curva, "c").slice(0, 2), [
+    ["curve", "enum:linear|hold|in|out|inout|bezier", undefined],
+    ["c", "json", undefined],
+  ]);
+
+  // o cfg mora PLANO no no' (graph.rs le `n.get("every")`), e nao em /cfg/<campo>
+  const ops = GM.opsChave(d, "space", "key", "Enter");
+  assert.deepEqual(ops, [{ op: "replace", path: "/graph/nodes/0/key", value: "Enter" }]);
+  assert.equal(GM.no(GM.patch(d, ops).doc, "space").key, "Enter");
+});
+
+test("Inspector: campo numerico ou json invalido nao grava", () => {
+  assert.deepEqual(GM.valor("number", "2.5"), { v: 2.5 });
+  assert.deepEqual(GM.valor("number", "0"), { v: 0 });
+  assert.ok(GM.valor("number", "").erro);
+  assert.ok(GM.valor("number", "abc").erro);            // NaN viraria null no JSON
+  assert.deepEqual(GM.valor("bool", true), { v: true });
+  assert.deepEqual(GM.valor("string", 12), { v: "12" });
+  assert.deepEqual(GM.valor("enum:a|b", "b"), { v: "b" });
+  assert.deepEqual(GM.valor("json", "[0,1]"), { v: [0, 1] });
+  assert.ok(GM.valor("json", "[0,").erro);
+});
+
 test("novoId nao repete", () => {
   const d = demo();
   assert.equal(GM.novoId(d, "logic.toggle"), "toggle2");

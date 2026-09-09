@@ -121,11 +121,17 @@ function compat(a, b) {
   return `tipo ${a} nao liga em ${b}: use um no de conversao (math.map, logic.toggle)`;
 }
 
+// Nome comparavel: sem caixa e sem separador. O nome do tipo tem ponto ("in.timer") e o operador
+// digita rapido: um ponto que nao entrou, um espaco no lugar dele ou o Caps ligado deixava a lista
+// VAZIA — e lista vazia nao cria no nem no Enter nem no clique, porque nao ha' item para clicar.
+function chave(s) { return String(s).toLowerCase().replace(/[^a-z0-9]/g, ""); }
+
 // Lista para o menu Shift+A: busca a partir do primeiro caractere (regra 10 de FUNCOES/README).
+// ponytail: substring da chave, sem fuzzy nem ranking ; entra quando o catalogo passar de uma tela.
 function busca(q, modules) {
   const nomes = Object.keys(CAT).concat(Object.keys(modules || {}).map(n => `module:${n}`));
-  const s = (q || "").toLowerCase();
-  return nomes.filter(n => n.toLowerCase().includes(s)).sort();
+  const s = chave(q);
+  return nomes.filter(n => chave(n).includes(s)).sort();
 }
 
 const CATALOG = { CAT, UNIVERSAL, PORT_SHAPE, moduleDef, nodeDef, port, compat, busca };
