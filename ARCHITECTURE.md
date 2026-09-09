@@ -234,7 +234,8 @@ u, v}]}`; a ligação com o player espera a R2 (mídia), então o crate ainda ro
   `time.*`, `cmd`, `out.*`), ordem topológica na compilação, pinos por índice, zero alocação por frame.
 - `laser`: `Point`, `Frame`, `optimize(&[Point], Safety) -> Vec<Point>` (dwell, blanking,
   interpolação, limite de kpps, tamanho mínimo de figura), `ild::read/write` (formatos 0, 1, 2, 4, 5),
-  `trait Dac` para Ether Dream (TCP, com `Emulator`), Helios (USB) e IDN (UDP),
+  `trait Dac` para Ether Dream (TCP, com `Emulator`) e IDN (UDP) — o Helios (USB) tem só o
+  encoder do frame, sem driver,
   `Feed::start(Box<dyn Dac>, pps, buffer_frames, Safety)` com thread própria por DAC.
   Safety é obrigatória no `Feed`: não há caminho para o DAC sem ela.
 
