@@ -427,7 +427,7 @@ TL.connect = function () {
 // ---- tracks -------------------------------------------------------------
 TL.trackAdd = function () {
   TL.show.tracks.push({ type: "dmx", universe: 1, address: 1, keys: [] });  // igual ao track_add
-  send([{ cmd: "track_add", args: { type: "dmx", universe: 1, address: 1, label: "" } }]);
+  send([{ cmd: "track_add", args: { type: "dmx", universe: 1, address: 1, name: "" } }]);
   TL.load(TL.show);
   TL.cur = TL.lanes.length - 1;
 };

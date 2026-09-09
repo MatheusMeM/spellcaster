@@ -237,7 +237,7 @@ fn barramento_http_ws_monitor_e_mcp() {
     ws.send(
         10,
         "load",
-        json!({"path": format!("{}/shows/medgrupo_r0.spell", RAIZ)}),
+        json!({"file": format!("{}/shows/medgrupo_r0.spell", RAIZ)}),
     );
     let r = ws.ate(10.0, |v| v["id"] == json!(10));
     assert!(r["error"].is_null(), "load: {}", r);

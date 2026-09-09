@@ -27,10 +27,15 @@ fn abrir_editar_gravar_e_reabrir() {
     c("show_get", json!({ "file": SPELL })).unwrap();
     let i = c(
         "track_add",
-        json!({"type": "dmx", "universe": 2, "address": 10, "label": "teste"}),
+        json!({"type": "dmx", "universe": 2, "address": 10, "name": "teste"}),
     )
     .unwrap();
     assert_eq!(i, json!(3));
+    // `label` e' o nome velho de `name` e continua aceito por uma rodada (deprecated)
+    let j = c("track_add", json!({"label": "velho"})).unwrap();
+    let tr = c("show_get", json!({"full": true})).unwrap();
+    assert_eq!(tr["tracks"][j.as_u64().unwrap() as usize]["name"], "velho");
+    c("track_del", json!({ "index": j })).unwrap();
     c("key_set", json!({"track": 3, "t": 0, "value": [0, 0, 0]})).unwrap();
     c(
         "key_set",

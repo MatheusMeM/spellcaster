@@ -179,7 +179,7 @@ fn rev_velha_e_recusada(r: &Registry) {
 /// `load` e `show_get {file}` trocam o show inteiro: a revisao que o cliente segurava nao pode
 /// valer no show novo, senao o patch dele entra no arquivo errado.
 fn trocar_de_show_sobe_rev(r: &Registry) {
-    for (cmd, arg) in [("load", "path"), ("show_get", "file")] {
+    for (cmd, arg) in [("load", "file"), ("show_get", "file")] {
         r.call("show_get", json!({ "file": SPELL })).unwrap();
         let v = rev();
         r.call(cmd, json!({ arg: OUTRO })).unwrap();
