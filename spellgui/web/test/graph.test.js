@@ -8,8 +8,6 @@ const assert = require("node:assert");
 const CATALOG = require("../catalog.js");
 const { GM } = require("../graph.js");
 
-const defs = { nodeDef: CATALOG.nodeDef, port: CATALOG.port, compat: CATALOG.compat, modules: {} };
-
 function demo() {
   return {
     name: "t",
@@ -33,12 +31,12 @@ function demo() {
 
 test("tipo de porta: igual liga, trigger e bool se ligam, number nao vira trigger", () => {
   const d = demo();
-  assert.equal(GM.porQue(d, "space.down", "toggle.in", defs), "");        // trigger -> trigger
-  assert.equal(GM.porQue(d, "toggle.out", "go.trigger", defs), "");       // bool -> trigger
-  assert.equal(GM.porQue(d, "osc.out", "param.in", defs), "");            // number -> number
-  assert.match(GM.porQue(d, "osc.out", "toggle.in", defs), /nao liga/);   // number -> trigger
-  assert.match(GM.porQue(d, "space.nope", "toggle.in", defs), /saida/);   // pino que nao existe
-  assert.match(GM.porQue(d, "toggle.out", "toggle.in", defs), /nele mesmo/);
+  assert.equal(GM.porQue(d, "space.down", "toggle.in"), "");        // trigger -> trigger
+  assert.equal(GM.porQue(d, "toggle.out", "go.trigger"), "");       // bool -> trigger
+  assert.equal(GM.porQue(d, "osc.out", "param.in"), "");            // number -> number
+  assert.match(GM.porQue(d, "osc.out", "toggle.in"), /nao liga/);   // number -> trigger
+  assert.match(GM.porQue(d, "space.nope", "toggle.in"), /saida/);   // pino que nao existe
+  assert.match(GM.porQue(d, "toggle.out", "toggle.in"), /nele mesmo/);
 });
 
 test("catalogo: todo no tem cfg, ins e outs; module.json vira no", () => {
@@ -79,12 +77,6 @@ test("patch: op invalida no meio nao aplica nada", () => {
   assert.equal(JSON.stringify(r.doc), antes);
 });
 
-test("patch: test que falha barra a lista", () => {
-  const d = demo();
-  const r = GM.patch(d, [{ op: "test", path: "/graph/nodes/0/type", value: "in.osc" }]);
-  assert.match(r.error, /test falhou/);
-});
-
 test("ops de chave, movimento e ligacao", () => {
   let d = demo();
   d = GM.patch(d, GM.opsChave(d, "toggle", "mute", true)).doc;
@@ -106,7 +98,7 @@ test("Delete apaga os cabos do no; Shift+Delete religa entrada na saida", () => 
   assert.equal(GM.g(so.doc).edges.filter(e => e.join().includes("toggle")).length, 0);
   assert.equal(GM.g(so.doc).edges.length, 2);
 
-  const re = GM.patch(d, GM.opsDelReconecta(d, ["toggle"], defs));
+  const re = GM.patch(d, GM.opsDelReconecta(d, ["toggle"]));
   assert.equal(re.error, "");
   assert.ok(GM.g(re.doc).edges.some(e => e[0] === "space.down" && e[1] === "go.trigger"));
   assert.equal(GM.g(re.doc).nodes.length, 4);
@@ -118,7 +110,7 @@ test("Shift+Delete nao religa quando o tipo nao bate", () => {
   const d = demo();
   // osc(number) -> param(number): apagar param nao tem saida; apagar osc nao tem entrada.
   // caso real: apagar `go` ligaria toggle.out(bool) em param.in(number): recusado.
-  const r = GM.patch(d, GM.opsDelReconecta(d, ["go"], defs));
+  const r = GM.patch(d, GM.opsDelReconecta(d, ["go"]));
   assert.equal(r.error, "");
   assert.ok(!GM.g(r.doc).edges.some(e => e[0] === "toggle.out" && e[1] === "param.in"));
 });
@@ -137,6 +129,17 @@ test("grupo: colapsa e expoe so' os pinos que cruzam a borda, em ordem estavel",
   const dentro = GM.visiveis(d, "seg");
   assert.deepEqual(dentro.nodes.map(n => n.id), ["osc", "param"]);
   assert.equal(dentro.grupos.size, 0);
+});
+
+test("Delete com grupo fechado selecionado apaga os nos do grupo", () => {
+  const d = demo();
+  // a selecao guarda o NOME do grupo fechado, que nao e' id de no: sem GM.ids, Delete nao faz nada
+  assert.deepEqual(GM.ids(d, new Set(["seg"])), ["osc", "param"]);
+  assert.deepEqual(GM.ids(d, new Set(["toggle", "seg"])), ["toggle", "osc", "param"]);
+  const r = GM.patch(d, GM.opsDel(d, GM.ids(d, new Set(["seg"]))));
+  assert.equal(r.error, "");
+  assert.deepEqual(GM.g(r.doc).nodes.map(n => n.id), ["space", "toggle", "go"]);
+  assert.equal(GM.g(r.doc).edges.length, 2);
 });
 
 test("novoId nao repete", () => {

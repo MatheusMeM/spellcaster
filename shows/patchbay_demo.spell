@@ -18,8 +18,9 @@
  "graph": {
   "nodes": [
    { "id": "space", "type": "in.key", "key": "Space", "x": 40, "y": 60 },
-   { "id": "toggle", "type": "logic.toggle", "x": 280, "y": 60 },
-   { "id": "go", "type": "cmd", "cmd": "cue_go", "args": {}, "x": 520, "y": 60 },
+   { "id": "ensaio", "type": "state", "initial": true, "x": 40, "y": 180 },
+   { "id": "toggle", "type": "logic.toggle", "state": "ensaio", "x": 280, "y": 60 },
+   { "id": "go", "type": "cmd", "cmd": "cue_go", "args": {}, "state": "ensaio", "x": 520, "y": 60 },
    { "id": "black", "type": "in.osc", "address": "/spell/blackout", "x": 40, "y": 280,
      "group": "seguranca" },
    { "id": "hold", "type": "time.hold", "ms": 500, "x": 280, "y": 280, "group": "seguranca" },
@@ -27,6 +28,7 @@
      "group": "seguranca" }
   ],
   "edges": [
+   ["space.down", "ensaio.enter"],
    ["space.down", "toggle.in"],
    ["toggle.out", "go.trigger"],
    ["space.down", "hold.in"],

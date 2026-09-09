@@ -39,6 +39,7 @@
          border: 1px solid var(--sc-accent); padding: 4px; }
   #add input { width: 200px; background: var(--sc-well); color: var(--sc-fg);
                border: 1px solid var(--sc-line); font: 12px var(--sc-mono); padding: 4px; }
+  #add div { max-height: 46vh; overflow: auto; }
   #add button { display: block; width: 100%; text-align: left; background: none; border: 0;
                 color: var(--sc-fg); font: 11px var(--sc-mono); padding: 3px 6px; }
   #add button:hover { background: var(--sc-accent); color: var(--sc-bg); }
@@ -51,7 +52,6 @@
   <button id="open">Abrir</button>
   <span class="over" id="estado">offline</span>
   <span class="over" id="aviso"></span>
-  <span class="over" id="msg"></span>
   <span class="over">Shift+A add &nbsp; Delete &nbsp; Shift+Delete religa &nbsp; Ctrl+] / Ctrl+[ grupo &nbsp;
     M mute &nbsp; L lock &nbsp; Shift+G grupo &nbsp; Ctrl+Z &nbsp; Shift+Z enquadra</span>
 </div>
@@ -70,7 +70,7 @@
 <script>
 "use strict";
 const q = id => document.getElementById(id);
-PB.init({ cv: q("cv"), cat: q("cat"), insp: q("insp"), log: q("log"), msg: q("msg"),
+PB.init({ cv: q("cv"), cat: q("cat"), insp: q("insp"), log: q("log"),
           aviso: q("aviso"), add: q("add"), estado: q("estado") });
 const arg = new URLSearchParams(location.search).get("show");
 if (arg) q("path").value = arg;

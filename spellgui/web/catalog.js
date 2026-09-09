@@ -1,6 +1,6 @@
 "use strict";
 // catalog.js — o catalogo FECHADO do graph (spellcore/script/src/graph.rs, PRD §10) como DADO,
-// mais os nos propostos na rodada (state, module) e as chaves universais (mute, lock, group, x, y).
+// mais os nos state e module (frente graph-runtime) e as chaves universais (mute, lock, group, x, y).
 // Quem desenha o PATCHBAY le daqui: nao ha lista de nos escrita a mao em graph.js.
 //
 // Tipo de porta e REGRA DO EDITOR: o runtime carrega tudo como f64. Cabo so liga tipos
@@ -74,12 +74,11 @@ const CAT = {
   "out.osc": { fam: "out", cfg: { address: "string" }, ins: { in: "number" }, outs: {} },
   "out.param": { fam: "out", cfg: { target: "string" }, ins: { in: "number" }, outs: {} },
   "out.notify": { fam: "out", cfg: { text: "string" }, ins: { in: "trigger" }, outs: {} },
-  // Propostos na rodada (frente graph-runtime); o editor ja monta, o runtime entra no merge dela.
   "state": {
     fam: "logic", cfg: { group: "string", initial: "bool" },
-    ins: { enter: "trigger", exit: "trigger" }, outs: { active: "bool" }, proposto: true,
+    ins: { enter: "trigger", exit: "trigger" }, outs: { active: "bool" },
   },
-  "module": { fam: "module", cfg: { module: "string" }, ins: {}, outs: {}, proposto: true },
+  "module": { fam: "module", cfg: { module: "string" }, ins: {}, outs: {} },
 };
 
 // Chaves aceitas em QUALQUER no. O runtime ignora as desconhecidas (confirmado em graph.rs).
