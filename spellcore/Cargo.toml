@@ -17,6 +17,7 @@ rmcp = { version = "3", default-features = false, features = ["server", "transpo
 tokio = { version = "1", default-features = false, features = ["rt", "time"] }
 axum = { version = "0.8", features = ["ws"] }
 socket2 = { version = "0.5", features = ["all"] }
+midir = "0.10"   # entrada MIDI: RtMidi em Rust (winmm no Windows, ALSA no Linux, CoreMIDI no mac)
 criterion = { version = "0.5", default-features = false, features = ["cargo_bench_support"] }
 engine = { path = "engine" }
 laser = { path = "laser" }

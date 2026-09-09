@@ -825,6 +825,117 @@
     }
   },
   {
+    "doc": "Lista as portas MIDI de entrada da maquina e qual esta' aberta.",
+    "name": "midi_ports",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "description": "Comando sem parametro.",
+      "title": "NoArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Abre uma porta MIDI de entrada (nome, trecho do nome ou indice) e grava midi_port no show aberto.",
+    "name": "midi_open",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "port": {
+          "default": "",
+          "description": "Nome da porta (ou um trecho dele), indice em texto (\"0\"), ou vazio = a primeira.",
+          "type": "string"
+        }
+      },
+      "title": "PortArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Fecha a porta MIDI e tira o midi_port do show aberto.",
+    "name": "midi_close",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "description": "Comando sem parametro.",
+      "title": "NoArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Liga uma tecla/CC a um comando no show aberto. Devolve o mapa.",
+    "name": "midi_map",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "args": {
+          "default": null,
+          "description": "Argumentos do comando. \"$\" vira o valor 0..1 e \"$<n>\" vira round(valor * n)."
+        },
+        "cmd": {
+          "description": "Nome do comando do registry.",
+          "type": "string"
+        },
+        "key": {
+          "description": "Chave do evento: \"<status>/<data1>\" (144/60 = note on nota 60, 176/1 = CC 1).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cmd",
+        "key"
+      ],
+      "title": "MapArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Desliga uma tecla do show aberto.",
+    "name": "midi_unmap",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "key": {
+          "description": "Chave do evento a remover.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "title": "KeyArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "O mapa tecla -> comando do show aberto.",
+    "name": "midi_maps",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "description": "Comando sem parametro.",
+      "title": "NoArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Ultima tecla MIDI recebida: {key, value, raw, seq}. E' com ela que a GUI mostra ao vivo.",
+    "name": "midi_last",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "description": "Comando sem parametro.",
+      "title": "NoArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Espera ate' 5 s pela proxima tecla MIDI e devolve a chave dela.",
+    "name": "midi_learn",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "description": "Comando sem parametro.",
+      "title": "NoArgs",
+      "type": "object"
+    }
+  },
+  {
     "doc": "Toca um show .spell ate o fim ou Ctrl+C.",
     "name": "play_show",
     "params": {

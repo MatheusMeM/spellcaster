@@ -83,6 +83,7 @@ C:\Python313\python.exe tests/conformance/capture_sacn.py --secs 3
 | `schemars` | engine (registry) | schema JSON de cada comando, consumido pela CLI e pelas tools do MCP; reexportado em `engine::schemars` para que `cli` não pine a própria versão |
 | `clap` (feature `derive`) | cli | parser de argumentos; cinco subcomandos em structs fixas |
 | `rmcp` + `tokio` | mcp | SDK oficial do Model Context Protocol; é async, e o runtime `current_thread` mora só dentro de `mcp::serve_stdio` |
+| `midir` | protocols | entrada MIDI de qualquer teclado ou surface; é a RtMidi em Rust (winmm no Windows, ALSA no Linux, CoreMIDI no mac), e falar winmm na mão seria FFI de Windows dentro do crate de protocolo |
 | `socket2` | protocols | `std::net::UdpSocket` não expõe `IP_MULTICAST_IF` nem `SO_REUSEADDR`, exigidos por sACN |
 | `criterion` | bench, laser, pixelmap (dev) | medida estatística de jitter/latência exigida pelo PRD |
 | `rayon` | pixelmap | 100 000 px por frame em ~590 universos independentes; pool de trabalho sem escrever um |
@@ -430,6 +431,8 @@ MCP, Rhai e laser.
 
 ## Ordem de avaliação de um frame (fixa; é o que a conformidade mede)
 
+0. A fila de entrada: os pedidos de `cue_go`/`locate`/`input` **e** os eventos MIDI
+   (`midi::pump()`). Não é passo de avaliação — é o que chega de fora antes do frame começar.
 1. `Timeline::apply(&mut universes, t)` — tracks `dmx` e `artnet`.
 2. Cada `FrameHook` na ordem em que foi registrado (tracks `fx` na ordem do `.spell`, depois o Graph).
 3. Efeito colateral: a **gravação** (`rec::tick` — track armado lê o universo de entrada e grava
@@ -686,7 +689,8 @@ default `v`. "Dispara na GUI" cita a página (`index.html` = TIMELINE, `teatro.h
 
 Assinatura muda para `pub fn base() -> Registry` (sem `Clock`: o transporte age no player vivo).
 Comandos: `load` (R0), `resume`, `pause`, `stop`, `locate`, `cue_go`, `transport_state` e, desde
-a R7, `show_get`. Os de transporte usam `player::current()`; sem player vivo devolvem
+a R7, `show_get`; mais os de `engine::edit`, `engine::module` e `engine::midi`, que se registram
+em `base()`. Os de transporte usam `player::current()`; sem player vivo devolvem
 `Err("sem player em execucao")`. `show_get(file="", full=false)` abre o `.spell` (ou reusa o
 último aberto neste processo, o `OPEN` do `spellcaster/mcp/tools.py`) e resume nome, fps,
 duração, saídas, patch, tracks, cues e o transporte vivo; é ele que alimenta o resource
@@ -827,6 +831,79 @@ frame seguinte, antes da timeline, para o que a timeline possui voltar a valer. 
 Sem player vivo, os cinco devolvem `sem player em execucao`. Teste: `engine/tests/programmer.rs`,
 binário próprio (`CURRENT` e `OPEN` são globais do processo).
 
+### MIDI — mapeamento de tecla para comando (`engine::midi` + `protocols::midi`)
+
+"Fazer o MIDI mapping das teclas para qualquer teclado ou surface": uma porta de entrada aberta,
+um mapa `tecla → comando` que vive no `.spell`, e a mesma tecla entregue ao graph.
+
+Chave do evento: **`"<status>/<data1>"`** — `144/60` = note on canal 1 nota 60, `128/60` = a mesma
+tecla solta, `176/1` = CC 1 do canal 1. O canal já está no status (canal 2 = 145 / 177), então é
+uma chave só, a mesma que o nó `in.midi` do graph já usava. Note on com velocidade 0 vira note off
+(`0x8n`): metade dos teclados solta a tecla assim, e sem isso soltar dispararia o comando de novo.
+
+No `.spell`:
+
+```json
+{"midi_port": "MPK mini 3",
+ "midi": {"144/60": {"cmd": "resume"},
+          "144/62": {"cmd": "cue_go", "args": {}},
+          "176/1":  {"cmd": "level_set", "args": {"address": 1, "values": ["$255"]}}}}
+```
+
+`"$"` nos args vira o valor da tecla (0..1, isto é `data2/127`) e `"$<n>"` vira
+`round(valor × n)`: `"$127"` é o byte cru do MIDI e `"$255"` é o nível DMX. Vale dentro de lista e
+de objeto. `"midi_port"` religa a superfície quando o show sobe (`Player::new`); porta que não
+aparece vira aviso no stderr, não erro — show não para porque o controlador ficou no estojo.
+
+| Comando | Faz | Devolve |
+|---|---|---|
+| `midi_ports()` | portas de entrada da máquina; máquina sem MIDI devolve lista vazia, nunca erro | `{ports, open}` |
+| `midi_open(port="")` | abre por nome, trecho do nome ou índice em texto; vazio = a primeira. Grava `midi_port` no show aberto | `{open}` |
+| `midi_close()` | fecha a porta e tira `midi_port` do show | `{open: null}` |
+| `midi_map(key, cmd, args={})` | liga a tecla ao comando no show aberto; a chave e o nome do comando são validados **aqui**, não no meio do show | o mapa |
+| `midi_unmap(key)` | desliga a tecla | o mapa |
+| `midi_maps()` | o mapa do show aberto | o mapa |
+| `midi_last()` | última tecla recebida; é com ela que a GUI mostra ao vivo | `{key, value, raw, seq}` |
+| `midi_learn()` | espera até 5 s pela próxima tecla e devolve a chave dela | `{key, value, raw, seq}` |
+
+Onde o evento é consumido: `midi::pump()` na primeira linha de `Rt::drain`, o mesmo ponto onde a
+fila do comando `input` é consumida — **a ordem de avaliação do frame não muda**. Cada evento vira
+(1) `input {key: "midi:<chave>", value}` nos ganchos do player vivo, para o nó `in.midi`, e (2) a
+chamada do comando do mapa pelo registry, o mesmo caminho do WS. `midi_last` e `midi_learn` também
+drenam a fila, para o LEARN da GUI funcionar sem show tocando.
+
+`protocols::midi` (crate `midir`, a RtMidi em Rust: winmm no Windows, ALSA no Linux, CoreMIDI no
+mac — é o que faz "qualquer teclado" funcionar sem driver do fabricante):
+
+```rust
+pub fn ports() -> Vec<String>;                       // vazio quando não há MIDI na máquina
+pub struct MidiIn { /* conexão + fila */ }
+impl MidiIn {
+    pub fn open(port: &str) -> Result<MidiIn, String>;   // nome, trecho, índice, ou "" = a primeira
+    pub fn name(&self) -> &str;
+    pub fn try_recv(&self) -> Option<(u8, u8, u8)>;      // (status, data1, data2)
+}
+pub fn evento(m: &[u8]) -> Option<(u8, u8, u8)>;     // mensagem crua -> evento de canal
+```
+
+A thread de callback do driver empurra em um `sync_channel(256)`: cheia, o evento novo cai e o
+driver nunca bloqueia. `Ignore::All` descarta SysEx, clock e active sensing antes da fila.
+
+Fora do escopo desta frente: **saída** MIDI, MTC/clock, MIDI Show Control e feedback de LED de
+superfície (`design/DECISOES.md`, "aguarda voto").
+
+Limites deliberados:
+
+- uma porta por processo (`// ponytail:` em `engine/src/midi.rs`) — a chave não distingue a porta;
+- o comando do mapa roda na thread que drenou (o frame, no caso normal): mapear `net` ou
+  `play_show` numa tecla trava o frame enquanto o comando roda;
+- sem player e sem página de MIDI aberta, ninguém drena a fila — ela enche e para de crescer.
+
+Página: `spellgui/web/midi.html` + `midi.js` (portas, abrir/fechar, tabela do mapa, LEARN, última
+tecla ao vivo, prévia do `"$"`). Testes: `engine/tests/midi.rs` (mapa e `$`, sem hardware),
+`protocols::midi` (parse da mensagem e escolha de porta), `spellgui/web/test/midi.test.js` (args da
+página).
+
 ## `script` (crate novo)
 
 ```rust
@@ -948,7 +1025,7 @@ spellcore mcp install --target code [--path P]      # .mcp.json do diretório co
 
 | Superfície | Conteúdo |
 |---|---|
-| tools | uma por comando de `Registry::iter()`: `load`, `show_get`, `resume`, `pause`, `stop`, `locate`, `cue_go`, `transport_state`, `input`, `input_get`, `rec_arm`, `rec_state`, os de edição de `engine::edit` (`show_new`, `show_set`, `show_save`, `track_add`, `track_del`, `key_set`, `key_del`, `cue_set`, `cue_del`, `patch_add`, `patch_del`, `patch_check`, `profiles`, `show_patch`, `graph_get`, `face_get`, `profile_get`, `level_set`, `level_clear`, `level_get`, `cue_capture`, `fixture_set`), os `module_*` de `engine::module` (`module_add`, `module_del`, `module_list`, `module_get`), `play_show`, `net`, `graph_check` e os `laser_*` de `cli/src/laser_cmd.rs` (`laser_dacs`, `laser_open`, `laser_play`, `laser_stop`, `laser_close`, `laser_param`, `laser_stats`, `laser_files`, `clip_frame`). `inputSchema` = o schema que o `schemars` gerou do struct de argumentos |
+| tools | uma por comando de `Registry::iter()`: `load`, `show_get`, `resume`, `pause`, `stop`, `locate`, `cue_go`, `transport_state`, `input`, `input_get`, `rec_arm`, `rec_state`, os de edição de `engine::edit` (`show_new`, `show_set`, `show_save`, `track_add`, `track_del`, `key_set`, `key_del`, `cue_set`, `cue_del`, `patch_add`, `patch_del`, `patch_check`, `profiles`, `show_patch`, `graph_get`, `face_get`, `profile_get`, `level_set`, `level_clear`, `level_get`, `cue_capture`, `fixture_set`), os `module_*` de `engine::module` (`module_add`, `module_del`, `module_list`, `module_get`), os `midi_*` de `engine::midi` (`midi_ports`, `midi_open`, `midi_close`, `midi_map`, `midi_unmap`, `midi_maps`, `midi_last`, `midi_learn`), `play_show`, `net`, `graph_check` e os `laser_*` de `cli/src/laser_cmd.rs` (`laser_dacs`, `laser_open`, `laser_play`, `laser_stop`, `laser_close`, `laser_param`, `laser_stats`, `laser_files`, `clip_frame`). `inputSchema` = o schema que o `schemars` gerou do struct de argumentos |
 | resources | `spell://show` (o `.spell` aberto: fps, duração, saídas, patch, tracks, cues, transporte vivo), `spell://commands` (o registry inteiro em JSON), `spell://graph` (o `graph_get`) e `spell://face` (o `face_get`). Cada resource é uma chamada de comando do registry: o crate `mcp` não tem lógica de produto |
 | erro | erro de comando volta como `isError: true` com o texto (o cliente lê); só rota inexistente vira erro JSON-RPC |
 | `play_show` | bloqueia até o fim do show, então roda em thread e a tool volta na hora (o `BACKGROUND` do Python). Enquanto o MCP roda, a linha de status do `play` vai para o **stderr**: no stdio o stdout é o canal JSON-RPC |

@@ -6,6 +6,7 @@ pub mod cues;
 pub mod edit;
 pub mod hook;
 pub mod input;
+pub mod midi;
 pub mod module;
 pub mod player;
 pub mod rec;

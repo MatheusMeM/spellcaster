@@ -342,6 +342,7 @@ pub fn base() -> Registry {
     crate::edit::register(&mut r);
     crate::module::register(&mut r);
     crate::rec::register(&mut r);
+    crate::midi::register(&mut r);
     r
 }
 
