@@ -279,10 +279,18 @@ mod tests {
     #[test]
     fn base_tem_transporte_e_load() {
         let r = base();
-        for c in ["load", "show_get", "resume", "pause", "stop", "locate", "cue_go"] {
+        for c in [
+            "load",
+            "show_get",
+            "resume",
+            "pause",
+            "stop",
+            "locate",
+            "cue_go",
+            "transport_state",
+        ] {
             assert!(r.get(c).is_some(), "comando {} ausente", c);
         }
-        assert!(r.get("transport_state").is_some());
         // ponytail: o teste so' vale quando nao ha player neste processo — os testes do player
         // sobem o seu em outro binario (tests/player.rs), entao aqui nunca ha CURRENT.
         for (c, a) in [

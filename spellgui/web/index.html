@@ -85,14 +85,15 @@ q("rec").onclick = () => {
 q("fit").onclick = () => TL.fit();
 q("tadd").onclick = () => { show(); TL.trackAdd(); };
 q("tdel").onclick = () => TL.trackDel();
-q("mon").onclick = () => { TL.mon = !TL.mon; q("mon").classList.toggle("on", TL.mon); TL.k.invalidate(); };
+q("mon").onclick = () => { TL.mon = !TL.mon; TL.onState(); TL.k.invalidate(); };
 q("save").onclick = () => TL.save();
 
-// O botao Play so acende quando ha transporte andando (local ou do engine).
-setInterval(() => {
+// O botao Play so acende quando ha transporte andando (local ou do engine): a timeline chama isto
+// em toda mudanca de transporte e no Alt+M do monitor.
+TL.onState = () => {
   q("play").classList.toggle("on", !!TL.rate);
   q("mon").classList.toggle("on", TL.mon);
-}, 200);
+};
 
 TL.k.loop();
 TL.file = q("path").value;

@@ -12,7 +12,7 @@
 //
 // Sem servidor nada muda: o show vem de fetch, o transporte e o relogio local e o commit so reescreve
 // o JSON em memoria. Com servidor o playhead vem dos eventos `transport` e o show recarrega quando
-// alguem de fora mexe (evento `show` com rev diferente).
+// alguem de fora mexe (evento `show` com rev acima do que as nossas chamadas explicam).
 
 const CURVES = ["linear", "hold", "in", "out", "inout", "bezier"];
 // Mesma matematica do engine (spellcaster/timeline/model.py, spellcore/engine): a curva vale para o
@@ -28,6 +28,7 @@ const EASE = [
 const STEPS = [0.04, 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1800];
 const LANE_PARAMS = ["x", "y", "scale", "rot", "color"];
 const SHUTTLE = [1, 2, 4, 8];
+const MONH = 56;                                   // altura do monitor de 512 barras
 
 const TL = {
   show: null, lanes: [], k: null, clip: null, snaps: null,
@@ -35,8 +36,9 @@ const TL = {
   snap: true, cur: -1, drawn: 0,
   t: 0, rate: 0, loop: false, last: 0,
   col: {}, menuEl: null, msgEl: null,
-  file: "", rev: null, expect: 0, tstate: null,   // engine: caminho do show, revisao, transporte
-  mon: false, dmx: new Map(), monH: 56,            // monitor: ultimo frame binario por universo
+  onState: () => {},                               // index.html sincroniza os botoes de transporte
+  file: "", rev: 0, tstate: null,                  // engine: caminho do show, revisao, transporte
+  mon: false, dmx: new Map(),                      // monitor: ultimo frame binario por universo
   fps() { return (this.show && this.show.fps) || 30; },
   dur() { return (this.show && this.show.duration) || 60; },
   inT() { return +((this.show && this.show.in) || 0); },
@@ -61,7 +63,7 @@ TL.log = function (s) { if (TL.msgEl) TL.msgEl.textContent = s; };
 // ---- barramento (spellcore/README.md, secao `serve`) --------------------
 // ponytail: cliente WS de 30 linhas aqui dentro ; trocar por bus.js (frente face) quando ele existir.
 const BUS = {
-  ws: null, id: 0, pend: new Map(), on: {}, ever: false, nopatch: false,
+  ws: null, id: 0, pend: new Map(), on: {}, ever: false,
   live() { return !!this.ws && this.ws.readyState === 1; },
   call(cmd, args) {
     if (!this.live()) return Promise.reject("sem servidor");
@@ -72,7 +74,7 @@ const BUS = {
   msg(d) {
     if (typeof d !== "string") {                       // frame binario do monitor
       const f = TL.frameBin(d);
-      if (f && BUS.on.dmx) BUS.on.dmx(f);
+      if (f) { TL.dmx.set(f.universe, f.data); if (TL.mon) TL.k.dirty = true; }
       return;
     }
     const m = JSON.parse(d);
@@ -87,8 +89,7 @@ const BUS = {
     try { w = this.ws = new WebSocket(url); } catch (e) { TL.log("sem servidor: " + e.message); return; }
     w.binaryType = "arraybuffer";
     w.onmessage = e => BUS.msg(e.data);
-    w.onopen = () => { BUS.ever = true; if (BUS.on.open) BUS.on.open(); };
-    w.onerror = () => {};
+    w.onopen = () => { BUS.ever = true; TL.reload(); };
     w.onclose = () => {
       BUS.ws = null;
       TL.tstate = null;
@@ -99,7 +100,6 @@ const BUS = {
     };
   },
 };
-TL.bus = BUS;
 
 // Frame binario do monitor: topic:u8 | universe:u16 LE | 512 bytes. topic 1 = dmx de saida.
 TL.frameBin = function (buf) {
@@ -107,9 +107,6 @@ TL.frameBin = function (buf) {
   if (b.length < 515 || b[0] !== 1) return null;
   return { universe: b[1] | (b[2] << 8), data: b.subarray(3, 515) };
 };
-
-// Comandos que nao mexem no show (o serve nao emite evento `show` por eles).
-const LEITURA = ["show_get", "transport_state", "profiles", "patch_check", "net", "load"];
 
 // Uma lista de edicoes locais vira a lista de chamadas do registry. Funcao pura: e' esta que o
 // teste cobre. Edicoes: {k:"set"|"move", track, t, from?, value, curve} | {k:"del", track, t} |
@@ -130,29 +127,27 @@ TL.ops = function (eds) {
 };
 
 // Manda as chamadas. Sem servidor nao faz nada: o modo offline continua o de hoje.
+// O serve conta uma revisao por comando aceito e devolve o numero no evento `show`; adiantamos a
+// conta aqui para reconhecer o eco das nossas proprias edicoes (ver TL.revEvento).
+// ponytail: `play_show` (background no serve, unico que nao conta revisao) pelo nome ; sai quando
+// toda resposta do barramento trouxer o rev.
 function send(calls) {
   if (!BUS.live()) return;
-  for (const c of calls) one(c);
+  for (const c of calls) {
+    const conta = c.cmd !== "play_show";
+    if (conta) TL.rev++;
+    BUS.call(c.cmd, c.args)
+      .then(r => { if (r && r.rev) TL.rev = r.rev; })     // show_patch devolve a revisao nova
+      .catch(err => { if (conta) TL.rev--; TL.log(c.cmd + ": " + err); });   // recusado: sem revisao
+  }
 }
 
-function one(c) {
-  // ponytail: sem show_patch no engine, o show inteiro vai por show_set ; sai quando a frente
-  // patch estiver em main (o commit() ja deixou TL.show atualizado, entao os dois sao equivalentes).
-  if (c.cmd === "show_patch" && BUS.nopatch) c = { cmd: "show_set", args: { data: TL.show } };
-  if (LEITURA.indexOf(c.cmd) < 0) TL.expect++;         // o serve emite um evento `show` por chamada
-  BUS.call(c.cmd, c.args).catch(err => {
-    if (LEITURA.indexOf(c.cmd) < 0 && TL.expect > 0) TL.expect--;   // falhou: nao vem evento `show`
-    if (c.cmd === "show_patch" && /desconhecido/.test(String(err))) {
-      BUS.nopatch = true;
-      return one(c);
-    }
-    TL.log(c.cmd + ": " + err);
-  });
-}
-TL.send = send;
+// Evento `show` do serve: rev maior que o esperado (o das nossas chamadas) veio de outro cliente e
+// manda recarregar; menor ou igual e' eco nosso, ou evento atrasado. Funcao pura: e' esta que o
+// teste cobre. O maximo ressincroniza a conta local em qualquer desvio.
+TL.revEvento = (rev, esperado) => ({ rev: Math.max(rev, esperado), reload: rev > esperado });
 
 const hasPlayer = () => TL.tstate === "play" || TL.tstate === "pause";
-TL.hasPlayer = hasPlayer;
 
 const isKeys = v => Array.isArray(v) && v.length > 0 && Array.isArray(v[0]) &&
                     v[0].length >= 2 && typeof v[0][0] === "number";
@@ -190,7 +185,7 @@ TL.load = function (show) {
   TL.k.sel.clear();
   TL.cur = -1;
   TL.t = 0;
-  TL.rate = 0;
+  setRate(0);
   (show.tracks || []).forEach((spec, si) => {
     TL.lanes.push(mkLane(spec, si, null));                        // lane principal (spec.keys)
     for (const p of Object.keys(spec)) {
@@ -317,13 +312,11 @@ function commit(eds) {
   }
   TL.k.dirty = true;
   if (!eds || !eds.length || !BUS.live()) return;
-  const vistas = new Set(), fim = [];
-  for (const e of eds) {                                 // lane inteira: uma op por path, ja gravada
+  const fim = [];
+  for (const e of eds) {                          // lane inteira: uma op com o array ja' gravado
     if (e.k !== "lane") { fim.push(e); continue; }
-    const L = TL.lanes[e.li], path = "/tracks/" + L.si + "/" + L.param;
-    if (vistas.has(path)) continue;
-    vistas.add(path);
-    fim.push({ k: "field", path: path, value: L.spec[L.param] });
+    const L = TL.lanes[e.li];
+    fim.push({ k: "field", path: "/tracks/" + L.si + "/" + L.param, value: L.spec[L.param] });
   }
   send(TL.ops(fim));
 }
@@ -331,7 +324,6 @@ TL.commit = commit;
 
 // Campo do show por show_patch (in, out, markers, mute/solo de track).
 function field(path, value) { commit([{ k: "field", path: path, value: value }]); }
-TL.field = field;
 
 function trackFlag(L, key, on) { field("/tracks/" + L.si + "/" + key, on); }
 
@@ -349,7 +341,13 @@ function setT(t) {
   TL.t = clamp(t, 0, TL.dur());
   TL.k.dirty = true;
 }
-TL.setT = setT;
+
+// Todo ponto que muda o transporte avisa a pagina (TL.onState): sem isso a barra pesquisaria o
+// estado por temporizador.
+function setRate(r) {
+  TL.rate = r;
+  TL.onState();
+}
 
 TL.locate = function (t) {
   setT(t);
@@ -367,7 +365,7 @@ TL.play = function (rate) {
     send([{ cmd: "play_show", args: { file: TL.file, loop: TL.loop } }]);
     return;
   }
-  TL.rate = rate;
+  setRate(rate);
   TL.last = performance.now();
   TL.k.dirty = true;
 };
@@ -375,7 +373,7 @@ TL.play = function (rate) {
 TL.stop = function () {
   if (BUS.live()) send([{ cmd: "stop", args: {} }]);
   TL.tstate = null;
-  TL.rate = 0;
+  setRate(0);
   setT(0);
 };
 
@@ -391,36 +389,26 @@ function frame() {
   const t = TL.t + dt * TL.rate;
   if (hasPlayer()) return setT(t);       // o engine manda; aqui so' interpola entre os eventos
   if (TL.loop && TL.rate > 0 && t >= TL.outT()) return setT(TL.inT());
-  if (t <= 0 || t >= TL.dur()) TL.rate = 0;
+  if (t <= 0 || t >= TL.dur()) setRate(0);
   setT(t);
 }
 
 // ---- ligacao com o engine ----------------------------------------------
 BUS.on.transport = d => {
   TL.tstate = d.state;
-  TL.rate = d.state === "play" ? 1 : 0;
+  setRate(d.state === "play" ? 1 : 0);
   TL.last = performance.now();
   setT(d.t);
 };
 
 // Cada comando nosso que muda o show volta como um evento `show`; so' recarrega o que veio de fora.
 BUS.on.show = d => {
-  TL.rev = d.rev;
-  if (TL.expect > 0) { TL.expect--; return; }
-  TL.reload();
+  const r = TL.revEvento(d.rev, TL.rev);
+  TL.rev = r.rev;
+  if (r.reload) TL.reload();
 };
 
 BUS.on.log = d => TL.log(d.text);
-
-BUS.on.dmx = f => {
-  TL.dmx.set(f.universe, f.data);
-  if (TL.mon) TL.k.dirty = true;
-};
-
-BUS.on.open = () => {
-  BUS.call("show_get", {}).then(s => { TL.file = (s && s.file) || ""; }).catch(() => {});
-  TL.reload();
-};
 
 TL.reload = function () {
   return fetch("/show").then(r => r.json()).then(sh => {
@@ -432,14 +420,13 @@ TL.reload = function () {
   }).catch(e => TL.log("GET /show: " + e.message));
 };
 
-TL.connect = function (url) {
-  BUS.open(url || ("ws://" + location.host + "/ws"));
+TL.connect = function () {
+  BUS.open("ws://" + location.host + "/ws");
 };
 
 // ---- tracks -------------------------------------------------------------
 TL.trackAdd = function () {
-  const tr = { type: "dmx", universe: 1, address: 1, keys: [] };
-  TL.show.tracks.push(tr);                                 // mesmo track que o track_add do engine
+  TL.show.tracks.push({ type: "dmx", universe: 1, address: 1, keys: [] });  // igual ao track_add
   send([{ cmd: "track_add", args: { type: "dmx", universe: 1, address: 1, label: "" } }]);
   TL.load(TL.show);
   TL.cur = TL.lanes.length - 1;
@@ -669,7 +656,7 @@ function draw(k) {
   // ---- monitor: 512 barras do ultimo frame binario do universo da lane focada (Alt+M) ----
   // ponytail: faixa sobreposta no rodape, sem painel proprio ; virar painel quando a GUI tiver layout.
   if (TL.mon) {
-    const mh = TL.monH, y0 = H - mh, sel = TL.lanes[TL.cur];
+    const mh = MONH, y0 = H - mh, sel = TL.lanes[TL.cur];
     const u = sel ? +(sel.spec.universe || 1) : 1, d = TL.dmx.get(u);
     c.fillStyle = col.panel;
     c.fillRect(0, y0, W, mh);
@@ -868,7 +855,7 @@ function onKey(e) {
   else if (key === "ArrowDown") jumpKey(1);
   else if (key === "Home") TL.locate(0);
   else if (key === "End") TL.locate(TL.dur());
-  else if ((key === "m" || key === "M") && alt) { TL.mon = !TL.mon; }
+  else if ((key === "m" || key === "M") && alt) { TL.mon = !TL.mon; TL.onState(); }
   else if ((key === "i" || key === "I") && alt) TL.setInOut(0, null);
   else if ((key === "o" || key === "O") && alt) TL.setInOut(null, TL.dur());
   else if ((key === "x" || key === "X") && alt) TL.setInOut(0, TL.dur());

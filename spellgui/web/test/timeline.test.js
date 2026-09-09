@@ -1,7 +1,8 @@
 "use strict";
 // node --test spellgui/web/test/timeline.test.js
-// Cobre as duas funcoes puras que a timeline ganhou ao ligar no engine: a traducao de uma edicao
-// local em chamadas do registry (TL.ops) e a leitura do frame binario do monitor (TL.frameBin).
+// Cobre as tres funcoes puras que a timeline ganhou ao ligar no engine: a traducao de uma edicao
+// local em chamadas do registry (TL.ops), a leitura do frame binario do monitor (TL.frameBin) e a
+// decisao de recarregar o show pelo `rev` do evento `show` (TL.revEvento).
 // timeline.js e' script de navegador: carrega com `window` e `CK` falsos, sem DOM.
 
 const { test } = require("node:test");
@@ -106,4 +107,27 @@ test("frame de outro topico ou curto demais e ignorado", () => {
   outro[0] = 2;
   assert.strictEqual(TL.frameBin(outro.buffer), null);
   assert.strictEqual(TL.frameBin(new Uint8Array(10).buffer), null);
+});
+
+// Evento `show`: o serve conta uma revisao por comando aceito, e a pagina adianta a conta a cada
+// chamada que manda. Recarregar so' quando o numero passa do que as nossas chamadas explicam.
+test("eco da propria edicao nao recarrega", () => {
+  assert.deepStrictEqual(TL.revEvento(5, 5), { rev: 5, reload: false });
+});
+
+test("rev acima do esperado e edicao de outro cliente: recarrega", () => {
+  assert.deepStrictEqual(TL.revEvento(6, 5), { rev: 6, reload: true });
+});
+
+test("evento atrasado com edicoes ainda em voo nao recarrega nem atrasa a conta", () => {
+  assert.deepStrictEqual(TL.revEvento(4, 6), { rev: 6, reload: false });
+});
+
+// O contador antigo nunca voltava de um desvio (comando contado a mais, evento perdido, pagina
+// aberta contra um serve que ja' tinha revisoes): engolia os reloads de fora para sempre. Com `rev`
+// o desvio custa um reload e a conta volta ao numero do servidor.
+test("conta desalinhada se conserta no primeiro evento", () => {
+  const r = TL.revEvento(9, 1);
+  assert.deepStrictEqual(r, { rev: 9, reload: true });
+  assert.deepStrictEqual(TL.revEvento(10, r.rev), { rev: 10, reload: true });
 });
