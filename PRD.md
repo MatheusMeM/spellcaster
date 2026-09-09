@@ -1,4 +1,4 @@
-# PRD — Spellcaster v1: core em Rust, previz em Godot, GUI web com skins
+# PRD — Spellcaster v1: core em Rust, previz em Godot, interface por Theme + Face + Graph
 
 Você é o orquestrador. Leia este documento inteiro antes de despachar qualquer agente.
 Modo ponytail sempre: menor código que funciona, stdlib e crates já presentes antes de
@@ -58,11 +58,13 @@ spellcore/          binário Rust, sem GUI
   pixelmap/         wgpu compute + fallback rayon
   ipc/              socket local, frames binários, memória compartilhada p/ preview
   mcp/              rmcp, tools/resources gerados do registry
-  script/           rhai embutido (tracks fx)
-  cli               spell play|net|serve|tui|mcp|export
-spellgui/           Tauri: WebView2 + web/ (index, timeline.js em canvas, skins/)
+  script/           rhai embutido: tracks fx e o Graph compilado (seção 10)
+  cli               spell play|net|serve|tui|mcp|export|agent
+spellgui/           Tauri: WebView2 + web/ (index, canvaskit.js, timeline.js, graph.js, face.js, widgets/, themes/)
+faces/              superfícies de operação (.face.json) — layout, views, widgets
+themes/             looks (theme.json + theme.css) — o que hoje está em spellcaster/gui/web/skins/
 spellviz/           projeto Godot 4 + gdext em Rust: palco 3D, fixtures, feixes, LED walls
-shows/ profiles/ skins/ tests/ bench/
+shows/ profiles/ tests/ bench/
 ```
 
 Contratos fixos:
@@ -102,10 +104,34 @@ Track de laser:
  "safety": {"min_size": 2000, "max_intensity": 200, "zone": [-1, -0.2, 1, 1]}}
 ```
 
-Skin (mantida do que já existe em web/skins/):
+Theme (o `skin.json` atual, renomeado; formato mantido):
 ```json
-{"name": "quicksilver", "chrome": {"transport": "round", "visualizer": "scope"},
+{"name": "quicksilver", "chrome": {"transport": "round", "visualizer": "scope", "shape": "chrome.svg"},
  "vars": {"--bg": "#1c1e21", "--accent": "#39d0ff", "--bevel": "1px"}}
+```
+
+Face (superfície de operação de um show; várias views como as `<VIEW>` do WMP):
+```json
+{"name": "operador_medgrupo", "theme": "quicksilver", "mode": "performance",
+ "views": {
+   "full":    {"grid": "12x8", "widgets": ["transport", "go", "cues", "vu"]},
+   "compact": {"grid": "4x1",  "widgets": ["go", "transport"], "shape": "pill"}},
+ "widgets": [
+   {"id": "go",    "type": "button", "label": "GO", "size": "xl", "at": [0, 0, 4, 4], "bind": "graph:go.press"},
+   {"id": "cues",  "type": "cuelist", "at": [4, 0, 8, 6]},
+   {"id": "vu",    "type": "universes", "universes": [1, 2], "at": [4, 6, 8, 2]},
+   {"id": "transport", "type": "transport", "at": [0, 4, 4, 1]}]}
+```
+
+Graph (comportamento; vive no `.spell`, roda no engine, com ou sem GUI):
+```json
+{"nodes": [
+   {"id": "go",    "type": "in.widget", "widget": "go"},
+   {"id": "k",     "type": "in.key", "key": "Space"},
+   {"id": "any",   "type": "logic.or"},
+   {"id": "next",  "type": "cmd", "cmd": "cue_go"},
+   {"id": "flash", "type": "out.widget", "widget": "go", "prop": "glow", "hold_ms": 300}],
+ "edges": [["go.press", "any.a"], ["k.down", "any.b"], ["any.out", "next.trigger"], ["next.done", "flash.in"]]}
 ```
 
 Previz (Godot recebe do engine por IPC, nunca lê o .spell sozinho):
@@ -117,14 +143,15 @@ frame_video(texture_id)         → LED wall mostra o mapping em tempo real
 ## 6. Fases e aceite
 
 - **R0 — Core e protocolos.** `spellcore play show.spell` reproduz os fixtures de conformidade em `tests/` byte a byte (sACN e Art-Net). `bench/jitter` dentro do alvo. CLI `net`.
-- **R1 — Timeline, cues, .spell, script fx, transporte por OSC.** Player headless no Pi por SSH.
+- **R1 — Timeline, cues, .spell, script fx, Graph runtime, transporte por OSC.** O Graph (seção 10) compila para Rhai e roda no engine; fontes OSC/MIDI/teclado/timer funcionam sem GUI. Player headless no Pi por SSH. Aceite: graph de 500 nós avaliado em < 0,1 ms por frame.
 - **R2 — Mídia:** GStreamer decode com hardware, NDI in/out, RTSP in, Spout out. Preview por memória compartilhada. Aceite: 1080p60 dentro do alvo de CPU.
 - **R3 — Pixel mapping** wgpu + fallback rayon. Aceite: 100 000 pixels a 60 Hz < 2 ms.
 - **R4 — Laser multi-feed:** Ether Dream, Helios, IDN; safety no engine; 4 feeds simultâneos.
-- **R5 — GUI Tauri:** timeline canvas (tracks, keyframes, curvas, snapping em markers, scrub, zoom, loop, record arm), painéis Patch, Outputs, Network, Log; skins existentes funcionando com troca em runtime. Aceite: montar um show de 3 min do zero na GUI.
+- **R5 — GUI Tauri:** `canvaskit.js` (pan, zoom, seleção, hit-test por bisect, dirty-flag, DPR) compartilhado por timeline e graph; timeline canvas (tracks, keyframes, curvas, snapping em markers, scrub, zoom, loop, record arm); painéis Patch, Outputs, Network, Log; **runtime de Theme e Face**: catálogo de widgets, views com troca por atalho, modo performance (kiosk, fullscreen, touch, nada editável), janela sem moldura com forma por SVG do theme; os 6 themes existentes com troca em runtime. Aceite: montar um show de 3 min do zero na GUI; abrir `faces/operador_medgrupo.face.json` em modo performance e operar o show só por ele.
 - **R6 — Previz Godot:** palco, fixtures com feixe volumétrico, LED walls com o mapping, laser projetado. Aceite: 60 fps com 64 fixtures e 2 LED walls.
-- **R7 — MCP com rmcp** (stdio e HTTP), `spell mcp install`. Aceite: de uma sessão de IA, escanear rede, patchear, criar timeline e dar play sem tocar na GUI.
+- **R7 — MCP com rmcp** (stdio e HTTP), `spell mcp install`; tools de Theme/Face/Graph (`face_get`, `face_patch` com JSON Patch, `graph_get`, `graph_patch`, `theme_set`), resources `spell://face`, `spell://graph`, `spell://ui/screenshot`, `spell://ui/events`. Aceite: de uma sessão de IA, escanear rede, patchear, criar timeline, criar uma Face de 4 botões ligada por Graph a cues e dar play sem tocar na GUI.
 - **R8 — Empacotamento:** Windows onedir no pendrive, Linux x64, Pi aarch64 estático; CI com `bench/` como gate.
+- **R9 — Editores de Face e Graph + painel Agent.** Editor de Face (arrastar widgets na grade, propriedades, views, preview do theme ao vivo), editor de Graph em canvas (nós do catálogo, fios, busca por tipo, colapsar em subgraph, valores ao vivo nos pinos), undo ilimitado por JSON Patch inverso, "proposta" da IA mostrada como diff antes de aplicar, modo ensaio (graph armado só em saídas virtuais/previz). Painel Agent: chat que sobe `claude` (CLI) como subprocesso com o MCP do Spellcaster registrado e faz stream da conversa; sem loop de agente próprio. Aceite: um operador sem treino monta uma Face de show em 10 min; a IA, por prompt no painel, gera Face + Graph para o `medgrupo.spell` e o operador aplica após ver o diff.
 
 Cada fase entrega algo usável em obra. Ordem fixa. Fase só fecha com o bench verde.
 
@@ -146,7 +173,35 @@ Cada fase entrega algo usável em obra. Ordem fixa. Fase só fecha com o bench v
 | Godot vira projeto próprio | Escopo travado em previz; nada de edição de show dentro do Godot |
 | GPU ausente no Pi | Fallback CPU obrigatório e testado em CI com `WGPU_BACKEND=none` |
 | Laser queima ou ofusca | Safety no engine, nunca na GUI; testes de figura mínima e ponto parado antes de R4 fechar |
+| Editor de nós vira um TouchDesigner | Catálogo fechado (seção 10): nós só de entrada, lógica, comando e saída; sem sinal, sem vídeo, sem render. Pedido novo vira track, não nó |
+| Graph editado pela IA dispara laser ou blackout ao vivo | Toda edição por MCP é proposta com diff; aplicar exige clique; modo ensaio por padrão em show armado |
+| Widget custom sem fim | Um só widget `canvas` com script Rhai de desenho; nada de widgets definidos pelo usuário em v1 |
 
 ## 9. Relação com o protótipo Python (`spellcaster/`)
 
 O pacote Python `spellcaster/` (F0–F6) fica no repo como implementação de referência e gerador dos fixtures de conformidade. Não recebe funcionalidade nova. `spellcore` tem que reproduzir byte a byte a saída sACN/Art-Net do `shows/medgrupo.spell` gerada pelo Python. As skins de `spellcaster/gui/web/skins/` são reaproveitadas pela GUI Tauri sem alteração de formato.
+
+## 10. Interface: Theme, Face e Graph
+
+A ideia de origem: skins que mudam o comportamento da interface, cada show com a sua, inspiradas nas skins do Windows Media Player, mais um editor de interface por nós usável por gente e por IA, com agente embutido. A leitura correta das skins do WMP é que `skin.xml` declarava **views, botões, sliders e o que cada um fazia**, não só cores. Uma "skin" era três coisas coladas. Aqui elas se separam, porque cada camada muda por um motivo diferente e é editada por uma ferramenta diferente:
+
+| Camada | O que é | Onde vive | Quem edita |
+|---|---|---|---|
+| **Theme** | Look: tokens de cor, tipografia, bisel, brilho, forma da janela (SVG), estilo do transporte e do visualizador | `themes/<nome>/theme.json` + `theme.css` | Designer; IA por `theme_set` |
+| **Face** | Superfície: quais widgets existem, onde, em que views, o que é editável | `faces/<nome>.face.json`, referenciada pelo show (`"face": ...`) ou inline | Operador no editor de Face; IA por `face_patch` |
+| **Graph** | Comportamento: o que cada widget, tecla, OSC, MIDI, timer ou marker faz | `"graph"` dentro do `.spell` | Editor de nós; IA por `graph_patch` |
+
+Regras:
+- **Um Theme veste qualquer Face; uma Face aceita qualquer Theme.** Precedência do theme: preferência do usuário > `face.theme` > `feiticaria` (padrão).
+- **A Face é uma vista do Graph; o Graph vive no engine.** Um botão da Face é um nó `in.widget`. O mesmo Graph roda no Pi sem GUI com `in.osc`, `in.midi`, `in.key`, `in.timer`, `in.marker` como fontes. Não existe segundo runtime na GUI; a GUI só renderiza estado e envia eventos por IPC.
+- **Tudo é JSON, diffável, com JSON Patch.** Os editores em canvas são renderizadores/editores desse JSON. Undo = patch inverso. A IA edita pelo mesmo caminho que o humano.
+- **Duas Faces por padrão em todo show:** `editor` (a aplicação completa) e `performance` (só o que o operador precisa; kiosk, fullscreen, touch, nada editável, sem menu). Alternar com uma tecla. É isso que "cada projeto tem a sua skin" significa na prática: o designer monta no editor, o operador recebe uma tela de quatro botões.
+- **Views por Face** (full, compact, touch, …) como as `<VIEW>` do WMP: mesma Face, arranjos diferentes, atalho para trocar. Janela sem moldura, forma por `clip-path` de um SVG do Theme, transparência via Tauri: é aqui que a interface fica selvagem sem custar performance.
+
+Catálogo de widgets (fechado em v1): `button`, `toggle`, `fader`, `knob`, `xy`, `color`, `label`, `lcd`, `meter`, `universes`, `timecode`, `transport`, `cuelist`, `timeline`, `netscan`, `log`, `visualizer` (barras/scope/script), `canvas` (desenho por script Rhai, o único "custom"). Cada widget é `{id, type, at:[col,row,w,h], props, bind}`; `bind` aponta para um pino do Graph.
+
+Catálogo de nós (fechado em v1): entradas `in.widget | in.key | in.osc | in.midi | in.timer | in.marker | in.state` (tempo, cue atual, universo, fixture); lógica `logic.and|or|not|latch|toggle|debounce|counter|select`, `math.map|curve|expr` (expr = Rhai de uma linha), `time.delay|hold`; comando `cmd` (qualquer entrada do registry, tipado pelo `schemars`); saídas `out.widget` (prop de widget), `out.osc`, `out.param` (fixture.canal via patch), `out.notify`. Nada de sinal, áudio, vídeo, render: isso é track. Um subgraph pode ser colapsado em um nó com pinos; é o único mecanismo de reuso.
+
+Agent embutido: o painel Agent não implementa loop de agente. Sobe `claude` (CLI do Claude Code) como subprocesso com o MCP do Spellcaster registrado, faz stream da conversa e mostra cada proposta de `face_patch`/`graph_patch` como diff com botão Aplicar. `// ponytail: subprocesso do claude ; loop próprio via API só se o CLI não estiver instalado na máquina do operador`. A IA vê o que fez pelo resource `spell://ui/screenshot` e vê o operador pelo `spell://ui/events` (últimos 200 eventos de widget).
+
+Segurança de show: comandos de laser, blackout e armar saídas passam pelo mesmo Graph, mas o engine tem a palavra final (safety, seção 8). Show armado em saídas reais entra em **modo ensaio** por padrão para edições de Graph: o graph novo roda contra saídas virtuais (previz) até o operador armar.
