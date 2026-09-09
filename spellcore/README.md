@@ -608,6 +608,9 @@ impl engine::FrameHook for Fx { }
 pub struct Graph;
 impl Graph {
     pub fn new(spec: &serde_json::Value, sink: Box<dyn engine::EventSink>) -> Result<Graph, String>;
+    /// Idem, com o diretório do show: é de lá que o nó `module` lê `modules/<nome>.json`.
+    pub fn new_in(spec: &serde_json::Value, sink: Box<dyn engine::EventSink>, base: &Path)
+        -> Result<Graph, String>;
     pub fn nodes(&self) -> usize;
 }
 impl engine::FrameHook for Graph { }
@@ -629,7 +632,11 @@ Medida de referência antes do Rhai (Windows x64, perfil release do workspace): 
 
 `in.widget | in.key | in.osc | in.midi (stub) | in.timer | in.marker | in.state` ·
 `logic.and|or|not|latch|toggle|debounce|counter|select` · `math.map|curve|expr` ·
-`time.delay|hold` · `cmd` · `out.widget|out.osc|out.param|out.notify`.
+`time.delay|hold` · `cmd` · `out.widget|out.osc|out.param|out.notify` ·
+`state` · `module` (os dois últimos são proposta desta rodada, `design/DECISOES.md`).
+
+Semântica de `state`, `module` e `mute`: `design/DECISOES.md` (e o cabeçalho de
+`script/src/graph.rs`, que é a mesma tabela do runtime).
 
 JSON: `{"nodes":[{"id","type",...}], "edges":[["no.pino","no.pino"], ...]}`. Compila para lista
 de nós em ordem topológica com pinos indexados por inteiro; avaliação por frame sem alocação;

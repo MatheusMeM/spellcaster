@@ -239,7 +239,7 @@ pub fn hooks(
         v.push(Box::new(Fx::new(&base.join(f), u)?));
     }
     if let Some(g) = show.extra.get("graph") {
-        v.push(Box::new(Graph::new(g, sink)?));
+        v.push(Box::new(Graph::new_in(g, sink, base)?));
     }
     Ok(v)
 }
