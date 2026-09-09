@@ -196,6 +196,7 @@ CI, sem tocar no que já está conforme):
 | F8 TEATRO DE PAPEL | programmer no engine (`level_set`, `level_clear`, `level_get`, `cue_capture`, `fixture_set`, `profile_get`) e a página `spellgui/web/teatro.*`: patch, cues com GO e cenário clicável | `engine/tests/programmer.rs` e `node --test spellgui/web/test/teatro.test.js` verdes | a página espera o barramento da F1 e o `show_patch` da F2 |
 | FÓSFORO núcleo | `laser::trace`: RGBA → contornos → frame ILDA (`paths`, `trace`, bin `trace`) | quadro 1080p em < 8 ms em release; quadrado/círculo/dois objetos/max_points nos testes | — (feita: 4,4 ms com 20 objetos; falta o NDI da R2 para alimentar) |
 | F5 face | `spellgui/web/bus.js` (cliente do barramento), `widgets.js` (parâmetro tipado → widget: regras 1 e 3 de `design/FUNCOES/README.md`), `face.js`/`face.html` e `faces/quatro.face.json` | a Face de 4 botões abre em kiosk e opera o show só pelo registry | comando `input` e o barramento (F1) |
+| F7 sequencer | `spellgui/web/timeline.js` ligado ao engine: edição por `key_set`/`key_del`/`show_patch`, transporte e monitor DMX pelo barramento, modo offline intacto | arrastar um keyframe muda o show no engine e o playhead segue o player | contrato do `serve` (F1) |
 
 Bloqueadas até instalar SDK (decisão do dono, não de agente): R2 (GStreamer + NDI SDK),
 R6 (Godot 4). R9 espera R5.

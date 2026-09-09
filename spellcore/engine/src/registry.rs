@@ -222,10 +222,11 @@ pub fn base() -> Registry {
             }
         },
     );
-    // metade que faltava do `pause`: `serve --show` deixa o player parado em t=0, e sem isto
-    // nenhum cliente do registry conseguiria solta-lo. Chama-se `resume`, nao `play`: `play` e' o
-    // subcomando da CLI que toca um arquivo, e para isso o registry ja' tem `play_show`.
-    r.add::<NoArgs>("resume", "Continua o player pausado neste processo.", |_| {
+    // O par do `pause`: sem ele, quem pausou pelo registry (GUI, MCP, OSC) so' voltava a tocar
+    // subindo outro player com `play_show`, e o `serve --show`, que deixa o player parado em
+    // t=0, nao teria como solta-lo. Chama-se `resume` e nao `play` porque `play` e' o subcomando
+    // da CLI que SOBE um player (o `play_show` do registry); aqui nao se sobe nada.
+    r.add::<NoArgs>("resume", "Retoma o player pausado neste processo (o par do pause).", |_| {
         let h = vivo()?;
         h.play();
         estado(&h)

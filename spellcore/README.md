@@ -549,12 +549,15 @@ não repete (não há fim). O transporte remoto por OSC nunca toca nos Universes
 ## `engine::registry::base()`
 
 Assinatura muda para `pub fn base() -> Registry` (sem `Clock`: o transporte age no player vivo).
-Comandos: `load` (R0), `pause`, `stop`, `locate`, `cue_go`, `transport_state` e, desde a R7,
-`show_get`. Os de transporte usam `player::current()`; sem player vivo devolvem
+Comandos: `load` (R0), `resume`, `pause`, `stop`, `locate`, `cue_go`, `transport_state` e, desde
+a R7, `show_get`. Os de transporte usam `player::current()`; sem player vivo devolvem
 `Err("sem player em execucao")`. `show_get(file="", full=false)` abre o `.spell` (ou reusa o
 último aberto neste processo, o `OPEN` do `spellcaster/mcp/tools.py`) e resume nome, fps,
 duração, saídas, patch, tracks, cues e o transporte vivo; é ele que alimenta o resource
 `spell://show`. `full=true` devolve o `.spell` inteiro (o que a GUI desenha).
+`resume()` é o par do `pause` (o `Handle::play`): sem ele, quem pausava pelo registry só voltava
+a tocar subindo outro player. Chama-se `resume` e não `play` porque `play` é o subcomando da
+CLI que SOBE um player — esse é o `play_show`.
 `play_show` **não** entra aqui: ele monta os hooks de `script` e é registrado pela CLI, como
 `play` e `net` na R0.
 
