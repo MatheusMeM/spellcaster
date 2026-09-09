@@ -279,3 +279,24 @@ cargo bench -p bench
 | 4 feeds laser × 30 kpps, cpu das threads de feed | < 1 % de um núcleo | 0,83 % em 30 s (GetThreadTimes quantiza em 15,6 ms: rodar ≥ 30 s) |
 | Pixel mapping, 100 000 px a 60 Hz (CPU, rayon) | < 2 ms por frame | 0,105 ms p50, 0,316 ms p99 (bilinear: 0,196 / 0,493) |
 | Binário `spellcore.exe` release | < 20 MB | 3,8 MB (2,5 MB antes do rmcp; 0,95 MB antes do Rhai) |
+
+## spellgui/web (GUI Tauri) — base da R5
+
+```
+spellgui/web/
+  canvaskit.js   kit de canvas: view {x, zoom, y}, world<->screen, bisect/near (hit-test),
+                 selecao esparsa, marquee, pan, zoom no cursor, dirty-flag, DPR, laco rAF
+  timeline.js    timeline sobre o kit: lanes do .spell, keyframes em arrays paralelos, curvas
+                 (linear, hold, in, out, inout, bezier) iguais as do engine, regua com timecode,
+                 snapping em markers/keyframes, scrub, In/Out, loop, atalhos de design/SHORTCUTS.md
+  index.html     pagina minima: abre shows/medgrupo.spell (?show=<caminho> troca), barra e menu
+tests/test_spellgui_timeline.py   Chrome headless --dump-dom sobre uma pagina que roda as asseracoes em JS
+```
+
+O app Tauri ainda não existe: `spellgui/web/` é a base de canvas da R5, servida por qualquer HTTP
+estático e testada em Chrome headless. O `canvaskit.js` é o único lugar que sabe de pan, zoom,
+seleção, marquee, DPR e dirty-flag; a timeline (e o graph, na R9) só desenham e respondem a
+`k.on.{down,move,up,marquee,menu,frame}`. Todo hit-test é `CK.bisect`/`CK.near` sobre listas
+ordenadas por tempo, e o desenho percorre só as lanes visíveis, como no protótipo Python. Não há
+WebSocket nem engine: o transporte é um relógio local e a edição volta para o JSON do show em
+memória (`TL.commit`). Cores só por token de `design/tokens/spellcaster.css`.
