@@ -235,7 +235,26 @@ fn net(a: NetArgs) -> Result<Value, String> {
     }
 }
 
-/// `play_show` e `net` moram aqui porque so' a CLI conhece `script` e `protocols`; o resto do
+#[derive(Deserialize, JsonSchema)]
+#[schemars(crate = "engine::schemars")]
+struct GraphCheckArgs {
+    /// O graph a compilar; ausente = o do show aberto (o mesmo que `graph_get` devolve).
+    #[serde(default)]
+    graph: Option<Value>,
+}
+
+/// Compila o graph sem rodar: quantos nos ele tem, ou o erro. Mora aqui porque so' a CLI
+/// conhece o crate `script` — `graph_get`/`graph_set`, que sao edicao pura, ficam no engine.
+fn graph_check(a: GraphCheckArgs) -> Result<Value, String> {
+    let g = a.graph.unwrap_or_else(engine::edit::graph);
+    match script::graph::Graph::new(&g, Box::new(engine::NullSink)) {
+        Ok(gr) => Ok(json!({"nodes": gr.nodes(), "error": Value::Null})),
+        Err(e) => Ok(json!({"nodes": 0, "error": e})),
+    }
+}
+
+/// `play_show`, `net` e `graph_check` moram aqui porque so' a CLI conhece `script` e
+/// `protocols`; o resto do
 /// transporte vem de `registry::base()`, que age no player vivo (`player::current()`).
 /// E' este registry que o MCP expoe como tools.
 fn registry() -> Registry {
@@ -245,6 +264,11 @@ fn registry() -> Registry {
         "net",
         "Varre a rede: interfaces, nos Art-Net, fontes sACN, Ether Dream e sugestoes.",
         net,
+    );
+    r.add::<GraphCheckArgs>(
+        "graph_check",
+        "Compila o graph (o do show aberto, ou o passado em `graph`) sem rodar. Devolve {nodes, error}.",
+        graph_check,
     );
     r
 }
