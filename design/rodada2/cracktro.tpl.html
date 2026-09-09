@@ -173,7 +173,7 @@
     </div>
 
     <canvas id="glass" aria-hidden="true"></canvas><canvas id="glare" aria-hidden="true"></canvas>
-    <div id="winb" class="hide" style="--gel:27,15,143; --ga:.34"><div id="win">
+    <div id="winb" class="hide" style="--gel:255,255,255; --ga:.10"><div id="win">
       <div class="tstrip" id="drag"><span class="nm">SPELLCASTER</span><span class="sc"><span id="scroll">MED GRUPO RJ · PLENÁRIA · sACN U1 U2 a 30 Hz · ETHER DREAM 20 kpps · GREETZ: CAPTURE, RESOLUME, TOUCHDESIGNER, ETC, MA · CRACKED BY FEITIÇARIA iNDUSTRIAL · NO SERIAL NEEDED</span></span><span class="x" id="mini" title="fita">▁</span><span class="x" id="close" title="fechar">✕</span></div>
       <button class="gob" id="go">GO<small>ESPAÇO · MIDI 36</small></button>
       <div class="main">
@@ -194,7 +194,7 @@
       <div class="foot">
         <span>GEL</span>
         <div class="gels" id="gels"></div>
-        <span id="gelname">Lee 181 Congo Blue</span>
+        <span id="gelname">Sem gel</span>
         <span class="sp"></span>
         <span class="tg" id="frost">GEADA</span>
         <span class="tg" id="nfobtn">NFO</span>
@@ -231,7 +231,7 @@
       <h2>O que desta demo vira produto, e como</h2>
       <ul>
         <li><b>Vidro sobre o desktop.</b> Aqui o fundo é desenhado; o blur em CSS só enxerga a própria página. No produto: janela Tauri com <code>transparent: true</code>, <code>decorations: false</code> e acrílico do Windows 11 via <code>window-vibrancy</code>. O desfoque é feito pelo DWM, custa quase nada, e o Resolume de verdade aparece atrás.</li>
-        <li><b>A janela é um cubo de vidro flutuando.</b> Raymarching em WebGL no estilo Shadertoy: um bloco 760×470×220 de borda redonda com a cúpula do GO, boiando e girando devagar na frente do desktop (que aqui vira textura). O raio entra, atravessa e sai do vidro; índice diferente por canal dá a dispersão; o gel é absorção pela espessura, não tinta por cima; dentro do cubo, no GO, sobe fogo volumétrico (gyroid fBm). Por cima da UI, um segundo passe do mesmo shader pinta só a face da frente: fresnel, reflexo de um estúdio com três softboxes, specular que segue o mouse. A UI em HTML é a face da frente, com a mesma matriz 3D do shader. Sombra e cáustica caem no desktop. No produto o mesmo shader roda no WebView2 sobre o acrílico do DWM; sem captura de tela não há textura do desktop de verdade, então lá o refrator trabalha sobre o blur do sistema, e fresnel, cáustica e specular continuam. Clique fora da forma ainda pega a janela no Windows: hit-test no SDF resolve.</li>
+        <li><b>A janela é um cubo de vidro flutuando.</b> Raymarching em WebGL no estilo Shadertoy: um bloco 760×470×220 de borda redonda com a cúpula do GO, boiando e girando devagar na frente do desktop (que aqui vira textura). O raio entra, atravessa e sai do vidro; índice diferente por canal dá a dispersão; o gel é absorção pela espessura, não tinta por cima; o cubo é gelo: rachaduras e bolhas congeladas dentro (gyroid), tinta ciano pela espessura; o GO racha o gelo, uma onda de luz corre pelas fissuras a partir da cúpula. Por cima da UI, um segundo passe do mesmo shader pinta só a face da frente: fresnel, reflexo de um estúdio com três softboxes, specular que segue o mouse. A UI em HTML é a face da frente, com a mesma matriz 3D do shader. Sombra e cáustica caem no desktop. No produto o mesmo shader roda no WebView2 sobre o acrílico do DWM; sem captura de tela não há textura do desktop de verdade, então lá o refrator trabalha sobre o blur do sistema, e fresnel, cáustica e specular continuam. Clique fora da forma ainda pega a janela no Windows: hit-test no SDF resolve.</li>
         <li><b>Jingle.</b> Sintetizado em Web Audio, zero bytes de mídia, toca igual dentro do WebView2. Se você quiser tracker de verdade (.xm de 20 KB), entra <code>libopenmpt</code>; só vale se a música for assinatura.</li>
         <li><b>Gel.</b> O theme deixa de ser CSS solto e vira uma cor de gel sobre vidro mais uma escolha de silhueta. Um <code>.spellskin</code> cabe em 5 KB. Os nomes são gels reais (Lee, Rosco): a linguagem de quem monta luz.</li>
         <li><b>Performance.</b> A UI é HTML sem framework; o engine Rust não sabe que a janela é de vidro. Nada aqui encosta no caminho do DMX.</li>
@@ -340,9 +340,9 @@
   $("#press").addEventListener("click", start);
   $("#never").addEventListener("change", function (e) { try { localStorage.setItem("sc-never-splash", e.target.checked ? "1" : "0"); } catch (x) {} });
 
-  /* ---------- a janela é um cubo de vidro flutuando (ref: Enscape Cube, Empty Glass, Refraction blobs, Dispersion, Volumetric fire). Dois passes do mesmo shader: #glass (abaixo do HTML) marca o corpo: refração de duas faces com dispersão por canal, absorção do gel pela espessura, fogo volumétrico (gyroid fBm) dentro do cubo no GO, sombra e cáustica na parede (o desktop vira textura); #glare (acima do HTML) só a face da frente: fresnel × reflexo de estúdio + specular. O HTML da UI é a face da frente via CSS 3D com a mesma matriz do shader. ---------- */
+  /* ---------- a janela é um cubo de vidro flutuando (ref: Enscape Cube, Empty Glass, Refraction blobs, Dispersion; tema GELO). Dois passes do mesmo shader: #glass (abaixo do HTML) marca o corpo: refração de duas faces com dispersão por canal, absorção do gel pela espessura, gelo por dentro (rachaduras gyroid que acendem no GO), sombra e cáustica na parede (o desktop vira textura); #glare (acima do HTML) só a face da frente: fresnel × reflexo de estúdio + specular. O HTML da UI é a face da frente via CSS 3D com a mesma matriz do shader. ---------- */
   var gc = $("#glass"), gl = null;
-  var deskc = document.createElement("canvas"), dk = deskc.getContext("2d"), tdImg = null, GW = 0, GH = 0, glassOn = 0, frostOn = false, fireV = 0, dragX = 0, dragY = 0, mouse = [-9999, -9999], stageEl = $("#stage");
+  var deskc = document.createElement("canvas"), dk = deskc.getContext("2d"), tdImg = null, GW = 0, GH = 0, glassOn = 0, frostOn = false, goV = 0, dragX = 0, dragY = 0, mouse = [-9999, -9999], stageEl = $("#stage");
   (function () { var svg = document.querySelector(".td svg"), im = new Image(); im.onload = function () { tdImg = im; }; im.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(new XMLSerializer().serializeToString(svg)); })();
   function drawDesk() {
     var W = GW, H = GH, rw = Math.round(W * 0.62);
@@ -371,8 +371,8 @@
     "vec3 wall(vec3 p,vec3 d,float r){float t=(-ZW-p.z)/min(d.z,-1e-3);vec3 w=p+d*t;vec2 q=u_ctr+w.xy*(CAM/(CAM+ZW));vec3 c=tex(q);if(r>0.){c=(c+tex(q+vec2(r,0.))+tex(q-vec2(r,0.))+tex(q+vec2(0.,r))+tex(q-vec2(0.,r)))/5.;}",
     " vec3 b=(w-u_T-vec3(50.,70.,0.))*u_R;float sd=min(sdRB2(b.xy,HB.xy,36.),length(b.xy-DC.xy)-125.);c*=1.-.55*(1.-smoothstep(-20.,110.,sd));",
     " float ca=1.-smoothstep(-60.,150.,sd);c+=u_gel*u_ga*ca*.9;c*=mix(.5,1.,smoothstep(1.6,.5,length((q-u_ctr)/u_res*2.)));return c;}",
-    "float gy(vec3 p){float d=0.,z=1.;for(int i=0;i<4;i++){d-=abs(dot(cos(p),sin(p.zxy)))*z;z*=.6;p=p*1.9+vec3(1.7,9.2,3.1);}return d;}",
-    "vec3 fire(vec3 b){float go=.2+1.6*u_go;vec3 pp=b*.016;pp.y+=u_t*1.7;pp.x+=sin(u_t*.7)*.3;float g=gy(pp+vec3(0.,0.,u_t*.2));float base=smoothstep(HB.y-(60.+460.*u_go),HB.y+30.,b.y);float den=clamp(1.15+g*.8,0.,1.)*base*go;den*=smoothstep(HB.x+20.,HB.x-80.,abs(b.x));return mix(vec3(1.,.18,0.),vec3(1.,.7,.2),den)*den*den*2.6;}",
+    "float gy(vec3 p){float d=0.,z=1.;for(int i=0;i<3;i++){d-=abs(dot(cos(p),sin(p.zxy)))*z;z*=.55;p=p*2.1+vec3(1.7,9.2,3.1);}return d;}",
+    "vec3 ice(vec3 b){float g=gy(b*.021+vec3(3.1,.7,5.3));float crack=pow(smoothstep(.22,0.,abs(g+.55)),1.5);float r=length(b.xy-DC.xy);float wave=1.-smoothstep(0.,140.,abs(r-(1.-u_go)*1000.));float bub=smoothstep(.35,.0,abs(gy(b*.05+vec3(u_t*.05,9.,1.))+1.1));return vec3(.55,.85,1.)*crack*(.06+1.4*u_go*wave)+vec3(.8,.95,1.)*bub*(.02+.3*u_go*wave);}",
     "float spec(vec3 n,vec3 v,vec3 l,float k){vec3 h=normalize(l+v);return pow(max(dot(n,h),0.),k);}",
     "void main(){",
     " vec2 fp=vec2(gl_FragCoord.x,u_res.y-gl_FragCoord.y);vec2 p=fp-u_ctr;",
@@ -397,8 +397,8 @@
     "   vec3 refr=vec3(r2r.z<0.?wall(qe,r2r,fr).r:env(r2r).r,r2g.z<0.?wall(qe,r2g,fr).g:env(r2g).g,r2b.z<0.?wall(qe,r2b,fr).b:env(r2b).b);",
     "   vec3 gel=u_gel/max(max(u_gel.r,u_gel.g),max(u_gel.b,.001));refr*=pow(mix(vec3(1.),gel,u_ga*1.4),vec3(L/110.));",
     "   refr=mix(refr,vec3(.85),u_frost*.35);refr*=exp(-L*.0014);",
-    "   vec3 fc=vec3(0.);for(int i=0;i<7;i++){fc+=fire(toBox(qi+r1*ti*(float(i)+.5)/7.));}refr+=fc/7.*min(L/120.,1.5);",
-    "   vec3 b=toBox(q);float dm=length(b.xy-DC.xy);refr+=vec3(.25,.9,.35)*(.10+.5*u_go)*(1.-smoothstep(60.,125.,dm));",
+    "   vec3 fc=vec3(0.);for(int i=0;i<7;i++){fc+=ice(toBox(qi+r1*ti*(float(i)+.5)/7.));}refr+=fc/7.*min(L/90.,2.);refr*=pow(vec3(.86,.95,1.),vec3(L/220.));",
+    "   vec3 b=toBox(q);float dm=length(b.xy-DC.xy);refr+=vec3(.25,.9,.35)*(.08+.6*u_go)*(1.-smoothstep(60.,125.,dm));",
     "   rgb=mix(rgb,refr,aa);",
     "  }",
     " }",
@@ -421,13 +421,13 @@
     return mul(mul(X, Y), Z); }
   function drawGlass(now) { if (!L) return; var W = stageEl.clientWidth, H = stageEl.clientHeight; if (W !== GW || H !== GH) { GW = W; GH = H; deskc.width = W; deskc.height = H; L.forEach(function (o) { o.c.width = W; o.c.height = H; o.gl.viewport(0, 0, W, H); }); }
     var b = $("#winb"), vis = shown && !b.classList.contains("hide"); glassOn += ((vis ? 1 : 0) - glassOn) * 0.12; if (!vis && glassOn < 0.01) { glassOn = 0; L.forEach(function (o) { o.gl.clear(o.gl.COLOR_BUFFER_BIT); }); b.style.transform = ""; return; }
-    fireV *= reduced ? 0.9 : 0.975;
+    goV *= reduced ? 0.9 : 0.975;
     var t = now / 1000, s = reduced ? 0 : 1, ax = -0.12 + 0.06 * s * Math.sin(t * 0.37), ay = 0.14 + 0.22 * s * Math.sin(t * 0.29), az = 0.025 * s * Math.sin(t * 0.53), tx = dragX, ty = dragY + (1 - glassOn) * -120 + 8 * s * Math.sin(t * 0.8);
     var R = rot(ax, ay, az), Rc = new Float32Array([R[0][0], R[1][0], R[2][0], R[0][1], R[1][1], R[2][1], R[0][2], R[1][2], R[2][2]]);
     b.style.transform = "translate3d(" + tx.toFixed(1) + "px," + ty.toFixed(1) + "px,0) rotateX(" + ax.toFixed(4) + "rad) rotateY(" + ay.toFixed(4) + "rad) rotateZ(" + az.toFixed(4) + "rad) translateZ(110px)";
     drawDesk(); var g = gelRGB.split(",").map(Number);
     L.forEach(function (o, i) { var gl = o.gl, U = o.U; gl.bindTexture(gl.TEXTURE_2D, gl.getParameter(gl.TEXTURE_BINDING_2D)); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, deskc);
-      gl.uniform2f(U.u_res, W, H); gl.uniform1i(U.u_tex, 0); gl.uniform2f(U.u_ctr, W / 2, H / 2); gl.uniform1f(U.u_t, t); gl.uniform3f(U.u_gel, g[0] / 255, g[1] / 255, g[2] / 255); gl.uniform1f(U.u_ga, gelA); gl.uniform1f(U.u_frost, frostOn ? 1 : 0); gl.uniform1f(U.u_on, glassOn); gl.uniform2f(U.u_mouse, mouse[0], mouse[1]); gl.uniform1f(U.u_go, fireV); gl.uniform1f(U.u_layer, i); gl.uniform3f(U.u_T, tx, ty, 0); gl.uniformMatrix3fv(U.u_R, false, Rc);
+      gl.uniform2f(U.u_res, W, H); gl.uniform1i(U.u_tex, 0); gl.uniform2f(U.u_ctr, W / 2, H / 2); gl.uniform1f(U.u_t, t); gl.uniform3f(U.u_gel, g[0] / 255, g[1] / 255, g[2] / 255); gl.uniform1f(U.u_ga, gelA); gl.uniform1f(U.u_frost, frostOn ? 1 : 0); gl.uniform1f(U.u_on, glassOn); gl.uniform2f(U.u_mouse, mouse[0], mouse[1]); gl.uniform1f(U.u_go, goV); gl.uniform1f(U.u_layer, i); gl.uniform3f(U.u_T, tx, ty, 0); gl.uniformMatrix3fv(U.u_R, false, Rc);
       gl.clear(gl.COLOR_BUFFER_BIT); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); }); }
 
   /* ---------- janela ---------- */
@@ -443,7 +443,7 @@
     requestAnimationFrame(tick); }
   requestAnimationFrame(tick);
   function toast(m) { var t = $("#toast"); t.textContent = m; t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(function () { t.classList.remove("on"); }, 2600); }
-  function doGo() { if (!shown) { start(); return; } blip(true); burst = 0.6; fireV = 1; $("#go").classList.add("dn"); setTimeout(function () { $("#go").classList.remove("dn"); }, 120); if (cueI < cues.length - 1) { cueI++; renderCues(); $("#scroll").textContent = "GO · CUE " + cues[cueI][0] + " " + cues[cueI][1].toUpperCase() + " · VAI!"; } else { toast("Acabou. O público quer bis; o Spellcaster também."); cueI = 0; renderCues(); } }
+  function doGo() { if (!shown) { start(); return; } blip(true); burst = 0.6; goV = 1; $("#go").classList.add("dn"); setTimeout(function () { $("#go").classList.remove("dn"); }, 120); if (cueI < cues.length - 1) { cueI++; renderCues(); $("#scroll").textContent = "GO · CUE " + cues[cueI][0] + " " + cues[cueI][1].toUpperCase() + " · VAI!"; } else { toast("Acabou. O público quer bis; o Spellcaster também."); cueI = 0; renderCues(); } }
   $("#go").addEventListener("click", doGo); $("#go2").addEventListener("click", doGo);
   $("#mini").addEventListener("click", toggleStrip); $("#close").addEventListener("click", function () { chord(); toast("Show encerrado · 6 cues · 0 erros. Valeu."); $("#winb").classList.add("hide"); setTimeout(function () { $("#winb").classList.remove("hide"); }, 2600); });
   function toggleStrip() { var on = !$("#strip").classList.contains("on"); $("#strip").classList.toggle("on", on); $("#winb").classList.toggle("hide", on); }
@@ -451,9 +451,9 @@
   $("#nfobtn").addEventListener("click", function () { $("#nfo").classList.toggle("on"); });
   /* gels reais */
   var gels = [["clear", "Sem gel", "255,255,255", 0.10], ["lee181", "Lee 181 Congo Blue", "27,15,143", 0.34], ["rosco27", "Rosco 27 Medium Red", "200,16,46", 0.30], ["lee139", "Lee 139 Primary Green", "0,154,68", 0.28], ["lee158", "Lee 158 Deep Orange", "232,101,26", 0.30], ["lee117", "Lee 117 Steel Blue", "74,110,138", 0.34], ["lee210", "Lee 210 ND 0.6", "40,40,40", 0.45]];
-  var gelCur = "lee181";
+  var gelCur = "clear", gelRGB = "255,255,255", gelA = 0.10;
   gels.forEach(function (g) { var d = document.createElement("span"); d.className = "gel" + (g[0] === gelCur ? " on" : ""); d.dataset.n = g[0]; d.title = g[1]; if (g[0] !== "clear") d.style.background = "rgb(" + g[2] + ")"; d.addEventListener("click", function () { setGel(g); }); $("#gels").appendChild(d); });
-  function setGel(g) { gelCur = g[0]; document.querySelectorAll(".gel").forEach(function (x) { x.classList.toggle("on", x.dataset.n === g[0]); }); ["#winb", "#strip"].forEach(function (s) { $(s).style.setProperty("--gel", g[2]); $(s).style.setProperty("--ga", g[3]); }); $("#gelname").textContent = g[1]; $("#gelvote").textContent = g[1]; state.gel = g[1]; mark(); }
+  function setGel(g) { gelCur = g[0]; gelRGB = g[2]; gelA = g[3]; document.querySelectorAll(".gel").forEach(function (x) { x.classList.toggle("on", x.dataset.n === g[0]); }); ["#winb", "#strip"].forEach(function (s) { $(s).style.setProperty("--gel", g[2]); $(s).style.setProperty("--ga", g[3]); }); $("#gelname").textContent = g[1]; $("#gelvote").textContent = g[1]; state.gel = g[1]; mark(); }
   /* arrastar */
   var drag = null; $("#drag").addEventListener("pointerdown", function (e) { if (e.target.classList.contains("x")) return; drag = [e.clientX - dragX, e.clientY - dragY]; $("#drag").setPointerCapture(e.pointerId); });
   $("#drag").addEventListener("pointermove", function (e) { if (!drag) return; dragX = e.clientX - drag[0]; dragY = e.clientY - drag[1]; });
