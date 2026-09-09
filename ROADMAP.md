@@ -184,6 +184,7 @@ CI, sem tocar no que já está conforme):
 | Frente | Entrega | Aceite | Depende de |
 |---|---|---|---|
 | Design | rodada 7 (FÓSFORO, PATCHBAY) | voto do dono | voto das rodadas 5 e 6 |
+| Graph runtime | nós `state` e `module` e as chaves `mute`/`state` em qualquer nó (`script/graph.rs`) | 500 nós continuam < 0,1 ms/frame (8,7 µs); semântica em `design/DECISOES.md` | voto do dono; formato do `module.json` combinado com a frente `module` |
 
 Bloqueadas até instalar SDK (decisão do dono, não de agente): R2 (GStreamer + NDI SDK),
 R6 (Godot 4). R9 espera R5.

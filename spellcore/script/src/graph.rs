@@ -29,10 +29,35 @@
 //! | `out.osc`        | `address`                       | `in`         | -       |
 //! | `out.param`      | `target`                        | `in`         | -       |
 //! | `out.notify`     | `text`                          | `in`         | -       |
+//! | `state`          | `group` ("main"), `initial`     | `enter`,`exit` | `active` |
+//! | `module`         | `module` (nome do `modules/<nome>.json`) | um por `parameter`, depois um por `command` | um por `value` |
 //!
 //! Sinal e' `f64`; "ligado" e' `>= 0.5`; "borda de subida" e' passar de `< 0.5` para `>= 0.5`.
 //! Um no de entrada de EVENTO da' um pulso de UM frame com o valor recebido em
 //! `FrameHook::input`; `in.timer` e `in.state` valem por nivel.
+//!
+//! # Estado e mute (proposta desta rodada; ver `design/DECISOES.md`)
+//!
+//! Qualquer no aceita duas chaves a mais: `"mute": true` (o no nao emite) e
+//! `"state": "<id de um no state>"` (o no so' emite enquanto aquele estado esta' ativo).
+//! "Nao emite" e' a mesma coisa nos dois casos: as saidas do no ficam em 0, nenhum `Ev` sai e o
+//! `time.delay` pendente e' cancelado. Ao voltar, o no volta como estava (o `q` do toggle e do
+//! latch, o `n` do counter), com as bordas zeradas e o proximo valor de uma saida de NIVEL
+//! (`out.osc`, `out.param`, `out.widget`, `module`) reemitido: e' o "reemitir ao ativar" do
+//! Chataigne. Trigger que ja' esteja alto no frame em que o estado abre dispara uma vez.
+//!
+//! `state` e' UM ativo por `group`: pulso em `enter` liga este e desliga os outros do mesmo
+//! grupo; pulso em `exit` desliga; `reset()` volta ao `initial`.
+// ponytail: o estado vale a partir do ponto em que o no `state` e' avaliado, entao um no gated
+// que venha ANTES dele na ordem topologica ve o valor do frame anterior ; virar pre-passe so' dos
+// nos `state` se algum show real depender do frame exato.
+//!
+//! `module` e' o app declarado em `modules/<nome>.json` (formato do `module.json` do Chataigne):
+//! `parameters{path:{type,default,norm,min,max}}`, `values{path:{type}}`, `commands{nome:{context}}`.
+//! Cada `parameter` e' uma ENTRADA: valor mudou -> `Ev::Param{target:"<modulo>/<path>"}`, com
+//! `norm` mapeando o sinal 0..1 para `[n0,n1]` antes do clamp em `min`..`max`. Cada `value` e' uma
+//! SAIDA de nivel alimentada por `FrameHook::input("module:<modulo>/<path>", v)`. Cada `command`
+//! e' uma entrada de trigger -> `Ev::Cmd{name:"<modulo>/<cmd>", args:{}}`.
 //!
 //! JSON: `{"nodes":[{"id","type",...}], "edges":[["no.pino","no.pino"], ...]}`.
 //! Compila para uma lista de nos em ordem topologica com os pinos indexados por INTEIRO
@@ -43,6 +68,7 @@ use engine::{Curve, Universes};
 use rhai::{Dynamic, Engine as Rhai, Scope, AST};
 use serde_json::Value;
 use std::collections::{HashMap, VecDeque};
+use std::path::Path;
 
 /// Fila de eventos de entrada e de saida, pre-alocadas.
 // ponytail: 64 eventos por frame em cada sentido ; um GO e um OSC por frame estao a ordens de
@@ -77,6 +103,19 @@ enum Kind {
     SaiOsc { addr: String, ult: f64 },
     SaiParam { alvo: String, ult: f64 },
     SaiNotify { txt: String, p: f64 },
+    /// Maquina de estados: `i` e' o indice deste estado em `Graph::estados`.
+    Estado { i: usize, pe: f64, px: f64 },
+    /// App declarado: uma entrada por parameter, depois uma por command; uma saida por value.
+    Modulo { params: Vec<Par>, cmds: Vec<(String, f64)> },
+}
+
+/// Um `parameter` de um no `module`, ja' resolvido para o caminho quente.
+struct Par {
+    alvo: String,
+    norm: Option<(f64, f64)>,
+    min: f64,
+    max: f64,
+    ult: f64,
 }
 
 struct No {
@@ -84,6 +123,11 @@ struct No {
     kind: Kind,
     base: usize,
     nin: usize,
+    nout: usize,
+    /// `"mute": true` no JSON: o no nao emite.
+    mute: bool,
+    /// `"state": "<id>"` no JSON: indice em `Graph::estados` do estado que libera este no.
+    estado: Option<usize>,
     /// arestas que CHEGAM neste no: (slot de origem, slot de destino)
     ins: Vec<(usize, usize)>,
 }
@@ -103,8 +147,49 @@ fn pinos(t: &str) -> Option<(&'static [&'static str], &'static [&'static str])> 
         "math.expr" => (&["a", "b"], &["out"]),
         "cmd" => (&["trigger"], &["done"]),
         "out.widget" | "out.osc" | "out.param" | "out.notify" => (&["in"], &[]),
+        "state" => (&["enter", "exit"], &["active"]),
+        // "module": pinos vem do modules/<nome>.json, resolvidos em `pinos_no`
+        "module" => (&[], &[]),
         _ => return None,
     })
+}
+
+/// `modules/<nome>.json` relativo ao diretorio do show.
+// ponytail: le e valida o minimo do module.json aqui ; trocar por `engine::module::load` quando
+// a frente F4 entrar em main (o formato e' o mesmo).
+fn carrega_modulo(base: &Path, nome: &str) -> Result<Value, String> {
+    let p = base.join("modules").join(format!("{nome}.json"));
+    let s = std::fs::read_to_string(&p)
+        .map_err(|e| format!("module {nome:?}: {}: {e}", p.display()))?;
+    serde_json::from_str(&s).map_err(|e| format!("module {nome:?}: {e}"))
+}
+
+/// Chaves de um objeto do module.json, em ordem estavel (o layout dos pinos depende dela).
+fn chaves(m: &Value, k: &str) -> Vec<String> {
+    let mut v: Vec<String> = match m.get(k).and_then(|x| x.as_object()) {
+        Some(o) => o.keys().cloned().collect(),
+        None => Vec::new(),
+    };
+    v.sort();
+    v
+}
+
+/// Pinos deste no. Iguais aos do tipo, menos `module`, que os tira do arquivo.
+fn pinos_no(tipo: &str, m: Option<&Value>) -> (Vec<String>, Vec<String>) {
+    match m {
+        Some(m) => {
+            let mut ins = chaves(m, "parameters");
+            ins.extend(chaves(m, "commands"));
+            (ins, chaves(m, "values"))
+        }
+        None => {
+            let (i, o) = pinos(tipo).unwrap();
+            (
+                i.iter().map(|s| s.to_string()).collect(),
+                o.iter().map(|s| s.to_string()).collect(),
+            )
+        }
+    }
 }
 
 fn txt(n: &Value, k: &str, pad: &str) -> String {
@@ -127,7 +212,14 @@ fn chave(tipo: &str, n: &Value) -> Option<String> {
     })
 }
 
-fn monta(tipo: &str, n: &Value, rhai: &mut Option<(Rhai, Scope<'static>)>) -> Result<Kind, String> {
+fn monta(
+    tipo: &str,
+    n: &Value,
+    rhai: &mut Option<(Rhai, Scope<'static>)>,
+    m: Option<&Value>,
+    // se este no E' um `state`, o indice dele em `Graph::estados`
+    meu: Option<usize>,
+) -> Result<Kind, String> {
     Ok(match tipo {
         "in.widget" | "in.key" | "in.osc" | "in.midi" | "in.marker" => Kind::Evento,
         "in.timer" => Kind::Timer { every: f(n, "every", 1.0).max(1e-6), prox: 0.0 },
@@ -210,6 +302,32 @@ fn monta(tipo: &str, n: &Value, rhai: &mut Option<(Rhai, Scope<'static>)>) -> Re
         "out.osc" => Kind::SaiOsc { addr: txt(n, "address", ""), ult: f64::NAN },
         "out.param" => Kind::SaiParam { alvo: txt(n, "target", ""), ult: f64::NAN },
         "out.notify" => Kind::SaiNotify { txt: txt(n, "text", ""), p: 0.0 },
+        "state" => Kind::Estado { i: meu.unwrap(), pe: 0.0, px: 0.0 },
+        "module" => {
+            let m = m.unwrap();
+            let nome = txt(n, "module", "");
+            let params = chaves(m, "parameters")
+                .iter()
+                .map(|k| {
+                    let p = &m["parameters"][k];
+                    Par {
+                        alvo: format!("{nome}/{k}"),
+                        norm: p
+                            .get("norm")
+                            .and_then(|v| v.as_array())
+                            .filter(|a| a.len() == 2)
+                            .map(|a| (a[0].as_f64().unwrap_or(0.0), a[1].as_f64().unwrap_or(1.0))),
+                        // ponytail: sem min/max declarados o clamp e' identidade ; parametro sem
+                        // faixa e' o caso do app que ainda nao mediu o proprio limite.
+                        min: f(p, "min", f64::NEG_INFINITY),
+                        max: f(p, "max", f64::INFINITY),
+                        ult: f64::NAN,
+                    }
+                })
+                .collect();
+            let cmds = chaves(m, "commands").iter().map(|k| (format!("{nome}/{k}"), 0.0)).collect();
+            Kind::Modulo { params, cmds }
+        }
         _ => return Err(format!("tipo fora do catalogo: {tipo}")),
     })
 }
@@ -217,7 +335,7 @@ fn monta(tipo: &str, n: &Value, rhai: &mut Option<(Rhai, Scope<'static>)>) -> Re
 pub struct Graph {
     nos: Vec<No>,
     vals: Vec<f64>,
-    /// "widget:go" -> indices (ja' topologicos) dos nos que escutam essa chave
+    /// "widget:go" / "module:laser/geo/scale" -> slots que essa chave alimenta
     por_chave: HashMap<String, Vec<usize>>,
     /// slots de saida dos nos de evento: zerados no inicio de cada frame (pulso de 1 frame)
     ev_slots: Vec<usize>,
@@ -226,10 +344,28 @@ pub struct Graph {
     sink: Box<dyn EventSink>,
     perdidos: u64,
     rhai: Option<(Rhai, Scope<'static>)>,
+    /// um por no `state`: ativo agora
+    estados: Vec<bool>,
+    /// grupo (internado) de cada estado, e o `initial` a que `reset()` volta
+    grupos: Vec<usize>,
+    iniciais: Vec<bool>,
+    /// slot do pino `active` de cada estado, reescrito no fim do frame (uma exclusao de grupo
+    /// pode acontecer depois do no `state` ter sido avaliado)
+    est_slots: Vec<usize>,
 }
 
 impl Graph {
+    /// Sem diretorio de show: nenhum no `module` pode ser resolvido.
     pub fn new(spec: &Value, sink: Box<dyn EventSink>) -> Result<Graph, String> {
+        Graph::new_in(spec, sink, Path::new("."))
+    }
+
+    /// `base` e' o diretorio do show: `module` le `base/modules/<nome>.json`.
+    pub fn new_in(
+        spec: &Value,
+        sink: Box<dyn EventSink>,
+        base_dir: &Path,
+    ) -> Result<Graph, String> {
         let brutos = spec
             .get("nodes")
             .and_then(|v| v.as_array())
@@ -237,6 +373,13 @@ impl Graph {
         let n = brutos.len();
         let mut idx: HashMap<&str, usize> = HashMap::with_capacity(n);
         let mut tipos: Vec<&str> = Vec::with_capacity(n);
+        // um por no `state`, em ordem de arquivo
+        let mut est_de_id: HashMap<&str, usize> = HashMap::new();
+        let mut grupos: Vec<usize> = Vec::new();
+        let mut declarados: Vec<bool> = Vec::new();
+        let mut nomes_grupo: HashMap<String, usize> = HashMap::new();
+        // module.json de cada no `module`, lido uma vez
+        let mut mods: HashMap<usize, Value> = HashMap::new();
         for (i, no) in brutos.iter().enumerate() {
             let id = no
                 .get("id")
@@ -252,7 +395,48 @@ impl Graph {
             if idx.insert(id, i).is_some() {
                 return Err(format!("id repetido no graph: {id:?}"));
             }
+            if tipo == "state" {
+                let g = txt(no, "group", "main");
+                let ng = nomes_grupo.len();
+                let g = *nomes_grupo.entry(g).or_insert(ng);
+                est_de_id.insert(id, grupos.len());
+                grupos.push(g);
+                declarados.push(no.get("initial").and_then(|v| v.as_bool()).unwrap_or(false));
+            }
+            if tipo == "module" {
+                let nome = txt(no, "module", "");
+                let m = carrega_modulo(base_dir, &nome).map_err(|e| format!("no {id:?}: {e}"))?;
+                mods.insert(i, m);
+            }
             tipos.push(tipo);
+        }
+        let pinos_de: Vec<(Vec<String>, Vec<String>)> =
+            (0..n).map(|i| pinos_no(tipos[i], mods.get(&i))).collect();
+        // um ativo por grupo tambem na carga: o ultimo `initial` do grupo ganha
+        let mut estados = vec![false; grupos.len()];
+        for i in 0..estados.len() {
+            if declarados[i] {
+                (0..estados.len()).for_each(|j| {
+                    if grupos[j] == grupos[i] {
+                        estados[j] = false;
+                    }
+                });
+                estados[i] = true;
+            }
+        }
+        let iniciais = estados.clone(); // ja' com a exclusao aplicada: e' onde `reset()` volta
+                                        // `"state": "<id>"` de cada no, resolvido para o indice do estado
+        let mut gated: Vec<Option<usize>> = Vec::with_capacity(n);
+        for no in brutos.iter() {
+            gated.push(match no.get("state").and_then(|v| v.as_str()) {
+                None => None,
+                Some(s) => Some(*est_de_id.get(s).ok_or_else(|| {
+                    format!(
+                        "no {:?}: \"state\": {s:?} nao e' um no do tipo state",
+                        no["id"].as_str().unwrap_or("?")
+                    )
+                })?),
+            });
         }
 
         // arestas: "no.pino" -> "no.pino", resolvidas para (no, pino) inteiros
@@ -273,7 +457,7 @@ impl Graph {
                     .rsplit_once('.')
                     .ok_or_else(|| format!("pino {s:?} sem ponto (use \"no.pino\")"))?;
                 let i = *idx.get(no).ok_or_else(|| format!("aresta {a}: no {no:?} nao existe"))?;
-                let (ins, outs) = pinos(tipos[i]).unwrap();
+                let (ins, outs) = &pinos_de[i];
                 let lista = if saida { outs } else { ins };
                 let p = lista.iter().position(|x| *x == pino).ok_or_else(|| {
                     format!(
@@ -325,27 +509,52 @@ impl Graph {
         let mut base = 0usize;
         let mut bases = vec![0usize; n];
         let mut ev_slots = Vec::new();
+        let mut est_slots = vec![0usize; grupos.len()];
         let mut por_chave: HashMap<String, Vec<usize>> = HashMap::new();
         for &i in &ordem {
-            let (ins, outs) = pinos(tipos[i]).unwrap();
+            let (ins, outs) = &pinos_de[i];
             bases[i] = base;
-            let kind = monta(tipos[i], &brutos[i], &mut rhai)
-                .map_err(|e| format!("no {:?}: {e}", brutos[i]["id"].as_str().unwrap_or("?")))?;
+            let id = brutos[i]["id"].as_str().unwrap_or("?");
+            let kind = monta(
+                tipos[i],
+                &brutos[i],
+                &mut rhai,
+                mods.get(&i),
+                est_de_id.get(id).copied(),
+            )
+            .map_err(|e| format!("no {id:?}: {e}"))?;
             if let Some(k) = chave(tipos[i], &brutos[i]) {
-                por_chave.entry(k).or_default().push(nos.len());
+                por_chave.entry(k).or_default().push(base + ins.len());
                 ev_slots.push(base + ins.len());
             }
+            if let Some(&e) = est_de_id.get(id) {
+                est_slots[e] = base + ins.len();
+            }
+            if tipos[i] == "module" {
+                // uma SAIDA de nivel por value, alimentada por `input("module:<mod>/<path>")`
+                let nome = txt(&brutos[i], "module", "");
+                for (j, val) in outs.iter().enumerate() {
+                    let k = format!("module:{nome}/{val}");
+                    por_chave.entry(k).or_default().push(base + ins.len() + j);
+                }
+            }
             nos.push(No {
-                id: brutos[i]["id"].as_str().unwrap_or("?").to_string(),
+                id: id.to_string(),
                 kind,
                 base,
                 nin: ins.len(),
+                nout: outs.len(),
+                mute: brutos[i]
+                    .get("mute")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false),
+                estado: gated[i],
                 ins: Vec::new(),
             });
             base += ins.len() + outs.len();
         }
         for (si, sp, di, dp) in arestas {
-            let src = bases[si] + pinos(tipos[si]).unwrap().0.len() + sp;
+            let src = bases[si] + pinos_de[si].0.len() + sp;
             let dst = bases[di] + dp;
             nos[topo[di]].ins.push((src, dst));
         }
@@ -360,6 +569,10 @@ impl Graph {
             sink,
             perdidos: 0,
             rhai,
+            estados,
+            grupos,
+            iniciais,
+            est_slots,
         })
     }
 
@@ -390,20 +603,27 @@ impl FrameHook for Graph {
         for &s in &self.ev_slots {
             self.vals[s] = 0.0;
         }
-        for &(i, v) in &self.inq {
-            let s = self.nos[i].base + self.nos[i].nin;
+        for &(s, v) in &self.inq {
             self.vals[s] = v;
         }
         self.inq.clear();
 
         // 2. nos em ordem topologica; nenhuma alocacao aqui (so' Ev, e evento e' raro)
         for k in 0..self.nos.len() {
-            let No { id, kind, base, nin, ins } = &mut self.nos[k];
+            let No { id, kind, base, nin, nout, mute, estado, ins } = &mut self.nos[k];
             for &(s, d) in ins.iter() {
                 self.vals[d] = self.vals[s];
             }
             let b = *base;
             let o = b + *nin;
+            // mute ou estado inativo: saidas em 0, nenhum Ev, delay pendente cancelado
+            if *mute || estado.is_some_and(|i| !self.estados[i]) {
+                for s in o..o + *nout {
+                    self.vals[s] = 0.0;
+                }
+                silencia(kind);
+                continue;
+            }
             match kind {
                 Kind::Evento => {}
                 Kind::Timer { every, prox } => {
@@ -601,10 +821,66 @@ impl FrameHook for Graph {
                         }
                     }
                 }
+                Kind::Estado { i, pe, px } => {
+                    let i = *i;
+                    if subiu(self.vals[b], pe) {
+                        for j in 0..self.estados.len() {
+                            if self.grupos[j] == self.grupos[i] {
+                                self.estados[j] = false; // um ativo por grupo
+                            }
+                        }
+                        self.estados[i] = true;
+                    }
+                    if subiu(self.vals[b + 1], px) {
+                        self.estados[i] = false;
+                    }
+                    self.vals[o] = b2f(self.estados[i]);
+                }
+                Kind::Modulo { params, cmds } => {
+                    for (j, par) in params.iter_mut().enumerate() {
+                        let mut v = self.vals[b + j];
+                        if let Some((n0, n1)) = par.norm {
+                            v = n0 + v * (n1 - n0);
+                        }
+                        let v = v.clamp(par.min, par.max);
+                        if v != par.ult {
+                            par.ult = v;
+                            let e = Ev::Param {
+                                target: par.alvo.clone(),
+                                value: v,
+                            };
+                            if self.outq.len() < FILA {
+                                self.outq.push(e);
+                            } else {
+                                self.perdidos += 1;
+                            }
+                        }
+                    }
+                    let np = params.len();
+                    for (j, (nome, p)) in cmds.iter_mut().enumerate() {
+                        if subiu(self.vals[b + np + j], p) {
+                            let e = Ev::Cmd {
+                                name: nome.clone(),
+                                args: Value::Object(Default::default()),
+                            };
+                            if self.outq.len() < FILA {
+                                self.outq.push(e);
+                            } else {
+                                self.perdidos += 1;
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        // 3. drena as saidas para o mundo
+        // 3. o pino `active` guarda o estado do FIM do frame (a exclusao de grupo pode ter
+        //    acontecido depois do no `state` ter sido avaliado)
+        for (i, &s) in self.est_slots.iter().enumerate() {
+            self.vals[s] = b2f(self.estados[i]);
+        }
+
+        // 4. drena as saidas para o mundo
         for e in &self.outq {
             self.sink.emit(e);
         }
@@ -613,9 +889,9 @@ impl FrameHook for Graph {
 
     fn input(&mut self, key: &str, value: f64) {
         if let Some(v) = self.por_chave.get(key) {
-            for &i in v {
+            for &s in v {
                 if self.inq.len() < FILA {
-                    self.inq.push((i, value));
+                    self.inq.push((s, value));
                 } else {
                     self.perdidos += 1;
                 }
@@ -627,6 +903,10 @@ impl FrameHook for Graph {
         self.vals.iter_mut().for_each(|v| *v = 0.0);
         self.inq.clear();
         self.outq.clear();
+        self.estados.copy_from_slice(&self.iniciais);
+        for (i, &s) in self.est_slots.iter().enumerate() {
+            self.vals[s] = b2f(self.estados[i]);
+        }
         for no in self.nos.iter_mut() {
             match &mut no.kind {
                 Kind::Timer { prox, .. } => *prox = t,
@@ -662,9 +942,58 @@ impl FrameHook for Graph {
                 }
                 Kind::SaiOsc { ult, .. } | Kind::SaiParam { ult, .. } => *ult = f64::NAN,
                 Kind::SaiNotify { p, .. } => *p = 0.0,
+                Kind::Estado { pe, px, .. } => {
+                    *pe = 0.0;
+                    *px = 0.0;
+                }
+                Kind::Modulo { params, cmds } => {
+                    params.iter_mut().for_each(|p| p.ult = f64::NAN);
+                    cmds.iter_mut().for_each(|c| c.1 = 0.0);
+                }
                 _ => {}
             }
         }
+    }
+}
+
+/// Silencia um no (mute ou estado inativo). Cancela o delay pendente, zera as bordas e faz a
+/// proxima saida de NIVEL ser reemitida ao voltar. O valor guardado (`q` do toggle e do latch, `n`
+/// do counter) fica: o no volta como estava, so' nao emitiu enquanto esteve fora.
+fn silencia(k: &mut Kind) {
+    match k {
+        Kind::Toggle { p, .. } | Kind::Debounce { p, .. } | Kind::Cmd { p, .. } => *p = 0.0,
+        Kind::SaiNotify { p, .. } => *p = 0.0,
+        Kind::Counter { p, pr, .. } => {
+            *p = 0.0;
+            *pr = 0.0;
+        }
+        Kind::Hold { ate, p, .. } => {
+            *ate = f64::NEG_INFINITY;
+            *p = 0.0;
+        }
+        Kind::Delay { n, ult, p, .. } => {
+            *n = 0;
+            *ult = 0.0;
+            *p = 0.0;
+        }
+        Kind::SaiWidget {
+            ate, aceso, p, ult, ..
+        } => {
+            *ate = 0.0;
+            *aceso = false;
+            *p = 0.0;
+            *ult = f64::NAN;
+        }
+        Kind::SaiOsc { ult, .. } | Kind::SaiParam { ult, .. } => *ult = f64::NAN,
+        Kind::Estado { pe, px, .. } => {
+            *pe = 0.0;
+            *px = 0.0;
+        }
+        Kind::Modulo { params, cmds } => {
+            params.iter_mut().for_each(|p| p.ult = f64::NAN);
+            cmds.iter_mut().for_each(|c| c.1 = 0.0);
+        }
+        _ => {}
     }
 }
 
@@ -866,6 +1195,186 @@ mod tests {
                 "edges":[["a.down","b.entrada"]]}"#,
         );
         assert!(e.contains("entrada") && e.contains("\"in\""), "{e}");
+    }
+
+    /// Valor do primeiro pino de saida de um no, pelo id.
+    fn saida(g: &Graph, id: &str) -> f64 {
+        let k = g.nos.iter().position(|n| n.id == id).unwrap();
+        g.vals[g.nos[k].base + g.nos[k].nin]
+    }
+
+    #[test]
+    fn dois_estados_do_mesmo_grupo_se_excluem() {
+        // ordem de arquivo escolhida para que os `state` sejam avaliados ANTES do no gated
+        let (mut g, s) = monta_graph(
+            r#"{"nodes":[{"id":"ea","type":"in.widget","widget":"a"},
+                         {"id":"eb","type":"in.widget","widget":"b"},
+                         {"id":"sa","type":"state","group":"ato","initial":true},
+                         {"id":"sb","type":"state","group":"ato"},
+                         {"id":"go","type":"in.widget","widget":"go"},
+                         {"id":"c1","type":"cmd","cmd":"cue_go","state":"sa"}],
+                "edges":[["ea.press","sa.enter"],["eb.press","sb.enter"],
+                         ["go.press","c1.trigger"]]}"#,
+        );
+        let mut u = Universes::new();
+        g.frame(0.0, &mut u);
+        assert_eq!(saida(&g, "sa"), 1.0, "initial liga o estado");
+        assert_eq!(saida(&g, "sb"), 0.0);
+        s.0.lock().unwrap().clear();
+        g.input("widget:go", 1.0);
+        g.frame(0.1, &mut u);
+        assert_eq!(s.0.lock().unwrap().len(), 1, "estado ativo: o cmd sai");
+
+        // entrar em sb desliga sa no mesmo frame; o cmd gated ja' nao emite
+        s.0.lock().unwrap().clear();
+        g.input("widget:b", 1.0);
+        g.input("widget:go", 1.0);
+        g.frame(0.2, &mut u);
+        assert_eq!(saida(&g, "sa"), 0.0, "um ativo por grupo");
+        assert_eq!(saida(&g, "sb"), 1.0);
+        assert!(s.0.lock().unwrap().is_empty(), "estado inativo: nada sai");
+
+        // voltar para sa religa o no
+        s.0.lock().unwrap().clear();
+        g.input("widget:a", 1.0);
+        g.input("widget:go", 1.0);
+        g.frame(0.3, &mut u);
+        assert_eq!(saida(&g, "sb"), 0.0);
+        assert_eq!(s.0.lock().unwrap().len(), 1, "voltou a emitir ao entrar");
+    }
+
+    #[test]
+    fn estado_inativo_cancela_o_delay_pendente() {
+        let (mut g, _) = monta_graph(
+            r#"{"nodes":[{"id":"e","type":"in.widget","widget":"e"},
+                         {"id":"x","type":"in.widget","widget":"x"},
+                         {"id":"go","type":"in.widget","widget":"go"},
+                         {"id":"s","type":"state","initial":true},
+                         {"id":"d","type":"time.delay","ms":300,"state":"s"}],
+                "edges":[["e.press","s.enter"],["x.press","s.exit"],["go.press","d.in"]]}"#,
+        );
+        let mut u = Universes::new();
+        g.input("widget:go", 1.0);
+        g.frame(0.0, &mut u);
+        g.input("widget:x", 1.0);
+        g.frame(0.05, &mut u);
+        assert_eq!(saida(&g, "s"), 0.0);
+        g.frame(0.4, &mut u);
+        assert_eq!(saida(&g, "d"), 0.0, "delay pendente foi cancelado");
+        g.input("widget:e", 1.0);
+        g.frame(0.5, &mut u);
+        assert_eq!(saida(&g, "d"), 0.0, "e nao solta atrasado ao voltar");
+        g.input("widget:go", 1.0);
+        g.frame(0.51, &mut u);
+        g.frame(0.9, &mut u);
+        assert_eq!(
+            saida(&g, "d"),
+            1.0,
+            "o delay volta a funcionar no estado ativo"
+        );
+    }
+
+    #[test]
+    fn mute_silencia_o_no() {
+        let (mut g, s) = monta_graph(
+            r#"{"nodes":[{"id":"go","type":"in.widget","widget":"go"},
+                         {"id":"c","type":"cmd","cmd":"cue_go","mute":true},
+                         {"id":"p","type":"out.param","target":"par1.dim","mute":true}],
+                "edges":[["go.press","c.trigger"],["go.press","p.in"]]}"#,
+        );
+        let mut u = Universes::new();
+        g.frame(0.0, &mut u);
+        s.0.lock().unwrap().clear();
+        g.input("widget:go", 1.0);
+        g.frame(0.1, &mut u);
+        assert!(s.0.lock().unwrap().is_empty(), "no mutado nao emite");
+        assert_eq!(saida(&g, "c"), 0.0, "e a saida dele fica em 0");
+    }
+
+    #[test]
+    fn chaves_desconhecidas_do_editor_sao_ignoradas() {
+        let (mut g, _) = monta_graph(
+            r#"{"nodes":[{"id":"go","type":"in.widget","widget":"go"},
+                         {"id":"n","type":"logic.not","x":120,"y":-40,"group":"g1",
+                          "label":"inverte","cor":"ambar"}],
+                "edges":[["go.press","n.in"]]}"#,
+        );
+        let mut u = Universes::new();
+        g.frame(0.0, &mut u);
+        assert_eq!(saida(&g, "n"), 1.0);
+        g.input("widget:go", 1.0);
+        g.frame(0.1, &mut u);
+        assert_eq!(saida(&g, "n"), 0.0, "x/y/group/label nao mudam o runtime");
+    }
+
+    #[test]
+    fn module_emite_param_na_mudanca_le_value_e_dispara_command() {
+        let dir = std::env::temp_dir().join("spellcore_graph_modulo");
+        std::fs::create_dir_all(dir.join("modules")).unwrap();
+        std::fs::write(
+            dir.join("modules").join("laser.json"),
+            r#"{"name":"laser","type":"laser","version":"1.0.0",
+                "parameters":{"geo/scale":{"type":"float","default":1,"norm":[0,2],
+                                           "min":0,"max":1.5}},
+                "values":{"stats/pps":{"type":"float"}},
+                "commands":{"blank":{"context":"action"}}}"#,
+        )
+        .unwrap();
+        let s = Sink::default();
+        let spec: Value = serde_json::from_str(
+            r#"{"nodes":[{"id":"k","type":"in.widget","widget":"k"},
+                         {"id":"t","type":"in.widget","widget":"t"},
+                         {"id":"tg","type":"logic.toggle"},
+                         {"id":"m","type":"module","module":"laser"}],
+                "edges":[["k.press","tg.in"],["tg.out","m.geo/scale"],["t.press","m.blank"]]}"#,
+        )
+        .unwrap();
+        let mut g = Graph::new_in(&spec, Box::new(s.clone()), &dir).expect("compila");
+        let mut u = Universes::new();
+
+        g.frame(0.0, &mut u);
+        assert_eq!(
+            *s.0.lock().unwrap(),
+            vec![Ev::Param {
+                target: "laser/geo/scale".into(),
+                value: 0.0
+            }],
+            "primeiro frame sincroniza o parametro"
+        );
+        s.0.lock().unwrap().clear();
+        g.frame(0.1, &mut u);
+        assert!(s.0.lock().unwrap().is_empty(), "sem mudanca, sem Param");
+
+        // toggle sobe: 1.0 mapeado por norm [0,2] = 2.0, clampado em max 1.5
+        g.input("widget:k", 1.0);
+        g.frame(0.2, &mut u);
+        assert_eq!(
+            *s.0.lock().unwrap(),
+            vec![Ev::Param {
+                target: "laser/geo/scale".into(),
+                value: 1.5
+            }]
+        );
+
+        // um value chega pelo input e vira a saida do no
+        s.0.lock().unwrap().clear();
+        g.input("module:laser/stats/pps", 31000.0);
+        g.frame(0.3, &mut u);
+        assert_eq!(saida(&g, "m"), 31000.0);
+        g.frame(0.4, &mut u);
+        assert_eq!(saida(&g, "m"), 31000.0, "value e' nivel, nao pulso");
+
+        // command vira Ev::Cmd na borda de subida
+        s.0.lock().unwrap().clear();
+        g.input("widget:t", 1.0);
+        g.frame(0.5, &mut u);
+        assert_eq!(
+            *s.0.lock().unwrap(),
+            vec![Ev::Cmd {
+                name: "laser/blank".into(),
+                args: serde_json::json!({})
+            }]
+        );
     }
 
     #[test]

@@ -519,6 +519,9 @@ impl engine::FrameHook for Fx { }
 pub struct Graph;
 impl Graph {
     pub fn new(spec: &serde_json::Value, sink: Box<dyn engine::EventSink>) -> Result<Graph, String>;
+    /// Idem, com o diretório do show: é de lá que o nó `module` lê `modules/<nome>.json`.
+    pub fn new_in(spec: &serde_json::Value, sink: Box<dyn engine::EventSink>, base: &Path)
+        -> Result<Graph, String>;
     pub fn nodes(&self) -> usize;
 }
 impl engine::FrameHook for Graph { }
@@ -540,7 +543,18 @@ Medida de referência antes do Rhai (Windows x64, perfil release do workspace): 
 
 `in.widget | in.key | in.osc | in.midi (stub) | in.timer | in.marker | in.state` ·
 `logic.and|or|not|latch|toggle|debounce|counter|select` · `math.map|curve|expr` ·
-`time.delay|hold` · `cmd` · `out.widget|out.osc|out.param|out.notify`.
+`time.delay|hold` · `cmd` · `out.widget|out.osc|out.param|out.notify` ·
+`state` · `module` (os dois últimos são proposta desta rodada, `design/DECISOES.md`).
+
+`state`: config `group` (padrão `"main"`) e `initial`, pinos `enter`/`exit` -> `active`; um ativo
+por grupo. `module`: config `module`, que nomeia `modules/<nome>.json` lido ao lado do show
+(`Graph::new_in(spec, sink, dir_do_show)`); uma entrada por `parameter` (mudou ->
+`Ev::Param{target:"<módulo>/<path>"}`, `norm` mapeia 0..1 antes do clamp em `min`..`max`), uma
+saída de nível por `value` (alimentada por `FrameHook::input("module:<módulo>/<path>", v)`) e uma
+entrada de trigger por `command` (-> `Ev::Cmd{name:"<módulo>/<cmd>"}`). Qualquer nó aceita
+`"mute": true` e `"state": "<id de um nó state>"`: o nó não emite (saídas em 0, nenhum evento,
+`time.delay` pendente cancelado) e volta a emitir ao entrar. As outras chaves desconhecidas
+(`x`, `y`, `group`, `label`) continuam ignoradas pelo runtime: posição é do editor.
 
 JSON: `{"nodes":[{"id","type",...}], "edges":[["no.pino","no.pino"], ...]}`. Compila para lista
 de nós em ordem topológica com pinos indexados por inteiro; avaliação por frame sem alocação;
