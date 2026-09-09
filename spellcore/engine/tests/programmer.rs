@@ -11,7 +11,6 @@ use engine::registry::{base, Registry};
 use engine::{Player, Show};
 use protocols::Output;
 use serde_json::{json, Value};
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -71,7 +70,7 @@ fn programmer_htp_clear_captura_e_fixture_set() {
     }))
     .expect("show de teste");
     let esp = Arc::new(Mutex::new([0u8; 512]));
-    let mut p = Player::new(sh, PathBuf::from("."), false).expect("player sem saidas");
+    let mut p = Player::new(sh, false).expect("player sem saidas");
     p.output(Box::new(Espelho(esp.clone())));
     p.start(None).expect("start");
     p.handle().play();

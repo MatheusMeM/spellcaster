@@ -49,16 +49,11 @@ fn cpu_secs() -> Option<f64> {
 
 fn arg(name: &str, default: f64) -> f64 {
     let a: Vec<String> = std::env::args().collect();
-    for i in 0..a.len() {
-        if a[i] == name {
-            if let Some(v) = a.get(i + 1) {
-                if let Ok(x) = v.parse() {
-                    return x;
-                }
-            }
-        }
-    }
-    default
+    a.iter()
+        .position(|x| x == name)
+        .and_then(|i| a.get(i + 1))
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(default)
 }
 
 /// Figura de `n` pontos que passa na safety (bbox bem maior que min_size) e tem vertices.
@@ -70,10 +65,6 @@ fn figura(n: usize) -> Vec<Point> {
             Point::new(r * a.cos(), r * a.sin(), 255, (i & 0xff) as u8, 80, false)
         })
         .collect()
-}
-
-fn cpu_feeds_us(stats: &[(String, laser::FeedStats)]) -> f64 {
-    stats.iter().map(|(_, s)| s.cpu).sum::<f64>() * 1e6
 }
 
 fn main() {
@@ -203,7 +194,7 @@ fn main() {
         cmds.join(" "),
         idas,
         idas as f64 / wall,
-        if idas > 0 { cpu_feeds_us(&stats) / idas as f64 } else { 0.0 }
+        if idas > 0 { cpu_feeds * 1e6 / idas as f64 } else { 0.0 }
     );
 
     let pct_feeds = 100.0 * cpu_feeds / wall;

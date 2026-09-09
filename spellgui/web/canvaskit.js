@@ -58,14 +58,14 @@ const CK = {
   sel() {
     const m = new Map();
     return {
-      m,
-      get(r) { return m.get(r); },
+      m,                                     // linha -> Set; quem quer ler percorre `m` direto
       has(r, i) { const s = m.get(r); return !!s && s.has(i); },
       add(r, i) { let s = m.get(r); if (!s) m.set(r, s = new Set()); s.add(i); },
-      del(r, i) { const s = m.get(r); if (s) { s.delete(i); if (!s.size) m.delete(r); } },
-      toggle(r, i) { if (this.has(r, i)) this.del(r, i); else this.add(r, i); },
+      toggle(r, i) {
+        const s = m.get(r);
+        if (s && s.has(i)) { s.delete(i); if (!s.size) m.delete(r); } else this.add(r, i);
+      },
       clear() { m.clear(); },
-      rows() { return m.keys(); },
       count() { let n = 0; for (const s of m.values()) n += s.size; return n; },
       each(fn) { for (const [r, s] of m) for (const i of s) fn(r, i); },
     };
@@ -84,7 +84,6 @@ const CK = {
     k.toScreen = t => k.gutter + (t - k.view.x) * k.view.zoom;
     k.toWorld = x => k.view.x + (x - k.gutter) / k.view.zoom;
     k.invalidate = () => { k.dirty = true; };
-    k.hit = (ts, n, t, tolPx) => CK.near(ts, n, t, (tolPx === undefined ? 6 : tolPx) / k.view.zoom);
 
     k.resize = () => {
       const r = cv.getBoundingClientRect();
@@ -126,7 +125,7 @@ const CK = {
     // O cliente pega o clique antes: se `on.down` devolver true, o kit nao inicia marquee.
     cv.addEventListener("pointerdown", e => {
       const p = pt(e);
-      if (cv.focus) cv.focus();
+      cv.focus();
       if (e.button === 1) {
         k.drag = { mode: "pan", x: p.x, y: p.y, vx: k.view.x, vy: k.view.y };
         cap(e);
@@ -187,7 +186,7 @@ const CK = {
     k.redraw = () => { k.dirty = false; draw(k); };     // desenho sincrono (teste e captura)
 
     k.resize();
-    if (window.ResizeObserver) new ResizeObserver(k.resize).observe(cv);
+    new ResizeObserver(k.resize).observe(cv);
     return k;
   },
 };

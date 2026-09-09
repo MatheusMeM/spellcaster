@@ -27,8 +27,7 @@ use protocols::{artnet::ArtNetOut, sacn::SacnOut, Output};
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::net::Ipv4Addr;
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -82,7 +81,7 @@ pub fn open_outputs(sh: &Show) -> Result<Vec<Box<dyn Output>>, String> {
                 outs.push(Box::new(o));
             }
             OutputCfg::Osc { .. } => {} // saida de mensagem, nao de universo: vai no `osc_out`
-            OutputCfg::Unknown(t) => eprintln!("aviso: saida \"{}\" ignorada", t),
+            OutputCfg::Unknown { tipo } => eprintln!("aviso: saida \"{}\" ignorada", tipo),
         }
     }
     Ok(outs)
@@ -211,7 +210,6 @@ struct Shared {
     prog: Mutex<Prog>,
     cue: AtomicI32,
     frames: AtomicU64,
-    nuni: AtomicUsize,
     universes: Mutex<Vec<u16>>,
     duration: Option<f64>,
     run: AtomicBool,
@@ -321,6 +319,7 @@ struct Rt {
     osc_out: Option<OscOut>,
     looping: bool,
     prev: f64,
+    nuni: usize,    // quantos universos sairam no ultimo frame (so' a thread de transporte le)
     pend: Vec<Ctl>, // fila drenada por swap: zero alocacao por frame
 }
 
@@ -339,13 +338,7 @@ impl Rt {
                 Ctl::Go(i) => {
                     self.cues.go(t, i);
                 }
-                Ctl::Reset(x) => {
-                    self.cues.reset();
-                    for h in self.hooks.iter_mut() {
-                        h.reset(x);
-                    }
-                    self.prev = x;
-                }
+                Ctl::Reset(x) => self.reset(x),
                 Ctl::Input(k, v) => {
                     for h in self.hooks.iter_mut() {
                         h.input(&k, v);
@@ -355,6 +348,15 @@ impl Rt {
         }
         self.pend = pend; // devolve o Vec vazio com a capacidade ja alocada
         s.cue.store(self.cues.index(), Ordering::Relaxed);
+    }
+
+    /// Volta cues, ganchos e o `prev` do frame para o instante `t`: locate, loop e stop.
+    fn reset(&mut self, t: f64) {
+        self.cues.reset();
+        for h in self.hooks.iter_mut() {
+            h.reset(t);
+        }
+        self.prev = t;
     }
 
     fn tick(&mut self, s: &Shared, t: f64) {
@@ -371,6 +373,7 @@ impl Rt {
             outs,
             osc_out,
             prev,
+            nuni,
             ..
         } = self;
         let Timeline {
@@ -436,8 +439,8 @@ impl Rt {
         }
         *prev = t;
         s.frames.fetch_add(1, Ordering::Relaxed);
-        if uni.len() != s.nuni.load(Ordering::Relaxed) {
-            s.nuni.store(uni.len(), Ordering::Relaxed);
+        if uni.len() != *nuni {
+            *nuni = uni.len();
             *lock(&s.universes) = uni.numbers();
         }
     }
@@ -500,13 +503,11 @@ pub struct Player {
     th: Option<JoinHandle<()>>,
     osc_in: Option<OscIn>,
     osc_port: Option<u16>,
-    base: PathBuf,
 }
 
 impl Player {
     /// Carrega timeline + cues e abre as saidas de `show.outputs` (sacn, artnet, osc).
-    /// `base` = diretorio do .spell (caminhos de `fx`/clipes sao relativos a ele).
-    pub fn new(show: Show, base: PathBuf, looping: bool) -> Result<Player, String> {
+    pub fn new(show: Show, looping: bool) -> Result<Player, String> {
         let tl = Timeline::new(&show)?;
         let ign = tl.ignored().join(", ");
         if !ign.is_empty() {
@@ -534,7 +535,6 @@ impl Player {
                 prog: Mutex::new(Prog::default()),
                 cue: AtomicI32::new(-1),
                 frames: AtomicU64::new(0),
-                nuni: AtomicUsize::new(0),
                 universes: Mutex::new(Vec::new()),
                 duration: show.duration,
                 run: AtomicBool::new(false),
@@ -551,12 +551,12 @@ impl Player {
                 osc_out,
                 looping,
                 prev: 0.0,
+                nuni: 0,
                 pend: Vec::new(),
             }),
             th: None,
             osc_in: None,
             osc_port,
-            base,
         })
     }
 
@@ -580,11 +580,6 @@ impl Player {
 
     pub fn clock(&self) -> Clock {
         self.s.clock.clone()
-    }
-
-    /// Diretorio do .spell (a CLI resolve `fx` e clipes a partir dele).
-    pub fn base(&self) -> &Path {
-        &self.base
     }
 
     /// Sobe a thread de transporte e, se `osc_port` (argumento ou `transport.osc_port`), o
@@ -629,10 +624,7 @@ impl Player {
         let d = lock(&self.s.done);
         match timeout {
             None => {
-                let mut d = d;
-                while !*d {
-                    d = self.s.cv.wait(d).unwrap_or_else(|e| e.into_inner());
-                }
+                drop(self.s.cv.wait_while(d, |x| !*x).unwrap_or_else(|e| e.into_inner()));
                 true
             }
             Some(to) => {
@@ -706,18 +698,10 @@ fn transport(mut rt: Rt, s: Arc<Shared>) {
             // ponytail: `looping` sem `duration` nao repete — sem fim, o run so' volta no stop.
             if rt.looping && s.duration.is_some() {
                 s.clock.locate(0.0);
-                rt.cues.reset();
-                for h in rt.hooks.iter_mut() {
-                    h.reset(0.0);
-                }
-                rt.prev = 0.0;
+                rt.reset(0.0);
             } else {
                 s.clock.stop();
-                rt.cues.reset();
-                for h in rt.hooks.iter_mut() {
-                    h.reset(0.0);
-                }
-                rt.prev = 0.0;
+                rt.reset(0.0);
                 s.cue.store(-1, Ordering::Relaxed);
                 s.finish();
             }

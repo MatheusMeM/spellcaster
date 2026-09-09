@@ -179,8 +179,7 @@ pub fn write_bytes(
     }
     let rsize = rec_size(fmt).unwrap();
     let total = frames.len();
-    let default: Vec<(u8, u8, u8)> = DEFAULT_PALETTE.to_vec();
-    let pal: &[(u8, u8, u8)] = palette.unwrap_or(&default);
+    let pal: &[(u8, u8, u8)] = palette.unwrap_or(&DEFAULT_PALETTE);
     let mut out = Vec::with_capacity(HDR * (total + 2) + frames.iter().map(|f| f.len().max(1) * rsize).sum::<usize>());
     if let (Some(p), 0 | 1) = (palette, fmt) {
         section(&mut out, 2, name, company, p.len(), 0, total);

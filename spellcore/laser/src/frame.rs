@@ -65,14 +65,11 @@ impl Frame {
         self.points.len()
     }
 
+    // clippy (len_without_is_empty) exige o par de `len`, que o `ild::write` usa.
     pub fn is_empty(&self) -> bool {
         self.points.is_empty()
     }
 
-    /// (x0, y0, x1, y1) dos pontos acesos; None se nao houver.
-    pub fn bbox(&self) -> Option<(i16, i16, i16, i16)> {
-        bbox(&self.points)
-    }
 }
 
 /// bbox dos pontos acesos.
@@ -223,18 +220,6 @@ impl Safety {
     }
 }
 
-/// Assinatura do Python, para conferencia contra as fixtures.
-pub fn safety(
-    frame: &Frame,
-    min_size: i32,
-    max_intensity: u8,
-    zone: Option<(f64, f64, f64, f64)>,
-) -> Frame {
-    let mut out = frame.clone();
-    Safety { min_size, max_intensity, zone }.apply(&mut out.points);
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -305,11 +290,17 @@ mod tests {
 
     #[test]
     fn safety_escurece_figura_pequena() {
-        let small = safety(&square(500), 2000, 255, None);
+        // `Safety::apply` e' o caminho de producao (o feed monta a struct e chama).
+        let sf = |f: &Frame, min_size, max_intensity, zone| {
+            let mut out = f.clone();
+            Safety { min_size, max_intensity, zone }.apply(&mut out.points);
+            out
+        };
+        let small = sf(&square(500), 2000, 255, None);
         assert!(small.points.iter().all(|p| p.r == 127)); // 1000/2000 * 255, truncado
-        let big = safety(&square(5000), 2000, 255, None);
+        let big = sf(&square(5000), 2000, 255, None);
         assert!(big.points.iter().all(|p| p.r == 255));
-        let dot = safety(
+        let dot = sf(
             &Frame::new(vec![Point::new(0.0, 0.0, 255, 255, 255, false); 5], ""),
             2000,
             255,
@@ -320,7 +311,13 @@ mod tests {
 
     #[test]
     fn safety_limita_intensidade_e_zona() {
-        let f = safety(&square(5000), 2000, 100, Some((-1000.0, -1000.0, 1000.0, 1000.0)));
+        let mut f = square(5000);
+        Safety {
+            min_size: 2000,
+            max_intensity: 100,
+            zone: Some((-1000.0, -1000.0, 1000.0, 1000.0)),
+        }
+        .apply(&mut f.points);
         assert!(f.points.iter().all(|p| p.r == 100));
         assert!(f.points.iter().filter(|p| p.x.abs() == 5000).all(|p| p.blank));
     }

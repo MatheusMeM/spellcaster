@@ -33,7 +33,7 @@ use std::time::{Duration, Instant};
 use engine::registry::Registry;
 use engine::schemars::JsonSchema;
 use laser::dac::idn;
-use laser::{ild, Dac, EtherDream, Feed, Helios, Idn, Safety, Transform};
+use laser::{ild, Dac, EtherDream, Feed, Idn, Safety, Transform};
 use protocols::netscan;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -118,9 +118,9 @@ fn dacs(a: DacsArgs) -> Result<Value, String> {
                    "buffer": d.buffer_capacity, "max_pps": d.max_point_rate})
         })
         .collect();
-    // ponytail: sem sonda de Helios ; `Helios::open` e' `Err` fixo nesta build (sem hidapi/rusb),
-    // entao o laco por indice USB entra junto com o driver.
-    out.extend(idn::scan(t).iter().map(|u| {
+    // ponytail: sem Helios na lista ; o DAC USB entra quando o driver (hidapi/rusb) entrar —
+    // `laser::dac::helios` hoje so' tem o encoder do frame, documentado para o porte.
+    out.extend(idn::scan(std::net::Ipv4Addr::BROADCAST, t).iter().map(|u| {
         json!({"type": "idn", "id": u.unit_id.iter().map(|b| format!("{b:02x}")).collect::<String>(),
                "host": u.ip, "name": u.name})
     }));
@@ -132,9 +132,9 @@ fn dacs(a: DacsArgs) -> Result<Value, String> {
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "engine::schemars")]
 struct OpenArgs {
-    /// etherdream, helios ou idn.
+    /// etherdream ou idn.
     dac: String,
-    /// Ether Dream e IDN: "ip" ou "ip:porta" (o `host` de `laser_dacs`). Helios: indice USB.
+    /// "ip" ou "ip:porta" (o `host` de `laser_dacs`).
     #[serde(default)]
     host: String,
     /// Milhares de pontos por segundo entregues ao DAC.
@@ -156,7 +156,7 @@ fn abrir(a: OpenArgs) -> Result<Value, String> {
         Some(v) => serde_json::from_value(v).map_err(|e| format!("safety: {}", e))?,
         None => Safety::default(),
     };
-    if a.host.is_empty() && a.dac != "helios" {
+    if a.host.is_empty() {
         return Err(format!("laser_open {} exige host (veja laser_dacs)", a.dac));
     }
     let d: Box<dyn Dac> = match a.dac.as_str() {
@@ -167,10 +167,7 @@ fn abrir(a: OpenArgs) -> Result<Value, String> {
         "idn" => {
             Box::new(Idn::connect(&a.host, 0).map_err(|e| format!("idn {}: {}", a.host, e))?)
         }
-        "helios" => Box::new(
-            Helios::open(a.host.parse().unwrap_or(0)).map_err(|e| format!("helios: {}", e))?,
-        ),
-        o => return Err(format!("dac desconhecido: {} (etherdream, helios, idn)", o)),
+        o => return Err(format!("dac desconhecido: {} (etherdream, idn)", o)),
     };
     let feed = Feed::start(d, pps, 2, safety).map_err(|e| e.to_string())?;
     let id = NEXT.fetch_add(1, Ordering::Relaxed);

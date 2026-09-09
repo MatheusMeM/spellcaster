@@ -185,8 +185,6 @@ pub struct Track {
     pub clip: u16,
     /// `media`: reprodutor Capture (ausente ou "capture") — os outros viram track OSC.
     pub capture: bool,
-    /// `fx`: caminho do script, relativo ao .spell. Quem executa e' o crate `script`.
-    pub script: String,
     /// `osc`: valor padrao quando o track nao tem keys (o `args` do Python).
     pub args: Vec<f64>,
     buf: Vec<f64>,      // saida reaproveitada: zero alocacao por frame
@@ -208,14 +206,6 @@ pub enum Side {
 
 impl Track {
     pub fn new(kind: String, universe: u16, address: u16, keys: Keys) -> Track {
-        let n = keys
-            .keys()
-            .first()
-            .map(|k| match &k.value {
-                Value::List(v) => v.len(),
-                _ => 1,
-            })
-            .unwrap_or(1);
         Track {
             kind,
             universe,
@@ -224,10 +214,9 @@ impl Track {
             text_address: String::new(),
             clip: 0,
             capture: true,
-            script: String::new(),
             args: Vec::new(),
-            buf: Vec::with_capacity(n),
-            last: Vec::with_capacity(n),
+            buf: Vec::new(),      // o clear()+push do primeiro frame aloca uma vez
+            last: Vec::new(),
             text: String::new(),
             sent: false,
         }
@@ -252,11 +241,6 @@ impl Track {
         tr.text_address = adr.and_then(|v| v.as_str()).unwrap_or("").to_string();
         tr.clip = spec.get("clip").and_then(|v| v.as_f64()).unwrap_or(0.0) as u16;
         tr.capture = spec.get("player").and_then(|v| v.as_str()).unwrap_or("capture") == "capture";
-        tr.script = spec
-            .get("script")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
         tr.args = match spec.get("args") {
             Some(serde_json::Value::Array(a)) => a.iter().filter_map(|x| x.as_f64()).collect(),
             Some(serde_json::Value::Number(n)) => vec![n.as_f64().unwrap_or(0.0)],
@@ -378,8 +362,6 @@ pub struct Timeline {
     pub media: Vec<usize>,
     /// "cue" — `crossed(prev, t)` dispara a cue.
     pub cue: Vec<usize>,
-    /// "fx" — script Rhai; o engine so' guarda `script` e `universe`.
-    pub fx: Vec<usize>,
 }
 
 impl Timeline {
@@ -403,7 +385,6 @@ impl Timeline {
             osc: idx(&["osc"]),
             media: idx(&["media"]),
             cue: idx(&["cue"]),
-            fx: idx(&["fx"]),
             tracks,
         })
     }
@@ -576,9 +557,7 @@ mod tests {
         assert_eq!(tl.osc, vec![2]);
         assert_eq!(tl.media, vec![3, 4]);
         assert_eq!(tl.cue, vec![5]);
-        assert_eq!(tl.fx, vec![6]);
         assert_eq!(tl.ignored(), vec!["fixture", "pyfx"], "reservado e Python: aviso");
-        assert_eq!(tl.tracks[6].script, "medgrupo.rhai");
         assert_eq!(tl.tracks[6].universe, 3);
         assert_eq!(tl.tracks[2].text_address, "/spell/dim");
         assert!(tl.tracks[3].capture && !tl.tracks[4].capture);

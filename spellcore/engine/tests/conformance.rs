@@ -28,7 +28,6 @@ fn medgrupo_universo_1_byte_a_byte() {
 
     let mut uni = Universes::new();
     uni.get_or_create(1);
-    let mut ok = 0usize;
     for i in 0..n {
         tl.apply(&mut uni, i as f64 / fps);
         let want = &bin[4 + i * 512..4 + (i + 1) * 512];
@@ -44,8 +43,6 @@ fn medgrupo_universo_1_byte_a_byte() {
                 got[ch]
             );
         }
-        ok += 1;
     }
-    assert_eq!(ok, n);
     assert_eq!(n, 2577, "nframes do fixture");
 }

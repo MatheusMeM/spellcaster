@@ -11,14 +11,14 @@
   body { display: flex; flex-direction: column; }
   .bar { display: flex; align-items: center; gap: var(--sc-gap); padding: 6px 8px;
          background: var(--sc-panel); border-bottom: 1px solid var(--sc-line); flex: 0 0 auto; }
-  .bar button, .bar input { background: var(--sc-panel-2); color: var(--sc-fg); border: 1px solid var(--sc-line);
+  .bar button, .bar input,
+  .bar input[type=file]::file-selector-button { background: var(--sc-panel-2); color: var(--sc-fg);
+                            border: 1px solid var(--sc-line);
                             border-radius: var(--sc-radius); font: 12px var(--sc-mono); padding: 5px 9px; }
   .bar button:hover { border-color: var(--sc-fg-3); }
   .bar button.on { border-color: var(--sc-accent); color: var(--sc-accent); }
   .bar input[type=text] { width: 230px; }
   .bar input[type=file] { border: 0; padding: 0; font-size: 0; }
-  .bar input[type=file]::file-selector-button { background: var(--sc-panel-2); color: var(--sc-fg);
-    border: 1px solid var(--sc-line); border-radius: var(--sc-radius); font: 12px var(--sc-mono); padding: 5px 9px; }
   .sep { width: 1px; height: 20px; background: var(--sc-line); }
   .over { color: var(--sc-fg-3); font-size: var(--sc-text-xs); letter-spacing: var(--sc-tracking);
           text-transform: uppercase; font-family: var(--sc-label); }
@@ -57,17 +57,14 @@
 "use strict";
 const q = id => document.getElementById(id);
 const msg = q("msg");
-const arg = new URLSearchParams(location.search).get("show");   // ?show=<caminho> abre outro .spell
-if (arg) q("path").value = arg;
-TL.mount(q("cv"), { menu: q("menu"), msg });
-
-const show = () => TL.show || (TL.show = { name: "vazio", fps: 30, duration: 60, tracks: [], markers: [] });
-const load = data => { TL.load(data); q("cv").focus(); };
+TL.mount(q("cv"), q("menu"), msg);
+TL.load({ name: "vazio", fps: 30, duration: 60, tracks: [], markers: [] });
 
 q("open").onclick = () => { TL.file = q("path").value; TL.fetch(TL.file).catch(e => { msg.textContent = e.message; }); };
 q("file").onchange = e => {
   const f = e.target.files[0];
-  if (f) f.text().then(t => load(JSON.parse(t))).catch(err => { msg.textContent = err.message; });
+  if (f) f.text().then(t => { TL.load(JSON.parse(t)); q("cv").focus(); })
+                 .catch(err => { msg.textContent = err.message; });
 };
 q("play").onclick = () => TL.play(1);
 q("pause").onclick = () => TL.play(0);
@@ -83,7 +80,7 @@ q("rec").onclick = () => {
   TL.k.invalidate();
 };
 q("fit").onclick = () => TL.fit();
-q("tadd").onclick = () => { show(); TL.trackAdd(); };
+q("tadd").onclick = () => TL.trackAdd();
 q("tdel").onclick = () => TL.trackDel();
 q("mon").onclick = () => { TL.mon = !TL.mon; TL.onState(); TL.k.invalidate(); };
 q("save").onclick = () => TL.save();

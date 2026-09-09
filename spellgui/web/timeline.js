@@ -27,7 +27,6 @@ const EASE = [
 ];
 const STEPS = [0.04, 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1800];
 const LANE_PARAMS = ["x", "y", "scale", "rot", "color"];
-const SHUTTLE = [1, 2, 4, 8];
 const MONH = 56;                                   // altura do monitor de 512 barras
 
 const TL = {
@@ -195,7 +194,9 @@ TL.load = function (show) {
         TL.lanes.push(mkLane(spec, si, p));
     }
   });
+  // Ordenado uma vez aqui: `jumpMarker` e o desenho leem a lista como esta'.
   if (!Array.isArray(show.markers)) show.markers = [];
+  else show.markers.sort((a, b) => a - b);
   TL.fit();
   if (TL.msgEl) TL.msgEl.textContent = (show.name || "sem nome") + "  -  " +
     (show.tracks || []).length + " tracks, " + TL.lanes.length + " lanes";
@@ -231,12 +232,9 @@ function resort(li) {
   const L = TL.lanes[li], n = L.n, idx = new Array(n);
   for (let i = 0; i < n; i++) idx[i] = i;
   idx.sort((a, b) => L.ts[a] - L.ts[b]);
-  let ok = true;
-  for (let i = 0; i < n; i++) if (idx[i] !== i) { ok = false; break; }
-  if (ok) return;
   const ts = new Float64Array(L.ts.length), vs = new Float64Array(L.ts.length);
   const cu = new Uint8Array(L.ts.length), raw = new Array(L.ts.length);
-  const old = TL.k.sel.get(li), ns = old ? new Set() : null;
+  const old = TL.k.sel.m.get(li), ns = old ? new Set() : null;
   for (let i = 0; i < n; i++) {
     const j = idx[i];
     ts[i] = L.ts[j]; vs[i] = L.vs[j]; cu[i] = L.cu[j]; raw[i] = L.raw[j];
@@ -446,10 +444,10 @@ TL.trackDel = function () {
 // ---- snapping (markers, in/out, playhead, keyframes visiveis) ----------
 function buildSnaps() {
   const s = [0, TL.dur(), TL.inT(), TL.outT(), TL.t];
-  for (const m of TL.show.markers || []) s.push(+m);
+  for (const m of TL.show.markers) s.push(+m);
   const lo = x2t(TL.headW), hi = x2t(TL.k.w);
   for (let li = 0; li < TL.lanes.length && s.length < 4000; li++) {
-    const L = TL.lanes[li], sel = TL.k.sel.get(li);
+    const L = TL.lanes[li], sel = TL.k.sel.m.get(li);
     for (let i = CK.bisect(L.ts, L.n, lo); i < L.n && L.ts[i] <= hi; i++)
       if (!sel || !sel.has(i)) s.push(L.ts[i]);
   }
@@ -540,7 +538,7 @@ function draw(k) {
   c.stroke();
 
   // ---- markers (cinza: SHORTCUTS.md) ----
-  const mk = TL.show ? TL.show.markers || [] : [];
+  const mk = TL.show ? TL.show.markers : [];
   if (mk.length) {
     c.strokeStyle = col.fg3; c.beginPath();
     for (const m of mk) {
@@ -582,7 +580,7 @@ function draw(k) {
     c.beginPath();
     for (let li = first; li <= last; li++) {
       const L = TL.lanes[li], y = laneY(li), sc = (rh - 8) / ((L.vmax - L.vmin) || 1);
-      const sel = k.sel.get(li);
+      const sel = k.sel.m.get(li);
       if (pass && !sel) continue;
       const i0 = dragLanes && dragLanes.has(li) ? 0 : CK.bisect(L.ts, L.n, lo);
       let lastX = -1e9;
@@ -737,7 +735,7 @@ function onDown(p) {
     buildSnaps();
     const items = [];
     k.sel.each((l, i) => items.push({ li: l, ki: i, t: TL.lanes[l].ts[i], v: TL.lanes[l].vs[i] }));
-    k.drag = { mode: "keys", x, y, items, lanes: new Set(k.sel.rows()), moved: false, anchor: L.ts[ki] };
+    k.drag = { mode: "keys", x, y, items, lanes: new Set(k.sel.m.keys()), moved: false, anchor: L.ts[ki] };
     k.dirty = true;
     return true;
   }
@@ -788,7 +786,7 @@ function onMarquee(r, add) {
       if (ky >= r.y0 - 4 && ky <= r.y1 + 4) k.sel.add(li, i);
     }
   }
-  for (const li of k.sel.rows()) { TL.cur = li; break; }
+  for (const li of k.sel.m.keys()) { TL.cur = li; break; }
 }
 
 // ---- menu de contexto (easing) -----------------------------------------
@@ -817,29 +815,33 @@ TL.setCurve = setCurve;
 // ---- atalhos (design/SHORTCUTS.md) --------------------------------------
 function step(n) { TL.locate(TL.t + n / TL.fps()); }
 
+/// Anda para o instante vizinho numa lista JA' ordenada (keys da lane, marcadores do show).
+function jump(ts, n, dir) {
+  const i = CK.bisect(ts, n, TL.t + (dir > 0 ? 1e-6 : -1e-6));
+  const j = dir > 0 ? i : i - 1;
+  if (j >= 0 && j < n) TL.locate(ts[j]);
+}
+
 function jumpKey(dir) {
   const L = TL.lanes[TL.cur];
-  if (!L || !L.n) return;
-  const i = CK.bisect(L.ts, L.n, TL.t + (dir > 0 ? 1e-6 : -1e-6));
-  const j = dir > 0 ? i : i - 1;
-  if (j >= 0 && j < L.n) TL.locate(L.ts[j]);
+  if (L && L.n) jump(L.ts, L.n, dir);
 }
 
 function jumpMarker(dir) {
-  const m = (TL.show.markers || []).slice().sort((a, b) => a - b);
-  const i = CK.bisect(m, m.length, TL.t + (dir > 0 ? 1e-6 : -1e-6));
-  const j = dir > 0 ? i : i - 1;
-  if (j >= 0 && j < m.length) TL.locate(m[j]);
+  const m = TL.show.markers;
+  jump(m, m.length, dir);
 }
 
 function onKey(e) {
   if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
   const k = TL.k, key = e.key, code = e.code, ctrl = e.ctrlKey, shift = e.shiftKey, alt = e.altKey;
+  const kb = key.length === 1 ? key.toLowerCase() : key;   // a tecla; o Shift se le' em `shift`
   let used = true;
   if (code === "Space" && !ctrl) TL.play(TL.rate ? 0 : 1);
-  else if ((key === "j" || key === "J") && !ctrl) TL.play(TL.rate < 0 ? -SHUTTLE[Math.min(3, SHUTTLE.indexOf(-TL.rate) + 1)] : -1);
-  else if ((key === "k" || key === "K") && !ctrl) TL.play(0);
-  else if ((key === "l" || key === "L") && !ctrl) TL.play(TL.rate > 0 ? SHUTTLE[Math.min(3, SHUTTLE.indexOf(TL.rate) + 1)] : 1);
+  // J/L: cada toque dobra a velocidade, teto 8x (SHORTCUTS.md).
+  else if (kb === "j" && !ctrl) TL.play(TL.rate < 0 ? -Math.min(8, -TL.rate * 2) : -1);
+  else if (kb === "k" && !ctrl) TL.play(0);
+  else if (kb === "l" && !ctrl) TL.play(TL.rate > 0 ? Math.min(8, TL.rate * 2) : 1);
   else if (key === "ArrowLeft" && ctrl && shift) jumpMarker(-1);
   else if (key === "ArrowRight" && ctrl && shift) jumpMarker(1);
   else if (key === "ArrowLeft") step(shift ? -5 : -1);
@@ -848,36 +850,36 @@ function onKey(e) {
   else if (key === "ArrowDown") jumpKey(1);
   else if (key === "Home") TL.locate(0);
   else if (key === "End") TL.locate(TL.dur());
-  else if ((key === "m" || key === "M") && alt) { TL.mon = !TL.mon; TL.onState(); }
-  else if ((key === "i" || key === "I") && alt) TL.setInOut(0, null);
-  else if ((key === "o" || key === "O") && alt) TL.setInOut(null, TL.dur());
-  else if ((key === "x" || key === "X") && alt) TL.setInOut(0, TL.dur());
-  else if (key === "I" && shift) TL.locate(TL.inT());
-  else if (key === "O" && shift) TL.locate(TL.outT());
-  else if (key === "i") TL.setInOut(Math.min(TL.t, TL.outT() - 0.01), null);
-  else if (key === "o") TL.setInOut(null, Math.max(TL.t, TL.inT() + 0.01));
-  else if (ctrl && (key === "l" || key === "L")) TL.loop = !TL.loop;
-  else if (ctrl && (key === "s" || key === "S")) TL.save();
-  else if ((key === "m" || key === "M") && !ctrl) {
+  else if (kb === "m" && alt) { TL.mon = !TL.mon; TL.onState(); }
+  else if (kb === "i" && alt) TL.setInOut(0, null);
+  else if (kb === "o" && alt) TL.setInOut(null, TL.dur());
+  else if (kb === "x" && alt) TL.setInOut(0, TL.dur());
+  else if (kb === "i" && shift) TL.locate(TL.inT());
+  else if (kb === "o" && shift) TL.locate(TL.outT());
+  else if (kb === "i") TL.setInOut(Math.min(TL.t, TL.outT() - 0.01), null);
+  else if (kb === "o") TL.setInOut(null, Math.max(TL.t, TL.inT() + 0.01));
+  else if (ctrl && kb === "l") TL.loop = !TL.loop;
+  else if (ctrl && kb === "s") TL.save();
+  else if (kb === "m" && !ctrl) {
     TL.show.markers.push(+TL.t.toFixed(4));
-    TL.show.markers.sort((a, b) => a - b);
+    TL.show.markers.sort((a, b) => a - b);   // a lista fica ordenada: `jumpMarker` conta com isso
     field("/markers", TL.show.markers);
   }
   else if (key === "=" || key === "+") k.zoomAt(k.gutter + (k.w - k.gutter) / 2, 1.25);
   else if (key === "-" || key === "_") k.zoomAt(k.gutter + (k.w - k.gutter) / 2, 0.8);
-  else if (key === "\\" || (shift && (key === "z" || key === "Z"))) TL.fit();
-  else if (ctrl && (key === "k" || key === "K")) {
+  else if (key === "\\" || (shift && kb === "z")) TL.fit();
+  else if (ctrl && kb === "k") {
     if (TL.cur >= 0) {
       const L = TL.lanes[TL.cur], v = TL.valueAt(L, TL.t);
       k.sel.clear();
       k.sel.add(TL.cur, addKey(TL.cur, TL.t, v === null ? 0 : v, null, 0));
       commit([eAt(TL.cur, TL.t)]);
     }
-  } else if (ctrl && shift && (key === "a" || key === "A")) k.sel.clear();
-  else if (ctrl && (key === "a" || key === "A")) {
+  } else if (ctrl && shift && kb === "a") k.sel.clear();
+  else if (ctrl && kb === "a") {
     k.sel.clear();
     for (let li = 0; li < TL.lanes.length; li++) for (let i = 0; i < TL.lanes[li].n; i++) k.sel.add(li, i);
-  } else if (ctrl && (key === "c" || key === "C" || key === "x" || key === "X")) {
+  } else if (ctrl && (kb === "c" || kb === "x")) {
     let t0 = Infinity;
     const cl = [];
     k.sel.each((li, i) => {
@@ -887,8 +889,8 @@ function onKey(e) {
     });
     for (const c of cl) c.t -= t0;
     TL.clip = cl;
-    if (key === "x" || key === "X") delSelected();
-  } else if (ctrl && (key === "v" || key === "V") && TL.clip) {
+    if (kb === "x") delSelected();
+  } else if (ctrl && kb === "v" && TL.clip) {
     k.sel.clear();
     const ts = [];
     for (const c of TL.clip) {
@@ -898,33 +900,31 @@ function onKey(e) {
     }
     commit(ts.map(a => eAt(a[0], a[1])));
   } else if (key === "Delete" || key === "Backspace") delSelected();
-  else if (ctrl && shift && (key === "e" || key === "E")) {
+  else if (ctrl && shift && kb === "e") {
     const eds = [];
     k.sel.each((li, i) => { const L = TL.lanes[li]; L.cu[i] = (L.cu[i] + 1) % CURVES.length; eds.push(eKey(li, i)); });
     commit(eds);
-  } else if (key === "s" && !ctrl) TL.snap = !TL.snap;
-  else if (key === "D" && shift && TL.cur >= 0) { const L = TL.lanes[TL.cur]; L.mute = !L.mute; trackFlag(L, "mute", L.mute); }
-  else if (key === "S" && shift && TL.cur >= 0) { const L = TL.lanes[TL.cur]; L.solo = !L.solo; trackFlag(L, "solo", L.solo); }
-  else if ((key === "r" || key === "R") && !ctrl && TL.cur >= 0) TL.lanes[TL.cur].rec = !TL.lanes[TL.cur].rec;
+  } else if (kb === "s" && !ctrl && !shift) TL.snap = !TL.snap;
+  else if (kb === "d" && shift && TL.cur >= 0) { const L = TL.lanes[TL.cur]; L.mute = !L.mute; trackFlag(L, "mute", L.mute); }
+  else if (kb === "s" && shift && TL.cur >= 0) { const L = TL.lanes[TL.cur]; L.solo = !L.solo; trackFlag(L, "solo", L.solo); }
+  else if (kb === "r" && !ctrl && TL.cur >= 0) TL.lanes[TL.cur].rec = !TL.lanes[TL.cur].rec;
   else used = false;
   if (used) { e.preventDefault(); k.dirty = true; }
 }
 TL.onKey = onKey;
 
 TL.fit = function () {
-  TL.k.gutter = TL.headW;
   if (TL.k.w < 2) TL.k.resize();   // show carregado antes do primeiro layout: mede o canvas agora
   TL.k.fit(0, TL.dur());
 };
 
 // ---- montagem -----------------------------------------------------------
-TL.mount = function (cv, opts) {
-  opts = opts || {};
+TL.mount = function (cv, menuEl, msgEl) {
   const k = TL.k = CK.attach(cv, draw);
   k.gutter = TL.headW;
   k.on = { down: onDown, move: onMove, up: onUp, marquee: onMarquee, menu: onMenu, frame };
-  TL.menuEl = opts.menu || null;
-  TL.msgEl = opts.msg || null;
+  TL.menuEl = menuEl || null;
+  TL.msgEl = msgEl || null;
   colors();
   if (TL.menuEl) {
     for (const n of CURVES) {

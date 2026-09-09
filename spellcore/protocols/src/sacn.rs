@@ -14,6 +14,7 @@ use socket2::{Domain, Protocol, Socket, Type};
 use crate::{random16, Output, Queue};
 
 pub const PORT: u16 = 5568;
+/// Grupo multicast de discovery (E1.31 §8): quem escuta e' o `netscan`.
 pub const DISCOVERY_IP: Ipv4Addr = Ipv4Addr::new(239, 255, 250, 214);
 
 /// `>HH12s` 0x10, 0, "ASC-E1.17\0\0\0"
@@ -94,11 +95,6 @@ pub enum Packet {
         universe: u16,
         data: Vec<u8>,
     },
-    Discovery {
-        cid: [u8; 16],
-        name: String,
-        universes: Vec<u16>,
-    },
 }
 
 fn be16(b: &[u8], i: usize) -> u16 {
@@ -114,7 +110,7 @@ fn cstr(b: &[u8]) -> String {
     String::from_utf8_lossy(&b[..end]).into_owned()
 }
 
-/// Pacote data (vector 4) ou discovery (vector 8); `None` se nao for E1.31.
+/// Pacote data (vector 4); `None` se nao for E1.31. Quem le discovery e' o `netscan`.
 pub fn parse(pk: &[u8]) -> Option<Packet> {
     if pk.len() < 48 || pk[..16] != ROOT {
         return None;
@@ -135,44 +131,16 @@ pub fn parse(pk: &[u8]) -> Option<Packet> {
             data: pk[126..].to_vec(),
         });
     }
-    if vec == 8 && pk.len() >= 120 && be32(pk, 40) == 2 {
-        let n = (pk.len() - 120) / 2;
-        let universes = (0..n).map(|i| be16(pk, 120 + 2 * i)).collect();
-        return Some(Packet::Discovery {
-            cid,
-            name,
-            universes,
-        });
-    }
     None
 }
 
 /// IPv4 locais (resolvendo o hostname, como o `getaddrinfo` do Python) + loopback.
 /// Ordenado por texto, igual ao `sorted()` do Python: o primeiro e o que manda o unicast.
 pub fn interfaces() -> Vec<Ipv4Addr> {
-    use std::collections::BTreeSet;
-    use std::net::ToSocketAddrs;
-    let mut set: BTreeSet<String> = BTreeSet::new();
+    let mut set: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     set.insert("127.0.0.1".to_string());
-    let host = std::process::Command::new("hostname")
-        .output()
-        .ok()
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-        .filter(|h| !h.is_empty());
-    if let Some(h) = host {
-        if let Ok(addrs) = (h.as_str(), 0u16).to_socket_addrs() {
-            for a in addrs {
-                if let std::net::SocketAddr::V4(v4) = a {
-                    set.insert(v4.ip().to_string());
-                }
-            }
-        }
-    }
-    if set.len() == 1 {
-        // sem hostname resolvivel: cai para a varredura de interfaces do netscan
-        for i in crate::netscan::interfaces() {
-            set.insert(i.ip);
-        }
+    for i in crate::netscan::interfaces() {
+        set.insert(i.ip);
     }
     set.iter().filter_map(|s| s.parse().ok()).collect()
 }
@@ -293,7 +261,6 @@ impl Drop for SacnOut {
 /// Escuta os universos e guarda o ultimo frame de cada um.
 pub struct SacnIn {
     last: Arc<Mutex<HashMap<u16, [u8; 512]>>>,
-    sources: Arc<Mutex<HashMap<u16, String>>>,
     run: Arc<AtomicBool>,
     th: Option<JoinHandle<()>>,
 }
@@ -303,9 +270,8 @@ impl SacnIn {
         let groups: Vec<Ipv4Addr> = universes.iter().map(|u| mcast(*u)).collect();
         let sock = listener(&groups)?;
         let last = Arc::new(Mutex::new(HashMap::new()));
-        let sources = Arc::new(Mutex::new(HashMap::new()));
         let run = Arc::new(AtomicBool::new(true));
-        let (l, s, r) = (last.clone(), sources.clone(), run.clone());
+        let (l, r) = (last.clone(), run.clone());
         let th = std::thread::Builder::new()
             .name("sacn-in".into())
             .spawn(move || {
@@ -317,24 +283,16 @@ impl SacnIn {
                         Err(e) if e.kind() == io::ErrorKind::TimedOut => continue,
                         Err(_) => break,
                     };
-                    if let Some(Packet::Data {
-                        universe,
-                        data,
-                        name,
-                        ..
-                    }) = parse(&buf[..n])
-                    {
+                    if let Some(Packet::Data { universe, data, .. }) = parse(&buf[..n]) {
                         let mut frame = [0u8; 512];
                         let k = data.len().min(512);
                         frame[..k].copy_from_slice(&data[..k]);
                         l.lock().unwrap_or_else(|e| e.into_inner()).insert(universe, frame);
-                        s.lock().unwrap_or_else(|e| e.into_inner()).insert(universe, name);
                     }
                 }
             })?;
         Ok(SacnIn {
             last,
-            sources,
             run,
             th: Some(th),
         })
@@ -346,15 +304,6 @@ impl SacnIn {
             .unwrap_or_else(|e| e.into_inner())
             .get(&universe)
             .copied()
-    }
-
-    /// Nome da ultima fonte vista no universo.
-    pub fn source(&self, universe: u16) -> Option<String> {
-        self.sources
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .get(&universe)
-            .cloned()
     }
 
     pub fn close(&mut self) {
@@ -417,24 +366,20 @@ mod tests {
         let cid: [u8; 16] = std::array::from_fn(|i| (i as u8) ^ 0x5A);
         let d = data512();
         let pk = packet(300, &d, &cid, 42, "Fonte X", 77);
-        match parse(&pk).expect("parse") {
-            Packet::Data {
-                cid: c,
-                name,
-                priority,
-                seq,
-                universe,
-                data,
-            } => {
-                assert_eq!(c, cid);
-                assert_eq!(name, "Fonte X");
-                assert_eq!(priority, 77);
-                assert_eq!(seq, 42);
-                assert_eq!(universe, 300);
-                assert_eq!(data, d);
-            }
-            _ => panic!("esperava Data"),
-        }
+        let Packet::Data {
+            cid: c,
+            name,
+            priority,
+            seq,
+            universe,
+            data,
+        } = parse(&pk).expect("parse");
+        assert_eq!(c, cid);
+        assert_eq!(name, "Fonte X");
+        assert_eq!(priority, 77);
+        assert_eq!(seq, 42);
+        assert_eq!(universe, 300);
+        assert_eq!(data, d);
         assert!(parse(b"nao e e1.31").is_none());
     }
 
@@ -491,7 +436,6 @@ mod tests {
             None => println!("pulado: UDP em loopback nao entregou (firewall?)"),
             Some(g) => {
                 assert_eq!(g, ultimo, "ultimo frame recebido byte a byte");
-                assert_eq!(rx.source(1).as_deref(), Some("Spellcaster"));
             }
         }
     }

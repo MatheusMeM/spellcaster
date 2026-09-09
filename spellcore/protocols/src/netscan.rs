@@ -10,15 +10,7 @@ use std::time::{Duration, Instant};
 use serde::Serialize;
 use socket2::{Domain, Protocol, Socket, Type};
 
-pub const ARTNET_PORT: u16 = 6454;
-pub const SACN_PORT: u16 = 5568;
-pub const SACN_DISCOVERY: Ipv4Addr = Ipv4Addr::new(239, 255, 250, 214);
 pub const ETHERDREAM_PORT: u16 = 7654;
-
-/// ArtPoll cru do netscan: ProtVer 14, TalkToMe 0, prioridade 0.
-pub const ARTPOLL: [u8; 14] = [
-    b'A', b'r', b't', b'-', b'N', b'e', b't', 0, 0x00, 0x20, 0, 14, 0, 0,
-];
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Iface {
@@ -295,9 +287,11 @@ pub struct Node {
     pub from: String,
 }
 
+/// String NUL-terminada dos anuncios (Art-Net e E1.31): latin-1 na letra do padrao, mas o que
+/// os nos mandam na pratica e' UTF-8 quando sai do ASCII.
 fn latin1(b: &[u8]) -> String {
     let end = b.iter().position(|&c| c == 0).unwrap_or(b.len());
-    b[..end].iter().map(|&c| c as char).collect()
+    String::from_utf8_lossy(&b[..end]).into_owned()
 }
 
 pub fn parse_artpollreply(data: &[u8]) -> Option<Node> {
@@ -360,7 +354,7 @@ fn udp(port: u16, broadcast: bool) -> io::Result<UdpSocket> {
 
 /// ArtPoll em broadcast (global + 2.x + 10.x + subrede de cada interface) e coleta ArtPollReply.
 pub fn scan_artnet(timeout: Duration, ifaces: &[Iface]) -> Vec<Node> {
-    let Ok(sock) = udp(ARTNET_PORT, true) else {
+    let Ok(sock) = udp(crate::artnet::PORT, true) else {
         return Vec::new();
     };
     let mut targets: Vec<String> = ["255.255.255.255", "2.255.255.255", "10.255.255.255"]
@@ -375,7 +369,7 @@ pub fn scan_artnet(timeout: Duration, ifaces: &[Iface]) -> Vec<Node> {
     }
     for dst in &targets {
         if let Ok(ip) = dst.parse::<Ipv4Addr>() {
-            let _ = sock.send_to(&ARTPOLL, SocketAddrV4::new(ip, ARTNET_PORT));
+            let _ = sock.send_to(&crate::artnet::artpoll(0, 0), SocketAddrV4::new(ip, crate::artnet::PORT));
         }
     }
     let mut found: Vec<Node> = Vec::new();
@@ -409,8 +403,6 @@ pub struct Source {
 pub struct Discovery {
     pub cid: String,
     pub source_name: String,
-    pub page: u8,
-    pub last_page: u8,
     pub universes: Vec<u16>,
 }
 
@@ -426,25 +418,12 @@ pub fn parse_sacn_discovery(data: &[u8]) -> Option<Discovery> {
     let n = flen.saturating_sub(8) / 2;
     let n = n.min((data.len() - 120) / 2);
     Some(Discovery {
-        cid: data[22..38]
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect::<String>(),
-        source_name: {
-            let s = &data[44..108];
-            latin1_utf8(s)
-        },
-        page: data[118],
-        last_page: data[119],
+        cid: data[22..38].iter().map(|b| format!("{b:02x}")).collect(),
+        source_name: latin1(&data[44..108]),
         universes: (0..n)
             .map(|i| u16::from_be_bytes([data[120 + 2 * i], data[121 + 2 * i]]))
             .collect(),
     })
-}
-
-fn latin1_utf8(b: &[u8]) -> String {
-    let end = b.iter().position(|&c| c == 0).unwrap_or(b.len());
-    String::from_utf8_lossy(&b[..end]).into_owned()
 }
 
 /// Entra no multicast de discovery (239.255.250.214:5568) e lista as fontes anunciadas.
@@ -454,22 +433,19 @@ pub fn scan_sacn(timeout: Duration, ifaces: &[Iface]) -> Vec<Source> {
         Err(_) => return Vec::new(),
     };
     let _ = s.set_reuse_address(true);
-    if s.bind(&SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, SACN_PORT).into())
+    if s.bind(&SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, crate::sacn::PORT).into())
         .is_err()
     {
         return Vec::new();
     }
-    let ips: Vec<Ipv4Addr> = ifaces
-        .iter()
-        .filter_map(|i| i.ip.parse().ok())
-        .collect::<Vec<_>>();
+    let ips: Vec<Ipv4Addr> = ifaces.iter().filter_map(|i| i.ip.parse().ok()).collect();
     let ips = if ips.is_empty() {
         vec![Ipv4Addr::UNSPECIFIED]
     } else {
         ips
     };
     for ip in ips {
-        let _ = s.join_multicast_v4(&SACN_DISCOVERY, &ip);
+        let _ = s.join_multicast_v4(&crate::sacn::DISCOVERY_IP, &ip);
     }
     let _ = s.set_read_timeout(Some(Duration::from_millis(200)));
     let sock: UdpSocket = s.into();
@@ -504,7 +480,7 @@ pub fn scan_sacn(timeout: Duration, ifaces: &[Iface]) -> Vec<Source> {
 
 // ------------------------------------------------------------ Ether Dream
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct Status {
     pub protocol: u8,
     pub light_engine_state: u8,
@@ -541,19 +517,28 @@ pub fn parse_beacon(b: &[u8]) -> Option<(String, u16, u16, u16, u32, Status)> {
         .map(|x| format!("{x:02x}"))
         .collect::<Vec<_>>()
         .join(":");
-    let s = Status {
-        protocol: b[16],
-        light_engine_state: b[17],
-        playback_state: b[18],
-        source: b[19],
-        light_engine_flags: le16(20),
-        playback_flags: le16(22),
-        source_flags: le16(24),
-        buffer_fullness: le16(26),
-        point_rate: le32(28),
-        point_count: le32(32),
-    };
-    Some((mac, le16(6), le16(8), le16(10), le32(12), s))
+    Some((mac, le16(6), le16(8), le16(10), le32(12), parse_status(&b[16..])?))
+}
+
+/// `dac_status`, 20 bytes little-endian — o mesmo bloco no beacon UDP e na resposta TCP.
+pub fn parse_status(b: &[u8]) -> Option<Status> {
+    if b.len() < 20 {
+        return None;
+    }
+    let le16 = |i: usize| u16::from_le_bytes([b[i], b[i + 1]]);
+    let le32 = |i: usize| u32::from_le_bytes([b[i], b[i + 1], b[i + 2], b[i + 3]]);
+    Some(Status {
+        protocol: b[0],
+        light_engine_state: b[1],
+        playback_state: b[2],
+        source: b[3],
+        light_engine_flags: le16(4),
+        playback_flags: le16(6),
+        source_flags: le16(8),
+        buffer_fullness: le16(10),
+        point_rate: le32(12),
+        point_count: le32(16),
+    })
 }
 
 /// Escuta beacons UDP 7654 (1 Hz por DAC).
@@ -663,10 +648,6 @@ pub struct Scan {
     pub artnet: Vec<Node>,
     pub sacn: Vec<Source>,
     pub etherdream: Vec<Dac>,
-    /// Falhas de socket por scan ("artnet: ..."), no lugar do `{"error": ...}` do Python.
-    // ponytail: lista de strings em vez de campo polimorfico ; o `net --json` so precisa
-    // mostrar o erro, nao distinguir o tipo.
-    pub errors: Vec<String>,
 }
 
 /// Os tres scans rodam em paralelo; cada um tem seu proprio prazo.
@@ -689,7 +670,6 @@ pub fn scan_all(timeout: Duration) -> Scan {
         artnet,
         sacn,
         etherdream,
-        errors: Vec::new(),
     }
 }
 
@@ -775,9 +755,6 @@ pub fn report(s: &Scan) -> String {
             })
             .collect(),
     );
-    if !s.errors.is_empty() {
-        section("Erros:", s.errors.clone());
-    }
     let txt = ln.join("\n");
     debug_assert!(txt.is_ascii(), "relatorio tem que ser ASCII");
     txt
@@ -978,7 +955,7 @@ Wireless LAN adapter Wi-Fi:
                 Port { dir: "out".into(), universe: 0x13 },
             ]
         );
-        assert!(parse_artpollreply(&ARTPOLL).is_none());
+        assert!(parse_artpollreply(&crate::artnet::artpoll(0, 0)).is_none());
     }
 
     #[test]
@@ -1017,13 +994,11 @@ Wireless LAN adapter Wi-Fi:
             artnet: vec![parse_artpollreply(&artpollreply()).unwrap()],
             sacn: Vec::new(),
             etherdream: Vec::new(),
-            errors: vec!["sacn: porta ocupada".into()],
         };
         let txt = report(&s);
         assert!(txt.is_ascii());
         assert!(txt.contains("2.0.0.50  'Node1'"), "{txt}");
         assert!(txt.contains("(nada encontrado)"), "{txt}");
-        assert!(txt.contains("sacn: porta ocupada"), "{txt}");
         assert!(serde_json::to_string(&s).unwrap().contains("\"interfaces\""));
     }
 

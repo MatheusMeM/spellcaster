@@ -22,17 +22,14 @@ extern "system" {
 
 #[cfg(windows)]
 #[repr(C)]
+// PROCESS_MEMORY_COUNTERS: so' `cb` (tamanho) e `working_set_size` sao lidos; o resto e' o
+// tamanho certo da struct para a API nao escrever fora.
 struct ProcessMemoryCounters {
     cb: u32,
-    page_fault_count: u32,
-    peak_working_set_size: usize,
+    _page_faults: u32,
+    _peak_ws: usize,
     working_set_size: usize,
-    quota_peak_paged_pool_usage: usize,
-    quota_paged_pool_usage: usize,
-    quota_peak_non_paged_pool_usage: usize,
-    quota_non_paged_pool_usage: usize,
-    pagefile_usage: usize,
-    peak_pagefile_usage: usize,
+    _resto: [usize; 6],
 }
 
 #[cfg(windows)]

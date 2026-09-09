@@ -5,7 +5,6 @@
 use engine::hook::FrameHook;
 use engine::{Player, Show, Universes};
 use serde_json::json;
-use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -42,7 +41,7 @@ fn show_de_dois_tracks_em_loopback_sacn() {
             {"type": "media", "universe": 1, "address": 20, "clip": 5, "keys": [[0, "play"]]}
         ]
     }));
-    let mut p = match Player::new(sh, PathBuf::from("."), false) {
+    let mut p = match Player::new(sh, false) {
         Ok(p) => p,
         Err(e) => return println!("pulado: saida sACN nao subiu: {}", e),
     };
@@ -81,7 +80,7 @@ fn transporte_remoto_por_osc() {
         "name": "osc", "fps": 30, "version": 1, "outputs": [], "tracks": [],
         "transport": {"osc_port": PORTA}
     }));
-    let mut p = Player::new(sh, PathBuf::from("."), false).expect("player sem saida");
+    let mut p = Player::new(sh, false).expect("player sem saida");
     if let Err(e) = p.start(None) {
         return println!("pulado: OscIn na porta {} nao subiu: {}", PORTA, e);
     }
@@ -136,7 +135,7 @@ fn tracks_de_efeito_colateral_saem_por_osc() {
              "keys": [[0, "play"]]}
         ]
     }));
-    let mut p = match Player::new(sh, PathBuf::from("."), false) {
+    let mut p = match Player::new(sh, false) {
         Ok(p) => p,
         Err(e) => return println!("pulado: saida OSC nao subiu: {}", e),
     };
@@ -185,7 +184,7 @@ fn locate_zera_cues_e_ganchos() {
                  {"name": "dois", "fade": 0.0, "values": {"1/20": [10]}}]
     }));
     let (frames, resets) = (Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0)));
-    let mut p = Player::new(sh, PathBuf::from("."), false).expect("player");
+    let mut p = Player::new(sh, false).expect("player");
     p.hook(Box::new(Conta {
         frames: frames.clone(),
         resets: resets.clone(),

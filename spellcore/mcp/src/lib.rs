@@ -35,9 +35,11 @@ const INSTRUCTIONS: &str = concat!(
     "valida com `graph_check`."
 );
 
-/// Comandos que bloqueiam ate o fim do show ou ate Ctrl+C: rodam em thread e a tool volta na hora
-/// (o `BACKGROUND` do `spellcaster/mcp/server.py`).
-pub const BACKGROUND: [&str; 1] = ["play_show"];
+/// Comando que bloqueia ate o fim do show ou ate Ctrl+C: roda em thread e a tool volta na hora
+/// (o `BACKGROUND` do `spellcaster/mcp/server.py`). O `serve` pergunta o mesmo.
+pub fn background(name: &str) -> bool {
+    name == "play_show"
+}
 
 const SHOW: &str = "spell://show";
 const COMMANDS: &str = "spell://commands";
@@ -75,13 +77,9 @@ impl Spell {
     }
 
     fn run(&self, name: &str, args: Value) -> CallToolResult {
-        if self.reg.get(name).is_none() {
-            return CallToolResult::error(vec![ContentBlock::text(format!(
-                "comando desconhecido: {}",
-                name
-            ))]);
-        }
-        if BACKGROUND.contains(&name) {
+        // Comando desconhecido cai no `Registry::call` la' embaixo, que ja' devolve a mensagem;
+        // a checagem aqui existe so' para nao mandar um nome invalido para a thread.
+        if background(name) && self.reg.get(name).is_some() {
             let (reg, n) = (self.reg.clone(), name.to_string());
             std::thread::spawn(move || {
                 if let Err(e) = reg.call(&n, args) {

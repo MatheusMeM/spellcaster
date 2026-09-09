@@ -15,55 +15,17 @@ use std::time::{Duration, Instant};
 use crate::dac::Dac;
 use crate::frame::Point;
 
-pub use protocols::netscan::{parse_beacon, scan_etherdream as scan, Dac as DacInfo, Status};
+pub use protocols::netscan::{parse_beacon, parse_status, Status};
 
-pub const BEACON_PORT: u16 = 7654;
 pub const TCP_PORT: u16 = 7765;
 /// ack + comando ecoado + dac_status.
 pub const RESP_LEN: usize = 22;
 /// `<HhhHHHHHH`: control x y r g b i u1 u2.
 pub const POINT_LEN: usize = 18;
-pub const DEFAULT_CAPACITY: u16 = 1800;
 /// Teto de espera pelo buffer do DAC antes de desistir. O Python esperava para sempre.
 // ponytail: teto fixo de 2 s ; um DAC que nao drena em 2 s esta morto e a thread do Feed
 // tem que voltar a viver para o show poder parar. Vira parametro se aparecer DAC lento.
 const WAIT_LIMIT: Duration = Duration::from_secs(2);
-
-fn zero_status() -> Status {
-    Status {
-        protocol: 0,
-        light_engine_state: 0,
-        playback_state: 0,
-        source: 0,
-        light_engine_flags: 0,
-        playback_flags: 0,
-        source_flags: 0,
-        buffer_fullness: 0,
-        point_rate: 0,
-        point_count: 0,
-    }
-}
-
-/// `dac_status`, 20 bytes little-endian.
-pub fn parse_status(b: &[u8]) -> Option<Status> {
-    if b.len() < 20 {
-        return None;
-    }
-    let le16 = |i: usize| u16::from_le_bytes([b[i], b[i + 1]]);
-    let le32 = |i: usize| u32::from_le_bytes([b[i], b[i + 1], b[i + 2], b[i + 3]]);
-    Some(Status {
-        protocol: b[0],
-        light_engine_state: b[1],
-        playback_state: b[2],
-        source: b[3],
-        light_engine_flags: le16(4),
-        playback_flags: le16(6),
-        source_flags: le16(8),
-        buffer_fullness: le16(10),
-        point_rate: le32(12),
-        point_count: le32(16),
-    })
-}
 
 fn pack_status(s: &Status, out: &mut Vec<u8>) {
     out.extend_from_slice(&[s.protocol, s.light_engine_state, s.playback_state, s.source]);
@@ -79,7 +41,6 @@ fn pack_status(s: &Status, out: &mut Vec<u8>) {
 pub struct Response {
     /// `a` ok, `F` cheio, `I` invalido, `!` stop.
     pub ack: u8,
-    pub command: u8,
     pub status: Status,
 }
 
@@ -87,7 +48,7 @@ pub fn parse_response(b: &[u8]) -> Option<Response> {
     if b.len() < RESP_LEN {
         return None;
     }
-    Some(Response { ack: b[0], command: b[1], status: parse_status(&b[2..])? })
+    Some(Response { ack: b[0], status: parse_status(&b[2..])? })
 }
 
 /// Comando `d`: cabecalho + um registro de 18 bytes por ponto. Cores 0-255 viram 0-65535
@@ -149,7 +110,7 @@ impl EtherDream {
             addr: full,
             sock: Some(sock),
             capacity,
-            status: zero_status(),
+            status: Status::default(),
             pps: 20_000,
             chunk: 400,
             chunk_fixo: None,
@@ -187,14 +148,6 @@ impl EtherDream {
 
     pub fn prepare(&mut self) -> io::Result<Response> {
         self.cmd(b"p")
-    }
-
-    pub fn ping(&mut self) -> io::Result<Response> {
-        self.cmd(b"?")
-    }
-
-    pub fn point_rate(&self) -> u32 {
-        self.pps
     }
 
     /// Pontos por comando `d`. Padrao: 2/3 da capacidade do DAC. E o botao de calibracao
@@ -351,8 +304,7 @@ impl Emulator {
     pub fn start(capacity: u16) -> io::Result<Emulator> {
         let lis = TcpListener::bind(("127.0.0.1", 0))?;
         let port = lis.local_addr()?.port();
-        let mut status = zero_status();
-        status.protocol = 1;
+        let status = Status { protocol: 1, ..Default::default() };
         let emu = Arc::new(Emu {
             capacity,
             record: AtomicBool::new(true),

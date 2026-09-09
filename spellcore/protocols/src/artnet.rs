@@ -8,7 +8,7 @@
 use std::collections::HashMap;
 use std::io;
 use std::net::{Ipv4Addr, SocketAddrV4, ToSocketAddrs, UdpSocket};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::thread::JoinHandle;
 
 use socket2::{Domain, Protocol, Socket, Type};
@@ -68,11 +68,8 @@ pub fn artdmx(universe: u16, data: &[u8], sequence: u8) -> Vec<u8> {
     out
 }
 
-pub fn artpoll() -> Vec<u8> {
-    artpoll_with(0x06, 0x10)
-}
-
-pub fn artpoll_with(flags: u8, priority: u8) -> Vec<u8> {
+/// ArtPoll. O `netscan` manda `artpoll(0, 0)`; a saida manda TalkToMe 0x06, prioridade 0x10.
+pub fn artpoll(flags: u8, priority: u8) -> Vec<u8> {
     let mut v = Vec::with_capacity(14);
     v.extend_from_slice(HEADER);
     v.extend_from_slice(&OP_POLL.to_le_bytes());
@@ -92,23 +89,6 @@ pub fn artsync() -> Vec<u8> {
     v
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
-pub struct Reply {
-    pub ip: String,
-    pub short_name: String,
-    pub long_name: String,
-    pub num_ports: u16,
-    pub net: u8,
-    pub subnet: u8,
-    pub sw_in: Vec<u8>,
-    pub sw_out: Vec<u8>,
-    pub port_addresses: Vec<u16>,
-    pub universes: Vec<u16>,
-    pub mac: String,
-    /// IP de quem enviou (preenchido por `poll`).
-    pub from: String,
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum Packet {
     Dmx {
@@ -122,16 +102,10 @@ pub enum Packet {
         flags: u8,
     },
     Sync,
-    PollReply(Box<Reply>),
     Other(u16),
 }
 
-fn latin1(b: &[u8]) -> String {
-    let end = b.iter().position(|&c| c == 0).unwrap_or(b.len());
-    b[..end].iter().map(|&c| c as char).collect()
-}
-
-/// Decodifica ArtDmx / ArtPoll / ArtPollReply / ArtSync. `None` se nao for Art-Net.
+/// Decodifica ArtDmx / ArtPoll / ArtSync. Quem le ArtPollReply e' o `netscan`.
 pub fn parse(pkt: &[u8]) -> Option<Packet> {
     if pkt.len() < 10 || &pkt[..8] != HEADER {
         return None;
@@ -156,36 +130,6 @@ pub fn parse(pkt: &[u8]) -> Option<Packet> {
     }
     if op == OP_SYNC {
         return Some(Packet::Sync);
-    }
-    if op == OP_POLL_REPLY && pkt.len() >= 207 {
-        let ip = format!("{}.{}.{}.{}", pkt[10], pkt[11], pkt[12], pkt[13]);
-        let (net, subnet) = (pkt[18], pkt[19]);
-        let num_ports = u16::from_be_bytes([pkt[172], pkt[173]]);
-        let sw_in = pkt[186..190].to_vec();
-        let sw_out = pkt[190..194].to_vec();
-        let port_addresses: Vec<u16> = (0..num_ports.min(4) as usize)
-            .map(|i| ((net as u16) << 8) | ((subnet as u16) << 4) | (sw_out[i] & 0xF) as u16)
-            .collect();
-        let universes = port_addresses.iter().map(|p| p + 1).collect();
-        let mac = pkt[201..207]
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect::<Vec<_>>()
-            .join(":");
-        return Some(Packet::PollReply(Box::new(Reply {
-            ip,
-            short_name: latin1(&pkt[26..44]),
-            long_name: latin1(&pkt[44..108]),
-            num_ports,
-            net,
-            subnet,
-            sw_in,
-            sw_out,
-            port_addresses,
-            universes,
-            mac,
-            from: String::new(),
-        })));
     }
     Some(Packet::Other(op))
 }
@@ -212,8 +156,6 @@ fn resolve(t: &str, port: u16) -> Option<SocketAddrV4> {
 /// `send()` so enfileira; a thread interna monta o ArtDmx e fala com o socket.
 pub struct ArtNetOut {
     q: Arc<Queue>,
-    sync: Arc<Mutex<Option<UdpSocket>>>,
-    targets: Vec<SocketAddrV4>,
     th: Option<JoinHandle<()>>,
 }
 
@@ -233,12 +175,10 @@ impl ArtNetOut {
             _ if broadcast => BROADCASTS.iter().map(|s| s.to_string()).collect(),
             _ => Vec::new(),
         };
-        let targets: Vec<SocketAddrV4> = list.iter().filter_map(|t| resolve(t, port)).collect();
+        let tt: Vec<SocketAddrV4> = list.iter().filter_map(|t| resolve(t, port)).collect();
         let sock = bcast_socket()?;
-        let sync = Arc::new(Mutex::new(Some(sock.try_clone()?)));
         let q = Queue::new(8);
         let qt = q.clone();
-        let tt = targets.clone();
         let th = std::thread::Builder::new()
             .name("artnet-out".into())
             .spawn(move || {
@@ -257,28 +197,9 @@ impl ArtNetOut {
                     }
                 }
             })?;
-        Ok(ArtNetOut {
-            q,
-            sync,
-            targets,
-            th: Some(th),
-        })
+        Ok(ArtNetOut { q, th: Some(th) })
     }
 
-    /// Envia ArtSync para os mesmos destinos.
-    pub fn sync(&mut self) {
-        let pkt = artsync();
-        if let Some(s) = self
-            .sync
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .as_ref()
-        {
-            for t in &self.targets {
-                let _ = s.send_to(&pkt, t);
-            }
-        }
-    }
 }
 
 impl Output for ArtNetOut {
@@ -291,7 +212,6 @@ impl Output for ArtNetOut {
         if let Some(th) = self.th.take() {
             let _ = th.join();
         }
-        *self.sync.lock().unwrap_or_else(|e| e.into_inner()) = None;
     }
 }
 
@@ -358,7 +278,7 @@ mod tests {
             _ => panic!("esperava ArtDmx"),
         }
         assert_eq!(parse(&artsync()), Some(Packet::Sync));
-        assert_eq!(parse(&artpoll()), Some(Packet::Poll { flags: 0x06 }));
+        assert_eq!(parse(&artpoll(0x06, 0x10)), Some(Packet::Poll { flags: 0x06 }));
         assert!(parse(b"nao e art-net").is_none());
     }
 
@@ -390,39 +310,6 @@ mod tests {
     #[should_panic(expected = "universo fora de faixa")]
     fn port_address_acima_da_faixa_e_erro() {
         port_address(0x8001);
-    }
-
-    #[test]
-    fn pollreply_completo() {
-        let mut p = vec![0u8; 239];
-        p[..8].copy_from_slice(HEADER);
-        p[8..10].copy_from_slice(&OP_POLL_REPLY.to_le_bytes());
-        p[10..14].copy_from_slice(&[2, 0, 0, 50]);
-        p[14..16].copy_from_slice(&PORT.to_le_bytes());
-        p[18] = 0;
-        p[19] = 1;
-        p[26..31].copy_from_slice(b"Node1");
-        p[44..57].copy_from_slice(b"Nodo de teste");
-        p[172..174].copy_from_slice(&2u16.to_be_bytes());
-        p[186] = 5;
-        p[190] = 2;
-        p[191] = 3;
-        p[201..207].copy_from_slice(&[0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff]);
-        match parse(&p).expect("parse") {
-            Packet::PollReply(r) => {
-                assert_eq!(r.ip, "2.0.0.50");
-                assert_eq!(r.short_name, "Node1");
-                assert_eq!(r.long_name, "Nodo de teste");
-                assert_eq!(r.mac, "aa:bb:cc:dd:ee:ff");
-                assert_eq!(r.num_ports, 2);
-                assert_eq!((r.net, r.subnet), (0, 1));
-                assert_eq!(r.sw_in, vec![5, 0, 0, 0]);
-                assert_eq!(r.sw_out, vec![2, 3, 0, 0]);
-                assert_eq!(r.port_addresses, vec![0x12, 0x13]);
-                assert_eq!(r.universes, vec![0x13, 0x14]);
-            }
-            _ => panic!("esperava ArtPollReply"),
-        }
     }
 
     #[test]

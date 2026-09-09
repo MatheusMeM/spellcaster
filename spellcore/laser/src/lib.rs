@@ -24,8 +24,7 @@ pub mod ild;
 pub mod trace;
 
 pub use dac::etherdream::{Emulator, EtherDream};
-pub use dac::helios::Helios;
 pub use dac::idn::Idn;
 pub use dac::Dac;
 pub use feed::{Feed, FeedStats, Transform};
-pub use frame::{bbox, optimize, optimize_into, safety, Frame, Point, Safety};
+pub use frame::{bbox, optimize, optimize_into, Frame, Point, Safety};

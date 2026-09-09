@@ -151,7 +151,7 @@ async fn request(st: &Arc<St>, txt: &str) -> String {
     }
     // `play_show` bloqueia ate o fim do show: roda em thread e a resposta volta na hora (a mesma
     // lista BACKGROUND do MCP; um so' lugar decide o que e' comando de longa duracao).
-    if mcp::BACKGROUND.contains(&cmd.as_str()) {
+    if mcp::background(&cmd) {
         let (reg, nome, s) = (st.reg.clone(), cmd.clone(), st.clone());
         std::thread::spawn(move || {
             if let Err(e) = reg.call(&nome, args) {

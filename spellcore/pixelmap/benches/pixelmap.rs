@@ -24,7 +24,8 @@ fn bench(c: &mut Criterion) {
         })
     });
 
-    let mut bilin = Mapper::new(&grid(317, 316, 1, Order::Rgb)).bilinear(true);
+    let mut bilin = Mapper::new(&grid(317, 316, 1, Order::Rgb));
+    bilin.sampling = pixelmap::Sampling::Bilinear;
     c.bench_function("100k px bilinear 1080p", |b| {
         b.iter(|| {
             bilin.render(black_box(&frame));

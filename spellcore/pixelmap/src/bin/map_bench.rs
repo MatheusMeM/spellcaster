@@ -2,21 +2,16 @@
 // Gate do PRD (secao 3): < 2 ms por frame. Sai com erro se o p99 estourar.
 // Saida ASCII pura (console cp1252).
 
-use pixelmap::{grid, Frame, Mapper, Order};
+use pixelmap::{grid, Frame, Mapper, Order, Sampling};
 use std::time::Instant;
 
 fn arg(name: &str, default: f64) -> f64 {
     let a: Vec<String> = std::env::args().collect();
-    for i in 0..a.len() {
-        if a[i] == name {
-            if let Some(v) = a.get(i + 1) {
-                if let Ok(x) = v.parse() {
-                    return x;
-                }
-            }
-        }
-    }
-    default
+    a.iter()
+        .position(|x| x == name)
+        .and_then(|i| a.get(i + 1))
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(default)
 }
 
 fn flag(name: &str) -> bool {
@@ -31,7 +26,8 @@ fn main() {
 
     let cols = (pixels as f64).sqrt().ceil() as u32;
     let rows = pixels.div_ceil(cols);
-    let mut m = Mapper::new(&grid(cols, rows, 1, Order::Rgb)).bilinear(bilinear);
+    let mut m = Mapper::new(&grid(cols, rows, 1, Order::Rgb));
+    m.sampling = if bilinear { Sampling::Bilinear } else { Sampling::Nearest };
 
     // Frame 1080p RGBA sintetico: gradiente + ruido, para nenhuma amostra cair sempre no
     // mesmo valor e o cache nao ficar irrealmente quente.

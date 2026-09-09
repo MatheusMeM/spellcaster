@@ -571,11 +571,6 @@ impl Graph {
         self.nos.len()
     }
 
-    /// Eventos de entrada descartados por fila cheia desde a carga.
-    pub fn perdidos(&self) -> u64 {
-        self.perdidos
-    }
-
     /// Reescreve o pino `active` de cada estado: a exclusao de grupo pode acontecer depois do no
     /// `state` ter sido avaliado. No `state` calado (`mute`, ou ele proprio dentro de um estado
     /// inativo) nao emite: o `active` dele fica no 0 que o gate escreveu, ainda que a maquina
@@ -945,11 +940,7 @@ fn emite(outq: &mut Vec<Ev>, perdidos: &mut u64, e: Ev) {
 }
 
 fn b2f(b: bool) -> f64 {
-    if b {
-        1.0
-    } else {
-        0.0
-    }
+    b as u8 as f64
 }
 
 #[cfg(test)]

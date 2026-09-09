@@ -3,14 +3,11 @@
 /// `--nome valor` no argv; `default` se faltar ou nao for numero.
 pub fn arg_f64(name: &str, default: f64) -> f64 {
     let a: Vec<String> = std::env::args().collect();
-    for i in 0..a.len() {
-        if a[i] == name {
-            if let Some(x) = a.get(i + 1).and_then(|v| v.parse().ok()) {
-                return x;
-            }
-        }
-    }
-    default
+    a.iter()
+        .position(|x| x == name)
+        .and_then(|i| a.get(i + 1))
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(default)
 }
 
 #[cfg(test)]

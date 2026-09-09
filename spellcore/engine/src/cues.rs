@@ -80,25 +80,16 @@ pub struct CueList {
     pending: Option<(usize, f64)>,
 }
 
-impl Default for CueList {
-    fn default() -> CueList {
+impl CueList {
+    pub fn new(specs: &[Value]) -> CueList {
         CueList {
-            cues: Vec::new(),
+            cues: specs.iter().map(Cue::new).collect(),
             state: Vec::new(),
             from: Vec::new(),
             index: -1,
             cur: None,
             t0: 0.0,
             pending: None,
-        }
-    }
-}
-
-impl CueList {
-    pub fn new(specs: &[Value]) -> CueList {
-        CueList {
-            cues: specs.iter().map(Cue::new).collect(),
-            ..CueList::default()
         }
     }
 
@@ -113,10 +104,6 @@ impl CueList {
     /// Indice da ultima cue disparada; -1 = nenhuma.
     pub fn index(&self) -> i32 {
         self.index
-    }
-
-    pub fn cues(&self) -> &[Cue] {
-        &self.cues
     }
 
     /// Dispara a proxima cue (ou a de indice dado). O fade comeca depois do `wait` dela.
@@ -140,7 +127,7 @@ impl CueList {
                 self.index = i as i32;
                 self.cur = Some(i);
                 self.t0 = t;
-                copy(&self.state, &mut self.from); // ponto de partida do fade
+                self.from.clone_from(&self.state); // ponto de partida do fade
             }
         }
         if let Some(i) = self.cur {
@@ -206,21 +193,6 @@ fn slot(snap: &mut Snap, k: Key) -> &mut Vec<f64> {
         None => {
             snap.push((k, Vec::new()));
             &mut snap.last_mut().expect("acabou de entrar").1
-        }
-    }
-}
-
-/// Copia o snapshot reaproveitando os `Vec` do destino.
-fn copy(src: &Snap, dst: &mut Snap) {
-    dst.truncate(src.len());
-    for (i, (k, v)) in src.iter().enumerate() {
-        match dst.get_mut(i) {
-            Some(d) => {
-                d.0 = *k;
-                d.1.clear();
-                d.1.extend_from_slice(v);
-            }
-            None => dst.push((*k, v.clone())),
         }
     }
 }
@@ -328,6 +300,6 @@ mod tests {
         assert!(uni.is_empty());
 
         let cl = CueList::new(&[json!({"values": {"nao/e/chave": [1]}})]);
-        assert_eq!(cl.cues()[0].values.len(), 0);
+        assert_eq!(cl.len(), 1, "chave invalida nao derruba a cue");
     }
 }

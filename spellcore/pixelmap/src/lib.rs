@@ -261,15 +261,6 @@ impl Mapper {
         }
     }
 
-    pub fn bilinear(mut self, on: bool) -> Mapper {
-        self.sampling = if on {
-            Sampling::Bilinear
-        } else {
-            Sampling::Nearest
-        };
-        self
-    }
-
     pub fn universes(&self) -> usize {
         self.unis.len()
     }

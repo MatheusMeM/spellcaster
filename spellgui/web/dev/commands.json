@@ -821,12 +821,12 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "dac": {
-          "description": "etherdream, helios ou idn.",
+          "description": "etherdream ou idn.",
           "type": "string"
         },
         "host": {
           "default": "",
-          "description": "Ether Dream e IDN: \"ip\" ou \"ip:porta\" (o `host` de `laser_dacs`). Helios: indice USB.",
+          "description": "\"ip\" ou \"ip:porta\" (o `host` de `laser_dacs`).",
           "type": "string"
         },
         "kpps": {

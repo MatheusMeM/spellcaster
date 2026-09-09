@@ -141,14 +141,12 @@ impl EventSink for CliSink {
     }
 }
 
-/// Host/porta da saida `osc` do .spell. `show::OutputCfg` guarda so' o nome dos tipos que nao
-/// conhece, entao o destino do `out.osc` do Graph sai do JSON cru.
-// ponytail: reabre o arquivo so' para isso ; sair daqui quando `OutputCfg` ganhar variante Osc.
-fn osc_target(path: &Path) -> Option<(String, u16)> {
-    let v: Value = serde_json::from_str(&std::fs::read_to_string(path).ok()?).ok()?;
-    let c = v["outputs"].as_array()?.iter().find(|c| c["type"] == "osc")?;
-    let host = c["host"].as_str().unwrap_or("127.0.0.1").to_string();
-    Some((host, c["port"].as_u64()? as u16))
+/// Host/porta da saida `osc` do .spell — o destino do `out.osc` do Graph.
+fn osc_target(sh: &show::Show) -> Option<(String, u16)> {
+    sh.outputs.iter().find_map(|o| match o {
+        show::OutputCfg::Osc { host, port } => Some((host.clone(), *port)),
+        _ => None,
+    })
 }
 
 // ------------------------------------------------------------ play (headless)
@@ -218,11 +216,11 @@ fn play(a: PlayArgs) -> Result<Value, String> {
     let path = Path::new(&a.file);
     let sh = show::load(path)?;
     let base = path.parent().unwrap_or_else(|| Path::new(".")).to_path_buf();
-    let sink: Box<dyn EventSink> = Box::new(CliSink::new(osc_target(path)));
+    let sink: Box<dyn EventSink> = Box::new(CliSink::new(osc_target(&sh)));
     let hooks = script::hooks(&sh, &base, sink)?;
     let name = sh.name.clone();
 
-    let mut p = Player::new(sh, base, a.looping)?;
+    let mut p = Player::new(sh, a.looping)?;
     for h in hooks {
         p.hook(h);
     }

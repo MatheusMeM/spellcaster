@@ -20,15 +20,11 @@ use crate::frame::Point;
 pub const PORT: u16 = 7255;
 
 // --- comandos IDN-Hello ---
-pub const CMD_VOID: u8 = 0x00;
 pub const CMD_PING_REQUEST: u8 = 0x08;
 pub const CMD_PING_RESPONSE: u8 = 0x09;
 pub const CMD_SCAN_REQUEST: u8 = 0x10;
 pub const CMD_SCAN_RESPONSE: u8 = 0x11;
-pub const CMD_SERVICEMAP_REQUEST: u8 = 0x12;
-pub const CMD_SERVICEMAP_RESPONSE: u8 = 0x13;
 pub const CMD_MESSAGE: u8 = 0x40;
-pub const CMD_MESSAGE_ACKREQ: u8 = 0x41;
 pub const CMD_MESSAGE_CLOSE: u8 = 0x44;
 
 // --- contentID da mensagem de canal ---
@@ -93,12 +89,8 @@ pub fn parse_scan_response(b: &[u8], ip: &str) -> Option<Unit> {
     Some(Unit { ip: ip.to_string(), unit_id, name, protocol_version: b[1], status: b[2] })
 }
 
-/// Manda scan request para o broadcast e junta as respostas ate estourar `timeout`.
-pub fn scan(timeout: Duration) -> Vec<Unit> {
-    scan_to(Ipv4Addr::BROADCAST, timeout)
-}
-
-pub fn scan_to(target: Ipv4Addr, timeout: Duration) -> Vec<Unit> {
+/// Manda scan request (broadcast, ou o `target` de um teste) e junta as respostas ate `timeout`.
+pub fn scan(target: Ipv4Addr, timeout: Duration) -> Vec<Unit> {
     let Ok(sock) = UdpSocket::bind(("0.0.0.0", 0)) else {
         return Vec::new();
     };

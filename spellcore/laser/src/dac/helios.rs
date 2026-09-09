@@ -32,9 +32,6 @@
 //! Ordem de envio: status request -> esperar `ready` -> frame. O `Feed` ja serializa isso
 //! porque so um envio acontece por vez na thread do DAC.
 
-use std::io;
-
-use crate::dac::Dac;
 use crate::frame::Point;
 
 /// Converte um ponto ILDA para o par de 12 bits do Helios. Testado; e a unica parte da
@@ -62,37 +59,6 @@ pub fn encode_frame(points: &[Point], pps: u32, flags: u8, out: &mut Vec<u8>) {
     out.push(flags);
 }
 
-/// Placeholder do DAC USB. `open` sempre falha: sem hardware nao ha o que testar.
-pub struct Helios {
-    pub index: u32,
-}
-
-impl Helios {
-    pub fn open(index: u32) -> io::Result<Helios> {
-        let _ = index;
-        Err(io::Error::new(
-            io::ErrorKind::Unsupported,
-            "Helios exige USB (hidapi/rusb): nao compilado nesta build",
-        ))
-    }
-}
-
-impl Dac for Helios {
-    fn name(&self) -> String {
-        format!("helios:{}", self.index)
-    }
-
-    fn begin(&mut self, _pps: u32) -> io::Result<()> {
-        Err(io::Error::new(io::ErrorKind::Unsupported, "Helios nao implementado"))
-    }
-
-    fn send(&mut self, _points: &[Point]) -> io::Result<()> {
-        Err(io::Error::new(io::ErrorKind::Unsupported, "Helios nao implementado"))
-    }
-
-    fn stop(&mut self) {}
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -109,10 +75,5 @@ mod tests {
         // ponto apagado sai preto
         encode_frame(&[Point::new(0.0, 0.0, 255, 255, 255, true)], 1000, 0, &mut out);
         assert_eq!(&out[3..7], &[0, 0, 0, 0][..]);
-    }
-
-    #[test]
-    fn open_recusa_sem_usb() {
-        assert!(Helios::open(0).is_err());
     }
 }

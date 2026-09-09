@@ -1,104 +1,63 @@
 //! Arquivo de show `.spell` (JSON) v1 — mesmo arquivo do `spellcaster/show.py`.
 
-use serde::de::Error as _;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use serde_json::{json, Map, Value};
+use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 use std::path::Path;
 
 pub const VERSION: u32 = 1;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "lowercase")]
 pub enum OutputCfg {
     Sacn {
+        #[serde(default)]
         universes: Vec<u16>,
+        #[serde(default = "cem")]
         priority: u8,
+        #[serde(default = "spellcaster")]
         source_name: String,
+        #[serde(default)]
         interfaces: Option<Vec<String>>,
     },
     ArtNet {
+        #[serde(default)]
         targets: Option<Vec<String>>,
+        #[serde(default = "sim")]
         broadcast: bool,
     },
     /// Saida OSC do Player: tracks `osc` e `media` de reprodutor nao-Capture.
     Osc {
+        #[serde(default = "local")]
         host: String,
+        /// Sem "port" a saida fica em 0 e o Player a ignora (o Python levanta KeyError).
+        #[serde(default)]
         port: u16,
     },
     // ponytail: tipo desconhecido guarda so' o nome (o resto da config se perde ao regravar)
-    // ; virar Unknown(String, Map) quando laser/media entrarem no `outputs` do Rust.
-    Unknown(String),
+    // ; virar Unknown com Map quando laser/media entrarem no `outputs` do Rust.
+    // O `untagged` e' o ultimo braco: pega o "type" que nao e' nenhum dos de cima e tambem o
+    // output sem "type" nenhum (vira Unknown { tipo: "" } em vez de erro de parse).
+    #[serde(untagged)]
+    Unknown {
+        #[serde(default, rename = "type")]
+        tipo: String,
+    },
 }
 
-impl<'de> Deserialize<'de> for OutputCfg {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<OutputCfg, D::Error> {
-        let v = Value::deserialize(d)?;
-        let ty = v.get("type").and_then(|x| x.as_str()).unwrap_or("");
-        let list = |k: &str| -> Option<Vec<String>> {
-            v.get(k).and_then(|x| x.as_array()).map(|a| {
-                a.iter()
-                    .map(|s| s.as_str().unwrap_or_default().to_string())
-                    .collect()
-            })
-        };
-        Ok(match ty {
-            "sacn" => OutputCfg::Sacn {
-                universes: v
-                    .get("universes")
-                    .and_then(|x| x.as_array())
-                    .map(|a| a.iter().filter_map(|n| n.as_u64()).map(|n| n as u16).collect())
-                    .unwrap_or_default(),
-                priority: v.get("priority").and_then(|x| x.as_u64()).unwrap_or(100) as u8,
-                source_name: v
-                    .get("source_name")
-                    .and_then(|x| x.as_str())
-                    .unwrap_or("Spellcaster")
-                    .to_string(),
-                interfaces: list("interfaces"),
-            },
-            "artnet" => OutputCfg::ArtNet {
-                targets: list("targets"),
-                broadcast: v.get("broadcast").and_then(|x| x.as_bool()).unwrap_or(true),
-            },
-            "osc" => OutputCfg::Osc {
-                host: v
-                    .get("host")
-                    .and_then(|x| x.as_str())
-                    .unwrap_or("127.0.0.1")
-                    .to_string(),
-                // sem "port" a saida fica em 0 e o Player a ignora (o Python levanta KeyError)
-                port: v.get("port").and_then(|x| x.as_u64()).unwrap_or(0) as u16,
-            },
-            "" => return Err(D::Error::custom("output sem \"type\"")),
-            other => OutputCfg::Unknown(other.to_string()),
-        })
-    }
+fn cem() -> u8 {
+    100
 }
 
-impl Serialize for OutputCfg {
-    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-        match self {
-            OutputCfg::Sacn {
-                universes,
-                priority,
-                source_name,
-                interfaces,
-            } => {
-                let mut m = json!({"type": "sacn", "universes": universes,
-                                   "priority": priority, "source_name": source_name});
-                if let Some(i) = interfaces {
-                    m["interfaces"] = json!(i);
-                }
-                m.serialize(s)
-            }
-            OutputCfg::ArtNet { targets, broadcast } => {
-                json!({"type": "artnet", "targets": targets, "broadcast": broadcast}).serialize(s)
-            }
-            OutputCfg::Osc { host, port } => {
-                json!({"type": "osc", "host": host, "port": port}).serialize(s)
-            }
-            OutputCfg::Unknown(t) => json!({ "type": t }).serialize(s),
-        }
-    }
+fn spellcaster() -> String {
+    "Spellcaster".to_string()
+}
+
+fn sim() -> bool {
+    true
+}
+
+fn local() -> String {
+    "127.0.0.1".to_string()
 }
 
 fn def_fps() -> u32 {
@@ -198,7 +157,7 @@ mod tests {
             o => panic!("esperava sacn, veio {:?}", o),
         }
         assert_eq!(sh.outputs[1], OutputCfg::ArtNet { targets: None, broadcast: false });
-        assert_eq!(sh.outputs[2], OutputCfg::Unknown("laser".into()));
+        assert_eq!(sh.outputs[2], OutputCfg::Unknown { tipo: "laser".into() });
     }
 
     #[test]

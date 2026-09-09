@@ -25,16 +25,10 @@ pub fn novo() -> Show {
             source_name: "Spellcaster".into(),
             interfaces: None,
         }],
-        extra: [
-            ("patch", json!([])),
-            ("cues", json!([])),
-            ("markers", json!([])),
-            ("in", json!(0.0)),
-            ("out", json!(60.0)),
-        ]
-        .into_iter()
-        .map(|(k, v)| (k.to_string(), v))
-        .collect(),
+        extra: json!({"patch": [], "cues": [], "markers": [], "in": 0.0, "out": 60.0})
+            .as_object()
+            .cloned()
+            .unwrap_or_default(),
         ..Show::default()
     }
 }
