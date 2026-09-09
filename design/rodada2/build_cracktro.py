@@ -13,8 +13,8 @@ def rep(old, new, count=1):
 
 
 # CSS
-rep("  #winb.drop { animation:drop .55s cubic-bezier(.2,1.4,.4,1); }",
-"""  #winb.drop { animation:drop .55s cubic-bezier(.2,1.4,.4,1); }
+rep("  #winb.drop { animation:drop .45s cubic-bezier(.2,1.4,.4,1); }",
+"""  #winb.drop { animation:drop .45s cubic-bezier(.2,1.4,.4,1); }
   #skin { position:absolute; left:160px; top:120px; z-index:6; display:none; filter:drop-shadow(0 18px 30px rgba(0,0,0,.6)); }
   #skin.on { display:block; }
   #skinc { display:block; image-rendering:pixelated; cursor:grab; touch-action:none; }

@@ -28,3 +28,4 @@ Uma linha por decisão. Data, decisão, motivo. Agente nenhum re-decide o que es
 - Fita compacta (TAB) sobre o Resolume; NFO como about; copy com humor (toast), animação só onde há estado.
 - Pendente: votos da rodada 2 (gel padrão, splash, silhueta, kitsch, jingle, .wmz, fita).
 - 2026-09-09 — Interface e atalhos seguem Adobe Premiere e DaVinci Resolve (mapa em `design/SHORTCUTS.md`). Motivo: operador que edita vídeo opera sem aprender nada novo; gramática Ctrl/Shift/Alt fixa.
+- 2026-09-09 — Carcaça reprovada de novo ("software quadradão"): o vidro passa a ser um fragment shader WebGL (SDF corpo + cúpula do GO, refração com dispersão R/G/B, fresnel, specular no mouse, varredura, sombra e cáustica do gel). Motivo: pedido explícito de vidro reconhecível e "espetaculoso"; GLSL liberado pelo Matheus. Splash cracktro aprovado ("cyber matrix ficou ótima").
