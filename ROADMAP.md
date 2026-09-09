@@ -72,7 +72,7 @@ Cada fase termina com algo usável em trabalho real. Ordem fixa; prazos são est
 - Migrar `sacn` de `show_medgrupo.py` para `protocols/sacn.py` com N universos e entrada.
 - `artnet.py` out/in + ArtPoll; `osc.py` out/in.
 - `clock.py`, `registry.py`, `engine.py` com uma `look(t)` Python como track (compatibilidade com o show do MED GRUPO).
-- CLI: `spell play show_medgrupo.py` reproduz o show atual sem GUI.
+- CLI: `spell play shows/medgrupo.py` reproduz o show atual sem GUI.
 - Aceite: Capture recebe sACN e Art-Net idênticos; `ffmpeg`-style loopback test compara pacotes byte a byte com fixtures gravadas.
 
 ### F1 — Análise de rede (semana 2)

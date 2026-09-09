@@ -37,6 +37,14 @@ def play(file: str, fps: int = 30, loop: bool = False, universes: str = "1"):
 
 
 @command
+def net(timeout: int = 2, as_json: bool = False):
+    """Analisa a rede: interfaces, nós Art-Net, fontes sACN, DACs Ether Dream, sugestões."""
+    from .protocols import netscan
+    d = netscan.scan_all(timeout)
+    print(json.dumps(d, indent=1, ensure_ascii=False) if as_json else netscan.report(d))
+
+
+@command
 def commands():
     """Lista os comandos do registry (JSON)."""
     print(json.dumps(schema(), indent=1, ensure_ascii=False))

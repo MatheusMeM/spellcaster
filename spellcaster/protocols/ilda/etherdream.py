@@ -104,7 +104,7 @@ class EtherDream:
             pts = getattr(fr, "points", fr)
             for i in range(0, len(pts), chunk):
                 block = pts[i:i + chunk]
-                # ponytail: espera o buffer esvaziar o suficiente antes de enfileirar
+                # ponytail: polling do buffer_fullness a cada ack ; trocar por low_water medido em DAC real
                 while self._run and self.status["buffer_fullness"] + len(block) > self.capacity:
                     time.sleep(len(block) / pps / 2)
                     self.ping()

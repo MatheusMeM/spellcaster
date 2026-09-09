@@ -139,7 +139,7 @@ def poll(timeout=2.0, targets=BROADCASTS):
     try:
         s.bind(("", PORT))
     except OSError:
-        s.bind(("", 0))  # ponytail: se 6454 está ocupada, respostas unicast ainda chegam
+        s.bind(("", 0))  # ponytail: porta efêmera se 6454 ocupada, só respostas unicast chegam ; usar SO_REUSEADDR em 6454 quando precisar de broadcast
     s.settimeout(0.2)
     for t in targets:
         try:

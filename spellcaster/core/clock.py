@@ -56,4 +56,4 @@ class Clock:
             if d > 0:
                 time.sleep(d)
             else:
-                nxt = time.perf_counter()   # ponytail: atrasou, não acumula o atraso
+                nxt = time.perf_counter()   # ponytail: atrasou, não acumula o atraso ; trocar por fase fixa se precisar de sync externo (LTC/MTC)

@@ -150,7 +150,7 @@ class OscIn(threading.Thread):
 
     def _dispatch(self, p):
         if p[0] == "#bundle":
-            for e in p[2]:  # ponytail: timetag futuro ignorado, executa já; agendar quando o clock existir
+            for e in p[2]:  # ponytail: timetag futuro ignorado, executa já ; agendar pelo Clock em F2
                 self._dispatch(e)
             return
         addr, args = p
