@@ -44,7 +44,10 @@ Apareceram em mais de um app e valem para todas as seis funções. Cada arquivo 
 
 ## Pontos abertos (não decididos aqui)
 
-- `SHORTCUTS.md` tem `Shift+1..7` para sete painéis; o cenário interativo precisa de um slot (ver `cenario-interativo.md § Atalhos`).
+- `SHORTCUTS.md` tem `Shift+1..7` para sete painéis; `cenario-interativo.md § Atalhos` propõe `Shift+8` para o viewer/maquete.
 - O catálogo de nós do PRD §10 não tem nó de **estado** (State Machine); `orquestrador.md § Objetos` mostra o que Chataigne faz e o que falta. Decisão vai para `DECISOES.md`.
-- `Ctrl+B` (cue na posição do playhead, Chataigne) e `Shift+PageUp/PageDown` (cue anterior/próximo) não estão em `SHORTCUTS.md` e não conflitam com nada; propostos em `cenas-cues-dmx.md`.
-- `F3` (paleta), `Q` (favoritos), `F9` (ajustar última operação), `Shift+R` (repetir) vêm do Blender, não conflitam, e são o teclado do Aprendiz (`aprendiz-menu.md`).
+- `Tab` é a troca de Face em `SHORTCUTS.md`, então entrar/sair de grupo no graph fica em `Ctrl+]`/`Ctrl+[`; `Ctrl+X` é recortar, então apagar religando fica em `Shift+Delete` (`orquestrador.md § Atalhos`).
+- `Ctrl+B` (cue na posição do playhead, Chataigne) e `Shift+PageUp/PageDown` (cue anterior/próximo) não estão em `SHORTCUTS.md` e não conflitam com nada; propostos em `cenas-cues-dmx.md`, junto com `Shift+E` (modo editar cue).
+- `F3` (paleta), `Q` (favoritos), `F9` (ajustar última operação), `Shift+R` (repetir), `F1` (ajuda do elemento) vêm do Blender/TD, não conflitam, e são o teclado do Aprendiz (`aprendiz-menu.md`).
+- Teclas nuas por painel focado: `V` (modo do viewer) e `F` (congelar) em `ndi-ilda.md`; `F` (modo Foco), `H`/`Shift+H`/`Alt+H`, `Alt+1..9` (câmeras) em `cenario-interativo.md`; `Shift+T` (padrão de teste) em `ilda-player.md`. `Ctrl+I` colide (importar marcadores × inverter seleção) e precisa de decisão.
+- A rodada 4 em `design/0.1.2` renomeou o Aprendiz para Pino; estes arquivos ainda dizem Aprendiz.
