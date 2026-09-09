@@ -131,3 +131,14 @@ test("conta desalinhada se conserta no primeiro evento", () => {
   assert.deepStrictEqual(r, { rev: 9, reload: true });
   assert.deepStrictEqual(TL.revEvento(10, r.rev), { rev: 10, reload: true });
 });
+
+// Reconexao: o serve novo comeca em rev = 0. `revEvento` so' corrige a conta para cima, entao o
+// onopen zera TL.rev antes do reload; sem isso o primeiro `show` do serve novo (rev 1) cairia
+// abaixo da conta velha e nao recarregaria nada.
+test("depois do reset da reconexao, o primeiro evento do serve novo recarrega", () => {
+  assert.deepStrictEqual(TL.revEvento(1, 0), { rev: 1, reload: true });
+});
+
+test("sem o reset, o serve reiniciado seria engolido", () => {
+  assert.deepStrictEqual(TL.revEvento(1, 37), { rev: 37, reload: false });
+});

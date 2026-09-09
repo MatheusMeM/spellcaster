@@ -89,7 +89,9 @@ const BUS = {
     try { w = this.ws = new WebSocket(url); } catch (e) { TL.log("sem servidor: " + e.message); return; }
     w.binaryType = "arraybuffer";
     w.onmessage = e => BUS.msg(e.data);
-    w.onopen = () => { BUS.ever = true; TL.reload(); };
+    // serve reiniciado volta com rev = 0, e TL.revEvento so' corrige a conta para cima: sem zerar
+    // aqui, todo evento `show` do serve novo viria abaixo do numero velho e seria engolido.
+    w.onopen = () => { BUS.ever = true; TL.rev = 0; TL.reload(); };
     w.onclose = () => {
       BUS.ws = null;
       TL.tstate = null;
@@ -127,17 +129,23 @@ TL.ops = function (eds) {
 };
 
 // Manda as chamadas. Sem servidor nao faz nada: o modo offline continua o de hoje.
-// O serve conta uma revisao por comando aceito e devolve o numero no evento `show`; adiantamos a
-// conta aqui para reconhecer o eco das nossas proprias edicoes (ver TL.revEvento).
+// TL.rev e' a conta do SERVE: `st.rev` (serve/src/lib.rs) sobe um por request aceito fora da lista
+// de LEITURA, e e' esse numero que volta no evento `show`. Adiantamos a conta aqui para reconhecer
+// o eco das nossas proprias edicoes (ver TL.revEvento) — o `TL.rev++` antes do envio ja' fecha a
+// conta, e o `--` desfaz o comando recusado.
+// A resposta do `show_patch` tambem traz um `rev`, mas e' OUTRO contador: o REV do engine
+// (engine/src/edit.rs), que so' sobe em edicao de show (MCP/OSC/CLI incluidos) e nao sobe em
+// locate/pause/etc. Escrever esse numero em TL.rev jogaria o esperado para cima assim que o
+// contador do engine passasse o do serve, e todo evento `show` de outro cliente viraria
+// `rev <= esperado`: reload de fora engolido. Por isso a resposta e' ignorada.
 // ponytail: `play_show` (background no serve, unico que nao conta revisao) pelo nome ; sai quando
-// toda resposta do barramento trouxer o rev.
+// toda resposta do barramento trouxer o rev do serve.
 function send(calls) {
   if (!BUS.live()) return;
   for (const c of calls) {
     const conta = c.cmd !== "play_show";
     if (conta) TL.rev++;
     BUS.call(c.cmd, c.args)
-      .then(r => { if (r && r.rev) TL.rev = r.rev; })     // show_patch devolve a revisao nova
       .catch(err => { if (conta) TL.rev--; TL.log(c.cmd + ": " + err); });   // recusado: sem revisao
   }
 }
