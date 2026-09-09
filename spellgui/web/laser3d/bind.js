@@ -11,10 +11,14 @@ window.Bind = (function () {
   function keyOf(id, src) { var t = table(src); return Object.keys(t).filter(function (k) { return t[k] === id; })[0] || ""; }
   function def(id, label, fn, o) { o = o || {}; A[id] = { label: label, fn: fn, type: o.type || "btn", get: o.get }; order.push(id); if (o.key) DEF.key[o.key] = id; if (o.midi) DEF.midi[o.midi] = id; }
   function run(id, v) { var a = A[id]; if (!a) return false; a.fn(v); feedback(id); onChange(); return true; }
-  function keyStr(e) { var k = e.key; if (k === " ") k = "Space"; else if (k.length === 1) k = k.toUpperCase(); return (e.ctrlKey || e.metaKey ? "Ctrl+" : "") + (e.shiftKey && k.length > 1 ? "Shift+" : "") + (e.altKey ? "Alt+" : "") + k; }
+  // "Shift+" vale tambem para tecla de um caractere: sem isto "Shift+Z" nunca chegava (o keyStr
+  // devolvia "Z" e o binding ficava morto). `idFor` cai de volta na tecla sem Shift quando a
+  // combinacao nao esta' mapeada, entao "S" continua armando com Shift ou CapsLock apertado.
+  function keyStr(e) { var k = e.key; if (k === " ") k = "Space"; else if (k.length === 1) k = k.toUpperCase(); return (e.ctrlKey || e.metaKey ? "Ctrl+" : "") + (e.shiftKey ? "Shift+" : "") + (e.altKey ? "Alt+" : "") + k; }
+  function idFor(ks) { var t = table("key"); return t[ks] || (ks.indexOf("Shift+") === 0 ? t[ks.slice(6)] : undefined); }
   document.addEventListener("keydown", function (e) { var tg = e.target.tagName; if (tg === "TEXTAREA" || tg === "INPUT") return; var ks = keyStr(e);
     if (learn && learn.src === "key") { if (ks !== "Escape") { USR.key[ks] = learn.id; save(); } learn = null; onChange(); e.preventDefault(); return; }
-    var id = table("key")[ks]; if (id) { e.preventDefault(); run(id); } });
+    var id = idFor(ks); if (id) { e.preventDefault(); run(id); } });
   function onMidi(e) { var d = e.data, ty = d[0] >> 4, ch = (d[0] & 15) + 1; if (ty !== 9 && ty !== 8 && ty !== 11) return; var k = (ty === 11 ? "cc" : "note") + ":" + ch + ":" + d[1];
     if (learn && learn.src === "midi") { if (ty === 8 || (ty === 9 && d[2] === 0)) return; USR.midi[k] = learn.id; learn = null; onChange(); return; }
     var id = table("midi")[k], a = A[id]; if (!a) return; if (a.type === "cc") { a.fn(d[2] / 127); onChange(); } else if (ty === 11 ? d[2] > 63 : ty === 9 && d[2] > 0) run(id); }

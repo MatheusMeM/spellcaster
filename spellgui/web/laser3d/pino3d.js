@@ -25,11 +25,15 @@ window.Pino3D = (function () {
     function current(k) { cur = k; pins.forEach(function (p, i) { p.material.emissive.setHex(PINS[i][0] === k ? 0x38ff5c : 0); p.material.emissiveIntensity = .8; }); }
     function bye() { gone = true; say("Tá, me solta. Puxa pelo cabo se precisar.", null, false); setTimeout(hide, 1600); }
     function back() { gone = false; }
-    function update(dt, mouse, W, H) { t += dt; if (talking > 0) talking -= dt; var down = gone ? 1 : 0; head.rotation.x += ((down ? 1.1 : -.5) - head.rotation.x) * Math.min(1, dt * 3); head.position.y += ((down ? .012 : .06) - head.position.y) * Math.min(1, dt * 3);
+    function update(dt, mouse, W, H, minTop) { t += dt; if (talking > 0) talking -= dt; var down = gone ? 1 : 0; head.rotation.x += ((down ? 1.1 : -.5) - head.rotation.x) * Math.min(1, dt * 3); head.position.y += ((down ? .012 : .06) - head.position.y) * Math.min(1, dt * 3);
       head.rotation.z = talking > 0 ? Math.sin(t * 28) * .06 : Math.sin(t * 1.3) * .02; head.position.x = Math.sin(t * .9) * .002;
       blink -= dt; if (blink < -3.4 - Math.random()) blink = .11; var sy = blink > 0 ? .15 : 1; eyes.forEach(function (e) { e.scale.y += (sy - e.scale.y) * Math.min(1, dt * 30); });
       v.set(0, .014, 0); head.localToWorld(v); v.project(cam); var sx = (v.x + 1) / 2 * W, sy2 = (1 - v.y) / 2 * H; if (mouse) { var dx = mouse[0] - sx, dy = mouse[1] - sy2, d = Math.max(1, Math.hypot(dx, dy)), k = Math.min(1, d / 200) * .0028; pupils.forEach(function (p) { p.position.x = dx / d * k; p.position.y = -dy / d * k; }); }
-      v.set(0, .04, .012); head.localToWorld(v); v.project(cam); bal.style.left = Math.max(270, Math.min(W - 10, (v.x + 1) / 2 * W - 14)) + "px"; bal.style.top = Math.max(120, Math.min(H - 20, (1 - v.y) / 2 * H - 10)) + "px"; }
+      v.set(0, .04, .012); head.localToWorld(v); v.project(cam); bal.style.left = Math.max(270, Math.min(W - 10, (v.x + 1) / 2 * W - 14)) + "px";
+      // `minTop` e' a base da traseira do aparelho na tela: o balao desce para debaixo dela, senao
+      // tapa o display e os controles — que sao o motivo de o programa existir.
+      var top = Math.max((1 - v.y) / 2 * H + 16, Math.max(0, Math.min(H - 170, minTop || 0)));
+      bal.style.top = Math.min(H - 40, top) + "px"; }
     return { group: g, head: head, say: say, hide: hide, current: current, bye: bye, back: back, update: update, PINS: PINS }; }
   return { build: build, PINS: PINS };
 })();

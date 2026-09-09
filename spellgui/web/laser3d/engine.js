@@ -1,11 +1,62 @@
-/* laser3d ↔ engine: o mapa estado → comando do registry, e nada mais.
-   `cmdFor(id, value, st)` e' pura: `id` e' o caminho do estado do aparelho (o mesmo nome que o
-   binding e o slider usam), `value` e' o valor absoluto ja' aplicado em `S`, `st` e' o contexto do
-   feed aberto ({feed, dac, host, kpps, file, fps, show}). Devolve `{cmd, args}` do registry, ou
-   `null` quando aquele estado nao tem comando hoje — a pagina segue local e o desenho na parede e'
-   o mesmo. Quem chama e' `app.js`; quem executa e' `bus.call`. */
+/* laser3d ↔ engine: as tres funcoes puras da pagina do laser — o que cada peca do aparelho e'
+   (`CONTROLS`), o mapa estado → comando do registry (`cmdFor`) e o que o display mostra
+   (`oledLines`). Nenhuma delas toca DOM, THREE nem rede: e' o que o teste em
+   `spellgui/web/test/laser3d.test.js` roda sem navegador.
+
+   `cmdFor(id, value, st)`: `id` e' o caminho do estado do aparelho (o mesmo nome que o binding e o
+   slider usam), `value` e' o valor absoluto ja' aplicado em `S`, `st` e' o contexto do feed aberto
+   ({feed, dac, host, kpps, file, fps, show}). Devolve `{cmd, args}` do registry, ou `null` quando
+   aquele estado nao tem comando hoje — a pagina segue local e o desenho na parede e' o mesmo.
+   Quem chama e' `app.js`; quem executa e' `bus.call`. */
 (function () {
   "use strict";
+
+  // ---------------------------------------------------------------- CONTROLS
+  // Um controle, uma funcao. `[familia, rotulo]` por `userData.key` das pecas de `body.js` e
+  // `optics.js`; e' daqui que sai o tooltip e e' daqui que `app.js` decide o que o clique faz.
+  // familia: "toggle" (inverte estado) | "momentary" (age enquanto apertado) | "valor" (muda um
+  // numero) | "conector" (plugue: clique nao faz nada) | "navegacao" (abre a tela daquela peca).
+  // Nenhuma chave pode ter duas familias, e nenhuma funcao pode aparecer em duas chaves.
+  var CONTROLS = {
+    // painel traseiro — energia e seguranca
+    power:     ["toggle", "POWER: liga e desliga o aparelho"],
+    keyswitch: ["toggle", "chave: arma a emissao"],
+    interlock: ["toggle", "interlock: tira o plugue e o obturador fecha"],
+    acin:      ["conector", "AC IN: powerCON TRUE1, 100-240 V (quem liga e' o rocker POWER)"],
+    // painel traseiro — display e navegacao
+    enc:       ["navegacao", "encoder: gira navega, aperta entra"],
+    back:      ["navegacao", "BACK: volta uma pagina do display"],
+    // painel traseiro — portas
+    ilda:      ["navegacao", "ILDA IN: carrega o .ild"],
+    ildathru:  ["navegacao", "ILDA OUT: encadeia o proximo projetor"],
+    dmxin:     ["navegacao", "DMX IN: endereco e modo"],
+    dmxout:    ["navegacao", "DMX OUT: repete o universo"],
+    rj45:      ["navegacao", "NET: sACN, Art-Net, NDI, Spout e os DACs da rede"],
+    usb:       ["navegacao", "USB: firmware"],
+    fan:       ["navegacao", "ventoinha 60 mm: temperatura"],
+    // corpo
+    lid:       ["navegacao", "tampa: abrir = preferencias"],
+    front:     ["navegacao", "frente: abertura do feixe"],
+    aperture:  ["navegacao", "abertura: classe 4, 10 W"],
+    side:      ["navegacao", "aletas de dissipacao"],
+    // dentro (optics.js)
+    bench:     ["navegacao", "mesa optica: aluminio 16 mm, furacao M4 12,5 mm"],
+    r:         ["navegacao", "modulo vermelho 638 nm - 2,5 W: limite e curva"],
+    g:         ["navegacao", "modulo verde 520 nm - 3 W: limite e curva"],
+    b:         ["navegacao", "modulo azul 445 nm - 4,5 W: limite e curva"],
+    dichro:    ["navegacao", "dicroicos: combinam R, G e B num feixe"],
+    fold:      ["navegacao", "espelho de dobra HR: manda o feixe para os galvos"],
+    shutter:   ["navegacao", "obturador: fecha sem chave ou sem interlock"],
+    galvo:     ["navegacao", "galvos X/Y: kpps"],
+    galvodrv:  ["navegacao", "driver dos galvos: buffer e velocidade"],
+    pcb:       ["navegacao", "driver do diodo: corrente e modulacao"],
+    dac:       ["navegacao", "placa DAC ILDA: os conectores traseiros nascem aqui"],
+    psu:       ["navegacao", "fonte 48 V - 250 W"],
+    // Pino
+    pino:      ["navegacao", "Pino: cabo DMX, cinco pinos, zero paciencia"]
+  };
+  function labelOf(k) { return (CONTROLS[k] && CONTROLS[k][1]) || k; }
+  function kindOf(k) { return (CONTROLS[k] && CONTROLS[k][0]) || ""; }
 
   function cmdFor(id, v, st) {
     st = st || {};
@@ -37,7 +88,70 @@
     }
   }
 
-  var api = { cmdFor: cmdFor };
+  // -------------------------------------------------------------- oledLines
+  // O display do painel traseiro e' o instrumento do aparelho, nao enfeite: sete paginas, e cada
+  // uma responde a uma pergunta que o operador faz de longe. `oledLines(S, eng)` e' pura e devolve
+  // as linhas ja' prontas: [0] cabecalho, [1] linha grande (a que se le' do outro lado da sala),
+  // [2..] ate' quatro linhas de detalhe. Uma linha que comeca com ">" e' o campo selecionado.
+  // Tudo em ASCII: e' um display de equipamento, nao uma pagina web.
+  var PAGES = ["STATUS", "SHOW", "DMX", "NET", "TEMP/ILK", "ENGINE", "ERRO"];
+  // Os campos que o encoder edita em cada pagina, na ordem em que ele passa por eles.
+  var FIELDS = { STATUS: ["kpps"], DMX: ["addr", "univ"], NET: ["sacn", "artnet", "ndi", "spout"], "TEMP/ILK": [], SHOW: [], ENGINE: [], ERRO: ["limpar"] };
+  function n3(v) { return ("00" + Math.round(v)).slice(-3); }
+  function mmss(t) { t = Math.max(0, Math.round(t || 0)); return Math.floor(t / 60) + ":" + ("0" + (t % 60)).slice(-2); }
+  function cut(s, n) { s = String(s == null ? "" : s).toUpperCase(); return s.length > n ? s.slice(0, n - 1) + "+" : s; }
+
+  function oledLines(S, eng) {
+    eng = eng || {}; S = S || {};
+    var page = PAGES[S.page] || PAGES[0], f = FIELDS[page] || [];
+    var head = page + "   " + ((S.page || 0) + 1) + "/" + PAGES.length + (S.edit ? "  EDITA" : "");
+    var sel = function (i, s) { return (S.edit && S.field === i ? ">" : " ") + s; };
+    if (!S.power) return [head, "DESLIGADO", " SEM ALIMENTACAO", " O ROCKER POWER LIGA"];
+    var armed = !!(S.power && S.key), live = armed && S.lock;
+    var fr = (S.show && S.show[S.frame]) || [], pts = fr.length, fps = pts ? Math.round(S.kpps / pts) : 0;
+    var out = [head];
+    if (page === "STATUS") {
+      out.push(live ? "LIVE" : !S.key ? "DESARMADO" : !S.lock ? "SCAN FAIL" : "STANDBY");
+      out.push(" CHAVE " + (S.key ? "ARMADA" : "ABERTA") + "  ILK " + (S.lock ? "OK" : "ABERTO") + "  OBTURADOR " + (live ? "ABERTO" : "FECHADO"));
+      out.push(" DAC " + cut(eng.dac || "-", 12) + " " + (eng.feed != null ? "FEED " + eng.feed : eng.err ? "ERRO" : eng.host ? cut(eng.host, 15) : "SEM HOST"));
+      out.push(sel(0, "KPPS " + Math.round((S.kpps || 0) / 1000) + "  " + pts + " PTS  " + fps + " FPS"));
+    } else if (page === "SHOW") {
+      var tr = eng.tr || null;
+      out.push(cut(eng.show || "SEM SHOW", 18));
+      out.push(" REV " + (eng.rev || 0) + "  " + (tr ? tr.state.toUpperCase() : "SEM PLAYER") + "  T " + mmss(tr && tr.t) + " / " + mmss(tr && tr.duration));
+      // ponytail: o evento `transport` nao publica loop ; o unico loop que a pagina conhece e' o
+      // do `laser_play --loop`, entao e' esse que aparece. Sai daqui quando o evento trouxer loop.
+      out.push(" ILDA " + cut(S.name || "-", 22));
+      out.push(" FRAME " + ((S.frame || 0) + 1) + "/" + ((S.show && S.show.length) || 0) + "  " + (S.play ? "PLAY" : "PAUSA") + "  LOOP " + (eng.feed != null && eng.file ? "ON" : "-"));
+    } else if (page === "DMX") {
+      out.push("ADDR " + n3(S.dmx));
+      out.push(sel(0, "ENDERECO " + n3(S.dmx)));
+      out.push(sel(1, "UNIVERSO " + (S.univ || 1) + "   MODO 16CH"));
+      out.push(" BUS " + (S.dmxIn ? "U" + S.dmxIn.universe + " CH" + n3(S.dmx) + " = " + S.dmxIn.value : "SEM FRAME"));
+    } else if (page === "NET") {
+      var nets = f, on = nets.filter(function (k) { return S.net && S.net[k]; });
+      out.push(on.length ? on.join(" ").toUpperCase() : "TUDO OFF");
+      nets.forEach(function (k, i) { if (i < 4) out.push(sel(i, k.toUpperCase() + (S.net && S.net[k] ? "  ON" : "  OFF") + (i === 0 ? "        DAC " + cut(eng.dac || "-", 10) : ""))); });
+    } else if (page === "TEMP/ILK") {
+      out.push(Math.round(S.temp) + " C");
+      out.push(" DIODOS " + Math.round(S.temp) + "C  GALVOS " + Math.round(S.temp - 6) + "C  FONTE " + Math.round(S.temp + 4) + "C");
+      out.push(" VENTOINHA " + (S.power ? "GIRANDO" : "PARADA") + "   DESLIGA A 65 C");
+      out.push(" INTERLOCK " + (S.lock ? "FECHADO" : "ABERTO: SCAN FAIL"));
+    } else if (page === "ENGINE") {
+      out.push(eng.on ? "OK  REV " + (eng.rev || 0) : "OFFLINE");
+      out.push(" PORTA " + cut(eng.port || "-", 22) + "   SPELL " + cut(eng.ver || "0.1.2", 8));
+      out.push(" FEED " + (eng.feed != null ? eng.feed + "  " + ((eng.stats && eng.stats["stat/sent"]) || 0) + " PT" : "FECHADO") + "   DAC " + cut(eng.dac || "-", 10));
+      out.push(" LOG " + cut(eng.log || "-", 30));
+    } else {
+      out.push(S.err ? "ERRO" : "SEM ERRO");
+      if (S.err) { out.push(" " + cut(S.err.msg, 40)); if (S.err.msg.length > 40) out.push(" " + cut(S.err.msg.slice(39), 40)); out.push(" " + S.err.when); }
+      else out.push(" NENHUM ERRO DESDE QUE LIGOU");
+      out.push(sel(0, "LIMPAR"));
+    }
+    return out;
+  }
+
+  var api = { cmdFor: cmdFor, CONTROLS: CONTROLS, labelOf: labelOf, kindOf: kindOf, PAGES: PAGES, FIELDS: FIELDS, oledLines: oledLines };
   if (typeof window !== "undefined") window.LaserEngine = api;
   if (typeof module !== "undefined") module.exports = api;
 })();

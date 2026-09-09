@@ -62,9 +62,9 @@ kbd { border-bottom-width:2px; }
 /* sala: nunca retangular */
 .room { position:relative; background:#000; overflow:hidden; user-select:none; clip-path:polygon(var(--chamfer-room) 0, calc(100% - var(--chamfer-room)) 0, 100% var(--chamfer-room), 100% calc(100% - var(--chamfer-room)), calc(100% - var(--chamfer-room)) 100%, calc(50% + 120px) 100%, calc(50% + 96px) calc(100% - 26px), calc(50% - 96px) calc(100% - 26px), calc(50% - 120px) 100%, var(--chamfer-room) 100%, 0 calc(100% - var(--chamfer-room)), 0 var(--chamfer-room)); }
 /* Pino fala em balão Win98: a única coisa "de software" na cena, de propósito */
-.bal { position:absolute; width:250px; background:#FFFFE1; color:#000; border:1px solid #000; border-radius:8px; padding:9px 11px 8px; font:12px Tahoma, Verdana, 'Segoe UI', sans-serif; line-height:1.4; box-shadow:2px 2px 0 #000; display:none; cursor:default; z-index:6; transform:translate(-100%, -100%); }
+.bal { position:absolute; width:250px; background:#FFFFE1; color:#000; border:1px solid #000; border-radius:8px; padding:9px 11px 8px; font:12px Tahoma, Verdana, 'Segoe UI', sans-serif; line-height:1.4; box-shadow:2px 2px 0 #000; display:none; cursor:default; z-index:6; transform:translate(-100%, 0); }
 .bal.on { display:block; }
-.bal::after { content:''; position:absolute; right:-11px; bottom:14px; border:6px solid transparent; border-left-color:#000; }
+.bal::after { content:''; position:absolute; right:-11px; top:12px; border:6px solid transparent; border-left-color:#000; }
 .bal b { display:block; margin-bottom:4px; font-weight:700; }
 .bal ul { list-style:none; margin:6px 0 0; padding:6px 0 0; border-top:1px dotted #888; }
 .bal li { padding:3px 4px; cursor:pointer; } .bal li:hover { background:#0A246A; color:#fff; } .bal li small { color:#666; } .bal li:hover small { color:#cfd6ff; }

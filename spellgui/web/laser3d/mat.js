@@ -37,8 +37,8 @@ window.MAT = function (THREE, R) {
     floor: M(0x040507, { metalness: 0, roughness: .8, roughnessMap: grainR, envMapIntensity: .15 }),
     wall: M(0x0e1014, { metalness: 0, roughness: .95, roughnessMap: grainR, envMapIntensity: .3 }),
     caseM: M(0x040405, { roughness: .92, metalness: 0, roughnessMap: grainR, envMapIntensity: .12 }),
-    glassDark: new THREE.MeshPhysicalMaterial({ color: 0x0a0c10, metalness: 0, roughness: .05, transmission: .4, thickness: .003, clearcoat: 1, clearcoatRoughness: .03, transparent: true, opacity: .9 }),
-    dichro: function (tint) { return new THREE.MeshPhysicalMaterial({ color: tint, metalness: 0, roughness: .02, transmission: .82, thickness: .002, clearcoat: 1, clearcoatRoughness: .01, reflectivity: 1, transparent: true, opacity: .75, side: THREE.DoubleSide }); },
+    glassDark: new THREE.MeshPhysicalMaterial({ color: 0x0a0c10, metalness: 0, roughness: .05, transmission: .4, clearcoat: 1, clearcoatRoughness: .03, transparent: true, opacity: .9 }),
+    dichro: function (tint) { return new THREE.MeshPhysicalMaterial({ color: tint, metalness: 0, roughness: .02, transmission: .82, clearcoat: 1, clearcoatRoughness: .01, reflectivity: 1, transparent: true, opacity: .75, side: THREE.DoubleSide }); },
     mirror: M(0xf4f6f8, { metalness: 1, roughness: .02, side: THREE.DoubleSide }),
     led: function (c) { return new THREE.MeshBasicMaterial({ color: c }); } };
   // caixa com aresta arredondada (chapa dobrada tem raio) e chapa com furo redondo (aro da ventoinha)
