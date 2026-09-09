@@ -166,7 +166,7 @@ mod sig {
 mod sig {
     use std::sync::atomic::Ordering;
     unsafe extern "C" {
-        fn signal(sig: i32, h: usize) -> usize;
+        fn signal(sig: i32, h: extern "C" fn(i32)) -> usize;
     }
     extern "C" fn on_sigint(_s: i32) {
         super::INT.store(true, Ordering::SeqCst);
