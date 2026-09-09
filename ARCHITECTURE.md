@@ -1,4 +1,4 @@
-# Spellcaster — arquitetura (protótipo Python F0–F6; spellcore Rust R0, R1, R4)
+# Spellcaster — arquitetura (protótipo Python F0–F6; spellcore Rust R0, R1, R3, R4)
 
 ## Árvore
 
@@ -144,7 +144,7 @@ Todas as saídas expõem `send(universe: int, data: bytes)` e `close()`.
 | F5 MCP | `mcp/server.py` gera tools de `registry.schema()`; resources: show, patch, rede, log | registry, `netscan.scan_all` |
 | F6 portátil e Lite | PyInstaller onedir; `spell serve --headless`, `spell tui` (curses); tarball aarch64 | tudo acima sem `pywebview` |
 
-## spellcore (Rust) — estado em R1 + R4
+## spellcore (Rust) — estado em R1 + R3 + R4
 
 Core do produto reescrito em Rust (PRD v1.1). O pacote Python `spellcaster/` continua no repo
 como implementação de referência e gerador dos fixtures de conformidade; não recebe funcionalidade
@@ -159,6 +159,8 @@ spellcore/
   script/        lib.rs (Fx: track `fx` em Rhai), graph.rs (Graph runtime da seção 10 do PRD)
   laser/         frame (otimização + safety), ild, feed (multi-feed), dac/{etherdream,helios,idn}
                  bin/feeds (bench de 4 feeds), benches/laser.rs, tests/conformance.rs + fixtures
+  pixelmap/      lib.rs (Order, Fixture, PixelMap, Frame, Sampling, Mapper, grid), rayon
+                 bin/map_bench (gate de 2 ms), benches/pixelmap.rs, tests/conformance.rs
   cli/           binário `spellcore`: play, net, commands, load, pause, stop, locate, cue_go,
                  transport_state (subcomandos gerados do registry em runtime)
   bench/         Criterion (benches/core.rs, benches/graph.rs) + binários jitter e throughput
@@ -172,8 +174,20 @@ shows/
 ```
 
 Grafo de dependências: `protocols` autocontido; `engine -> protocols`; `script -> engine, rhai`;
-`laser -> protocols` (só o beacon Ether Dream); `cli -> engine, protocols, script`;
-`bench -> engine, protocols, script`. O engine não conhece GUI, MCP, Rhai nem laser.
+`laser -> protocols` (só o beacon Ether Dream); `pixelmap -> rayon, serde` (não depende de
+nenhum crate do workspace); `cli -> engine, protocols, script`; `bench -> engine, protocols,
+script`. O engine não conhece GUI, MCP, Rhai, laser nem pixelmap.
+
+O `pixelmap` (R3) amostra um frame RGB/RGBA em coordenada normalizada `(u, v)` por pixel físico
+e escreve um buffer de 512 canais por universo — o par `(universo, &[u8; 512])` que
+`protocols::Output::send` recebe. `Mapper::new` agrupa as fixtures por universo e aloca os
+buffers uma vez; `render` não aloca e paraleliza por universo com `rayon`. Amostragem nearest
+por default, bilinear opcional. Universo 0, canal 0 e canal acima de 512 são descartados na
+compilação; canal que estoura os 512 no fim (510 + RGBW) é truncado; `u`/`v` fora de `0..1`
+clampam na borda. O `.spell` guarda o mapa no bloco `pixelmaps` (fora de `tracks`, preservado
+pelo `extra` do `Show`), com `{name, source: "media/<id>", fixtures: [{universe, channel, order,
+u, v}]}`; a ligação com o player espera a R2 (mídia), então o crate ainda roda sozinho, sobre um
+`&[u8]` de teste. A versão wgpu do PRD entra quando `map_bench` não fechar os 2 ms.
 
 ### Contratos
 
@@ -235,6 +249,7 @@ cargo build --release --workspace
 cargo run --release -p bench --bin jitter
 cargo run --release -p bench --bin throughput
 cargo run --release -p laser --bin feeds -- --secs 30
+cargo run --release -p pixelmap --bin map_bench
 cargo bench -p bench
 ```
 
@@ -253,4 +268,5 @@ cargo bench -p bench
 | `Timeline::apply` do show inteiro | — | 3,73 µs |
 | Graph de 500 nós por frame | < 0,1 ms | 8,4 µs (2,0 µs sem `math.expr`) |
 | 4 feeds laser × 30 kpps, cpu das threads de feed | < 1 % de um núcleo | 0,83 % em 30 s (GetThreadTimes quantiza em 15,6 ms: rodar ≥ 30 s) |
+| Pixel mapping, 100 000 px a 60 Hz (CPU, rayon) | < 2 ms por frame | 0,105 ms p50, 0,316 ms p99 (bilinear: 0,196 / 0,493) |
 | Binário `spellcore.exe` release | < 20 MB | 2,5 MB (0,95 MB antes do Rhai) |
