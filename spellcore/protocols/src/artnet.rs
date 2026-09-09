@@ -1,4 +1,4 @@
-//! Art-Net 4 (Artistic Licence): ArtDmx out/in, ArtPoll/ArtPollReply, ArtSync.
+//! Art-Net 4 (Artistic Licence): ArtDmx out, ArtPoll/ArtPollReply, ArtSync.
 //!
 //! Universos no Spellcaster sao 1-based (como sACN). Conversao para Art-Net:
 //!     port_address = universe - 1   (15 bits: net[7] | subnet[4] | universe[4])
@@ -8,10 +8,8 @@
 use std::collections::HashMap;
 use std::io;
 use std::net::{Ipv4Addr, SocketAddrV4, ToSocketAddrs, UdpSocket};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
-use std::time::{Duration, Instant};
 
 use socket2::{Domain, Protocol, Socket, Type};
 
@@ -303,139 +301,10 @@ impl Drop for ArtNetOut {
     }
 }
 
-// ------------------------------------------------------------------ ArtNetIn
-
-/// Escuta a porta Art-Net e guarda o ultimo ArtDmx por universo.
-pub struct ArtNetIn {
-    frames: Arc<Mutex<HashMap<u16, Vec<u8>>>>,
-    port: u16,
-    run: Arc<AtomicBool>,
-    th: Option<JoinHandle<()>>,
-}
-
-impl ArtNetIn {
-    pub fn new(universes: &[u16]) -> io::Result<ArtNetIn> {
-        ArtNetIn::with_port(universes, PORT)
-    }
-
-    pub fn with_port(universes: &[u16], port: u16) -> io::Result<ArtNetIn> {
-        let s = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
-        s.set_reuse_address(true)?;
-        s.set_broadcast(true)?;
-        s.bind(&SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, port).into())?;
-        s.set_read_timeout(Some(Duration::from_millis(200)))?;
-        let sock: UdpSocket = s.into();
-        let bound = sock.local_addr()?.port();
-        let want: Vec<u16> = universes.to_vec();
-        let frames = Arc::new(Mutex::new(HashMap::new()));
-        let run = Arc::new(AtomicBool::new(true));
-        let (f, r) = (frames.clone(), run.clone());
-        let th = std::thread::Builder::new()
-            .name("artnet-in".into())
-            .spawn(move || {
-                let mut buf = [0u8; 1024];
-                while r.load(Ordering::Relaxed) {
-                    let n = match sock.recv_from(&mut buf) {
-                        Ok((n, _)) => n,
-                        Err(e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                        Err(e) if e.kind() == io::ErrorKind::TimedOut => continue,
-                        Err(_) => break,
-                    };
-                    if let Some(Packet::Dmx { universe, data, .. }) = parse(&buf[..n]) {
-                        if want.contains(&universe) {
-                            f.lock()
-                                .unwrap_or_else(|e| e.into_inner())
-                                .insert(universe, data);
-                        }
-                    }
-                }
-            })?;
-        Ok(ArtNetIn {
-            frames,
-            port: bound,
-            run,
-            th: Some(th),
-        })
-    }
-
-    /// Porta efetiva (util quando `with_port(.., 0)` pega porta efemera).
-    pub fn port(&self) -> u16 {
-        self.port
-    }
-
-    pub fn frame(&self, universe: u16) -> Option<Vec<u8>> {
-        self.frames
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .get(&universe)
-            .cloned()
-    }
-
-    pub fn close(&mut self) {
-        self.run.store(false, Ordering::Relaxed);
-        if let Some(th) = self.th.take() {
-            let _ = th.join();
-        }
-    }
-}
-
-impl Drop for ArtNetIn {
-    fn drop(&mut self) {
-        self.close();
-    }
-}
-
-// ---------------------------------------------------------------------- poll
-
-/// Envia ArtPoll em broadcast e coleta ArtPollReply por `timeout`.
-pub fn poll(timeout: Duration) -> Vec<Reply> {
-    let s = match Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP)) {
-        Ok(s) => s,
-        Err(_) => return Vec::new(),
-    };
-    let _ = s.set_broadcast(true);
-    let _ = s.set_reuse_address(true);
-    // ponytail: porta efemera se a 6454 estiver ocupada, so respostas unicast chegam
-    // ; igual ao Python. Usar SO_REUSEADDR na 6454 quando precisar de broadcast garantido.
-    if s.bind(&SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, PORT).into())
-        .is_err()
-        && s.bind(&SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0).into())
-            .is_err()
-    {
-        return Vec::new();
-    }
-    let _ = s.set_read_timeout(Some(Duration::from_millis(200)));
-    let sock: UdpSocket = s.into();
-    let pkt = artpoll();
-    for t in BROADCASTS {
-        if let Some(a) = resolve(t, PORT) {
-            let _ = sock.send_to(&pkt, a);
-        }
-    }
-    let mut out: Vec<Reply> = Vec::new();
-    let mut buf = [0u8; 1024];
-    let end = Instant::now() + timeout;
-    while Instant::now() < end {
-        let (n, addr) = match sock.recv_from(&mut buf) {
-            Ok(v) => v,
-            Err(e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-            Err(e) if e.kind() == io::ErrorKind::TimedOut => continue,
-            Err(_) => break,
-        };
-        if let Some(Packet::PollReply(r)) = parse(&buf[..n]) {
-            if !out.iter().any(|o| o.ip == r.ip && o.mac == r.mac) {
-                let mut r = *r;
-                r.from = addr.ip().to_string();
-                out.push(r);
-            }
-        }
-    }
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{Duration, Instant};
 
     const FIXTURE: &str = concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -553,40 +422,6 @@ mod tests {
                 assert_eq!(r.universes, vec![0x13, 0x14]);
             }
             _ => panic!("esperava ArtPollReply"),
-        }
-    }
-
-    #[test]
-    fn loopback_out_in() {
-        // 6454 costuma estar ocupada por outro no na rede: porta efemera
-        let mut rx = match ArtNetIn::with_port(&[1], 0) {
-            Ok(r) => r,
-            Err(e) => return println!("pulado: bind Art-Net falhou: {:?}", e.kind()),
-        };
-        let port = rx.port();
-        let mut tx = match ArtNetOut::with_port(Some(vec!["127.0.0.1".into()]), false, port) {
-            Ok(t) => t,
-            Err(e) => return println!("pulado: socket de saida falhou: {:?}", e.kind()),
-        };
-        let mut ultimo = Vec::new();
-        for f in 1..=3u8 {
-            let frame: [u8; 512] = std::array::from_fn(|i| (i as u8).wrapping_mul(f));
-            tx.send(1, &frame);
-            ultimo = frame.to_vec();
-            std::thread::sleep(Duration::from_millis(30));
-        }
-        for _ in 0..60 {
-            if rx.frame(1).as_ref() == Some(&ultimo) {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(50));
-        }
-        let got = rx.frame(1);
-        tx.close();
-        rx.close();
-        match got {
-            None => println!("pulado: UDP em loopback nao entregou (firewall?)"),
-            Some(g) => assert_eq!(g, ultimo, "ultimo frame recebido byte a byte"),
         }
     }
 

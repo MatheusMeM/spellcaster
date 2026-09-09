@@ -14,7 +14,6 @@ pub struct Command {
     pub name: String,
     pub doc: String,
     pub schema: Value,
-    pub mcp: bool,
     pub f: Box<dyn Fn(Value) -> Result<Value, String> + Send + Sync>,
 }
 
@@ -40,14 +39,11 @@ impl Registry {
         doc: &str,
         f: impl Fn(A) -> Result<Value, String> + Send + Sync + 'static,
     ) {
-        // ponytail: mcp = true para todo comando ; passar a flag quando existir verbo que a GUI
-        // usa mas o MCP nao pode chamar (ex.: shutdown).
         let schema = serde_json::to_value(schemars::schema_for!(A)).unwrap_or(Value::Null);
         self.cmds.push(Command {
             name: name.to_string(),
             doc: doc.to_string(),
             schema,
-            mcp: true,
             f: Box::new(move |v: Value| {
                 let a: A = serde_json::from_value(v).map_err(|e| e.to_string())?;
                 f(a)
@@ -63,7 +59,7 @@ impl Registry {
         Value::Array(
             self.cmds
                 .iter()
-                .map(|c| json!({"name": c.name, "doc": c.doc, "params": c.schema, "mcp": c.mcp}))
+                .map(|c| json!({"name": c.name, "doc": c.doc, "params": c.schema}))
                 .collect(),
         )
     }
@@ -77,14 +73,6 @@ impl Registry {
 
     pub fn iter(&self) -> impl Iterator<Item = &Command> {
         self.cmds.iter()
-    }
-
-    pub fn len(&self) -> usize {
-        self.cmds.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.cmds.is_empty()
     }
 }
 
@@ -178,7 +166,6 @@ mod tests {
         let c = &sc.as_array().unwrap()[0];
         assert_eq!(c["name"], "soma");
         assert_eq!(c["doc"], "Soma a + b.");
-        assert_eq!(c["mcp"], true);
         assert!(c["params"]["properties"]["a"].is_object(), "schema: {}", c["params"]);
         assert_eq!(r.get("soma").unwrap().name, "soma");
         assert_eq!(r.iter().count(), 1);

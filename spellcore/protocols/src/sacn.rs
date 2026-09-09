@@ -1,4 +1,4 @@
-//! sACN (ANSI E1.31): saida multicast por interface + unicast localhost, entrada, discovery.
+//! sACN (ANSI E1.31): saida multicast por interface + unicast localhost, entrada.
 //! Bytes identicos a `spellcaster/protocols/sacn.py` (fixture tests/conformance/sacn_packet.bin).
 
 use std::collections::HashMap;
@@ -7,7 +7,7 @@ use std::net::{Ipv4Addr, SocketAddrV4, UdpSocket};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use socket2::{Domain, Protocol, Socket, Type};
 
@@ -369,67 +369,10 @@ impl Drop for SacnIn {
     }
 }
 
-// ----------------------------------------------------------------- discovery
-
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
-pub struct Source {
-    pub cid: String,
-    pub name: String,
-    pub ip: String,
-    pub universes: Vec<u16>,
-}
-
-fn hex(b: &[u8]) -> String {
-    b.iter().map(|x| format!("{x:02x}")).collect()
-}
-
-/// Escuta o universo de discovery e devolve as fontes (anunciam a cada 10 s).
-pub fn discover(timeout: Duration) -> Vec<Source> {
-    let sock = match listener(&[DISCOVERY_IP]) {
-        Ok(s) => s,
-        Err(_) => return Vec::new(),
-    };
-    let mut found: Vec<Source> = Vec::new();
-    let mut buf = [0u8; 2048];
-    let end = Instant::now() + timeout;
-    while Instant::now() < end {
-        let (n, addr) = match sock.recv_from(&mut buf) {
-            Ok(v) => v,
-            Err(e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-            Err(e) if e.kind() == io::ErrorKind::TimedOut => continue,
-            Err(_) => break,
-        };
-        if let Some(Packet::Discovery {
-            cid,
-            name,
-            universes,
-        }) = parse(&buf[..n])
-        {
-            let id = hex(&cid);
-            match found.iter_mut().find(|s| s.cid == id) {
-                Some(s) => {
-                    for u in universes {
-                        if !s.universes.contains(&u) {
-                            s.universes.push(u);
-                        }
-                    }
-                    s.universes.sort_unstable();
-                }
-                None => found.push(Source {
-                    cid: id,
-                    name,
-                    ip: addr.ip().to_string(),
-                    universes,
-                }),
-            }
-        }
-    }
-    found
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Instant;
 
     const FIXTURE: &str = concat!(
         env!("CARGO_MANIFEST_DIR"),
