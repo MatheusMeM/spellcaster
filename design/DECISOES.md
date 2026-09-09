@@ -92,3 +92,10 @@ Consequências:
 - **Paths declarados sem implementação.** `modules/laser.json` declara `dev/type`, `dev/host`, `dev/pps`, `ilda/fps`, `curve/r|g|b`, `safe/zone`, `safe/armed` e `test/pattern`; `laser_param` não aceita nenhum deles (`dev/*` e `ilda/*` são argumento de `laser_open`/`laser_play`, o resto espera LUT de cor e `optimize` paramétrico). O manifesto é a declaração do app, não do comando: o voto decide se ele só declara o que já roda, ou se declara o alvo e o comando cresce até ele.
 - **`shutter` está dos dois lados.** É `command` no `modules/laser.json` e `path` no `laser_param`. Uma das duas some.
 - Motivo: a convenção está no código (seis linhas no sink da CLI, com comentário `ponytail:`) e funciona para um laser; registrar aqui evita que ela vire contrato por omissão.
+
+## 09/09/2026 · MIDI de entrada (frente `midi`) — o que ficou fora, aguarda voto
+
+- **Chave do evento é `"<status>/<data1>"`** (`144/60` = note on canal 1 nota 60, `176/1` = CC 1), e não o `note:1:60` / `cc:1:7` do protótipo `design/laser/bind.js`: é a chave que o nó `in.midi` do graph já usa (PRD §10) e o canal já vem no status. Quando o `bind.js` virar produto os dois formatos precisam virar um só; o voto decide qual.
+- **Saída MIDI e feedback de superfície (LED, fader motorizado) ficam fora** — aguarda voto. É o que faz o controlador mostrar o estado do show; o `feedback()` do `bind.js` já manda note/CC de volta, então a função existe no protótipo e não no engine.
+- **MTC / MIDI clock e MIDI Show Control ficam fora** — aguarda voto. São o caminho para o Spellcaster receber GO (ou timecode) de uma mesa de som ou de vídeo; é função de produto, não detalhe de implementação.
+- Uma porta MIDI por processo: teclado e surface ao mesmo tempo colidem, porque a chave não diz de qual porta o evento veio. Sai da frente como limite anotado (`// ponytail:` em `spellcore/engine/src/midi.rs`); o voto decide se a porta entra na chave ou se cada superfície vira um módulo.

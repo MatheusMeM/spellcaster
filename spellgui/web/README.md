@@ -11,6 +11,7 @@ o `spellcore serve` (ou qualquer servidor estático) entrega. Cor e tipografia v
 | `face.js` + `face.html` | runtime da Face: `faces/<nome>.face.json` vira grade de widgets em modo kiosk |
 | `canvaskit.js` | pan, zoom, hit-test, marquee, DPR, dirty-flag; compartilhado por timeline e graph |
 | `timeline.js` + `index.html` | timeline em canvas |
+| `midi.js` + `midi.html` | MIDI mapping: portas, abrir/fechar, tabela `tecla -> comando` do `.spell`, LEARN e a última tecla ao vivo. Só cliente dos comandos `midi_*` |
 | `dev/commands.json` | `Registry::schema()` congelado, usado no modo offline |
 | `test/*.test.js` | `node --test spellgui/web/test/*.test.js` |
 

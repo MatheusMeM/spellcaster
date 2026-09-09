@@ -5,6 +5,7 @@ pub mod clock;
 pub mod cues;
 pub mod edit;
 pub mod hook;
+pub mod midi;
 pub mod module;
 pub mod player;
 pub mod registry;

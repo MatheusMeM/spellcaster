@@ -373,6 +373,9 @@ enum McpCmd {
 }
 
 fn main() {
+    // O mapa MIDI chama o registry COMPLETO (com `play_show`, `net` e os `laser_*`), nao so' o
+    // `base()` do engine.
+    engine::midi::builder(registry);
     let r = match Cli::parse().cmd {
         Cmd::Play(a) => play(a),
         Cmd::Net(a) => net(a),

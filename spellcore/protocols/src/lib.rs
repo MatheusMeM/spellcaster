@@ -1,4 +1,5 @@
-//! Protocolos de saida/entrada do Spellcaster: sACN (E1.31), Art-Net 4, OSC 1.0 e varredura de rede.
+//! Protocolos de saida/entrada do Spellcaster: sACN (E1.31), Art-Net 4, OSC 1.0, MIDI de entrada
+//! e varredura de rede.
 //!
 //! Crate autocontido: nao depende de `engine`. A referencia de comportamento e o pacote Python
 //! `spellcaster/protocols/` — os bytes na rede tem que ser identicos (fixtures em tests/conformance).
@@ -7,6 +8,7 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Condvar, Mutex};
 
 pub mod artnet;
+pub mod midi;
 pub mod netscan;
 pub mod osc;
 pub mod sacn;

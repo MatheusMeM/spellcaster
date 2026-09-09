@@ -320,6 +320,10 @@ struct Rt {
 
 impl Rt {
     fn drain(&mut self, s: &Shared, t: f64) {
+        // MIDI: cada evento vira `input {key: "midi:<chave>"}` na fila abaixo (e o comando do
+        // mapa, se houver). Consumido AQUI, onde o `input` ja' e' consumido: a ordem do frame
+        // documentada no cabecalho nao muda.
+        crate::midi::pump();
         {
             let mut q = lock(&s.ctl);
             if q.is_empty() {
@@ -515,6 +519,7 @@ impl Player {
                 .map(|a| a.as_slice())
                 .unwrap_or(&[]),
         );
+        crate::midi::auto(&show); // "midi_port" do .spell: religa a superficie ao subir o show
         let outs = open_outputs(&show)?;
         let osc_out = open_osc(&show)?;
         let osc_port = show

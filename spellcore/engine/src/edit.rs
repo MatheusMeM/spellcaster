@@ -42,7 +42,9 @@ fn com_ro<T>(f: impl FnOnce(&mut String, &mut Show) -> Result<T, String>) -> Res
 }
 
 /// `com_ro` mais o contador: toda edicao bem-sucedida sobe `rev`.
-fn com<T>(f: impl FnOnce(&mut String, &mut Show) -> Result<T, String>) -> Result<T, String> {
+pub(crate) fn com<T>(
+    f: impl FnOnce(&mut String, &mut Show) -> Result<T, String>,
+) -> Result<T, String> {
     let v = com_ro(f)?;
     REV.fetch_add(1, Ordering::Relaxed);
     Ok(v)
