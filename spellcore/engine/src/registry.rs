@@ -80,8 +80,8 @@ impl Registry {
 #[derive(Deserialize, JsonSchema)]
 pub struct LoadArgs {
     /// Caminho do arquivo .spell (o mesmo `file` de show_get, show_save e play_show).
-    // ponytail: `path` era o nome deste argumento e continua aceito por uma rodada (o
-    // `spellcaster/` Python ainda manda assim) ; tirar o alias quando nenhum cliente usar.
+    // ponytail: `path` era o nome deste argumento e continua aceito por uma rodada, por script e
+    // sessao MCP ja' escritos (no repo nao sobrou chamador) ; tirar o alias na rodada 3.
     #[serde(alias = "path")]
     pub file: String,
 }

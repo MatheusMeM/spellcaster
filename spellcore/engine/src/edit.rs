@@ -493,8 +493,8 @@ pub struct TrackAddArgs {
     pub address: u16,
     /// Nome do track (campo `name` do .spell). O argumento `label` e' o nome velho deste
     /// (deprecated, sai na proxima rodada).
-    // ponytail: alias `label` por uma rodada (o `spellcaster/gui/api.py` ainda manda assim)
-    // ; tirar quando nenhum cliente usar.
+    // ponytail: alias `label` por uma rodada, por script e sessao MCP ja' escritos (no repo nao
+    // sobrou chamador) ; tirar na rodada 3.
     #[serde(default, alias = "label")]
     pub name: String,
 }

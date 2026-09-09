@@ -614,8 +614,9 @@ default `v`. "Dispara na GUI" cita a página (`index.html` = TIMELINE, `teatro.h
   `file` em `show_get`, `show_save`, `play_show` e `module_add`. `path` continua aceito por uma
   rodada (`#[serde(alias = "path")]`) e o `doc` do comando avisa que é deprecated; clientes
   atualizados: `spellgui/web/graph.js`, `serve::abre`, `cli/tests/serve.rs`,
-  `engine/tests/patch.rs`. O `spellcaster/` Python não muda (é referência) e continua entrando
-  pelo alias.
+  `engine/tests/patch.rs`. Dentro do repositório não sobrou chamador do nome velho: o alias fica
+  só por script e sessão MCP já escritos, e sai na rodada 3. O `spellcaster/` Python não muda
+  porque tem registry próprio (`spellcaster/core/registry.py`) e nunca chama o do Rust.
 - **`track_add(label)` virou `track_add(name)`.** O campo que ele escreve no `.spell` chama-se
   `name`, e `patch_add` já usava `name` para a mesma ideia. `label` continua aceito por uma
   rodada, pelo mesmo mecanismo; cliente atualizado: `spellgui/web/timeline.js`.
