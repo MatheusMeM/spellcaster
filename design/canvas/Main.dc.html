@@ -1,0 +1,83 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=JetBrains+Mono:wght@400;700&display=swap">
+  <style>
+    body { margin: 0; background: #000000; color: #F7F5EB; font-family: "JetBrains Mono", Consolas, monospace; }
+    a { color: #FFB000; } a:hover { color: #F7F5EB; }
+    .lbl { font-family: "Barlow Condensed", "Arial Narrow", sans-serif; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 500; }
+  </style>
+</helmet>
+<div style="width: 1280px; height: 800px; background: #000000; display: flex; flex-direction: column; padding: 16px; box-sizing: border-box; gap: 8px; position: relative; overflow: hidden;">
+
+  <!-- barra: três zonas, moldura tracejada (herança Feitiçaria) -->
+  <div class="lbl" style="display: flex; justify-content: space-between; align-items: center; border: 1px dashed #F7F5EB; padding: 6px 12px; font-size: 11px; color: #B5B1A9;">
+    <span>FACE operador_medgrupo · VIEW full</span>
+    <span style="color: #F7F5EB;">MED GRUPO RJ — PLENÁRIA · 08/09</span>
+    <span style="display: flex; gap: 12px; align-items: center;">
+      <span style="color: #FF2D1F; display: inline-flex; align-items: center; gap: 6px;"><span style="width: 8px; height: 8px; background: #FF2D1F; box-shadow: 0 0 12px rgba(255,45,31,0.5); display: inline-block;"></span>AO VIVO · sACN U1 U2</span>
+      <span>THEME feiticaria</span>
+    </span>
+  </div>
+
+  <!-- grade 12×8, unidade 48, gap 8 -->
+  <div style="display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: repeat(8, minmax(0, 1fr)); gap: 8px; flex-grow: 1;">
+
+    <!-- GO 4×5 -->
+    <div style="grid-column: 1 / 5; grid-row: 1 / 6; background: #0E0E0E; border: 1px solid #FFB000; box-shadow: 0 0 12px rgba(255,176,0,0.45); display: flex; flex-direction: column; justify-content: space-between; padding: 16px; box-sizing: border-box;">
+      <div class="lbl" style="font-size: 11px; color: #B5B1A9; display: flex; justify-content: space-between;"><span>GO</span><span>Space · MIDI 36 · /go</span></div>
+      <div style="font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 168px; line-height: 0.85; color: #FFB000; letter-spacing: -0.02em;">GO</div>
+      <div style="display: flex; justify-content: space-between; align-items: baseline;">
+        <span class="lbl" style="font-size: 11px; color: #B5B1A9;">PRÓXIMA</span>
+        <span style="font-size: 20px; color: #F7F5EB;">4 · PICO 33.12</span>
+      </div>
+    </div>
+
+    <!-- cue list 8×5 -->
+    <div style="grid-column: 5 / 13; grid-row: 1 / 6; background: #0E0E0E; border: 1px solid #262626; display: flex; flex-direction: column; box-sizing: border-box;">
+      <div class="lbl" style="font-size: 11px; color: #B5B1A9; padding: 8px 12px; border-bottom: 1px solid #262626; display: grid; grid-template-columns: 48px 1fr 120px 96px 80px; gap: 8px;"><span>#</span><span>CUE</span><span>TEMPO</span><span>FADE</span><span>FOLLOW</span></div>
+      <div style="display: flex; flex-direction: column; font-size: 14px; flex-grow: 1;">
+        <div style="display: grid; grid-template-columns: 48px 1fr 120px 96px 80px; gap: 8px; padding: 8px 12px; color: #666361;"><span>0</span><span>Countdown · pré-rolo</span><span>00:00:00:00</span><span>0.0</span><span>—</span></div>
+        <div style="display: grid; grid-template-columns: 48px 1fr 120px 96px 80px; gap: 8px; padding: 8px 12px; color: #666361;"><span>1</span><span>Dígitos · vara amarela</span><span>00:00:02:00</span><span>0.5</span><span>—</span></div>
+        <div style="display: grid; grid-template-columns: 48px 1fr 120px 96px 80px; gap: 8px; padding: 8px 12px; color: #666361;"><span>2</span><span>Flash · strobe branco</span><span>00:00:10:15</span><span>0.0</span><span>auto 0.8</span></div>
+        <div style="display: grid; grid-template-columns: 48px 1fr 120px 96px 80px; gap: 8px; padding: 8px 12px; background: #161616; color: #F7F5EB; border-left: 4px solid #FFB000;"><span style="color: #FFB000;">3</span><span>Cidades · movings por corte</span><span>00:00:13:03</span><span>1.0</span><span>—</span></div>
+        <div style="display: grid; grid-template-columns: 48px 1fr 120px 96px 80px; gap: 8px; padding: 8px 12px; color: #F7F5EB;"><span>4</span><span>Pico · logo, zoom 13→36°</span><span>00:00:33:04</span><span>2.0</span><span>—</span></div>
+        <div style="display: grid; grid-template-columns: 48px 1fr 120px 96px 80px; gap: 8px; padding: 8px 12px; color: #F7F5EB;"><span>5</span><span>Epílogo · cada aparelho sozinho</span><span>00:00:46:24</span><span>0.7</span><span>auto 0.7</span></div>
+      </div>
+      <div style="font-size: 12px; color: #666361; padding: 8px 12px; border-top: 1px solid #262626;">spell cue_go --index 4</div>
+    </div>
+
+    <!-- transporte 4×3 -->
+    <div style="grid-column: 1 / 5; grid-row: 6 / 9; background: #0E0E0E; border: 1px solid #262626; display: flex; flex-direction: column; justify-content: space-between; padding: 12px 16px; box-sizing: border-box;">
+      <div class="lbl" style="font-size: 11px; color: #B5B1A9;">TRANSPORTE</div>
+      <div style="font-size: 44px; font-weight: 700; color: #F7F5EB; letter-spacing: 0.02em; line-height: 1;">00:00:21<span style="color: #FFB000;">:09</span></div>
+      <div style="display: flex; gap: 8px;">
+        <div style="width: 48px; height: 48px; border: 1px solid #FFB000; background: #161616; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#FFB000" stroke-width="1.5"><path d="M5 3 L16 10 L5 17 Z"/></svg></div>
+        <div style="width: 48px; height: 48px; border: 1px solid #262626; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#B5B1A9" stroke-width="1.5"><path d="M6 3 V17 M14 3 V17"/></svg></div>
+        <div style="width: 48px; height: 48px; border: 1px solid #262626; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#B5B1A9" stroke-width="1.5"><rect x="4" y="4" width="12" height="12"/></svg></div>
+        <div style="width: 48px; height: 48px; border: 1px solid #262626; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#B5B1A9" stroke-width="1.5"><path d="M4 8 A6 6 0 0 1 16 8 M16 12 A6 6 0 0 1 4 12 M13 5 L16 8 L13 11 M7 15 L4 12 L7 9"/></svg></div>
+        <div style="flex-grow: 1; height: 48px; border: 1px solid #262626; display: flex; align-items: center; padding: 0 8px; box-sizing: border-box;"><div style="width: 100%; height: 2px; background: #262626; position: relative;"><div style="position: absolute; left: 0; top: 0; height: 2px; width: 45%; background: #FFB000;"></div><div style="position: absolute; left: 45%; top: -5px; width: 2px; height: 12px; background: #F7F5EB;"></div></div></div>
+      </div>
+    </div>
+
+    <!-- universos 8×3 -->
+    <div style="grid-column: 5 / 13; grid-row: 6 / 9; background: #0E0E0E; border: 1px solid #262626; display: flex; flex-direction: column; padding: 12px 16px; box-sizing: border-box; gap: 8px;">
+      <div class="lbl" style="font-size: 11px; color: #B5B1A9; display: flex; justify-content: space-between;"><span>UNIVERSO 1 · 512 CANAIS · 30 Hz</span><span>BSW fundo 300–367 · frente 380–460 · vídeo 400</span></div>
+      <div style="display: flex; gap: 2px; align-items: flex-end; flex-grow: 1; background: #070707; padding: 4px; box-sizing: border-box;">
+        <div style="flex: 1; height: 8%; background: #333;"></div><div style="flex: 1; height: 12%; background: #333;"></div><div style="flex: 1; height: 60%; background: #B5B1A9;"></div><div style="flex: 1; height: 62%; background: #B5B1A9;"></div><div style="flex: 1; height: 100%; background: #FFB000;"></div><div style="flex: 1; height: 100%; background: #FFB000;"></div><div style="flex: 1; height: 100%; background: #FFB000;"></div><div style="flex: 1; height: 100%; background: #FFB000;"></div><div style="flex: 1; height: 6%; background: #333;"></div><div style="flex: 1; height: 40%; background: #B5B1A9;"></div><div style="flex: 1; height: 10%; background: #333;"></div><div style="flex: 1; height: 55%; background: #B5B1A9;"></div><div style="flex: 1; height: 88%; background: #F7F5EB;"></div><div style="flex: 1; height: 86%; background: #F7F5EB;"></div><div style="flex: 1; height: 84%; background: #F7F5EB;"></div><div style="flex: 1; height: 82%; background: #F7F5EB;"></div><div style="flex: 1; height: 5%; background: #333;"></div><div style="flex: 1; height: 5%; background: #333;"></div><div style="flex: 1; height: 30%; background: #B5B1A9;"></div><div style="flex: 1; height: 50%; background: #B5B1A9;"></div><div style="flex: 1; height: 100%; background: #FFB000;"></div><div style="flex: 1; height: 100%; background: #FFB000;"></div><div style="flex: 1; height: 100%; background: #FFB000;"></div><div style="flex: 1; height: 100%; background: #FFB000;"></div><div style="flex: 1; height: 20%; background: #B5B1A9;"></div><div style="flex: 1; height: 12%; background: #333;"></div><div style="flex: 1; height: 70%; background: #F7F5EB;"></div><div style="flex: 1; height: 72%; background: #F7F5EB;"></div><div style="flex: 1; height: 4%; background: #333;"></div><div style="flex: 1; height: 4%; background: #333;"></div><div style="flex: 1; height: 50%; background: #B5B1A9;"></div><div style="flex: 1; height: 100%; background: #FFB000;"></div><div style="flex: 1; height: 40%; background: #A8E05E;"></div><div style="flex: 1; height: 3%; background: #333;"></div><div style="flex: 1; height: 3%; background: #333;"></div><div style="flex: 1; height: 3%; background: #333;"></div><div style="flex: 1; height: 90%; background: #F7F5EB;"></div><div style="flex: 1; height: 92%; background: #F7F5EB;"></div><div style="flex: 1; height: 94%; background: #F7F5EB;"></div><div style="flex: 1; height: 96%; background: #F7F5EB;"></div>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 12px; color: #666361;"><span>1</span><span>128</span><span>256</span><span>384</span><span>512</span></div>
+    </div>
+  </div>
+
+  <div class="lbl" style="font-size: 11px; color: #666361; display: flex; justify-content: space-between;"><span>ESC editor · F11 kiosk · TAB view compact</span><span>spell play_show shows/medgrupo.spell --face operador_medgrupo</span></div>
+</div>
+</x-dc>
+</body>
+</html>

@@ -143,3 +143,75 @@ Todas as saídas expõem `send(universe: int, data: bytes)` e `close()`.
 | F4 GUI | `gui/server.py` (HTTP + WebSocket), `gui/web/`, `gui/window.py` (pywebview) | registry via WebSocket; `netscan.scan_all` para o painel Network |
 | F5 MCP | `mcp/server.py` gera tools de `registry.schema()`; resources: show, patch, rede, log | registry, `netscan.scan_all` |
 | F6 portátil e Lite | PyInstaller onedir; `spell serve --headless`, `spell tui` (curses); tarball aarch64 | tudo acima sem `pywebview` |
+
+## spellcore (Rust)
+
+Core do produto reescrito em Rust (PRD, fase R0). O pacote Python `spellcaster/` continua no repo
+como implementação de referência e gerador dos fixtures de conformidade; não recebe funcionalidade
+nova. O `spellcore` tem que reproduzir byte a byte a saída sACN/Art-Net do `shows/medgrupo.spell`.
+
+```
+spellcore/
+  Cargo.toml     workspace, edition 2021; release: lto "thin", codegen-units 1, panic abort
+  engine/        clock.rs, universe.rs, timeline.rs, show.rs, registry.rs
+  protocols/     lib.rs (trait Output + fila), sacn.rs, artnet.rs, osc.rs, netscan.rs
+  cli/           binário `spellcore`: play, net, commands (gerados do registry em runtime)
+  bench/         Criterion (benches/core.rs) + binários jitter e throughput
+tests/conformance/
+  gen.py         gera os fixtures a partir do pacote Python
+  medgrupo_u1.bin, sacn_packet.bin, artnet_packet.bin
+  capture_sacn.py  valida o binário Rust contra o fixture, ao vivo, em 127.0.0.1
+```
+
+### Contratos
+
+- `Clock::new(fps)`, `Clock::run(FnMut(f64), Option<f64>)`, `stats() -> Stats {p50,p99,max,frames,drift}`.
+  Thread em prioridade alta, `timeBeginPeriod(1)` no Windows, fase fixa (`next += period`).
+  A margem de spin antes do alvo é **calibrada em runtime** pelo overshoot medido do `sleep`
+  (EWMA, limitada a 0,3–2 ms): margem fixa de 1 ms custava ~6 % de um núcleo a 60 Hz.
+- `Universes` 1-based, buffers `[u8; 512]` pré-alocados, `get_or_create` por busca binária.
+- `Timeline::apply(&mut Universes, t)` sem alocação por frame; keys por `partition_point`.
+  Curvas: linear, hold, in, out, inout, bezier — mesmas fórmulas do `timeline/model.py`.
+- `Registry::add::<A: JsonSchema + DeserializeOwned>(nome, doc, fn)`; erro é `String`, sem `anyhow`.
+  CLI, e depois OSC-API, GUI e MCP, são clientes: `Registry::schema()` gera os subcomandos.
+- `trait Output { fn send(&mut self, universe: u16, data: &[u8; 512]); fn close(&mut self); }`.
+  `close(&mut self)` e não `close(self)` do PRD: `Box<dyn Output>` exige object safety.
+- Cada saída tem thread própria e fila de 2 frames **por universo**; ao encher, o frame velho
+  daquele universo é descartado. `send()` nunca bloqueia o engine.
+
+### O show MED GRUPO na R0
+
+O track `pyfx` é Python e usa estado entre frames (histerese de pan dos movings), logo não existe
+em Rust. `tests/conformance/gen.py` assa o resultado frame a frame em `shows/medgrupo_r0.spell`:
+219 tracks `dmx`, 67 161 keyframes com curva `hold` (degrau exato), tempos truncados em 1 µs para
+nunca arredondarem para cima. É o arquivo que o `spellcore play` toca. O equivalente vivo do
+`pyfx` volta na R1 como track `fx` em script.
+
+### Como buildar
+
+A pasta do repo está no Google Drive: `target/` nunca pode nascer dentro dela.
+
+```powershell
+$env:CARGO_TARGET_DIR = "$env:TEMP\spellcore_target"
+cd spellcore
+cargo test --workspace
+cargo build --release
+cargo run --release -p bench --bin jitter
+cargo run --release -p bench --bin throughput
+cargo bench -p bench
+```
+
+`spellcore/.cargo/config.toml` (não versionado) fixa o mesmo caminho para quem esquecer a variável;
+`target/` está no `.gitignore` como segunda barreira. Dependências e justificativa: `spellcore/README.md`.
+
+### Números medidos (desktop x64, Windows 11)
+
+| Métrica | Alvo do PRD | Medido |
+|---|---|---|
+| Jitter entre frames, 60 Hz, p99 | < 1 ms | 0,42 ms (max 0,57 ms) |
+| Drift em 10 s a 60 Hz | 0 frames | 0 |
+| 16 sACN + 16 Art-Net a 60 Hz | < 3 % de um núcleo | 0,78 % |
+| Boot até o primeiro frame DMX | < 2 s | 0,002 s |
+| RSS em repouso | < 60 MB | 5,6 MB |
+| `Timeline::apply` do show inteiro | — | 3,73 µs (33 ms de orçamento a 30 fps) |
+| Binário `spellcore.exe` release | < 20 MB | 0,95 MB |

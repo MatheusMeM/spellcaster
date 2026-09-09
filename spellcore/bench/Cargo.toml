@@ -1,0 +1,23 @@
+[package]
+name = "bench"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "jitter"
+path = "src/bin/jitter.rs"
+
+[[bin]]
+name = "throughput"
+path = "src/bin/throughput.rs"
+
+[dependencies]
+engine = { workspace = true }
+protocols = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "core"
+harness = false

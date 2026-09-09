@@ -1,0 +1,16 @@
+[package]
+name = "cli"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "spellcore"
+path = "src/main.rs"
+
+[dependencies]
+engine = { workspace = true }
+protocols = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+clap = { workspace = true }
+schemars = { workspace = true }

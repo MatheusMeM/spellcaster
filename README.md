@@ -68,6 +68,42 @@ C:\Python313\python.exe -m unittest discover -s tests -v
 - Toda lógica não trivial deixa um teste `unittest` em `tests/`.
 - Simplificação deliberada leva comentário `# ponytail: <limite> ; <quando trocar>`.
 
+## spellcore (Rust)
+
+O core do produto está sendo reescrito em Rust em `spellcore/` (PRD, fase R0: engine, protocolos,
+CLI `net` e bench). O pacote Python acima continua como implementação de referência e gerador dos
+fixtures de conformidade. A pasta do repo está no Google Drive, então o `target/` do cargo fica
+fora dela.
+
+```powershell
+$env:CARGO_TARGET_DIR = "$env:TEMP\spellcore_target"
+cd spellcore
+cargo test --workspace
+cargo build --release
+
+# binario em %TEMP%/spellcore_target/release/spellcore.exe
+spellcore play ..\shows\medgrupo_r0.spell
+spellcore net --timeout 2
+spellcore net --timeout 2 --json
+spellcore commands
+
+# bench (gate do PRD)
+cargo run --release -p bench --bin jitter
+cargo run --release -p bench --bin throughput
+cargo bench -p bench
+```
+
+Fixtures de conformidade (regerar com `C:\Python313\python.exe tests/conformance/gen.py`):
+`tests/conformance/medgrupo_u1.bin`, `sacn_packet.bin`, `artnet_packet.bin` e o show assado
+`shows/medgrupo_r0.spell`. Para validar o binário Rust ao vivo contra o Python:
+
+```
+C:\Python313\python.exe tests/conformance/capture_sacn.py --secs 3
+```
+
+Detalhes de árvore, contratos e números do bench em `ARCHITECTURE.md`; dependências e
+justificativa em `spellcore/README.md`.
+
 ## Documentos
 
 - `ARCHITECTURE.md`: árvore, fluxo de dados, assinaturas públicas e simplificações por protocolo.
