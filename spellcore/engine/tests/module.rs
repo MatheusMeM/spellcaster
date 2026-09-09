@@ -78,45 +78,43 @@ fn registro_de_modulos_vivos() {
     assert!(c("module_add", json!({})).is_err(), "sem file nem data");
 
     // ---- manifesto errado: os erros vem todos juntos e citam o path
-    let ruim = json!({"name": "ruim", "parameters": {
+    let ruim: Module = serde_json::from_value(json!({"name": "ruim", "parameters": {
         "geo/scale": {"type": "float", "min": 2, "max": 1},
         "sem espaco/x": {"type": "int"},
-        "modo": {"type": "enum"}
-    }});
+        "modo": {"type": "enum"},
+        "fora/faixa": {"type": "float", "min": 0, "max": 1, "default": 5},
+        "fora/options": {"type": "enum", "options": ["x", "y"], "default": "z"},
+        "tipo/errado": {"type": "quaternion"}
+    }}))
+    .expect("manifesto ruim");
 
-    let ck = r.call("module_check", json!({ "data": ruim })).unwrap();
-    let e: Vec<String> = serde_json::from_value(ck["errors"].clone()).unwrap();
-    assert_eq!(e.len(), 3, "{:?}", e);
+    let e = module::check(&ruim);
+    assert_eq!(e.len(), 6, "{:?}", e);
+    let tem = |t: &str| e.iter().any(|s| s.contains(t));
+    assert!(tem("parameters/geo/scale") && tem("min 2"), "{:?}", e);
+    assert!(tem("sem espaco/x"), "{:?}", e);
+    assert!(tem("parameters/modo"), "{:?}", e);
+    assert!(tem("parameters/fora/faixa") && tem("default 5"), "{:?}", e);
     assert!(
-        e.iter()
-            .any(|s| s.contains("parameters/geo/scale") && s.contains("min 2")),
+        tem("parameters/fora/options") && tem("nao esta em options"),
         "{:?}",
         e
     );
-    assert!(e.iter().any(|s| s.contains("sem espaco/x")), "{:?}", e);
     assert!(
-        e.iter()
-            .any(|s| s.contains("parameters/modo") && s.contains("enum")),
+        tem("parameters/tipo/errado") && tem("\"quaternion\""),
         "{:?}",
         e
     );
 
-    let err = r.call("module_add", json!({ "data": ruim })).unwrap_err();
+    let err = r
+        .call("module_add", json!({ "data": ruim }))
+        .expect_err("reprovado nao entra");
     assert!(err.contains("parameters/geo/scale"), "{}", err);
     assert_eq!(
         r.call("module_list", json!({})).unwrap(),
         json!([]),
         "reprovado nao entra"
     );
-
-    // manifesto bom passa no mesmo module_check
-    let ck = r
-        .call(
-            "module_check",
-            json!({"file": laser().display().to_string()}),
-        )
-        .unwrap();
-    assert_eq!(ck, json!({"name": "laser", "errors": []}));
 
     // ---- modules_dir: `shows/` e `modules/` sao irmaos no repo: a regra do nivel acima acha a pasta
     assert_eq!(
@@ -133,11 +131,8 @@ fn registro_de_modulos_vivos() {
         d.join("modules")
     );
 
-    // com show aberto, o comando resolve pela pasta do show
+    // com show aberto, `file` sem extensao resolve pela pasta do show
     r.call("show_get", json!({ "file": SPELL })).unwrap();
-    let dir = r.call("modules_dir", json!({})).unwrap();
-    assert!(dir.as_str().unwrap().ends_with("modules"), "{}", dir);
-    // e' por essa pasta que `file` sem extensao resolve
     assert_eq!(
         r.call("module_add", json!({"file": "laser"})).unwrap()["name"],
         json!("laser")

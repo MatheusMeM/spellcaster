@@ -32,7 +32,7 @@
     "stat/clipped": { "type": "int" }
   },
   "commands": {
-    "play": { "context": "action", "args": { "file": "string" } },
+    "play": { "context": "action" },
     "stop": { "context": "action" },
     "shutter": { "context": "both" },
     "arm": { "context": "action" },

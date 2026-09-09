@@ -8,7 +8,7 @@
 //! { "name": "laser", "type": "laser", "version": "0.1.0",
 //!   "parameters": { "geo/scale": { "type": "float", "default": 1, "min": 0, "max": 4 } },
 //!   "values":     { "stat/fps":  { "type": "float" } },
-//!   "commands":   { "play": { "context": "action", "args": { "file": "string" } } } }
+//!   "commands":   { "play": { "context": "action" } } }
 //! ```
 
 use crate::registry::{lock, NoArgs, Registry, OPEN};
@@ -19,33 +19,17 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-/// Tipo do parametro; e' o que decide o widget (regra 1) e se ele dispara, liga ou vale
-/// (regra 3): `trigger` dispara, `bool` liga, o resto vale.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Type {
-    Float,
-    Int,
-    Bool,
-    Trigger,
-    Color,
-    String,
-    Enum,
-}
+/// Tipos de parametro aceitos: e' o que decide o widget (regra 1) e se ele dispara, liga ou
+/// vale (regra 3): `trigger` dispara, `bool` liga, o resto vale.
+const TIPOS: [&str; 7] = ["float", "int", "bool", "trigger", "color", "string", "enum"];
 
 /// Contexto do comando (o `CommandContext` do Chataigne): so' disparo, so' valor, ou os dois.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Context {
-    Action,
-    Mapping,
-    Both,
-}
+const CONTEXTOS: [&str; 3] = ["action", "mapping", "both"];
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Param {
     #[serde(rename = "type")]
-    pub r#type: Type,
+    pub r#type: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default: Option<Value>,
     /// Faixa util do slider, separada do clamp fisico `min`/`max` (regra 1).
@@ -62,13 +46,10 @@ pub struct Param {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Cmd {
-    pub context: Context,
-    /// Argumentos do comando, no formato livre do app.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub args: Option<Value>,
+    pub context: String,
 }
 
-// ponytail: campos alheios do manifesto do Chataigne (`hasInput`, `dependency`, `label`, `unit`)
+// ponytail: campos alheios do manifesto do Chataigne (`hasInput`, `dependency`, `label`, `unit`, `args`)
 // sao ignorados na leitura e nao voltam na gravacao ; entram quando algum cliente usar.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Module {
@@ -118,11 +99,17 @@ pub fn check(m: &Module) -> Vec<String> {
             param(grupo, path, p, &mut e);
         }
     }
-    for name in m.commands.keys() {
+    for (name, c) in &m.commands {
         if !endereco_ok(name) {
             e.push(format!(
                 "commands/{}: endereco precisa ser a/b, sem espaco",
                 name
+            ));
+        }
+        if !CONTEXTOS.contains(&c.context.as_str()) {
+            e.push(format!(
+                "commands/{}: context {:?} nao e' um de {:?}",
+                name, c.context, CONTEXTOS
             ));
         }
     }
@@ -149,17 +136,20 @@ fn param(grupo: &str, path: &str, p: &Param, e: &mut Vec<String>) {
             e.push(em(format!("default {} fora de min/max", d)));
         }
     }
-    match (p.r#type, &p.options) {
-        (Type::Enum, None) => e.push(em("type enum sem options".into())),
-        (Type::Enum, Some(o)) if o.is_empty() => e.push(em("options vazio".into())),
-        (Type::Enum, Some(o)) => {
+    if !TIPOS.contains(&p.r#type.as_str()) {
+        e.push(em(format!("type {:?} nao e' um de {:?}", p.r#type, TIPOS)));
+    }
+    match (p.r#type == "enum", &p.options) {
+        (true, None) => e.push(em("type enum sem options".into())),
+        (true, Some(o)) if o.is_empty() => e.push(em("options vazio".into())),
+        (true, Some(o)) => {
             if let Some(d) = &p.default {
                 if !o.contains(d) {
                     e.push(em(format!("default {} nao esta em options", d)));
                 }
             }
         }
-        (_, Some(_)) => e.push(em("options so' vale com type enum".into())),
+        (false, Some(_)) => e.push(em("options so' vale com type enum".into())),
         _ => {}
     }
 }
@@ -250,88 +240,5 @@ pub fn register(r: &mut Registry) {
             None => Err(format!("modulo {:?} nao esta carregado", a.name)),
         },
     );
-    r.add::<NoArgs>(
-        "modules_dir",
-        "Pasta modules/ que vale para o show aberto.",
-        |_| {
-            let spell = lock(&OPEN)
-                .as_ref()
-                .map(|(p, _)| p.clone())
-                .unwrap_or_default();
-            Ok(json!(modules_dir(&spell).display().to_string()))
-        },
-    );
-    r.add::<ModuleArgs>(
-        "module_check",
-        "Le um manifesto sem carregar e devolve o nome e a lista de erros (vazia = passou).",
-        |a| {
-            let m = manifesto(&a)?;
-            Ok(json!({"name": m.name, "errors": check(&m)}))
-        },
-    );
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn p(j: Value) -> Param {
-        serde_json::from_value(j).expect("param")
-    }
-
-    #[test]
-    fn endereco_e_faixa() {
-        assert!(endereco_ok("geo/scale"));
-        assert!(endereco_ok("play"));
-        assert!(!endereco_ok("geo /scale"));
-        assert!(!endereco_ok("geo//scale"));
-        assert!(!endereco_ok("/scale"));
-        assert!(!endereco_ok(""));
-
-        let mut e = Vec::new();
-        param(
-            "parameters",
-            "a/b",
-            &p(json!({"type": "float", "min": 2, "max": 1})),
-            &mut e,
-        );
-        assert_eq!(e.len(), 1, "{:?}", e);
-        assert!(e[0].contains("parameters/a/b"), "{}", e[0]);
-
-        e.clear();
-        param(
-            "parameters",
-            "a/b",
-            &p(json!({"type": "float", "min": 0, "max": 1, "default": 5})),
-            &mut e,
-        );
-        assert!(e[0].contains("default 5"), "{}", e[0]);
-
-        e.clear();
-        param(
-            "parameters",
-            "a/b",
-            &p(json!({"type": "enum", "default": "x"})),
-            &mut e,
-        );
-        assert!(e[0].contains("enum sem options"), "{}", e[0]);
-
-        e.clear();
-        param(
-            "parameters",
-            "a/b",
-            &p(json!({"type": "enum", "options": ["x", "y"], "default": "z"})),
-            &mut e,
-        );
-        assert!(e[0].contains("options"), "{}", e[0]);
-
-        e.clear();
-        param(
-            "parameters",
-            "a/b",
-            &p(json!({"type": "enum", "options": ["x"], "default": "x"})),
-            &mut e,
-        );
-        assert!(e.is_empty(), "{:?}", e);
-    }
-}
