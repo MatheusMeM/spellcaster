@@ -398,6 +398,79 @@ fn files(a: FilesArgs) -> Result<Value, String> {
     Ok(json!({"dir": dir, "files": out}))
 }
 
+// ----------------------------------------------------------------- clip_frame
+
+#[derive(Deserialize, JsonSchema)]
+#[schemars(crate = "engine::schemars")]
+struct ClipFrameArgs {
+    /// Caminho do .ild, ou o nome que o track usa (resolve na pasta do show aberto).
+    clip: String,
+    /// Tempo em segundos; com `fps` escolhe o quadro. Ignorado quando vem `index`.
+    #[serde(default)]
+    t: f64,
+    /// Quadro pedido direto; sem ele, o quadro de `t`.
+    #[serde(default)]
+    index: Option<usize>,
+    /// Quadros por segundo do track (o .ild nao carrega taxa).
+    #[serde(default = "def_fps")]
+    fps: f64,
+}
+
+/// Nome que o track usa contra a pasta do .spell aberto, igual ao `_load_clip` do Python. Caminho
+/// que ja' existe passa direto.
+fn caminho(clip: &str) -> std::path::PathBuf {
+    let p = Path::new(clip);
+    if p.exists() {
+        return p.to_path_buf();
+    }
+    let base = engine::registry::open_path();
+    match Path::new(&base).parent() {
+        Some(d) if !base.is_empty() => d.join(clip),
+        _ => p.to_path_buf(),
+    }
+}
+
+/// Ultimo .ild lido. O previz pede um quadro por vez e o mesmo arquivo toca o show inteiro.
+// ponytail: cache de um arquivo so', sem olhar mtime ; virar mapa com mtime quando dois clips
+// tocarem juntos ou quando o previz precisar ver o .ild trocado em disco sem reabrir o show.
+static CLIP: Mutex<Option<(std::path::PathBuf, Arc<Vec<laser::Frame>>)>> = Mutex::new(None);
+
+fn quadros(p: &Path) -> Result<Arc<Vec<laser::Frame>>, String> {
+    let mut g = lock(&CLIP);
+    if let Some((q, fs)) = g.as_ref() {
+        if q == p {
+            return Ok(fs.clone());
+        }
+    }
+    let fs = Arc::new(ild::read(p)?);
+    *g = Some((p.to_path_buf(), fs.clone()));
+    Ok(fs)
+}
+
+fn clip_frame(a: ClipFrameArgs) -> Result<Value, String> {
+    let p = caminho(&a.clip);
+    let fs = quadros(&p)?;
+    if fs.is_empty() {
+        return Err(format!("{}: nenhum frame", p.display()));
+    }
+    // Mesma conta do player (`spellcaster/player/player.py::laser_frame`): o clipe repete.
+    let i = match a.index {
+        Some(i) => i % fs.len(),
+        None => ((a.t * a.fps.clamp(1.0, 240.0)).floor().max(0.0) as usize) % fs.len(),
+    };
+    let f = &fs[i];
+    let n = |v: i16| v as f64 / laser::frame::LIM as f64;
+    let pts: Vec<Value> = f
+        .points
+        .iter()
+        .map(|q| json!([n(q.x), n(q.y), q.r, q.g, q.b, u8::from(q.blank)]))
+        .collect();
+    Ok(
+        json!({"clip": p.to_string_lossy(), "index": i, "frames": fs.len(),
+              "name": f.name, "points": pts}),
+    )
+}
+
 // -------------------------------------------------------------------- registro
 
 pub fn register(r: &mut Registry) {
@@ -436,5 +509,10 @@ pub fn register(r: &mut Registry) {
         "laser_files",
         "Lista os .ild de um diretorio (vazio = shows/).",
         files,
+    );
+    r.add::<ClipFrameArgs>(
+        "clip_frame",
+        "Um quadro do .ild para desenhar: escolhe por `index` ou por `t` a `fps`, e devolve os pontos [x, y, r, g, b, blank] com x e y normalizados em -1..1.",
+        clip_frame,
     );
 }

@@ -246,3 +246,61 @@ fn ilda_player_do_scan_ao_close() {
 
     std::fs::remove_file(&ild).ok();
 }
+
+// ------------------------------------------------------- clip_frame (previz)
+
+/// O quadro que o viewer da timeline desenha: escolha por `index` e por `t` a `fps`, e os pontos
+/// ja' normalizados em -1..1. Um .ild de tres quadros, cada um com o ponto num canto diferente.
+#[test]
+fn clip_frame_escolhe_o_quadro_e_normaliza() {
+    let dir = std::env::temp_dir().join("spellcore_clipframe_test");
+    std::fs::create_dir_all(&dir).expect("dir do teste");
+    let ild = dir.join("tres.ild");
+    let frames: Vec<Frame> = (0..3)
+        .map(|i| {
+            Frame::new(
+                vec![Point::new(32767.0, -32767.0, 255, 128, 0, i == 2)],
+                &format!("f{}", i),
+            )
+        })
+        .collect();
+    ild::write(&ild, &frames, 5, "teste", "spell", None).expect("gravar .ild");
+    let arquivo = ild.to_string_lossy().to_string();
+
+    let mut m = Mcp::start();
+
+    // index direto, e o clipe repete (index 4 de 3 quadros = 1)
+    let a = m.cmd("clip_frame", json!({"clip": arquivo, "index": 4}));
+    assert_eq!(a["index"], json!(1));
+    assert_eq!(a["frames"], json!(3));
+    assert_eq!(a["name"], json!("f1"));
+
+    // t a fps: floor(t * fps) % quadros, a conta do player
+    for (t, fps, i) in [
+        (0.0, 30.0, 0),
+        (0.05, 30.0, 1),
+        (0.07, 30.0, 2),
+        (0.1, 30.0, 0),
+        (0.3, 10.0, 0),
+        (0.5, 10.0, 2),
+    ] {
+        let v = m.cmd("clip_frame", json!({"clip": arquivo, "t": t, "fps": fps}));
+        assert_eq!(v["index"], json!(i), "t={} fps={}", t, fps);
+    }
+
+    // ponto [x, y, r, g, b, blank] com x e y em -1..1
+    let p = &m.cmd("clip_frame", json!({"clip": arquivo, "index": 2}))["points"][0];
+    assert_eq!(p[0], json!(1.0));
+    assert_eq!(p[1], json!(-1.0));
+    assert_eq!(
+        (p[2].as_u64(), p[3].as_u64(), p[4].as_u64()),
+        (Some(255), Some(128), Some(0))
+    );
+    assert_eq!(p[5], json!(1), "blank do terceiro quadro");
+
+    assert!(m
+        .erro("clip_frame", json!({"clip": "nao_existe.ild"}))
+        .contains("nao_existe.ild"));
+
+    std::fs::remove_file(&ild).ok();
+}

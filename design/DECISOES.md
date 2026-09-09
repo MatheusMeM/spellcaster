@@ -99,3 +99,13 @@ Consequências:
 - **O conflito.** O PRD §10 e `spellgui/web/README.md` descrevem a Face como kiosk: sem chrome, sem nada editável, alvo de toque. Uma barra com o nome do show num campo de texto é chrome, e é editável.
 - **O que o voto decide:** a barra some da Face (e o operador volta pelo `Shift+1`, que continua valendo), ou some só no modo `performance` (e fica no `editor`), ou fica como está.
 - Motivo: é decisão de produto, não de implementação — as três saídas custam a mesma linha de código.
+
+## 09/09/2026 · x/y de fixture no patch — aguarda voto
+
+- O previz da timeline (`spellgui/web/viewer.js`) desenha a planta do patch, e o patch não tem
+  onde a fixture está: `patch_add` grava `{name, profile, universe, address}` e nada mais. Enquanto
+  isso, a planta é uma grade em ordem de endereço — lê o rig, não a sala.
+- **O que o voto decide:** se a entrada do patch ganha `x`/`y` (planta em metros, com o palco na
+  origem) e se eles entram no `.spell` ou num arquivo de planta ao lado dele.
+- Não implementado e não removido até o voto: a grade por endereço fica, e vira posição real no dia
+  em que o patch souber dizer onde a fixture está.

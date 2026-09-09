@@ -31,7 +31,7 @@ const EASE = [
 ];
 const STEPS = [0.04, 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1800];
 const LANE_PARAMS = ["x", "y", "scale", "rot", "color"];
-const MONH = 56;                                   // altura do monitor de 512 barras
+const MONH = 120;                                  // altura fixa da faixa do previz (viewer.js)
 
 const TL = {
   show: null, lanes: [], k: null, clip: null, snaps: null,
@@ -49,6 +49,9 @@ const TL = {
   outT() { return +((this.show && this.show.out) || this.dur()); },
 };
 window.TL = TL;
+// Ganchos do previz (viewer.js): a curva de um keyframe e o barramento, sem duplicar nenhum dos dois.
+TL.ease = name => EASE[Math.max(0, CURVES.indexOf(name || "linear"))];
+TL.call = (cmd, args) => BUS.call(cmd, args);
 
 const clamp = CK.clamp;
 const pad2 = n => (n < 10 ? "0" : "") + n;
@@ -735,27 +738,9 @@ function draw(k) {
     c.beginPath(); c.moveTo(xp - 6, 0); c.lineTo(xp + 6, 0); c.lineTo(xp, 10); c.fill();
   }
 
-  // ---- monitor: 512 barras do ultimo frame binario do universo da lane focada (Alt+M) ----
+  // ---- previz: dmx + quadro ILDA + planta do patch no playhead (Alt+M) ----
   // ponytail: faixa sobreposta no rodape, sem painel proprio ; virar painel quando a GUI tiver layout.
-  if (TL.mon) {
-    const mh = MONH, y0 = H - mh, sel = TL.lanes[TL.cur];
-    const u = sel ? +(sel.spec.universe || 1) : 1, d = TL.dmx.get(u);
-    c.fillStyle = col.panel;
-    c.fillRect(0, y0, W, mh);
-    c.strokeStyle = col.line; c.lineWidth = 1;
-    c.beginPath(); c.moveTo(0, y0 + 0.5); c.lineTo(W, y0 + 0.5); c.stroke();
-    if (d) {
-      const bw = (W - 12) / 512, ph = mh - 18;
-      c.fillStyle = col.accent;
-      for (let i = 0; i < 512; i++) {
-        const v = d[i];
-        if (v) c.fillRect(6 + i * bw, y0 + mh - 4 - v / 255 * ph, Math.max(1, bw - 0.4), v / 255 * ph);
-      }
-    }
-    c.fillStyle = col.fg3;
-    c.font = "10px " + col.mono;
-    c.fillText("u" + u + (d ? "" : "  sem frame"), 6, y0 + 8);
-  }
+  if (TL.mon && window.VW) window.VW.draw(c, { x: 0, y: H - MONH, w: W, h: MONH }, TL.t);
 
   // ---- marquee ----
   const r = k.rect();

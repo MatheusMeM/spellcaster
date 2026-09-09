@@ -1018,5 +1018,45 @@
       "title": "FilesArgs",
       "type": "object"
     }
+  },
+  {
+    "doc": "Um quadro do .ild para desenhar: escolhe por `index` ou por `t` a `fps`, e devolve os pontos [x, y, r, g, b, blank] com x e y normalizados em -1..1.",
+    "name": "clip_frame",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "clip": {
+          "description": "Caminho do .ild, ou o nome que o track usa (resolve na pasta do show aberto).",
+          "type": "string"
+        },
+        "fps": {
+          "default": 30.0,
+          "description": "Quadros por segundo do track (o .ild nao carrega taxa).",
+          "format": "double",
+          "type": "number"
+        },
+        "index": {
+          "default": null,
+          "description": "Quadro pedido direto; sem ele, o quadro de `t`.",
+          "format": "uint",
+          "minimum": 0.0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "t": {
+          "default": 0.0,
+          "description": "Tempo em segundos; com `fps` escolhe o quadro. Ignorado quando vem `index`.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "clip"
+      ],
+      "title": "ClipFrameArgs",
+      "type": "object"
+    }
   }
 ]
