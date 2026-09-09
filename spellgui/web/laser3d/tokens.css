@@ -1,0 +1,85 @@
+/* Spellcaster LASER · sistema de design da ferramenta de laser e ILDA.
+   Um material (alumínio anodizado + feixe em névoa), um acento (verde do feixe = ativo/LIVE),
+   dois semáforos (âmbar = aviso, vermelho = perigo/desarmado). Tudo o que não é o aparelho é opaco e chanfrado.
+   As duas fontes moram em `../vendor/fonts/`: o programa roda em evento, sem rede. */
+@font-face { font-family:"Michroma"; font-style:normal; font-weight:400; font-display:swap; src:url(../vendor/fonts/michroma-latin.woff2) format("woff2"); }
+@font-face { font-family:"Share Tech Mono"; font-style:normal; font-weight:400; font-display:swap; src:url(../vendor/fonts/share-tech-mono-latin.woff2) format("woff2"); }
+:root {
+  --bg:#050608; --panel:#07090C; --fg:#E6EBEF; --dim:#7C8791; --line:#1A2026; --line-2:#2A333C;
+  --las:#38FF5C; --amb:#FFB000; --red:#FF2A1A; --oled:#9FF5D0; --blue:#3A6BFF;
+  --font-disp:"Michroma", system-ui, sans-serif; --font-mono:"Share Tech Mono", "JetBrains Mono", Consolas, monospace;
+  --fs-0:10px; --fs-1:11px; --fs-2:12px; --fs-3:13px; --fs-4:15px; --fs-5:18px; --fs-6:34px;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s6:24px; --s8:32px;
+  --chamfer:14px; --chamfer-room:30px;
+  --glow:0 0 12px rgba(56,255,92,.4); --glow-on:0 0 18px rgba(56,255,92,.6); --glow-red:0 0 10px rgba(255,42,26,.35);
+  --t-fast:120ms; --t-ui:220ms; --t-cam:700ms;
+  --pino-on:var(--las);
+}
+body { margin:0; background:var(--bg); color:var(--fg); font-family:var(--font-mono); }
+/* tipografia */
+.eyebrow { font-size:var(--fs-1); letter-spacing:.18em; text-transform:uppercase; color:var(--dim); }
+h1 { font-family:var(--font-disp); font-size:var(--fs-6); letter-spacing:.02em; margin:10px 0 12px; text-wrap:balance; }
+h2 { font-family:var(--font-disp); font-size:var(--fs-4); letter-spacing:.06em; margin:0 0 10px; }
+h2 span { color:var(--las); margin-right:12px; }
+p { max-width:70ch; line-height:1.6; font-size:var(--fs-4); color:#C6CDD3; }
+code, kbd { background:#0E1216; padding:1px 5px; border:1px solid var(--line); font-size:var(--fs-3); font-family:var(--font-mono); }
+kbd { border-bottom-width:2px; }
+/* HUD: texto sobre a cena, sempre com brilho do próprio material */
+.hud { position:absolute; pointer-events:none; text-shadow:0 0 8px currentColor; font-size:var(--fs-2); color:var(--las); }
+.hud.title { font-family:var(--font-disp); font-size:var(--fs-5); color:var(--fg); }
+.hud.cli { color:var(--amb); opacity:.85; }
+.hud.warn { font-size:var(--fs-0); color:var(--amb); }
+.hud.danger { color:var(--red); }
+/* botão laser: contorno do acento, preenchimento só quando ativo */
+.lb { background:rgba(0,0,0,.45); border:1px solid var(--las); color:var(--las); font-family:var(--font-mono); font-size:var(--fs-2); letter-spacing:.06em; padding:7px 12px; cursor:pointer; box-shadow:var(--glow), inset 0 0 8px rgba(56,255,92,.08); transition:box-shadow var(--t-fast), background var(--t-fast); }
+.lb.on { background:rgba(56,255,92,.18); box-shadow:var(--glow-on); }
+.lb.red { border-color:var(--red); color:var(--red); box-shadow:var(--glow-red); }
+.lb.red.on { background:rgba(255,42,26,.16); }
+.lb.amb { border-color:var(--amb); color:var(--amb); box-shadow:0 0 8px rgba(255,176,0,.3); }
+.lb:disabled { opacity:.35; cursor:not-allowed; box-shadow:none; }
+.lb:focus-visible { outline:2px solid #fff; outline-offset:2px; }
+.lb small { opacity:.6; margin-left:6px; }
+/* painel: opaco, chanfrado, uma coluna de linhas rótulo · controle · valor */
+.panel { position:absolute; background:var(--panel); border:1px solid var(--las); box-shadow:0 0 18px rgba(56,255,92,.35); padding:14px 16px 12px; z-index:5; clip-path:polygon(var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%, 0 var(--chamfer)); }
+.panel h3 { margin:0 0 2px; font-family:var(--font-disp); font-size:var(--fs-3); color:var(--fg); letter-spacing:.04em; padding-right:20px; }
+.panel .sub { font-size:var(--fs-1); color:var(--dim); margin-bottom:10px; }
+.panel .x { position:absolute; right:12px; top:10px; color:var(--las); cursor:pointer; font-size:14px; }
+.panel .row { display:grid; grid-template-columns:96px 1fr 58px; align-items:center; gap:8px; font-size:var(--fs-2); margin:6px 0; }
+.panel .row .v { text-align:right; color:var(--las); font-variant-numeric:tabular-nums; }
+.panel input[type=range] { width:100%; accent-color:var(--las); background:transparent; }
+.panel .btns { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.panel .btns .lb { padding:5px 10px; font-size:var(--fs-1); }
+.panel pre { margin:0; font-size:var(--fs-2); line-height:1.7; color:var(--las); white-space:pre-wrap; font-family:var(--font-mono); }
+.panel pre b { color:var(--fg); font-weight:400; }
+.panel table { width:100%; border-collapse:collapse; font-size:var(--fs-1); }
+.panel td { padding:3px 4px; border-bottom:1px solid var(--line); vertical-align:middle; }
+.panel td.k { color:var(--fg); } .panel td.b { color:var(--dim); white-space:nowrap; }
+.panel td .lb { padding:2px 6px; font-size:var(--fs-0); }
+.panel td .lb.learn { border-color:var(--amb); color:var(--amb); animation:pulse 1s infinite; }
+@keyframes pulse { 50% { opacity:.4; } }
+/* tooltip: fundo do acento, texto preto, sem borda */
+.tip { position:absolute; padding:4px 8px; font-size:var(--fs-1); color:#000; background:var(--las); pointer-events:none; display:none; z-index:6; white-space:nowrap; }
+/* sala: nunca retangular */
+.room { position:relative; background:#000; overflow:hidden; user-select:none; clip-path:polygon(var(--chamfer-room) 0, calc(100% - var(--chamfer-room)) 0, 100% var(--chamfer-room), 100% calc(100% - var(--chamfer-room)), calc(100% - var(--chamfer-room)) 100%, calc(50% + 120px) 100%, calc(50% + 96px) calc(100% - 26px), calc(50% - 96px) calc(100% - 26px), calc(50% - 120px) 100%, var(--chamfer-room) 100%, 0 calc(100% - var(--chamfer-room)), 0 var(--chamfer-room)); }
+/* Pino fala em balão Win98: a única coisa "de software" na cena, de propósito */
+.bal { position:absolute; width:250px; background:#FFFFE1; color:#000; border:1px solid #000; border-radius:8px; padding:9px 11px 8px; font:12px Tahoma, Verdana, 'Segoe UI', sans-serif; line-height:1.4; box-shadow:2px 2px 0 #000; display:none; cursor:default; z-index:6; transform:translate(-100%, -100%); }
+.bal.on { display:block; }
+.bal::after { content:''; position:absolute; right:-11px; bottom:14px; border:6px solid transparent; border-left-color:#000; }
+.bal b { display:block; margin-bottom:4px; font-weight:700; }
+.bal ul { list-style:none; margin:6px 0 0; padding:6px 0 0; border-top:1px dotted #888; }
+.bal li { padding:3px 4px; cursor:pointer; } .bal li:hover { background:#0A246A; color:#fff; } .bal li small { color:#666; } .bal li:hover small { color:#cfd6ff; }
+.bal .x { position:absolute; right:7px; top:4px; font-weight:bold; cursor:pointer; }
+.bal .hint { color:#555; font-size:11px; margin-top:5px; }
+/* voto / documento */
+.doc { max-width:1180px; margin:0 auto; padding:28px 24px 80px; }
+.keys { display:flex; flex-wrap:wrap; gap:6px 20px; font-size:var(--fs-2); color:var(--dim); margin:14px 0 12px; }
+.keys b { color:var(--fg); font-weight:400; }
+section { margin-top:40px; border-top:1px solid var(--line); padding-top:18px; }
+ul.l { padding-left:18px; color:#C6CDD3; line-height:1.6; font-size:14px; max-width:78ch; }
+.q { margin:12px 0; } .q .eyebrow { display:block; margin-bottom:6px; }
+.opts { display:flex; flex-wrap:wrap; gap:6px; }
+.opts button { background:none; border:1px solid var(--line-2); color:var(--fg); font-family:var(--font-mono); font-size:var(--fs-2); letter-spacing:.06em; padding:7px 11px; cursor:pointer; }
+.opts button.on { border-color:var(--las); color:var(--las); box-shadow:var(--glow); }
+textarea { width:100%; max-width:720px; min-height:80px; background:#0A0D10; color:var(--fg); border:1px solid var(--line-2); font-family:var(--font-mono); font-size:var(--fs-3); padding:8px; box-sizing:border-box; }
+.save { margin-top:10px; background:var(--las); color:#000; border:0; font-family:var(--font-disp); font-size:var(--fs-2); padding:10px 16px; cursor:pointer; }
+@media (prefers-reduced-motion:reduce) { .lb, .panel { transition:none; } .panel td .lb.learn { animation:none; } }

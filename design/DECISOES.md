@@ -92,3 +92,17 @@ Consequências:
 - **Paths declarados sem implementação.** `modules/laser.json` declara `dev/type`, `dev/host`, `dev/pps`, `ilda/fps`, `curve/r|g|b`, `safe/zone`, `safe/armed` e `test/pattern`; `laser_param` não aceita nenhum deles (`dev/*` e `ilda/*` são argumento de `laser_open`/`laser_play`, o resto espera LUT de cor e `optimize` paramétrico). O manifesto é a declaração do app, não do comando: o voto decide se ele só declara o que já roda, ou se declara o alvo e o comando cresce até ele.
 - **`shutter` está dos dois lados.** É `command` no `modules/laser.json` e `path` no `laser_param`. Uma das duas some.
 - Motivo: a convenção está no código (seis linhas no sink da CLI, com comentário `ponytail:`) e funciona para um laser; registrar aqui evita que ela vire contrato por omissão.
+
+## 09/09/2026 · A página inicial da janela do programa — aguarda voto
+
+- **O que o voto decide:** ao abrir a janela do Spellcaster, o que aparece primeiro — o **aparelho** (`spellgui/web/laser3d/app.html`, o projetor laser em 3D, com a splash, a traseira como menu e o Pino como navegação) ou a **timeline** (`spellgui/web/index.html`).
+- **Recomendação: o aparelho.** Foi o pedido literal ("não quero abrir no browser, quero uma GUI do programa" · "que a UI seja já wild e com 3D e com shaders GLSL e que seja cool de operar"), e é a regra "função antes de UI" aplicada de verdade: o programa é o aparelho, a timeline é o gravador do aparelho. Abrir pelo gravador inverte a metáfora e devolve o software quadradão.
+- **O que já está de pé nos dois casos:** o `laser3d/` é a página principal e roda ligado ao registry (`laser_open`, `laser_play`, `laser_stop`, `laser_close`, `laser_param`, `laser_stats`, `laser_files`, `resume`/`pause`, `show_get`) por `bus.js`, com three.js e as fontes vendorizados em `spellgui/web/vendor/` — nada de CDN, o evento não tem rede. Sem engine a página continua inteira, em modo local.
+- **O que fica fora enquanto o voto não sai:** a janela nativa (Tauri) é da frente `gui-janela`; esta decisão é só qual URL ela carrega primeiro.
+- Motivo: é escolha de produto, não de código — trocar a página inicial é uma linha, mas define o que o programa **é** quando abre.
+
+## 09/09/2026 · O que entra no menu do Pino — aguarda voto
+
+- **Os cinco pinos continuam sendo as cinco telas** (1 laser · 2 fósforo · 3 patchbay · 4 teatro · 5 info). O balão ganhou **dois itens que não são pino**: o **GRAVADOR** (a timeline, `index.html`) e a **MESA** (a Face, `face.html`). Cada um leva a frase que justifica a peça: a timeline é a fita do aparelho, a Face são os botões grandes que o operador aperta no show.
+- **O que o voto decide:** se peça sem pino pode morar no balão, ou se cada uma precisa virar um pino — o que exigiria um Pino com sete pinos (XLR-7 não existe) ou um segundo cabo.
+- Motivo: a regra é "nada aparece por conveniência de software". Dois itens sem pino são a exceção que o balão está abrindo; ou ela é aceita com a justificativa, ou o aparelho precisa crescer um conector.
