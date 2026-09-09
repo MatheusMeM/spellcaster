@@ -274,6 +274,24 @@ fn barramento_http_ws_monitor_e_mcp() {
     }
     assert!(visto, "nenhum frame de monitor em 5 s");
 
+    // o gancho global roda DEPOIS do programmer (posicao 6 do frame): o monitor ve o override
+    // manual do operador, nao so' o que a timeline escreveu
+    ws.send(20, "level_set", json!({"universe": 1, "address": 500, "values": [222]}));
+    let r = ws.ate(5.0, |v| v["id"] == json!(20));
+    assert!(r["error"].is_null(), "level_set: {}", r);
+    let mut visto = false;
+    let fim = Instant::now() + Duration::from_secs(5);
+    while !visto && Instant::now() < fim {
+        let (op, p) = ws.recv();
+        // canal 500 = byte 3 + (500 - 1)
+        if op == 2 && p.len() == 515 && p[3 + 499] == 222 {
+            visto = true;
+        }
+    }
+    assert!(visto, "o monitor nao viu o valor do programmer em 5 s");
+    ws.send(21, "level_clear", json!({}));
+    ws.ate(5.0, |v| v["id"] == json!(21));
+
     // `input` alimenta os ganchos do player vivo
     ws.send(6, "input", json!({"key": "widget:go", "value": 1.0}));
     let r = ws.ate(5.0, |v| v["id"] == json!(6));

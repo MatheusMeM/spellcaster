@@ -196,8 +196,9 @@ u, v}]}`; a ligação com o player espera a R2 (mídia), então o crate ainda ro
 - `Universes` 1-based, buffers `[u8; 512]` pré-alocados, `get_or_create` por busca binária.
 - `Timeline::apply(&mut Universes, t)` sem alocação por frame; keys por `partition_point`.
   Curvas: linear, hold, in, out, inout, bezier — mesmas fórmulas do `timeline/model.py`.
-- Ordem fixa do frame: `Timeline::apply` → cada `FrameHook` na ordem de registro (tracks `fx`,
-  depois o Graph) → tracks `osc`/`media`/`cue` → `CueList::update` → programmer → I/O. Igual ao
+- Ordem fixa do frame: `Timeline::apply` → cada `FrameHook` do show na ordem de registro (tracks
+  `fx`, depois o Graph) → tracks `osc`/`media`/`cue` → `CueList::update` → programmer → ganchos
+  globais (`hook_global`, o monitor do `serve`) → I/O. Igual ao
   `_tick` do Python.
 - `engine::hook`: `trait FrameHook { frame(t, &mut Universes); input(key, value); reset(t) }`,
   `enum Ev { Cmd, Osc, Widget, Param, Notify }`, `trait EventSink { emit(&Ev) }`. É por aqui que

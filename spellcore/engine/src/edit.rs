@@ -851,7 +851,7 @@ pub fn register(r: &mut Registry) {
                 a.values
             };
             let h = vivo()?;
-            h.level_set(a.universe, a.address, &v);
+            h.level_set(a.universe, a.address, &v)?;
             Ok(json!(v.len()))
         },
     );
@@ -901,7 +901,7 @@ pub fn register(r: &mut Registry) {
                     )
                 })? as u16;
             let h = vivo()?;
-            h.level_set(u, base + off, &[a.value]);
+            h.level_set(u, base + off, &[a.value])?;
             Ok(json!({"universe": u, "address": base + off, "value": a.value}))
         },
     );

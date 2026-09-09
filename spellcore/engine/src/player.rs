@@ -9,7 +9,9 @@
 //!   4. `CueList::update` escreve o snapshot corrente;
 //!   5. o programmer (`Prog`): o override manual do operador, HTP por canal, POR CIMA da cue
 //!      viva (o operador sobrepoe o que a cue esta segurando);
-//!   6. I/O: cada universo escrito vai para todas as saidas.
+//!   6. os ganchos GLOBAIS (`hook_global`, o monitor do `serve`): o frame ja' completo, com o
+//!      programmer dentro, antes de sair na rede;
+//!   7. I/O: cada universo escrito vai para todas as saidas.
 //!
 //! O transporte remoto por OSC (`/spellcaster/play|pause|stop|locate f`) nunca toca nos
 //! Universes: ele so' age no `Handle`, e a thread de transporte faz o resto no proximo frame.
@@ -34,8 +36,9 @@ use std::time::Duration;
 /// Player vivo neste processo (o `CURRENT` do Python): quem os comandos do registry operam.
 static CURRENT: Mutex<Option<Handle>> = Mutex::new(None);
 
-/// Ganchos instalados em TODO player que subir neste processo, DEPOIS dos ganchos do show: e'
-/// assim que o monitor do `serve` ve o frame que realmente sai, sem o engine conhecer GUI.
+/// Ganchos instalados em TODO player que subir neste processo, na posicao 6 do frame (depois do
+/// programmer, antes do I/O): e' assim que o monitor do `serve` ve o frame que realmente sai —
+/// com o override do operador dentro — sem o engine conhecer GUI.
 type Global = Box<dyn Fn() -> Box<dyn FrameHook> + Send + Sync>;
 static GLOBAL: Mutex<Vec<Global>> = Mutex::new(Vec::new());
 
@@ -266,9 +269,14 @@ impl Handle {
         self.s.push(Ctl::Input(key.to_string(), value));
     }
 
-    /// Programmer: escreve no override manual (vale no proximo frame).
-    pub fn level_set(&self, u: u16, addr: u16, values: &[f64]) {
+    /// Programmer: escreve no override manual (vale no proximo frame). Endereco fora de 1..512
+    /// e' erro, e nao silencio: e' o unico funil dos comandos `level_set` e `fixture_set`.
+    pub fn level_set(&self, u: u16, addr: u16, values: &[f64]) -> Result<(), String> {
+        if addr == 0 || addr > 512 {
+            return Err(format!("endereco {} fora de 1..512", addr));
+        }
         lock(&self.s.prog).set(u, addr, values);
+        Ok(())
     }
 
     /// Solta o override de um universo, ou de todos; devolve quantos canais sairam.
@@ -305,6 +313,9 @@ struct Rt {
     tl: Timeline,
     cues: CueList,
     hooks: Vec<Box<dyn FrameHook>>,
+    /// Ganchos globais (`hook_global`): rodam DEPOIS do programmer, na posicao 6, para ver o
+    /// frame que de fato sai — inclusive o override manual do operador.
+    globais: Vec<Box<dyn FrameHook>>,
     uni: Universes,
     outs: Vec<Box<dyn Output>>,
     osc_out: Option<OscOut>,
@@ -355,6 +366,7 @@ impl Rt {
             tl,
             cues,
             hooks,
+            globais,
             uni,
             outs,
             osc_out,
@@ -410,7 +422,11 @@ impl Rt {
         s.cue.store(cues.index(), Ordering::Relaxed);
         // 5. programmer: o override manual do operador, HTP sobre timeline E cue viva
         lock(&s.prog).apply(uni);
-        // 6. I/O
+        // 6. ganchos globais (o monitor do serve): o frame ja' completo, antes de sair na rede
+        for h in globais.iter_mut() {
+            h.frame(t, uni);
+        }
+        // 7. I/O
         // ponytail: todo universo escrito vai para TODAS as saidas do show (igual a R0)
         // ; separar por saida quando um show misturar "dmx" e "artnet" no mesmo universo.
         for u in uni.iter() {
@@ -529,6 +545,7 @@ impl Player {
                 tl,
                 cues,
                 hooks: Vec::new(),
+                globais: Vec::new(),
                 uni: Universes::new(),
                 outs,
                 osc_out,
@@ -578,7 +595,7 @@ impl Player {
         }
         let mut rt = self.rt.take().ok_or("player ja encerrado")?;
         for f in lock(&GLOBAL).iter() {
-            rt.hooks.push(f());
+            rt.globais.push(f());
         }
         let s = self.s.clone();
         s.run.store(true, Ordering::Relaxed);

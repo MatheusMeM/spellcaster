@@ -74,6 +74,7 @@ TEATRO.bus = {
   pend: new Map(),
   ev: {},
   dmx: {},
+  rev: 0, // ultima revisao vista numa resposta: o evento `show` com rev menor e' eco proprio
   on(e, f) { (this.ev[e] = this.ev[e] || []).push(f); },
   emit(e, d) { for (const f of this.ev[e] || []) f(d); },
   open() {
@@ -92,6 +93,7 @@ TEATRO.bus = {
       if (typeof m.data !== "string") return this.frame(m.data);
       const v = JSON.parse(m.data);
       if (v.event) return this.emit(v.event, v.data);
+      if (typeof v.rev === "number") this.rev = Math.max(this.rev, v.rev);
       const p = this.pend.get(v.id);
       if (!p) return;
       this.pend.delete(v.id);
@@ -382,7 +384,9 @@ TEATRO.mount = function (el) {
     recarrega().catch(erro);
   });
   bus.on("fechado", () => diga("sem barramento — spellcore serve"));
-  bus.on("show", () => recarrega().catch(erro));
+  // o `show` so' sai quando o `rev` do engine muda; `bus.rev` ja' subiu na resposta da propria
+  // edicao, entao so' recarrega o que veio de outro cliente.
+  bus.on("show", d => { if (!d || d.rev > bus.rev) recarrega().catch(erro); });
   bus.on("transport", d => {
     if (d.cue !== st.cue) { st.cue = d.cue; cues(); }
     q("cue-viva").textContent = st.cue < 0 ? "—" : `${st.cue} ${(st.show.cues[st.cue] || {}).name || ""}`;

@@ -87,6 +87,14 @@ fn programmer_htp_clear_captura_e_fixture_set() {
     let d = espera(&esp, 2.0, |d| d[0] == 200);
     assert_eq!(d[0], 200, "level_set nao subiu o canal 1");
 
+    // endereco fora de 1..512 e' erro, e nao silencio
+    for a in [0, 513] {
+        let e = r
+            .call("level_set", json!({"address": a, "values": [1]}))
+            .expect_err("endereco fora da faixa tem que recusar");
+        assert!(e.contains("fora de 1..512"), "{}", e);
+    }
+
     // 2. HTP: override abaixo da timeline nao derruba o canal
     ok(&r, "level_set", json!({"address": 1, "values": [50]}));
     let d = espera(&esp, 0.3, |_| false);

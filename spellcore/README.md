@@ -400,7 +400,9 @@ MCP, Rhai e laser.
 4. `CueList::update(t)` escreve o snapshot corrente nos Universes.
 5. O programmer (`player::Prog`): o override manual do operador, HTP por canal, por cima da
    timeline **e** da cue viva — o operador sobrepõe o que a cue está segurando.
-6. I/O: cada universo escrito vai para todas as saídas.
+6. Os ganchos **globais** (`player::hook_global`, o monitor do `serve`): o frame já completo,
+   com o programmer dentro, antes de sair na rede.
+7. I/O: cada universo escrito vai para todas as saídas.
 
 Igual ao `_tick` + `_side` do Python.
 
