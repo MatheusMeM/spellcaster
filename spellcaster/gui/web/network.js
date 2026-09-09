@@ -1,4 +1,4 @@
-// Rede: chama net_report (o mesmo scan do `spell net`, mas devolvendo dict) e mostra o relatorio
+// Rede: chama `net` (o mesmo comando do `spell net`, que devolve o dict com `report`) e mostra o relatorio
 // em texto e as sugestoes destacadas. O scan e sincrono no servidor: o botao fica travado enquanto roda.
 "use strict";
 
@@ -8,7 +8,7 @@
   function scan() {
     btn.disabled = true;
     btn.textContent = "escaneando...";
-    App.rpc("net_report", { timeout: tmo.value }).then(d => {
+    App.rpc("net", { timeout: tmo.value }).then(d => {
       pre.textContent = d.report;
       sug.textContent = "";
       for (const s of d.suggestions || []) {

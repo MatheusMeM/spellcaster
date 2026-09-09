@@ -1,4 +1,4 @@
-# Comandos que so existem por causa do MCP (resumo do show, monitor de saida, rede em JSON).
+# Comandos que so existem por causa do MCP (resumo do show, monitor de saida).
 # Entram no registry como qualquer outro: a CLI e a GUI tambem os enxergam.
 import base64
 import json
@@ -7,7 +7,6 @@ from ..core.registry import command
 
 OPEN = {}        # ponytail: um show aberto por processo, igual ao PATCH de fixtures/patch.py
                  # ; trocar por id de sessao quando a GUI abrir dois shows ao mesmo tempo.
-LAST_NET = {}    # ultimo scan de rede (alimenta o resource spell://net)
 
 
 def current():
@@ -65,12 +64,3 @@ def monitor(universe: int = 1):
          "b64": base64.b64encode(bytes(u.data) if u is not None else bytes(512)).decode()}
     print(json.dumps(d))
     return d
-
-
-@command(mcp=False)
-def net_json(timeout: int = 2):
-    """Analise de rede como dict (o `net` imprime o mesmo em texto); alimenta o resource spell://net."""
-    from ..protocols import netscan
-    LAST_NET.clear()
-    LAST_NET.update(netscan.scan_all(timeout))
-    return LAST_NET

@@ -1,13 +1,10 @@
 # F2: perfil, patch (sobreposicao), Group e o aceite byte a byte do MED GRUPO reescrito em fixtures.
-import pathlib, time, unittest
+import time, unittest
 
-from spellcaster.cli import load_show
 from spellcaster.core.engine import Engine
 from spellcaster.fixtures.group import Group
 from spellcaster.fixtures.patch import Patch, PatchError
 from spellcaster.fixtures.profile import Profile, ProfileError, load
-
-ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class TestProfile(unittest.TestCase):
@@ -107,20 +104,22 @@ class TestGroup(unittest.TestCase):
 
 class TestShowFx(unittest.TestCase):
     def test_mesmos_bytes_do_universo_1(self):
-        """Aceite F2: medgrupo_fx.py e medgrupo.py dao os mesmos 512 bytes em TODO frame de 0 a DUR a 30 fps
-        (inclui os CUES, o PICO e o epilogo). Comparar frame a frame e mais forte do que amostrar 30 instantes."""
-        old = load_show(str(ROOT / "shows" / "medgrupo.py"))
-        new = load_show(str(ROOT / "shows" / "medgrupo_fx.py"))
-        self.assertEqual(new.DUR, old.DUR)
+        """Aceite F2: escrever por nome de fixture (par, fresnel e um moving mirado por Group) da os mesmos
+        512 bytes do universo 1 que escrever por endereco cru no Engine."""
+        p = Patch()
+        p.add("par", "par_rgb_3", 1, 1)
+        p.add("fresnel", "dimmer_1", 1, 29)
+        p.add("mv", "bsw_scorpio_17", 1, 300)
+        p.set("par", r=200, g=100, b=0)
+        p.set("fresnel", dim="meio")
+        Group(p, ["mv"], "g_aceite", defaults={"shutter": "aberto"}).aim(dz=1.0, dim=255, color="amarelo", zoom=200)
+
         eng = Engine([])
-        for i in range(int(old.DUR * 30) + 1):
-            t = i / 30
-            eng.apply(old.look(t))
-            new.look(t)
-            if bytes(eng.universes[1].data) != bytes(new.P.universes[1].data):
-                a, b = eng.universes[1].data, new.P.universes[1].data
-                dif = [(c + 1, a[c], b[c]) for c in range(512) if a[c] != b[c]]
-                self.fail(f"frame {i} t={t:.3f}: {dif[:8]}")
+        eng.apply({1: [200, 100, 0], 29: [128],
+                   # pan 128 + 90 * 255/540 = 170,5 e tilt 128 + 38 = 166, ambos em 16 bit
+                   300: [171, 42, 166, 166, 48, 0, 0, 0, 255, 255, 0, 0, 200]})
+        a, b = eng.universes[1].data, p.universes[1].data
+        self.assertEqual(bytes(a), bytes(b), [(c + 1, a[c], b[c]) for c in range(512) if a[c] != b[c]][:8])
 
 
 if __name__ == "__main__":

@@ -226,14 +226,4 @@ def profiles():
     return profile_names()
 
 
-@command
-def net_report(timeout: int = 2):
-    """Analise de rede como dict (o comando `net` so imprime): relatorio, sugestoes e listas cruas."""
-    from ..protocols import netscan
-    d = netscan.scan_all(timeout)
-    # ponytail: scan sincrono trava a conexao ws do cliente por ~timeout+1 s ; jogar numa thread
-    # com push("net", ...) se alguem reclamar da GUI congelada durante o Rescan.
-    return {"report": netscan.report(d), **d}
-
-
 _ = playerpkg  # noqa: F401  (importar o pacote player registra play_show/stop/pause/locate/markers)

@@ -1,7 +1,7 @@
 import struct
 import unittest
 
-from spellcaster.protocols import netscan
+from spellcaster.protocols import artnet, netscan, sacn
 
 IPCONFIG_PTBR = """
 Configuração de IP do Windows
@@ -103,20 +103,22 @@ class TestParse(unittest.TestCase):
         self.assertEqual(ifs[1], {"name": "eth0", "ip": "10.1.2.3", "mask": "255.255.255.0", "gateway": "10.1.2.1"})
 
     def test_artpollreply(self):
-        r = netscan.parse_artpollreply(artpollreply())
+        r = artnet.parse(artpollreply())
         self.assertEqual(r["ip"], "2.0.0.50")
         self.assertEqual(r["short_name"], "Node1")
         self.assertEqual(r["long_name"], "Nodo de teste")
         self.assertEqual(r["mac"], "aa:bb:cc:dd:ee:ff")
         self.assertEqual(r["ports"], [{"dir": "out", "universe": 0x12}, {"dir": "in", "universe": 0x15},
                                       {"dir": "out", "universe": 0x13}])
-        self.assertIsNone(netscan.parse_artpollreply(netscan.ARTPOLL))
+        self.assertEqual(artnet.parse(netscan.ARTPOLL)["op"], "ArtPoll")
 
     def test_sacn_discovery(self):
-        r = netscan.parse_sacn_discovery(sacn_discovery())
-        self.assertEqual(r["source_name"], "Fonte X")
+        r = sacn.parse(sacn_discovery())
+        self.assertEqual((r["kind"], r["name"]), ("discovery", "Fonte X"))
         self.assertEqual(r["universes"], [1, 2, 10])
-        self.assertIsNone(netscan.parse_sacn_discovery(b"x" * 200))
+        # o n sai do comprimento do PDU, nao do datagrama: padding depois dos universos e ignorado
+        self.assertEqual(sacn.parse(sacn_discovery() + bytes(8))["universes"], [1, 2, 10])
+        self.assertIsNone(sacn.parse(b"x" * 200))
 
 
 class TestSuggest(unittest.TestCase):
@@ -136,7 +138,7 @@ class TestSuggest(unittest.TestCase):
 class TestReport(unittest.TestCase):
     def test_report_text(self):
         d = {"interfaces": [{"name": "Wi-Fi", "ip": "192.168.0.132", "mask": "255.255.255.0", "gateway": "192.168.0.1"}],
-             "suggestions": ["x"], "artnet": [netscan.parse_artpollreply(artpollreply())],
+             "suggestions": ["x"], "artnet": [artnet.parse(artpollreply())],
              "sacn": {"error": "porta ocupada"}, "etherdream": []}
         txt = netscan.report(d)
         self.assertIn("2.0.0.50  'Node1'", txt)

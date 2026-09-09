@@ -200,7 +200,7 @@ pub fn save(path: &Path, show: &Show) -> Result<(), String>;
 
 ```rust
 pub struct Command {
-    pub name: String, pub doc: String, pub schema: serde_json::Value, pub mcp: bool,
+    pub name: String, pub doc: String, pub schema: serde_json::Value,
     pub f: Box<dyn Fn(serde_json::Value) -> Result<serde_json::Value, String> + Send + Sync>,
 }
 pub struct Registry { /* Vec<Command> na ordem de inserção */ }
@@ -250,7 +250,6 @@ pub struct SacnIn;
 impl SacnIn { pub fn new(universes: &[u16]) -> io::Result<SacnIn>;
               pub fn get(&self, universe: u16) -> Option<[u8; 512]>;
               pub fn close(&mut self); }
-pub fn discover(timeout: Duration) -> Vec<Source>;
 
 // protocols::artnet
 pub const PORT: u16 = 6454;
@@ -263,8 +262,6 @@ pub struct ArtNetOut;
 impl ArtNetOut { pub fn new(targets: Option<Vec<String>>, broadcast: bool) -> io::Result<ArtNetOut>;
                  pub fn sync(&mut self); }
 impl Output for ArtNetOut { .. }
-pub struct ArtNetIn;  // .frame(universe) -> Option<Vec<u8>>
-pub fn poll(timeout: Duration) -> Vec<Reply>;
 
 // protocols::osc
 pub enum Arg { Int(i32), Long(i64), Float(f32), Double(f64), Str(String), Blob(Vec<u8>),

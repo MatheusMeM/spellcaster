@@ -53,14 +53,17 @@ class ArtDmxTest(unittest.TestCase):
         pkt[18], pkt[19] = 1, 2                      # net 1, subnet 2
         pkt[26:31] = b"Node1"; pkt[44:53] = b"Node Long"
         pkt[172:174] = struct.pack(">H", 2)
+        pkt[174:176] = bytes([0x80, 0xC0])           # porta 0 so saida, porta 1 saida e entrada
+        pkt[186:190] = bytes([9, 8, 0, 0])           # SwIn
         pkt[190:194] = bytes([3, 4, 0, 0])           # SwOut
         pkt[201:207] = bytes.fromhex("0a1b2c3d4e5f")
         p = artnet.parse(bytes(pkt))
         self.assertEqual(p["op"], "ArtPollReply")
-        self.assertEqual((p["ip"], p["short_name"], p["long_name"], p["num_ports"], p["mac"]),
-                         ("2.0.0.7", "Node1", "Node Long", 2, "0a:1b:2c:3d:4e:5f"))
-        self.assertEqual(p["port_addresses"], [(1 << 8) | (2 << 4) | 3, (1 << 8) | (2 << 4) | 4])
-        self.assertEqual(p["universes"], [292, 293])
+        self.assertEqual((p["ip"], p["short_name"], p["long_name"], p["mac"]),
+                         ("2.0.0.7", "Node1", "Node Long", "0a:1b:2c:3d:4e:5f"))
+        self.assertEqual(p["port"], 6454)
+        self.assertEqual(p["ports"], [{"dir": "out", "universe": 0x123}, {"dir": "out", "universe": 0x124},
+                                      {"dir": "in", "universe": 0x128}])
 
     def test_poll_parse(self):
         self.assertEqual(artnet.parse(artnet.artpoll())["op"], "ArtPoll")

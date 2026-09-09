@@ -2,6 +2,7 @@
 // boot ate o primeiro frame DMX. Gate do PRD: cpu < 3 %, rss < 60 MB, boot < 2 s.
 // Saida ASCII pura (console cp1252).
 
+use bench::arg_f64;
 use engine::clock::Clock;
 use engine::universe::Universes;
 use protocols::artnet::ArtNetOut;
@@ -80,20 +81,6 @@ fn rss_bytes() -> Option<u64> {
     let s = std::fs::read_to_string("/proc/self/statm").ok()?;
     let pages: u64 = s.split_whitespace().nth(1)?.parse().ok()?;
     Some(pages * 4096)
-}
-
-fn arg_f64(name: &str, default: f64) -> f64 {
-    let a: Vec<String> = std::env::args().collect();
-    for i in 0..a.len() {
-        if a[i] == name {
-            if let Some(v) = a.get(i + 1) {
-                if let Ok(x) = v.parse() {
-                    return x;
-                }
-            }
-        }
-    }
-    default
 }
 
 fn main() {

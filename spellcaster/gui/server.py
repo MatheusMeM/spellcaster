@@ -174,7 +174,7 @@ def serve(port: int = 8000, browser: bool = False):
     return srv
 
 
-from . import api  # noqa: E402,F401  (registra show_*/track_*/key_*/transport/patch_check/net_report)
+from . import api  # noqa: E402,F401  (registra show_*/track_*/key_*/transport/patch_check/profiles)
 
 # Entradas: `python -m spellcaster.gui.window` (janela, ou navegador sem pywebview).
 # `spell serve` passa a existir quando cli.py importar o pacote gui (uma linha: `from . import gui`);

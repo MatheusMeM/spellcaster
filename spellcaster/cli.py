@@ -38,11 +38,14 @@ def play(file: str, fps: int = 30, loop: bool = False, universes: str = "1"):
 
 
 @command
-def net(timeout: int = 2, as_json: bool = False):
-    """Analisa a rede: interfaces, nós Art-Net, fontes sACN, DACs Ether Dream, sugestões."""
+def net(timeout: int = 2):
+    """Analisa a rede: interfaces, nós Art-Net, fontes sACN, DACs Ether Dream, sugestões.
+    Devolve o dict do scan (GUI e MCP leem daqui); `report` é o texto que sai impresso."""
     from .protocols import netscan
     d = netscan.scan_all(timeout)
-    print(json.dumps(d, indent=1, ensure_ascii=False) if as_json else netscan.report(d))
+    d["report"] = netscan.report(d)
+    print(d["report"])
+    return d
 
 
 @command

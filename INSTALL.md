@@ -38,8 +38,7 @@ spell play_show medgrupo.spell
 ```
 
 O serviço `spellcaster` sobe `spell serve`; a GUI fica em `http://<hostname>.local:8000`
-para quem tiver navegador na rede. `install.sh <destino>` muda a pasta. Tarball `--no-gui` é o
-mesmo pacote sem os assets da GUI.
+para quem tiver navegador na rede. `install.sh <destino>` muda a pasta.
 
 Binário Rust para o Pi, dois no release:
 
@@ -87,7 +86,7 @@ Detalhes, bench e conformidade: `spellcore/README.md` e `ARCHITECTURE.md`.
 
 ```powershell
 pwsh -File packaging\build_win.ps1            # onedir em %TEMP%\spellcaster_build\dist\Spellcaster
-sh packaging/build_lite.sh [--no-gui] [saída] # tarball Lite (default /tmp)
+sh packaging/build_lite.sh [saída]           # tarball Lite (default /tmp)
 ```
 
 ### MCP (sessão de IA)
@@ -105,10 +104,9 @@ spellcore mcp install --target code --yes  # sem perguntar
 console. Sem console (pipe), aborta. As tools são os comandos do `spellcore commands`; os
 resources são `spell://show` e `spell://commands`.
 
-Python (protótipo, também traz HTTP streamable):
+Python (protótipo, só stdio):
 
 ```
-spell mcp                      # stdio
-spell mcp --transport http --port 8765   # HTTP streamable (Pi Lite, remoto)
+spell mcp                      # stdio, para Claude Desktop / Claude Code
 spell mcp_install --target desktop       # grava a entrada em claude_desktop_config.json (--target code = .mcp.json); pede confirmação
 ```

@@ -1,11 +1,9 @@
-# MCP: subprocesso stdio real, POST /mcp em loopback e mcp_install num arquivo de %TEMP%.
-import http.client
+# MCP: subprocesso stdio real e mcp_install num arquivo de %TEMP%.
 import json
 import os
 import subprocess
 import sys
 import tempfile
-import threading
 import unittest
 
 from spellcaster.mcp import install, server
@@ -86,7 +84,9 @@ class TestStdio(unittest.TestCase):
         self.assertEqual(sorted(uris), ["spell://log", "spell://net", "spell://patch", "spell://show"])
         c = self.rpc(6, "resources/read", {"uri": "spell://net"})["result"]["contents"][0]
         self.assertEqual(c["uri"], "spell://net")
-        self.assertIn("interfaces", json.loads(c["text"]))
+        d = json.loads(c["text"])                     # o `net` unico devolve o dict com o texto em `report`
+        self.assertIn("interfaces", d)
+        self.assertIn("Interfaces", d["report"])
 
         prompts = self.rpc(7, "prompts/list")["result"]["prompts"]
         self.assertEqual(sorted(p["name"] for p in prompts), ["calibrar_grupo", "montar_show_do_video"])
@@ -98,48 +98,6 @@ class TestStdio(unittest.TestCase):
         self.assertEqual(self.rpc(9, "nao_existe")["error"]["code"], -32601)
         r = self.rpc(10, "tools/call", {"name": "nao_existe", "arguments": {}})["result"]
         self.assertTrue(r["isError"])
-
-
-class TestHttp(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.srv = server.http_server(0)
-        cls.port = cls.srv.server_address[1]
-        threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.srv.shutdown()
-        cls.srv.server_close()
-
-    def post(self, body):
-        c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
-        c.request("POST", "/mcp", json.dumps(body),
-                  {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"})
-        r = c.getresponse()
-        data = r.read()
-        c.close()
-        return r.status, (json.loads(data) if data else None)
-
-    def test_tools_list_e_notificacao(self):
-        st, r = self.post({"jsonrpc": "2.0", "id": 1, "method": "initialize",
-                           "params": {"protocolVersion": "2025-06-18"}})
-        self.assertEqual(st, 200)
-        self.assertEqual(r["result"]["serverInfo"]["name"], "spellcaster")
-
-        st, r = self.post({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
-        self.assertEqual(st, 200)
-        self.assertIn("run_command", [t["name"] for t in r["result"]["tools"]])
-
-        st, r = self.post({"jsonrpc": "2.0", "method": "notifications/initialized"})
-        self.assertEqual((st, r), (202, None))        # notificacao: 202 sem corpo
-
-    def test_origin_nao_loopback_barrado(self):
-        c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
-        c.request("POST", "/mcp", json.dumps({"jsonrpc": "2.0", "id": 1, "method": "ping"}),
-                  {"Content-Type": "application/json", "Origin": "http://evil.example"})
-        self.assertEqual(c.getresponse().status, 403)
-        c.close()
 
 
 class TestInstall(unittest.TestCase):

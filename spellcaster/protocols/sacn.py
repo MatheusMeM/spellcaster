@@ -1,6 +1,6 @@
 # sACN (ANSI E1.31): saída multicast por interface + unicast localhost, entrada, discovery. Só stdlib.
 # Interface comum de saída (todos os protocolos): send(universe:int, data:bytes) e close().
-import socket, struct, threading, time, uuid
+import socket, struct, threading, uuid
 
 PORT = 5568
 ROOT = struct.pack(">HH12s", 0x10, 0, b"ASC-E1.17\0\0\0")
@@ -33,7 +33,8 @@ def parse(pk):
         return {"kind": "data", "cid": cid, "name": name, "priority": prio, "seq": seq,
                 "universe": universe, "data": pk[126:]}
     if vec == 8 and len(pk) >= 120 and struct.unpack(">I", pk[40:44])[0] == 2:
-        n = (len(pk) - 120) // 2
+        # n pelo comprimento declarado do Universe Discovery PDU (8 + 2n), limitado ao que chegou
+        n = max(0, min(((struct.unpack_from(">H", pk, 112)[0] & 0x0FFF) - 8) // 2, (len(pk) - 120) // 2))
         return {"kind": "discovery", "cid": cid, "name": name,
                 "universes": list(struct.unpack(f">{n}H", pk[120:120 + 2 * n]))}
     return None
@@ -114,21 +115,3 @@ class SacnIn:
     def close(self):
         self._run = False
         self._sock.close()
-
-
-def discover(timeout=3.0):
-    """Escuta o universo de discovery e devolve [{cid, name, ip, universes}] (fontes anunciam a cada 10 s)."""
-    s = _listener([DISCOVERY_IP])
-    found = {}
-    end = time.perf_counter() + timeout
-    while time.perf_counter() < end:
-        try:
-            pk, (ip, _) = s.recvfrom(2048)
-        except socket.timeout:
-            continue
-        p = parse(pk)
-        if p and p["kind"] == "discovery":
-            f = found.setdefault(p["cid"], {"cid": p["cid"].hex(), "name": p["name"], "ip": ip, "universes": set()})
-            f["universes"].update(p["universes"])
-    s.close()
-    return [dict(f, universes=sorted(f["universes"])) for f in found.values()]
