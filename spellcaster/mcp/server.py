@@ -124,8 +124,9 @@ def read_resource(uri):
         rows = fxpatch.PATCH.rows() if fxpatch.PATCH is not None else []
         return json.dumps(rows, indent=1, ensure_ascii=False)
     if uri == "spell://net":
-        # ponytail: sem scan guardado, faz um curto na hora ; o `net` da CLI so imprime, nao cacheia.
-        d = spelltools.LAST_NET or spelltools.net_json(1)
+        # ponytail: sem cache, faz um scan curto na hora ; guardar o ultimo se custar caro na pratica.
+        with contextlib.redirect_stdout(io.StringIO()):    # o `net` imprime o relatorio; aqui vale o dict
+            d = registry.call("net", timeout=1)
         return json.dumps(d, indent=1, ensure_ascii=False, default=str)
     if uri == "spell://log":
         return "\n".join(LOG)

@@ -1,10 +1,11 @@
-# config.json ao lado do executavel: porta da GUI, skin, interface preferida, ultimo show.
+# config.json ao lado do executavel. Chave lida por alguem: `port` (a GUI). O resto que o
+# usuario gravar fica no arquivo e volta no load; nao ha default para o que ninguem le.
 import json
 
 from .core.registry import command
 from .paths import CONFIG
 
-DEFAULTS = {"port": 8000, "skin": "feiticaria", "interface": None, "last_show": None}
+DEFAULTS = {"port": 8000}
 
 
 def load():

@@ -84,7 +84,9 @@ class TestStdio(unittest.TestCase):
         self.assertEqual(sorted(uris), ["spell://log", "spell://net", "spell://patch", "spell://show"])
         c = self.rpc(6, "resources/read", {"uri": "spell://net"})["result"]["contents"][0]
         self.assertEqual(c["uri"], "spell://net")
-        self.assertIn("interfaces", json.loads(c["text"]))
+        d = json.loads(c["text"])                     # o `net` unico devolve o dict com o texto em `report`
+        self.assertIn("interfaces", d)
+        self.assertIn("Interfaces", d["report"])
 
         prompts = self.rpc(7, "prompts/list")["result"]["prompts"]
         self.assertEqual(sorted(p["name"] for p in prompts), ["calibrar_grupo", "montar_show_do_video"])

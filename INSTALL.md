@@ -38,8 +38,7 @@ spell play_show medgrupo.spell
 ```
 
 O serviço `spellcaster` sobe `spell serve`; a GUI fica em `http://<hostname>.local:8000`
-para quem tiver navegador na rede. `install.sh <destino>` muda a pasta. Tarball `--no-gui` é o
-mesmo pacote sem os assets da GUI.
+para quem tiver navegador na rede. `install.sh <destino>` muda a pasta.
 
 Binário Rust para o Pi: `spellcore-linux-aarch64` do release (glibc; o build estático musl é
 pendência do R8).
@@ -76,7 +75,7 @@ Detalhes, bench e conformidade: `spellcore/README.md` e `ARCHITECTURE.md`.
 
 ```powershell
 pwsh -File packaging\build_win.ps1            # onedir em %TEMP%\spellcaster_build\dist\Spellcaster
-sh packaging/build_lite.sh [--no-gui] [saída] # tarball Lite (default /tmp)
+sh packaging/build_lite.sh [saída]           # tarball Lite (default /tmp)
 ```
 
 ### MCP (sessão de IA)

@@ -37,10 +37,6 @@ def rect(cx, cy, w, h, col, k=15):
     return polyline([(cx - w, cy - h), (cx + w, cy - h), (cx + w, cy + h), (cx - w, cy + h)], col, k, close=True)
 
 
-def line(x0, y0, x1, y1, col, k=15):
-    return polyline([(x0, y0), (x1, y1)], col, k)
-
-
 def blank_to(pts):
     """Ponto apagado no inicio da figura para o salto.
     O alvo sai daqui, nao do chamador: passado a mao ele erra quando a fase (ph) gira."""

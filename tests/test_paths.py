@@ -62,7 +62,7 @@ class TestConfig(unittest.TestCase):
         config.save(port=9001, last_show="medgrupo.spell")
         self.assertEqual(json.loads(config.CONFIG.read_text())["port"], 9001)
         d = config.load()
-        self.assertEqual((d["port"], d["last_show"], d["skin"]), (9001, "medgrupo.spell", "feiticaria"))
+        self.assertEqual((d["port"], d["last_show"]), (9001, "medgrupo.spell"))   # chave sem default sobrevive
         config.CONFIG.write_text("{ nao e json", encoding="utf-8")
         self.assertEqual(config.load(), config.DEFAULTS)       # quebrado = defaults, sem excecao
         os.remove(config.CONFIG)
