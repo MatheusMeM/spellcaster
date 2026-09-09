@@ -212,9 +212,13 @@ fn order(paths: &mut [Vec<(i32, i32)>]) {
 /// blanking, do `optimize` e da `safety`. Um caminho por objeto, fechado.
 ///
 /// A imagem entra inteira e centrada, com a proporcao preservada (o lado maior ocupa a
-/// faixa toda). Buffer menor que `w * h * 4` devolve vazio.
+/// faixa toda). Buffer menor que `w * h * 4` devolve vazio, e `w * h * 4` que estoura `usize`
+/// tambem: a dimensao vem de fora (linha de comando, produtor de quadro), nao do proprio buffer.
 pub fn paths(rgba: &[u8], w: usize, h: usize, o: &Opts) -> Vec<Vec<Point>> {
-    if w == 0 || h == 0 || rgba.len() < w * h * 4 {
+    let Some(n) = w.checked_mul(h).and_then(|n| n.checked_mul(4)) else {
+        return Vec::new();
+    };
+    if w == 0 || h == 0 || rgba.len() < n {
         return Vec::new();
     }
     let m = mask(rgba, w, h, o);

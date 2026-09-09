@@ -46,8 +46,12 @@ fn main() -> Result<(), String> {
     }
 
     let data = std::fs::read(pos[0]).map_err(|e| format!("{}: {e}", pos[0]))?;
-    if data.len() < w * h * 4 {
-        return Err(format!("{}: {} bytes, {}x{} pede {}", pos[0], data.len(), w, h, w * h * 4));
+    let n = w
+        .checked_mul(h)
+        .and_then(|n| n.checked_mul(4))
+        .ok_or_else(|| format!("{}x{} nao cabe em usize", w, h))?;
+    if data.len() < n {
+        return Err(format!("{}: {} bytes, {}x{} pede {}", pos[0], data.len(), w, h, n));
     }
 
     let t0 = Instant::now();
