@@ -103,6 +103,10 @@ fn handshake_tools_e_resources() {
         "cue_set",
         "patch_add",
         "patch_check",
+        "show_patch",
+        "graph_get",
+        "graph_check",
+        "face_get",
         "play_show",
         "net",
     ] {
@@ -140,7 +144,10 @@ fn handshake_tools_e_resources() {
         .iter()
         .map(|r| r["uri"].as_str().unwrap_or(""))
         .collect();
-    assert_eq!(uris, vec!["spell://show", "spell://commands"]);
+    assert_eq!(
+        uris,
+        vec!["spell://show", "spell://commands", "spell://graph", "spell://face"]
+    );
 
     let c = m.call(6, "resources/read", json!({"uri": "spell://commands"}));
     let txt = c["contents"][0]["text"].as_str().expect("texto");
@@ -158,6 +165,59 @@ fn handshake_tools_e_resources() {
     let d: Value = serde_json::from_str(s["contents"][0]["text"].as_str().unwrap()).unwrap();
     assert_eq!(d["aberto"], json!(true), "o show aberto pelo show_get continua aberto");
     assert_eq!(d["transport"], Value::Null, "nenhum player rodando");
+
+    // graph: o resource le o graph_get do registry; o medgrupo nao tem graph, entao vem vazio
+    let g = m.call(8, "resources/read", json!({"uri": "spell://graph"}));
+    let g: Value = serde_json::from_str(g["contents"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(g, json!({"nodes": [], "edges": []}));
+
+    // show_patch em /graph + resource: o que a IA grava e' o que o resource devolve
+    let g = json!({"nodes": [{"id": "k", "type": "in.key", "key": "Space"},
+                             {"id": "t", "type": "logic.toggle"},
+                             {"id": "c", "type": "cmd", "cmd": "cue_go"}],
+                   "edges": [["k.down", "t.in"], ["t.out", "c.trigger"]]});
+    let r = m.call(
+        9,
+        "tools/call",
+        json!({"name": "show_patch",
+               "arguments": {"ops": [{"op": "add", "path": "/graph", "value": g}]}}),
+    );
+    assert_eq!(r["isError"], json!(false));
+    let lido = m.call(10, "resources/read", json!({"uri": "spell://graph"}));
+    let lido: Value = serde_json::from_str(lido["contents"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(lido, g);
+
+    // graph_check compila o graph aberto: 3 nos, sem erro
+    let r = m.call(11, "tools/call", json!({"name": "graph_check", "arguments": {}}));
+    let c: Value = serde_json::from_str(&texto(&r)).expect("graph_check devolve JSON");
+    assert_eq!(c["nodes"], json!(3), "{}", texto(&r));
+    assert_eq!(c["error"], Value::Null);
+
+    // ciclo: erro no campo, nao excecao (o editor mostra o texto ao lado dos nos)
+    let ciclo = json!({"nodes": [{"id": "a", "type": "logic.not"},
+                                 {"id": "b", "type": "logic.not"}],
+                       "edges": [["a.out", "b.in"], ["b.out", "a.in"]]});
+    m.call(
+        12,
+        "tools/call",
+        json!({"name": "show_patch",
+               "arguments": {"ops": [{"op": "replace", "path": "/graph", "value": ciclo}]}}),
+    );
+    let r = m.call(13, "tools/call", json!({"name": "graph_check", "arguments": {}}));
+    let c: Value = serde_json::from_str(&texto(&r)).expect("graph_check devolve JSON");
+    let e = c["error"].as_str().unwrap_or("");
+    assert!(e.contains("ciclo") && e.contains('a') && e.contains('b'), "{}", e);
+
+    // show_patch: edita e devolve as ops de undo
+    let r = m.call(
+        14,
+        "tools/call",
+        json!({"name": "show_patch",
+               "arguments": {"ops": [{"op": "replace", "path": "/fps", "value": 25}]}}),
+    );
+    let d: Value = serde_json::from_str(&texto(&r)).expect("show_patch devolve JSON");
+    assert!(d["rev"].as_u64().unwrap_or(0) > 0);
+    assert_eq!(d["undo"], json!([{"op": "replace", "path": "/fps", "value": 30}]));
 }
 
 /// `play_show` bloqueia ate o fim do show: pelo MCP ele roda em thread e a tool volta na hora.

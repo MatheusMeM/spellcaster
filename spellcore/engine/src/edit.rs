@@ -10,6 +10,7 @@ use serde::Deserialize;
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 pub const CURVES: [&str; 6] = ["linear", "hold", "in", "out", "inout", "bezier"];
 
@@ -40,10 +41,35 @@ pub fn novo() -> Show {
 
 /// Roda `f` no show aberto (caminho, show). Sem show aberto, abre um novo — o Python nasce com
 /// `SHOW = NEW`, e a IA pode chamar `track_add` antes de qualquer `show_get`.
-fn com<T>(f: impl FnOnce(&mut String, &mut Show) -> Result<T, String>) -> Result<T, String> {
+fn com_ro<T>(f: impl FnOnce(&mut String, &mut Show) -> Result<T, String>) -> Result<T, String> {
     let mut g = lock(&OPEN);
     let (p, sh) = g.get_or_insert_with(|| (String::new(), novo()));
     f(p, sh)
+}
+
+/// `com_ro` mais o contador: toda edicao bem-sucedida sobe `rev`.
+fn com<T>(f: impl FnOnce(&mut String, &mut Show) -> Result<T, String>) -> Result<T, String> {
+    let v = com_ro(f)?;
+    REV.fetch_add(1, Ordering::Relaxed);
+    Ok(v)
+}
+
+/// Revisao do show aberto: sobe a cada edicao. O barramento faz broadcast dela; quem manda
+/// `show_patch` com uma revisao velha leva erro em vez de sobrescrever a edicao do outro.
+// ponytail: contador do processo, nao do arquivo ; virar hash do show se dois processos
+// passarem a editar o mesmo .spell.
+static REV: AtomicU64 = AtomicU64::new(0);
+
+pub fn rev() -> u64 {
+    REV.load(Ordering::Relaxed)
+}
+
+/// Troca o show aberto por inteiro (`load`, `show_get {file}`, `show_new`): grava `OPEN` e sobe
+/// `rev`. Sem isso a `rev` que o cliente segurava continuaria valendo em OUTRO show, e o
+/// `show_patch` dele entraria sem erro no arquivo errado.
+pub(crate) fn abre(path: String, sh: Show) {
+    *lock(&OPEN) = Some((path, sh));
+    REV.fetch_add(1, Ordering::Relaxed);
 }
 
 fn json(sh: &Show) -> Result<Value, String> {
@@ -128,25 +154,26 @@ fn perfil(dir: &Path, p: &str) -> Result<Perfil, String> {
     })
 }
 
-/// Pasta `profiles/`: ao lado do .spell, um nivel acima (`shows/` e `profiles/` irmaos, como no
-/// repo e no pendrive), no cwd ou ao lado do executavel — a primeira que existir.
-pub fn profiles_dir(spell: &str) -> PathBuf {
+/// Pasta de recurso do show (`profiles/`, `faces/`): ao lado do .spell, um nivel acima
+/// (`shows/` e `profiles/` irmaos, como no repo e no pendrive), no cwd ou ao lado do
+/// executavel — a primeira que existir.
+pub fn recurso_dir(spell: &str, nome: &str) -> PathBuf {
     let mut c = Vec::new();
     if !spell.is_empty() {
         let d = Path::new(spell).parent().unwrap_or(Path::new("."));
-        c.push(d.join("profiles"));
-        c.push(d.join("..").join("profiles"));
+        c.push(d.join(nome));
+        c.push(d.join("..").join(nome));
     }
-    c.push(PathBuf::from("profiles"));
+    c.push(PathBuf::from(nome));
     if let Some(d) = std::env::current_exe()
         .ok()
         .and_then(|e| e.parent().map(Path::to_path_buf))
     {
-        c.push(d.join("profiles"));
+        c.push(d.join(nome));
     }
     c.into_iter()
         .find(|p| p.is_dir())
-        .unwrap_or_else(|| PathBuf::from("profiles"))
+        .unwrap_or_else(|| PathBuf::from(nome))
 }
 
 /// Uma linha da grade por fixture; para no primeiro erro (perfil ausente, fora de 512,
@@ -216,6 +243,150 @@ fn linha(
     let i = rows.len();
     busy.extend((a..a + p.size).map(|ch| ((u, ch), i)));
     Ok(json!({"name": name, "profile": p.name, "universe": u, "address": a, "channels": p.size}))
+}
+
+// ------------------------------------------------------------- json patch (RFC 6902)
+
+/// Divide "/a/b/c" em ("/a/b", "c"), com o token final sem os escapes do RFC 6901.
+fn dividir(path: &str) -> Result<(&str, String), String> {
+    let i = path
+        .rfind('/')
+        .ok_or_else(|| format!("path {:?}: um JSON Pointer comeca com /", path))?;
+    Ok((&path[..i], path[i + 1..].replace("~1", "/").replace("~0", "~")))
+}
+
+fn indice(n: usize, tok: &str, path: &str, inserindo: bool) -> Result<usize, String> {
+    let i = if inserindo && tok == "-" {
+        n
+    } else {
+        tok.parse::<usize>()
+            .map_err(|_| format!("path {:?}: {:?} nao e' indice de lista", path, tok))?
+    };
+    if i > n || (!inserindo && i == n) {
+        return Err(format!("path {:?}: indice {} fora da lista de {}", path, i, n));
+    }
+    Ok(i)
+}
+
+fn pai<'a>(doc: &'a mut Value, path: &str, p: &str) -> Result<&'a mut Value, String> {
+    doc.pointer_mut(p)
+        .ok_or_else(|| format!("path {:?}: {:?} nao existe", path, p))
+}
+
+/// `add`: insere na lista ("-" = fim) ou grava a chave do objeto. Devolve o path com o indice
+/// ja' resolvido (o inverso nao pode dizer "-") e o valor que estava la', se havia.
+fn add(doc: &mut Value, path: &str, v: Value) -> Result<(String, Option<Value>), String> {
+    let (p, tok) = dividir(path)?;
+    match pai(doc, path, p)? {
+        Value::Array(a) => {
+            let i = indice(a.len(), &tok, path, true)?;
+            a.insert(i, v);
+            Ok((format!("{}/{}", p, i), None))
+        }
+        Value::Object(o) => {
+            let velho = o.insert(tok, v);
+            Ok((path.to_string(), velho))
+        }
+        _ => Err(format!("path {:?}: {:?} nao e' objeto nem lista", path, p)),
+    }
+}
+
+fn remove(doc: &mut Value, path: &str) -> Result<Value, String> {
+    let (p, tok) = dividir(path)?;
+    match pai(doc, path, p)? {
+        Value::Array(a) => {
+            let i = indice(a.len(), &tok, path, false)?;
+            Ok(a.remove(i))
+        }
+        Value::Object(o) => o
+            .remove(&tok)
+            .ok_or_else(|| format!("path {:?} nao existe", path)),
+        _ => Err(format!("path {:?}: {:?} nao e' objeto nem lista", path, p)),
+    }
+}
+
+/// Uma operacao; devolve a operacao que a desfaz (`test` nao desfaz nada).
+fn operar(doc: &mut Value, o: &PatchOp) -> Result<Option<Value>, String> {
+    Ok(Some(match o.op.as_str() {
+        "add" => match add(doc, &o.path, o.value.clone())? {
+            (p, Some(v)) => json!({"op": "replace", "path": p, "value": v}),
+            (p, None) => json!({"op": "remove", "path": p}),
+        },
+        "remove" => {
+            let v = remove(doc, &o.path)?;
+            json!({"op": "add", "path": o.path, "value": v})
+        }
+        "replace" => {
+            let alvo = doc
+                .pointer_mut(&o.path)
+                .ok_or_else(|| format!("path {:?} nao existe", o.path))?;
+            let v = std::mem::replace(alvo, o.value.clone());
+            json!({"op": "replace", "path": o.path, "value": v})
+        }
+        "test" => {
+            let v = doc
+                .pointer(&o.path)
+                .ok_or_else(|| format!("test: path {:?} nao existe", o.path))?;
+            if *v != o.value {
+                return Err(format!("test: {} e' {} e nao {}", o.path, v, o.value));
+            }
+            return Ok(None);
+        }
+        x => return Err(format!("op {:?}: use add, remove, replace ou test", x)),
+    }))
+}
+
+/// Aplica a lista inteira a uma COPIA do show; so' comita se todas passarem e se o resultado
+/// ainda for um Show valido (mesma via do `show_set`: deserializa e checa a versao).
+fn patch(a: &ShowPatchArgs) -> Result<Value, String> {
+    com_ro(|_, sh| {
+        // dentro do lock de `OPEN`: entre a checagem e a gravacao ninguem troca o show.
+        if let Some(r) = a.rev {
+            if r != rev() {
+                return Err(format!("rev {} != {}", r, rev()));
+            }
+        }
+        let mut doc = json(sh)?;
+        let mut undo: Vec<Value> = Vec::with_capacity(a.ops.len());
+        for o in &a.ops {
+            if let Some(u) = operar(&mut doc, o)? {
+                undo.push(u);
+            }
+        }
+        let novo: Show = serde_json::from_value(doc).map_err(|e| format!("show_patch: {}", e))?;
+        let mut novo = show::migrate(novo)?;
+        novo.extra.retain(|k, _| !k.starts_with('_'));
+        *sh = novo;
+        undo.reverse(); // ja' na ordem de aplicacao: o cliente manda de volta como veio
+        Ok(json!({"rev": REV.fetch_add(1, Ordering::Relaxed) + 1, "undo": undo}))
+    })
+}
+
+// ------------------------------------------------------------------ graph e face
+
+/// O graph do show aberto (`extra.graph`), vazio quando falta. A CLI le daqui para o
+/// `graph_check`: o engine nao conhece o crate `script` e por isso nao compila graph nenhum.
+pub fn graph() -> Value {
+    com_ro(|_, sh| Ok(sh.extra.get("graph").cloned()))
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| json!({"nodes": [], "edges": []}))
+}
+
+/// A face do show: o objeto inline de `extra.face`, ou `faces/<nome>.face.json` quando e' texto
+/// (nome sem extensao, ou caminho). `null` quando o show nao tem face.
+fn face() -> Result<Value, String> {
+    let (spell, f) = com_ro(|p, sh| Ok((p.clone(), sh.extra.get("face").cloned())))?;
+    match f {
+        None | Some(Value::Null) => Ok(Value::Null),
+        Some(Value::String(n)) => {
+            let p = recurso_dir(&spell, "faces").join(format!("{}.face.json", n));
+            let t = std::fs::read_to_string(&p)
+                .map_err(|e| format!("face {:?}: {} ({})", n, e, p.display()))?;
+            serde_json::from_str(&t).map_err(|e| format!("{}: {}", p.display(), e))
+        }
+        Some(v) => Ok(v),
+    }
 }
 
 // ------------------------------------------------------------------ args
@@ -330,6 +501,27 @@ pub struct PatchDelArgs {
     pub name: String,
 }
 
+#[derive(Deserialize, JsonSchema)]
+pub struct PatchOp {
+    /// add | remove | replace | test.
+    pub op: String,
+    /// JSON Pointer (RFC 6901) dentro do show: "/fps", "/tracks/-", "/tracks/0/keys/2",
+    /// "/graph/nodes". O documento inteiro ("") nao e' alvo: para isso ha' show_set.
+    pub path: String,
+    /// Valor de add, replace e test.
+    #[serde(default)]
+    pub value: Value,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct ShowPatchArgs {
+    /// As operacoes, em ordem; a primeira que falhar cancela todas.
+    pub ops: Vec<PatchOp>,
+    /// A revisao que o cliente tinha; diferente da atual = recusa ("rev 3 != 5").
+    #[serde(default)]
+    pub rev: Option<u64>,
+}
+
 // ------------------------------------------------------------------ comandos
 
 pub fn register(r: &mut Registry) {
@@ -339,13 +531,13 @@ pub fn register(r: &mut Registry) {
         |_| {
             let sh = novo();
             let v = json(&sh)?;
-            *lock(&OPEN) = Some((String::new(), sh));
+            abre(String::new(), sh);
             Ok(v)
         },
     );
     r.add::<ShowSetArgs>(
         "show_set",
-        "Substitui o show aberto pelo JSON dado. Devolve o show inteiro.",
+        "Substitui o show aberto pelo JSON dado (para IMPORTAR um show inteiro; para editar, prefira show_patch). Devolve o show inteiro.",
         |a| {
             let v = valor(a.data);
             if !v.is_object() {
@@ -364,7 +556,7 @@ pub fn register(r: &mut Registry) {
         "show_save",
         "Grava o show aberto (sem file, no caminho do ultimo aberto). Devolve o caminho.",
         |a| {
-            com(|p, sh| {
+            com_ro(|p, sh| {
                 let f = if a.file.is_empty() {
                     p.clone()
                 } else {
@@ -483,7 +675,7 @@ pub fn register(r: &mut Registry) {
         "Patcheia uma fixture (perfil, universo, endereco); recusa sobreposicao e estouro de 512. Devolve a grade do patch.",
         |a| {
             com(|p, sh| {
-                let dir = profiles_dir(p);
+                let dir = recurso_dir(p, "profiles");
                 lista(sh, "patch").push(json!({"name": a.name, "profile": a.profile,
                                                "universe": a.universe, "address": a.address}));
                 match checar(sh, &dir) {
@@ -513,14 +705,14 @@ pub fn register(r: &mut Registry) {
         "patch_check",
         "Grade do patch do show aberto (nome, perfil, universo, endereco, canais) e o erro de sobreposicao, se houver.",
         |_| {
-            com(|p, sh| {
-                let (rows, error) = checar(sh, &profiles_dir(p));
+            com_ro(|p, sh| {
+                let (rows, error) = checar(sh, &recurso_dir(p, "profiles"));
                 Ok(json!({"rows": rows, "error": error}))
             })
         },
     );
     r.add::<NoArgs>("profiles", "Nomes dos perfis disponiveis em profiles/.", |_| {
-        let dir = com(|p, _| Ok(profiles_dir(p)))?;
+        let dir = com_ro(|p, _| Ok(recurso_dir(p, "profiles")))?;
         let mut v: Vec<String> = std::fs::read_dir(&dir)
             .map_err(|e| format!("{}: {}", dir.display(), e))?
             .flatten()
@@ -535,4 +727,19 @@ pub fn register(r: &mut Registry) {
         v.sort();
         Ok(json!(v))
     });
+    r.add::<ShowPatchArgs>(
+        "show_patch",
+        "Edita o show aberto por JSON Patch (RFC 6902: add, remove, replace, test). Uma op que falha cancela todas. Devolve {rev, undo}: `undo` e' a lista de ops que volta ao estado anterior, ja' na ordem de aplicacao.",
+        |a| patch(&a),
+    );
+    r.add::<NoArgs>(
+        "graph_get",
+        "O graph do show aberto (secao 10 do PRD: nodes e edges); vazio quando o show nao tem graph.",
+        |_| Ok(graph()),
+    );
+    r.add::<NoArgs>(
+        "face_get",
+        "A face do show aberto: o objeto inline de `face`, ou faces/<nome>.face.json quando `face` e' texto. null quando o show nao tem face.",
+        |_| face(),
+    );
 }

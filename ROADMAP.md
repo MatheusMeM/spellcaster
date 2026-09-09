@@ -173,6 +173,11 @@ o programa é o modelo 3D fotorrealista do aparelho que ele controla.
 | FUNCOES | funções por referência (Blender, TouchDesigner, Resolume, MadMapper, Capture, Chataigne): `ilda-player`, `ndi-ilda`, `orquestrador`, `cenas-cues-dmx`, `cenario-interativo`, `aprendiz-menu` | `design/funcoes-referencia` | em uso pelas rodadas |
 | 0.1.4 | base única: merge de `funcoes-referencia` + `0.1.3`, `INTEGRACAO` virou `design/FUNCOES/integracao-laser.md`, rodadas 2–4 e o Pino 2D fora da árvore | `design/0.1.4`, em `main` | feita |
 
+Edição por JSON Patch (frente `patch`): `show_patch` (`add`, `remove`, `replace`, `test`,
+tudo-ou-nada, devolve as ops de `undo` e a revisão `rev`), `graph_get`/`face_get` no registry,
+`graph_check` na CLI e os resources `spell://graph` e `spell://face` no MCP. O graph passa a ser
+editável por IA antes de existir canvas.
+
 Pendência de design: rodada 7 = FÓSFORO (conversor NDI/Spout → ILDA na porta NET) e PATCHBAY
 (UI do orquestrador), após o voto das rodadas 5 e 6.
 

@@ -4,7 +4,8 @@
 //! Transporte: stdio (`spellcore mcp`) e HTTP streamable em `/mcp`, montado pelo crate `serve`
 //! (`StreamableHttpService` do rmcp e' um `tower::Service`; quem tem o axum e' o `serve`).
 //
-//! Resources: `spell://show` (o .spell aberto) e `spell://commands` (o registry inteiro em JSON).
+//! Resources: `spell://show` (o .spell aberto), `spell://commands` (o registry inteiro em
+//! JSON), `spell://graph` (o graph da secao 10) e `spell://face` (a superficie de operacao).
 //! Quem monta o `Registry` e' a CLI: e' ela que conhece `play_show` e `net`.
 
 use engine::Registry;
@@ -27,8 +28,11 @@ const INSTRUCTIONS: &str = concat!(
     "nos da rede, `show_get` para ler o show, `play_show` para tocar, `transport_state`/`pause`/",
     "`stop`/`locate`/`cue_go` para o transporte. Para montar um show: `show_new` ou `show_get` ",
     "com file, `profiles` + `patch_add`, `track_add` + `key_set`, `cue_set`, `show_save`. Os ",
-    "resources spell://show e spell://commands dao o show aberto e o registry inteiro sem gastar ",
-    "uma chamada de tool."
+    "resources spell://show, spell://commands, spell://graph e spell://face dao o show aberto, o ",
+    "registry inteiro, o graph e a face sem gastar uma chamada de tool. Para editar o show, ",
+    "prefira `show_patch` (JSON Patch, devolve as ops de undo) a `show_set`; o comportamento do ",
+    "show (teclas, OSC, botoes) se le com `graph_get`, se edita com `show_patch` em /graph e se ",
+    "valida com `graph_check`."
 );
 
 /// Comandos que bloqueiam ate o fim do show ou ate Ctrl+C: rodam em thread e a tool volta na hora
@@ -37,6 +41,8 @@ pub const BACKGROUND: [&str; 1] = ["play_show"];
 
 const SHOW: &str = "spell://show";
 const COMMANDS: &str = "spell://commands";
+const GRAPH: &str = "spell://graph";
+const FACE: &str = "spell://face";
 
 pub struct Spell {
     reg: Arc<Registry>,
@@ -58,6 +64,14 @@ impl Spell {
                 Tool::new(c.name.clone(), c.doc.clone(), Arc::new(schema))
             })
             .collect()
+    }
+
+    /// Resource que e' so' um comando do registry (nenhuma logica de produto mora aqui).
+    fn leia(&self, cmd: &str) -> Result<String, McpError> {
+        self.reg
+            .call(cmd, Value::Object(Map::new()))
+            .map(|v| texto(&v))
+            .map_err(|e| McpError::internal_error(format!("{}: {}", cmd, e), None))
     }
 
     fn run(&self, name: &str, args: Value) -> CallToolResult {
@@ -141,6 +155,14 @@ impl ServerHandler for Spell {
                 .with_title("Registry")
                 .with_description("Todo comando do produto: nome, doc e schema JSON dos parametros.")
                 .with_mime_type("application/json"),
+            Resource::new(GRAPH, "graph")
+                .with_title("Graph do show")
+                .with_description("Comportamento do show: nodes e edges da secao 10 do PRD.")
+                .with_mime_type("application/json"),
+            Resource::new(FACE, "face")
+                .with_title("Face do show")
+                .with_description("Superficie de operacao: faces/<nome>.face.json ou o objeto inline.")
+                .with_mime_type("application/json"),
         ]))
     }
 
@@ -154,6 +176,8 @@ impl ServerHandler for Spell {
                 |e| McpError::internal_error(format!("show_get: {}", e), None),
             )?),
             COMMANDS => texto(&self.reg.schema()),
+            GRAPH => self.leia("graph_get")?,
+            FACE => self.leia("face_get")?,
             u => return Err(McpError::resource_not_found(format!("resource {}", u), None)),
         };
         Ok(ReadResourceResult::new(vec![ResourceContents::text(txt, &r.uri)

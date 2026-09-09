@@ -203,7 +203,7 @@ pub fn base() -> Registry {
         let tl = Timeline::new(&sh)?;
         let out = json!({"name": sh.name, "fps": tl.fps, "duration": tl.duration,
                          "tracks": tl.tracks.len(), "ignored": tl.ignored()});
-        *lock(&OPEN) = Some((a.path.clone(), sh));
+        crate::edit::abre(a.path.clone(), sh);
         Ok(out)
     });
     r.add::<ShowGetArgs>(
@@ -212,7 +212,7 @@ pub fn base() -> Registry {
         |a| {
             if !a.file.is_empty() {
                 let sh = show::load(Path::new(&a.file))?;
-                *lock(&OPEN) = Some((a.file.clone(), sh));
+                crate::edit::abre(a.file.clone(), sh);
             }
             match &*lock(&OPEN) {
                 Some((_, sh)) if a.full => serde_json::to_value(sh).map_err(|e| e.to_string()),
