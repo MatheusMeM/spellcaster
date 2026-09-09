@@ -1,0 +1,337 @@
+<title>Spellcaster Laser DS</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Michroma&family=Share+Tech+Mono&display=swap">
+<link rel="stylesheet" href="tokens.css">
+<style>
+  body { background:var(--bg); color:var(--fg); }
+  .doc { max-width:1180px; margin:0; padding:32px 24px 96px; }
+  header.top { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:var(--s6); align-items:end;
+               border-bottom:1px solid var(--las); padding-bottom:var(--s4); }
+  header.top .id { max-width:62ch; }
+  header.top h1 { margin:var(--s2) 0 var(--s3); }
+  header.top .meta { font-size:var(--fs-1); color:var(--dim); text-align:right; line-height:1.9; white-space:nowrap; }
+  header.top .meta b { color:var(--las); font-weight:400; }
+  section > h2 { display:flex; align-items:baseline; gap:var(--s3); }
+  .lead { margin-top:0; }
+  .grid { display:grid; gap:var(--s3); grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); margin:var(--s4) 0; }
+  .sw { border:1px solid var(--line); background:var(--panel); padding:0; }
+  .sw .chip { height:64px; display:block; }
+  .sw .txt { padding:var(--s2) var(--s3) var(--s3); }
+  .sw .n { font-size:var(--fs-2); color:var(--fg); letter-spacing:.06em; }
+  .sw .h { font-size:var(--fs-1); color:var(--dim); margin-top:2px; }
+  .sw .u { font-size:var(--fs-1); color:var(--dim); margin-top:var(--s2); line-height:1.5; }
+  .type-row { display:grid; grid-template-columns:110px minmax(0,1fr); gap:var(--s3); align-items:baseline;
+              border-bottom:1px solid var(--line); padding:var(--s2) 0; }
+  .type-row .lbl { font-size:var(--fs-1); color:var(--dim); }
+  .scale { display:flex; flex-wrap:wrap; gap:var(--s1); margin:var(--s3) 0; }
+  .scale span { border:1px solid var(--line-2); color:var(--dim); font-size:var(--fs-1); padding:3px 7px; }
+  .stage { position:relative; background:var(--panel); border:1px solid var(--line);
+           min-height:270px; margin:var(--s4) 0; overflow:hidden; }
+  .stage.tall { min-height:330px; }
+  .bench { display:flex; flex-wrap:wrap; gap:var(--s2); align-items:center; margin:var(--s3) 0; }
+  table.t { width:100%; border-collapse:collapse; font-size:var(--fs-2); margin:var(--s3) 0; }
+  table.t th { text-align:left; font-weight:400; font-size:var(--fs-1); letter-spacing:.14em;
+               text-transform:uppercase; color:var(--dim); border-bottom:1px solid var(--las);
+               padding:var(--s2) var(--s2) var(--s2) 0; }
+  table.t td { border-bottom:1px solid var(--line); padding:var(--s2) var(--s2) var(--s2) 0; vertical-align:top; color:#C6CDD3; }
+  table.t td.k { color:var(--fg); white-space:nowrap; }
+  table.t td .dot { display:inline-block; width:8px; height:8px; margin-right:6px; vertical-align:middle; }
+  .no { color:#C6CDD3; font-size:var(--fs-3); line-height:1.7; max-width:78ch; padding-left:0; list-style:none; }
+  .no li { border-left:2px solid var(--red); padding:2px 0 2px var(--s3); margin-bottom:var(--s2); }
+  .no b { color:var(--fg); font-weight:400; }
+  .cols { display:grid; gap:var(--s6); grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); }
+  .cli-line { font-size:var(--fs-3); color:var(--amb); border-left:2px solid var(--amb);
+              padding:var(--s2) var(--s3); background:#0A0D10; margin:var(--s3) 0; overflow-x:auto; }
+  .oledbox { background:#04120C; border:1px solid var(--line-2); color:var(--oled); font-size:var(--fs-2);
+             padding:var(--s2) var(--s3); text-shadow:0 0 8px currentColor; display:inline-block; }
+  .beam { position:absolute; left:50%; top:0; width:2px; height:100%; background:var(--las);
+          box-shadow:var(--glow-on); opacity:.55; }
+  .wall { position:absolute; left:12%; right:12%; top:16%; height:52%; border:1px solid var(--line-2); }
+  .wall .t { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-family:var(--font-disp);
+             font-size:var(--fs-5); color:var(--las); text-shadow:var(--glow-on); white-space:nowrap; }
+  .floor { position:absolute; left:0; right:0; bottom:0; height:26%; border-top:1px solid var(--line); }
+  .note { font-size:var(--fs-1); color:var(--dim); margin-top:var(--s2); }
+  @media (max-width:620px) { header.top { grid-template-columns:minmax(0,1fr); }
+    header.top .meta { text-align:left; } .panel.demo { position:static; margin:var(--s3) 0; width:auto; }
+    .bal.demo { position:static; transform:none; width:auto; max-width:100%; } }
+</style>
+
+<div class="doc">
+
+<header class="top">
+  <div class="id">
+    <div class="eyebrow">Spellcaster · modulo laser / ILDA</div>
+    <h1>Design system do projetor</h1>
+    <p class="lead">Sistema desta ferramenta so. Valores em <code>tokens.css</code>; regra escrita em <code>SISTEMA.md</code>. O programa e o modelo 3D do aparelho: traseira e menu, tampa aberta e preferencias, a parede e o output.</p>
+  </div>
+  <div class="meta">
+    material <b>aluminio + feixe</b><br>
+    acento <b>#38FF5C</b><br>
+    fontes <b>Michroma / Share Tech Mono</b><br>
+    tempos <b>120 / 220 / 700 ms</b>
+  </div>
+</header>
+
+<section>
+  <h2><span>01</span>Principio</h2>
+  <div class="cols">
+    <ul class="l">
+      <li><b>Traseira = menu.</b> Todo controle vive num conector, chave ou display que existe no equipamento real.</li>
+      <li><b>Tampa aberta = preferencias.</b> Calibracao, kpps, limites de scan, ILDA in/out.</li>
+      <li><b>A parede e o output.</b> Preview de ILDA nao e um retangulo de UI: e feixe em nevoa.</li>
+    </ul>
+    <ul class="l">
+      <li><b>Funcao antes de UI.</b> Cada elemento responde "que peca do laser e essa". Se a resposta e "e um card", corta.</li>
+      <li><b>Um material.</b> Aluminio anodizado preto opaco. A unica coisa que transmite luz e a nevoa.</li>
+      <li><b>CLI sempre visivel.</b> Quem aprende a GUI aprende o verbo <code>spell</code> de graca.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2><span>02</span>Cor</h2>
+  <div class="grid">
+    <div class="sw"><span class="chip" style="background:#050608"></span><div class="txt">
+      <div class="n">--bg</div><div class="h">#050608</div><div class="u">Fundo da sala e do corpo. Preto anodizado, nunca cinza.</div></div></div>
+    <div class="sw"><span class="chip" style="background:#07090C"></span><div class="txt">
+      <div class="n">--panel</div><div class="h">#07090C</div><div class="u">Painel opaco. Sem blur, sem vidro.</div></div></div>
+    <div class="sw"><span class="chip" style="background:#38FF5C;box-shadow:var(--glow-on)"></span><div class="txt">
+      <div class="n">--las</div><div class="h">#38FF5C</div><div class="u">Acento do feixe. Ativo, LIVE, armado, valor corrente.</div></div></div>
+    <div class="sw"><span class="chip" style="background:#FFB000"></span><div class="txt">
+      <div class="n">--amb</div><div class="h">#FFB000</div><div class="u">Aviso, pendente, LEARN em curso, eco de CLI. Nunca estado final.</div></div></div>
+    <div class="sw"><span class="chip" style="background:#FF2A1A"></span><div class="txt">
+      <div class="n">--red</div><div class="h">#FF2A1A</div><div class="u">Perigo, desarmado, e-stop, interlock aberto, SCAN FAIL.</div></div></div>
+    <div class="sw"><span class="chip" style="background:#9FF5D0"></span><div class="txt">
+      <div class="n">--oled</div><div class="h">#9FF5D0</div><div class="u">So o display fisico da traseira. Nenhum outro elemento usa.</div></div></div>
+    <div class="sw"><span class="chip" style="background:#3A6BFF"></span><div class="txt">
+      <div class="n">--blue</div><div class="h">#3A6BFF</div><div class="u">Sinal externo (ILDA/DMX de fora). Uso raro; nao e segundo acento.</div></div></div>
+    <div class="sw"><span class="chip" style="background:#E6EBEF"></span><div class="txt">
+      <div class="n">--fg</div><div class="h">#E6EBEF</div><div class="u">Texto de leitura.</div></div></div>
+    <div class="sw"><span class="chip" style="background:#7C8791"></span><div class="txt">
+      <div class="n">--dim</div><div class="h">#7C8791</div><div class="u">Rotulo e metadado. Nunca informacao critica.</div></div></div>
+    <div class="sw"><span class="chip" style="background:#1A2026"></span><div class="txt">
+      <div class="n">--line / --line-2</div><div class="h">#1A2026 / #2A333C</div><div class="u">Aresta usinada e aresta iluminada.</div></div></div>
+  </div>
+  <p class="note">Estado nunca e comunicado so por cor: sempre cor + rotulo + posicao.</p>
+</section>
+
+<section>
+  <h2><span>03</span>Tipografia e escala</h2>
+  <div class="type-row"><div class="lbl">--fs-6 · 34</div><div style="font-family:var(--font-disp);font-size:var(--fs-6)">SPELLCASTER</div></div>
+  <div class="type-row"><div class="lbl">--fs-5 · 18</div><div style="font-family:var(--font-disp);font-size:var(--fs-5)">Titulo de tela</div></div>
+  <div class="type-row"><div class="lbl">--fs-4 · 15</div><div style="font-size:var(--fs-4)">Texto lido de longe, corpo do documento</div></div>
+  <div class="type-row"><div class="lbl">--fs-3 · 13</div><div style="font-size:var(--fs-3)">CLI, bloco de comando, valor grande</div></div>
+  <div class="type-row"><div class="lbl">--fs-2 · 12</div><div style="font-size:var(--fs-2)">Corpo da UI do aparelho: linha de painel, botao</div></div>
+  <div class="type-row"><div class="lbl">--fs-1 · 11</div><div style="font-size:var(--fs-1)">Rotulo, sub, binding, metadado</div></div>
+  <div class="type-row"><div class="lbl">--fs-0 · 10</div><div style="font-size:var(--fs-0)">HUD de aviso, tag em botao de tabela</div></div>
+  <p class="note">Michroma so em titulo e HUD de titulo. Share Tech Mono em todo o resto. Sem terceira familia.</p>
+  <div class="scale">
+    <span>--s1 4</span><span>--s2 8</span><span>--s3 12</span><span>--s4 16</span><span>--s6 24</span><span>--s8 32</span>
+    <span>--chamfer 14</span><span>--chamfer-room 30</span>
+    <span>--t-fast 120</span><span>--t-ui 220</span><span>--t-cam 700</span>
+  </div>
+</section>
+
+<section>
+  <h2><span>04</span>Botao laser <code>.lb</code></h2>
+  <div class="bench">
+    <button class="lb">ARM</button>
+    <button class="lb on">ARM <small>A</small></button>
+    <button class="lb amb">CALIBRAR</button>
+    <button class="lb red">E-STOP</button>
+    <button class="lb red on">DESARMADO</button>
+    <button class="lb" disabled>BLANK</button>
+  </div>
+  <p class="note">Contorno do acento; preenchimento so quando ativo. Desabilitado nao brilha. Foco: outline branco 2px, offset 2px — teste com Tab.</p>
+</section>
+
+<section>
+  <h2><span>05</span>HUD, tooltip e OLED</h2>
+  <div class="stage">
+    <div class="beam"></div>
+    <div class="wall"><div class="t">SPELLCASTER LASER</div></div>
+    <div class="floor"></div>
+    <div class="hud title" style="left:20px;top:16px">SALA · NEVOA 40%</div>
+    <div class="hud" style="left:20px;top:44px">LIVE · 30 kpps · 1 universo</div>
+    <div class="hud cli" style="left:20px;top:64px">spell ilda play show.ild --kpps 30</div>
+    <div class="hud warn" style="left:20px;bottom:52px">MPE ATIVO · NAO OLHE PARA A ABERTURA</div>
+    <div class="hud danger" style="left:20px;bottom:34px">INTERLOCK: ABERTO</div>
+    <div id="tipdemo" class="tip" style="right:24px;top:22px;display:block">DIODO VERDE · 520 nm</div>
+    <div class="oledbox" style="position:absolute;right:24px;bottom:34px">LIVE&nbsp;&nbsp;30 kpps<br>ILDA IN&nbsp;&nbsp;OK</div>
+  </div>
+  <p class="note">HUD nunca recebe clique. Tooltip e etiqueta de bancada: verde solido, texto preto, sem seta.</p>
+</section>
+
+<section>
+  <h2><span>06</span>Painel <code>.panel</code> e balao do Pino <code>.bal</code></h2>
+  <div class="stage tall">
+    <div class="panel demo" style="left:24px;top:24px;width:300px">
+      <span class="x">x</span>
+      <h3>SCANNER</h3>
+      <div class="sub">tampa aberta · preferencias</div>
+      <div class="row"><label for="r1">kpps</label><input id="r1" type="range" min="8" max="40" value="30"><span class="v">30</span></div>
+      <div class="row"><label for="r2">size</label><input id="r2" type="range" min="0" max="100" value="72"><span class="v">72%</span></div>
+      <div class="row"><label for="r3">blank shift</label><input id="r3" type="range" min="0" max="12" value="4"><span class="v">4</span></div>
+      <div class="btns">
+        <button class="lb on">ILDA IN</button>
+        <button class="lb">TESTE</button>
+        <button class="lb red">DESARMAR</button>
+      </div>
+      <pre style="margin-top:10px"><b>$</b> spell ilda play show.ild --kpps 30</pre>
+    </div>
+
+    <div class="bal demo on" style="right:24px;bottom:28px;transform:none">
+      <span class="x">x</span>
+      <b>Pino</b>
+      Interlock aberto. Sem interlock, sem feixe.
+      <ul>
+        <li>Fechar interlock <small>I</small></li>
+        <li>Ver estado do scanner <small>S</small></li>
+        <li>Abrir preferencias <small>,</small></li>
+      </ul>
+      <div class="hint">A unica coisa de software na cena. De proposito.</div>
+    </div>
+  </div>
+  <p class="note">Painel opaco, chanfro 14px, linhas no grid rotulo · controle · valor. Balao Win98 seco, nao cartoon.</p>
+</section>
+
+<section>
+  <h2><span>07</span>Bindings · tecla e MIDI, in e out</h2>
+  <div class="panel demo" style="position:relative;width:min(560px,100%);box-sizing:border-box">
+    <h3>KEY BINDING</h3>
+    <div class="sub">persistido em localStorage <code>sc-laser-bind</code></div>
+    <table>
+      <tr><td class="k">arm</td><td class="b">A · note 36 ch1 (out)</td><td style="text-align:right"><button class="lb">LEARN</button></td></tr>
+      <tr><td class="k">blackout</td><td class="b">ESC · note 37 ch1 (out)</td><td style="text-align:right"><button class="lb">LEARN</button></td></tr>
+      <tr><td class="k">kpps +/-</td><td class="b">CC 21 ch1</td><td style="text-align:right"><button class="lb learn">LEARN</button></td></tr>
+      <tr><td class="k">play cue</td><td class="b">sem binding</td><td style="text-align:right"><button class="lb">LEARN</button></td></tr>
+    </table>
+    <div class="sub" style="margin:10px 0 0">MIDI out acende o pad quando ARM liga. Binding e bidirecional por padrao.</div>
+  </div>
+  <p class="note">Enquanto o botao pulsa ambar, o proximo evento de tecla ou MIDI captura. <code>prefers-reduced-motion</code> desliga o pulso; o ambar fica.</p>
+</section>
+
+<section>
+  <h2><span>08</span>Sala <code>.room</code></h2>
+  <div class="room" style="height:300px">
+    <div class="beam" style="left:38%;transform:rotate(6deg);transform-origin:top center"></div>
+    <div class="beam" style="left:56%;transform:rotate(-5deg);transform-origin:top center;opacity:.35"></div>
+    <div class="wall"><div class="t">OUTPUT</div></div>
+    <div class="hud" style="left:20px;bottom:44px">chanfro 30px nos cantos · recorte trapezoidal na base</div>
+    <div class="hud warn" style="left:20px;bottom:26px">A SALA NUNCA E RETANGULAR</div>
+  </div>
+</section>
+
+<section>
+  <h2><span>09</span>Estados do aparelho</h2>
+  <table class="t">
+    <tr><th>Estado</th><th>Feixe</th><th>OLED</th><th>LED de emissao</th><th>UI</th></tr>
+    <tr><td class="k"><span class="dot" style="background:#2A333C"></span>DESLIGADO</td><td>ausente</td><td>apagado</td><td>apagado</td><td>paineis disabled; sala escura; so a chave de forca responde</td></tr>
+    <tr><td class="k"><span class="dot" style="background:var(--amb)"></span>STANDBY</td><td>ausente</td><td>STANDBY / INTERLOCK OK</td><td>ambar piscando lento</td><td>controles editaveis, ARM disponivel; HUD ambar "sem emissao"</td></tr>
+    <tr><td class="k"><span class="dot" style="background:var(--red)"></span>SCAN FAIL</td><td>cortado imediatamente</td><td>SCAN FAIL invertido</td><td>vermelho fixo</td><td>ARM em .red.on, output travado ate reset; Pino explica</td></tr>
+    <tr><td class="k"><span class="dot" style="background:var(--las)"></span>LIVE</td><td>visivel na nevoa</td><td>LIVE · 30 kpps</td><td>verde fixo</td><td>HUD verde, CLI ecoando, e-stop sempre alcancavel</td></tr>
+  </table>
+  <p class="note">Nunca ir de DESLIGADO direto a LIVE. SCAN FAIL so sai por reset explicito. Perda de interlock cai para SCAN FAIL, nao para STANDBY.</p>
+</section>
+
+<section>
+  <h2><span>10</span>Camera · padrao SolidWorks</h2>
+  <table class="t">
+    <tr><th>Gesto</th><th>Acao</th></tr>
+    <tr><td class="k">MMB arrastar</td><td>gira em torno do <b>ponto clicado</b>, nao do centro da cena</td></tr>
+    <tr><td class="k">Ctrl + MMB</td><td>pan</td></tr>
+    <tr><td class="k">Shift + MMB</td><td>zoom</td></tr>
+    <tr><td class="k">Roda</td><td>zoom no cursor, direcao <b>invertida por padrao</b>, com toggle nas preferencias</td></tr>
+    <tr><td class="k">Botao esquerdo no vazio</td><td>tambem gira — quem nao tem botao do meio nao fica de fora</td></tr>
+  </table>
+  <div class="keys">
+    <span><kbd>&larr;</kbd><kbd>&rarr;</kbd><kbd>&uarr;</kbd><kbd>&darr;</kbd> <b>gira 15&deg;</b></span>
+    <span><kbd>Shift</kbd>+setas <b>90&deg;</b></span>
+    <span><kbd>Ctrl</kbd>+setas <b>pan</b></span>
+    <span><kbd>F</kbd> <b>enquadra</b></span>
+    <span><kbd>Ctrl</kbd>+<kbd>1</kbd>..<kbd>7</kbd> <b>vistas padrao</b></span>
+    <span><kbd>A</kbd> <b>arm</b></span>
+    <span><kbd>Esc</kbd> <b>blackout</b></span>
+    <span><kbd>I</kbd> <b>interlock</b></span>
+    <span><kbd>,</kbd> <b>preferencias</b></span>
+    <span><kbd>Space</kbd> <b>play/pause</b></span>
+  </div>
+  <p class="note">Todo movimento de camera em --t-cam (700 ms) com ease-out. Sem inercia infinita.</p>
+</section>
+
+<section>
+  <h2><span>11</span>Movimento, som e texto</h2>
+  <div class="cols">
+    <div>
+      <div class="eyebrow">Splash, uma vez</div>
+      <ul class="l">
+        <li>O foco sai do ponto estatico e vai para a <b>parede</b>, ignorando o laser e a traseira.</li>
+        <li>O feixe <b>contorna</b> SPELLCASTER LASER em movimento dinamico.</li>
+        <li>As letras sao <b>reveladas</b> e ficam na parede.</li>
+        <li>Todas <b>brilham</b> ao fechar o contorno.</li>
+        <li>A camera <b>voa para a traseira</b> (menu) ou para a tampa (preferencias).</li>
+        <li>O laser <b>apaga</b> e a luz da sala <b>baixa</b>.</li>
+      </ul>
+    </div>
+    <div>
+      <div class="eyebrow">Som</div>
+      <ul class="l">
+        <li>Jingle de <b>onda quadrada</b> na splash. Sem sample.</li>
+        <li><b>Blip</b> ao revelar letra e ao capturar LEARN.</li>
+        <li><b>Clique</b> seco de botao fisico em <code>.lb</code>.</li>
+        <li><b>Acorde descendente</b> ao desarmar ou entrar em SCAN FAIL.</li>
+        <li>Mudo e padrao respeitado e persistido.</li>
+      </ul>
+      <div class="eyebrow" style="margin-top:16px">Voz do Pino</div>
+      <ul class="l">
+        <li>Bom: <b>Interlock aberto. Sem interlock, sem feixe.</b></li>
+        <li>Ruim: Ops! Parece que algo deu errado :(</li>
+      </ul>
+      <div class="cli-line">spell ilda play show.ild --kpps 30</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span>12</span>Acessibilidade</h2>
+  <ul class="l">
+    <li><b>Foco visivel</b> obrigatorio em todo controle, inclusive dentro da cena 3D: outline branco 2px, offset 2px. Ordem de tab segue a leitura do painel.</li>
+    <li><b>prefers-reduced-motion</b>: sem splash animada, sem pulso do LEARN, sem transicao de painel. A informacao continua toda presente por cor e texto.</li>
+    <li><b>Contraste</b> — pares aprovados sobre --bg/--panel: --fg, --las, --amb, --oled, e --dim so para rotulo. --red aprovado para icone e borda; texto longo em vermelho, nao.</li>
+    <li>Alvo de clique minimo <b>24px</b> na cena, mesmo quando a peca modelada e menor.</li>
+  </ul>
+</section>
+
+<section>
+  <h2><span>13</span>O que NAO fazer</h2>
+  <ul class="no">
+    <li><b>Software quadradao.</b> Grid de cards, sidebar, barra de titulo de app. Se parece dashboard, esta errado.</li>
+    <li><b>Painel transparente.</b> Vidro, blur, translucidez na UI. O unico material que transmite luz e a nevoa.</li>
+    <li><b>Elemento sem funcao.</b> Dois interlocks, fusivel decorativo, LED que nao indica nada. Um interlock. Sem fusivel.</li>
+    <li><b>Cartoon.</b> Traco grosso, cor pastel, mascote fofo. O Pino e Win98 seco.</li>
+    <li>Terceira fonte, quarta cor de acento, espacamento fora da escala, tempo fora dos tres.</li>
+    <li>Glow como elevacao de card. Glow e feixe.</li>
+    <li>Cor sozinha carregando estado.</li>
+  </ul>
+</section>
+
+</div>
+
+<script>
+(function () {
+  document.querySelectorAll('.panel .row input[type=range]').forEach(function (r) {
+    var v = r.parentNode.querySelector('.v'), suf = /%/.test(v.textContent) ? '%' : '';
+    r.addEventListener('input', function () { v.textContent = r.value + suf; });
+  });
+  document.querySelectorAll('.panel td .lb').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var on = b.classList.toggle('learn');
+      b.textContent = on ? 'ESCUTANDO' : 'LEARN';
+    });
+  });
+  var bal = document.querySelector('.bal.demo');
+  bal.querySelector('.x').addEventListener('click', function () { bal.classList.remove('on'); });
+  bal.parentNode.addEventListener('click', function (e) {
+    if (!bal.contains(e.target)) bal.classList.add('on');
+  });
+})();
+</script>

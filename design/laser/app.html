@@ -1,0 +1,81 @@
+<title>Spellcaster Laser</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Michroma&family=Share+Tech+Mono&display=swap">
+<link rel="stylesheet" href="tokens.css">
+<style>
+  #stage { height:760px; }
+  #gl { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+  #stage.dz::after { content:"solta o .ild na porta ILDA IN"; position:absolute; inset:0; display:grid; place-items:center; font-family:var(--font-disp); font-size:24px; color:var(--las); background:rgba(0,0,0,.6); pointer-events:none; z-index:9; }
+  #ttl { left:30px; top:22px; } #sub { left:30px; top:48px; opacity:.85; }
+  #st1 { right:30px; top:22px; text-align:right; } #st2 { right:30px; top:44px; font-size:var(--fs-1); opacity:.8; text-align:right; } #cli { right:30px; top:64px; text-align:right; }
+  #warn { left:30px; bottom:12px; } #midi { right:30px; bottom:12px; font-size:var(--fs-0); color:var(--dim); }
+  #cams { position:absolute; left:30px; top:78px; display:flex; gap:8px; z-index:4; flex-wrap:wrap; max-width:640px; }
+  #panel { right:150px; top:96px; width:300px; display:none; } #panel.on { display:block; } #panel.wide { width:560px; right:60px; max-height:620px; overflow:auto; }
+  #panel .cv { margin:4px 0 8px; display:block; border:1px solid var(--line); }
+  #panel td small.ad { color:var(--amb); opacity:.85; margin-left:6px; } #panel .eyebrow { margin:10px 0 4px; }
+  #panel pre.js { max-height:200px; overflow:auto; font-size:var(--fs-1); line-height:1.4; color:var(--fg); user-select:text; }
+  #panel tr.hit td { animation:hit .5s; } @keyframes hit { from { background:rgba(56,255,92,.4); } }
+  #splash { position:absolute; inset:0; display:grid; place-items:end center; padding-bottom:44px; z-index:7; font-size:var(--fs-2); color:var(--las); text-shadow:0 0 8px var(--las); pointer-events:none; }
+  #splash.off { display:none; } #splash span { animation:blink 1s steps(2) infinite; } @keyframes blink { 50% { opacity:0; } }
+  #saved { color:var(--dim); font-size:12px; margin-left:10px; } input[type=file] { display:none; }
+  @media (prefers-reduced-motion:reduce) { #splash span { animation:none; } }
+</style>
+<div class="doc">
+  <div class="eyebrow">Spellcaster · departamento de design · rodada 6 · a ferramenta de laser, módulo do orquestrador</div>
+  <h1>Laser 10 W, tema LASER, iterado</h1>
+  <p>O programa continua sendo o projetor. Nesta rodada ele ficou de verdade: traseira de laser show (powerCON, chave, um interlock, ILDA IN/OUT, DMX IN/OUT, NET, USB, OLED com encoder, ventoinha axial de 60 mm), interior com mesa óptica de alumínio e o caminho óptico completo (três módulos, dois dicroicos, espelho de dobra, obturador, bloco de galvos X/Y), feixe em GLSL com bloom, câmera no padrão SolidWorks, qualquer ação vira tecla ou MIDI (in e out) com LEARN, e o <b>Pino</b> virou um cabo DMX de verdade plugado no DMX OUT. Abre olhando para a parede: o laser contorna o nome, as letras acendem, e a câmera vai para o menu. Só depois de armar a chave a vista do show libera.</p>
+  <div class="keys"><span><b>botão do meio</b> gira em torno do ponto clicado</span><span><b>Ctrl+meio</b> pan</span><span><b>Shift+meio</b> zoom</span><span><b>roda</b> zoom no cursor</span><span><b>setas</b> 15° · <b>Shift</b> 90° · <b>Ctrl</b> pan</span><span><b>F</b> enquadra</span><span><b>Ctrl+1..7</b> vistas</span><span><b>1 2 3</b> show · trás · dentro</span><span><b>S</b> chave</span><span><b>B</b> bindings</span><span><b>N</b> info</span><span><b>pino 3</b> orquestrador</span><span><b>arraste</b> um .ild</span></div>
+  <div id="stage" class="room">
+    <canvas id="gl"></canvas>
+    <div class="hud title" id="ttl">SPELLCASTER</div><div class="hud" id="sub">LASER 10 W RGB · RODADA 6</div>
+    <div class="hud" id="st1"></div><div class="hud" id="st2"></div><div class="hud cli" id="cli">spell ilda play show.ild --kpps 30</div>
+    <div class="hud warn" id="warn">PERIGO · LASER CLASSE 4 · 10 W · NÃO OLHE PARA O FEIXE</div><div class="hud" id="midi"></div>
+    <div id="cams"><button class="lb" data-a="cam.show" disabled>1 SHOW</button><button class="lb on" data-a="cam.rear">2 TRÁS · MENU</button><button class="lb" data-a="cam.inside">3 DENTRO · PREFERÊNCIAS</button><button class="lb red" data-a="key.toggle" id="keyb">CHAVE: DESARMADO</button><button class="lb" data-a="bind">B BINDINGS</button></div>
+    <div class="tip" id="tip"></div>
+    <div class="panel" id="panel"><span class="x">×</span><div id="pbody"></div></div>
+    <div id="splash"><span>ESC PULA</span></div>
+    <input type="file" id="file" accept=".ild,.ilda">
+  </div>
+
+  <section><h2><span>01</span>o que mudou da rodada 4</h2>
+    <ul class="l">
+      <li><b>Traseira real.</b> Layout inspirado no Clubmax, sem fusível e com um interlock só. Cada porta continua sendo o que é: ILDA IN carrega o .ild, NET abre NDI · Spout · Art-Net · sACN, DMX IN dá o endereço, a chave arma, o OLED com encoder e BACK é o menu do painel.</li>
+      <li><b>Dentro, nada voando.</b> Uma mesa óptica de alumínio natural parafusada no fundo, um bloco só; em cima dela os três módulos em bases, dois dicroicos e o espelho de dobra em suportes cinemáticos com parafusos de ajuste, o obturador que fecha sem chave, e o bloco de galvos em cantoneira com os dois motores. Drivers e fonte ficam nas paredes, escuros, com cabos que vão de um ponto a outro.</li>
+      <li><b>Feixe em GLSL.</b> Cilindros instanciados com núcleo e halo, poeira animada, aditivo, bloom. O caminho óptico inteiro acende quando a chave arma; o obturador corta.</li>
+      <li><b>Câmera SolidWorks.</b> Botão do meio gira em torno do que você clicou; Ctrl pan, Shift zoom, roda no cursor (sentido SolidWorks, com toggle nas bindings), setas, F, Ctrl+1..7.</li>
+      <li><b>Bindings.</b> <code>B</code> abre a tabela: qualquer ação vira tecla ou evento MIDI (note ou CC, com canal). O estado volta para o controlador (feedback de LED e fader). Tudo persistido.</li>
+      <li><b>Pino 3D.</b> Um cabo DMX plugado no DMX OUT, com a ponta macho em pé em cima do case. Os pinos são botões de verdade na cena.</li>
+      <li><b>Comando equivalente:</b> <code>spell ilda play show.ild --kpps 30</code>; cada porta e componente tem o seu, sempre no canto.</li>
+      <li><b>Rodada 6 · orquestrador.</b> O projetor é o módulo <code>laser/1</code> do graph: cada ação tem endereço (<code>laser/1/kpps</code>, <code>laser/1/limit/r</code>, <code>laser/1/net/sacn</code>…) ao lado do rótulo em BINDINGS, e cada binding é uma rota <code>midi/cc:1:7 → lag → laser/1/kpps</code>. O pino 3 do Pino abre o painel ORQUESTRADOR com o manifesto (<code>module.json</code>), as rotas ativas piscando quando a ação roda, e o trecho <code>graph</code> do <code>.spell</code> para copiar. Comando: <code>spell graph add laser/1</code>.</li>
+    </ul></section>
+
+  <section><h2><span>02</span>arco 5E</h2>
+    <ul class="l"><li><b>Excitement</b> · a câmera mira o output; um ponto vermelho estacionado.</li><li><b>Entry</b> · o galvo contorna SPELLCASTER LASER; as letras acendem; o laser apaga e a luz da sala baixa; a câmera pousa na traseira.</li><li><b>Engagement</b> · arma a chave, o show libera; portas, tampa, componentes, bindings.</li><li><b>Exit</b> · gira a chave: obturador fecha, acorde final.</li><li><b>Extension</b> · bindings e kpps lembrados na próxima abertura.</li></ul></section>
+
+  <section id="vote"><h2><span>03</span>voto</h2>
+    <div class="q"><span class="eyebrow">traseira</span><div class="opts" data-q="traseira"><button data-v="sim">SIM</button><button data-v="ajustar">AJUSTAR</button><button data-v="nao">NÃO</button></div></div>
+    <div class="q"><span class="eyebrow">interior e caminho óptico</span><div class="opts" data-q="dentro"><button data-v="sim">SIM</button><button data-v="ajustar">AJUSTAR</button><button data-v="nao">NÃO</button></div></div>
+    <div class="q"><span class="eyebrow">splash: parede, contorno, câmera para o menu</span><div class="opts" data-q="splash"><button data-v="sim">SIM</button><button data-v="ajustar">AJUSTAR</button><button data-v="nao">NÃO</button></div></div>
+    <div class="q"><span class="eyebrow">câmera SolidWorks</span><div class="opts" data-q="camera"><button data-v="sim">SIM</button><button data-v="ajustar">AJUSTAR</button><button data-v="nao">NÃO</button></div></div>
+    <div class="q"><span class="eyebrow">bindings e MIDI</span><div class="opts" data-q="bind"><button data-v="sim">SIM</button><button data-v="ajustar">AJUSTAR</button><button data-v="nao">NÃO</button></div></div>
+    <div class="q"><span class="eyebrow">Pino 3D</span><div class="opts" data-q="pino"><button data-v="sim">SIM</button><button data-v="ajustar">AJUSTAR</button><button data-v="nao">NÃO</button></div></div>
+    <div class="q"><span class="eyebrow">notas</span><textarea id="notas" placeholder="o que ficou, o que sai, o que faltou"></textarea></div>
+    <button class="save" id="save">SALVAR VOTO</button><span id="saved"></span>
+  </section>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/FXAAShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script src="ilda.js"></script>
+<script src="cam.js"></script>
+<script src="bind.js"></script>
+<script src="mat.js"></script>
+<script src="body.js"></script>
+<script src="optics.js"></script>
+<script src="beam.js"></script>
+<script src="pino3d.js"></script>
+<script src="app.js"></script>

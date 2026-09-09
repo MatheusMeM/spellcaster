@@ -1,0 +1,211 @@
+{
+ "nodes": [
+  {
+   "uid": "key",
+   "type": "in.key"
+  },
+  {
+   "uid": "midi",
+   "type": "in.midi"
+  },
+  {
+   "uid": "laser/1",
+   "type": "laser",
+   "params": {
+    "geo/scale": 1,
+    "limit/r": 1,
+    "curve/r": 1,
+    "limit/g": 1,
+    "curve/g": 1,
+    "limit/b": 1,
+    "curve/b": 1,
+    "dmx/addr": 1,
+    "queue": 3
+   },
+   "mute": false,
+   "lock": false,
+   "enabled": true
+  },
+  {
+   "uid": "lag/1",
+   "type": "filter.lag",
+   "params": {
+    "ms": 80
+   },
+   "mute": false,
+   "lock": false,
+   "enabled": true
+  },
+  {
+   "uid": "lag/2",
+   "type": "filter.lag",
+   "params": {
+    "ms": 80
+   },
+   "mute": false,
+   "lock": false,
+   "enabled": true
+  },
+  {
+   "uid": "lag/3",
+   "type": "filter.lag",
+   "params": {
+    "ms": 80
+   },
+   "mute": false,
+   "lock": false,
+   "enabled": true
+  },
+  {
+   "uid": "lag/4",
+   "type": "filter.lag",
+   "params": {
+    "ms": 80
+   },
+   "mute": false,
+   "lock": false,
+   "enabled": true
+  },
+  {
+   "uid": "lag/5",
+   "type": "filter.lag",
+   "params": {
+    "ms": 80
+   },
+   "mute": false,
+   "lock": false,
+   "enabled": true
+  }
+ ],
+ "wires": [
+  {
+   "from": "key/D",
+   "to": "laser/1/clip",
+   "args": {
+    "file": "demo.ild"
+   },
+   "muted": false
+  },
+  {
+   "from": "key/P",
+   "to": "laser/1/power",
+   "muted": false
+  },
+  {
+   "from": "key/S",
+   "to": "laser/1/arm",
+   "muted": false
+  },
+  {
+   "from": "key/Space",
+   "to": "laser/1/play",
+   "muted": false
+  },
+  {
+   "from": "key/[",
+   "to": "laser/1/kpps",
+   "args": {
+    "step": -1000
+   },
+   "muted": false
+  },
+  {
+   "from": "key/]",
+   "to": "laser/1/kpps",
+   "args": {
+    "step": 1000
+   },
+   "muted": false
+  },
+  {
+   "from": "midi/cc:1:10",
+   "to": "laser/1/limit/g",
+   "filter": "lag/1",
+   "muted": false
+  },
+  {
+   "from": "midi/cc:1:11",
+   "to": "laser/1/limit/b",
+   "filter": "lag/2",
+   "muted": false
+  },
+  {
+   "from": "midi/cc:1:7",
+   "to": "laser/1/kpps",
+   "filter": "lag/3",
+   "muted": false
+  },
+  {
+   "from": "midi/cc:1:8",
+   "to": "laser/1/geo/scale",
+   "filter": "lag/4",
+   "muted": false
+  },
+  {
+   "from": "midi/cc:1:9",
+   "to": "laser/1/limit/r",
+   "filter": "lag/5",
+   "muted": false
+  },
+  {
+   "from": "midi/note:1:60",
+   "to": "laser/1/arm",
+   "muted": false
+  },
+  {
+   "from": "midi/note:1:62",
+   "to": "laser/1/play",
+   "muted": false
+  },
+  {
+   "from": "midi/note:1:64",
+   "to": "laser/1/shutter",
+   "muted": false
+  }
+ ],
+ "states": [],
+ "view": {
+  "key": {
+   "x": 0,
+   "y": 0,
+   "collapsed": false
+  },
+  "midi": {
+   "x": 0,
+   "y": 120,
+   "collapsed": false
+  },
+  "laser/1": {
+   "x": 520,
+   "y": 60,
+   "collapsed": false,
+   "cam": "rear",
+   "fog": 0.85
+  },
+  "lag/1": {
+   "x": 260,
+   "y": 60,
+   "collapsed": false
+  },
+  "lag/2": {
+   "x": 260,
+   "y": 100,
+   "collapsed": false
+  },
+  "lag/3": {
+   "x": 260,
+   "y": 140,
+   "collapsed": false
+  },
+  "lag/4": {
+   "x": 260,
+   "y": 180,
+   "collapsed": false
+  },
+  "lag/5": {
+   "x": 260,
+   "y": 220,
+   "collapsed": false
+  }
+ }
+}
