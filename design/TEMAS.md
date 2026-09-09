@@ -12,7 +12,7 @@ Regra que amarra: **um tema é um material, e tudo na skin obedece ao material**
 | 2 | **NDI → ILDA** | Recebe vídeo NDI, extrai contornos (Canny + simplificação), vira frame ILDA em tempo real. `spell ilda from-ndi "RESOLUME (out)" --kpps 25`. | **FÓSFORO**: rack de broadcast dos anos 70. À esquerda um CRT raster (o NDI), à direita um osciloscópio vetorial (o ILDA). Fósforo verde, knobs Tektronix, ruído de linha. | 4 |
 | 3 | **Orquestrador** | O modo Chataigne: módulos (sACN, Art-Net, OSC, MIDI, NDI, ILDA), estados, sequências, mapeamentos. É o Graph do `PRINCIPIOS.md §1` visto de frente. `spell graph`. | **PATCHBAY**: central telefônica de 1960. Baquelite, jacks de latão, cabos de pano com física, etiquetas Dymo. Mapear = plugar cabo. Estado = lâmpada de válvula. | 5 |
 | 4 | **Cenas e cues DMX + cenário interativo** | Programa cenas (valores por fixture), cues (cena + fade + follow), e um menu de cenário onde se clica no aparelho na maquete. `spell cue`, `spell scene`, `spell patch`. | **TEATRO DE PAPEL**: maquete de palco de papelão. Aparelhos são recortes que acendem; cenas são bastidores que deslizam; cues são páginas do libreto. GO vira a página. | 6 |
-| 5 | **Pino** (companion) | O Clippy do Spellcaster e o **menu principal** de todas as skins. Um cabo DMX com plugue XLR-5 na cabeça: os cinco pinos são botões (1 ILDA, 2 NDI→ILDA, 3 orquestrador, 4 cenas e cues, 5 info), a trava manda ele embora. Vetor (`design/pino.js`), olhos que seguem o mouse, balão Win98. Sabe o contexto: avisa quando o galvo não acompanha, quando o frame pisca, quando um universo não responde. Lembra a última sessão. Substituiu o Aprendiz pixel no voto da rodada 3. | Não tem tema: é o mesmo em todas, como o Clippy era o mesmo em todos os Office. | 4 em diante |
+| 5 | **Pino** (companion) | O Clippy do Spellcaster e o **menu principal** de todas as skins. Um cabo DMX com plugue XLR-5 na cabeça: os cinco pinos são botões (1 ILDA, 2 NDI→ILDA, 3 orquestrador, 4 cenas e cues, 5 info), a trava manda ele embora. 3D (`design/laser/pino3d.js`), olhos que seguem o mouse, balão Win98. Sabe o contexto: avisa quando o galvo não acompanha, quando o frame pisca, quando um universo não responde. Lembra a última sessão. Substituiu o Aprendiz pixel no voto da rodada 3. | Não tem tema: é o mesmo em todas, como o Clippy era o mesmo em todos os Office. | 4 em diante |
 
 Ordem de build: 3 → 4 (o projetor 3D) → 5 → 6, uma função por rodada, cada uma com voto. O Pino cresce a cada rodada. O NDI → ILDA (FÓSFORO) aparece na porta ETHER do projetor.
 
@@ -35,7 +35,7 @@ Mesma sequência sempre, veste-se de tema: **Excitement** = ligar (o material ac
 - Splash cracktro com jingle Web Audio sintetizado (zero mídia): aprovado, vira padrão de Entry.
 - Fragment shader WebGL para material físico (raymarching, refração, dispersão, absorção): guardado para FÓSFORO (vidro do CRT) e PATCHBAY (latão).
 - Face em CSS 3D com a mesma matriz do shader: guardado para qualquer tela com objeto 3D.
-- Leitor `.wmz`: descartado (voto). Fica em `rodada2/` como referência de formato.
+- Leitor `.wmz`: descartado (voto). O leitor está só no git (`design/rodada2/wmzparse.py`, commit `6fe8b23`).
 - Gels Lee/Rosco como filtro físico: guardado para TEATRO DE PAPEL (gelatina de verdade na frente do recorte).
 - Voto dentro do protótipo com `db`: padrão de todas as rodadas.
 
