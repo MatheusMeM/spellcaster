@@ -349,11 +349,12 @@ MCP, Rhai e laser.
 ## Ordem de avaliação de um frame (fixa; é o que a conformidade mede)
 
 1. `Timeline::apply(&mut universes, t)` — tracks `dmx` e `artnet`.
-2. O programmer (`player::Prog`): o override manual do operador, HTP por canal.
-3. Cada `FrameHook` na ordem em que foi registrado (tracks `fx` na ordem do `.spell`, depois o Graph).
-4. Tracks de efeito colateral: `osc` e `media` não-Capture (envia quando o valor muda), `cue`
+2. Tracks de efeito colateral: `osc` e `media` não-Capture (envia quando o valor muda), `cue`
    (`crossed(prev, t)` dispara `CueList::go`).
-5. `CueList::update(t)` escreve o snapshot corrente nos Universes.
+3. `CueList::update(t)` escreve o snapshot corrente nos Universes.
+4. O programmer (`player::Prog`): o override manual do operador, HTP por canal, por cima da
+   timeline **e** da cue viva — o operador sobrepõe o que a cue está segurando.
+5. Cada `FrameHook` na ordem em que foi registrado (tracks `fx` na ordem do `.spell`, depois o Graph).
 6. I/O: cada universo escrito vai para todas as saídas.
 
 Igual ao `_tick` + `_side` do Python.
@@ -504,24 +505,24 @@ em `base()` por `edit::register`. Todo comando age no `OPEN`; sem show aberto, a
 
 `profiles/` é a primeira que existir entre: ao lado do `.spell`, um nível acima dele (`shows/` e
 `profiles/` irmãos, como no repo e no pendrive), o cwd e a pasta do executável. O perfil é lido
-para nome, footprint (`max(offset, fine) + 1`) e nomes de canal (é o que `fixture_set` resolve);
-faixas e roda só viajam cruas no `profile_get`. Teste: `engine/tests/edit.rs`, binário próprio
+para nome e footprint (`max(offset, fine) + 1`); `fixture_set` resolve o nome do canal no JSON
+cru do próprio perfil; faixas e roda só viajam cruas no `profile_get`. Teste: `engine/tests/edit.rs`, binário próprio
 porque `OPEN` é um por processo.
 
 ### Programmer — a camada manual do operador (tema TEATRO DE PAPEL)
 
 `Prog`, em `player.rs`: um `Option<u8>` por canal (valor e máscara de "tocado" na mesma
-estrutura), aplicado **depois de `Timeline::apply` e antes dos ganchos**, HTP por canal. Soltar
-um canal zera o valor preso no buffer no frame seguinte, antes da timeline, para o que a
-timeline possui voltar a valer. O programmer não vai para o `.spell`: quem grava é a cue.
+estrutura), aplicado **depois de `CueList::update` e antes dos ganchos**, HTP por canal: o
+operador sobrepõe a cue viva no mesmo canal. Soltar um canal zera o valor preso no buffer no
+frame seguinte, antes da timeline, para o que a timeline possui voltar a valer. O programmer não vai para o `.spell`: quem grava é a cue.
 
 | Comando | Faz | Devolve |
 |---|---|---|
-| `level_set(universe=1, address, value \| values)` | escreve no override; HTP sobre a timeline | quantos canais |
+| `level_set(universe=1, address, values)` | escreve no override a partir de `address`; HTP sobre a timeline e a cue viva; lista vazia escreve zero | quantos canais |
 | `level_clear(universe?)` | solta um universo, ou todos | quantos canais saíram |
 | `level_get(universe?)` | o override atual, no formato `values` de cue | `{"u/end": v}` |
 | `cue_capture(name, fade, wait, follow)` | o override vira cue nova no fim da lista (mesma via de `cue_set`) e o override é solto | índice |
-| `fixture_set(name, channel, value)` | resolve fixture do patch + nome do canal no perfil (ou o offset como número) e chama `level_set` | `{universe, address, value}` |
+| `fixture_set(name, channel, value)` | resolve fixture do patch + nome do canal no perfil e chama `level_set` | `{universe, address, value}` |
 
 Sem player vivo, os cinco devolvem `sem player em execucao`. Teste: `engine/tests/programmer.rs`,
 binário próprio (`CURRENT` e `OPEN` são globais do processo).

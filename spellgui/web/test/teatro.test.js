@@ -90,9 +90,7 @@ test("posicao padrao espalha em fileira e a salva manda", () => {
     { name: "b", profile: "dimmer_1", universe: 1, address: 2, pos: [0.5, 0.9] },
   ];
   const fs = T.look(patch, perfis, {});
-  assert.strictEqual(fs[0].pos, null);
-  assert.deepStrictEqual(fs[1].pos, [0.5, 0.9]);
-  const [x0] = T.posicao(fs[0], 2);
+  const [x0] = fs[0].pos;
   assert.ok(x0 > 0 && x0 < 1, "posicao padrao dentro da tela: " + x0);
-  assert.deepStrictEqual(T.posicao(fs[1], 2), [0.5, 0.9]);
+  assert.deepStrictEqual(fs[1].pos, [0.5, 0.9], "a posicao salva manda");
 });

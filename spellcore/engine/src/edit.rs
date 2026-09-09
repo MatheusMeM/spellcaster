@@ -95,9 +95,6 @@ fn lista<'a>(sh: &'a mut Show, k: &str) -> &'a mut Vec<Value> {
 struct Perfil {
     name: String,
     size: u16,
-    /// (nome do canal, offset). Canal sem `name` ou sem `offset` fica de fora, mas continua
-    /// contando no footprint (`size` sai do maior offset/fine).
-    chans: Vec<(String, u16)>,
     json: Value,
 }
 
@@ -126,21 +123,9 @@ fn perfil(dir: &Path, p: &str) -> Result<Perfil, String> {
     if m > 511 {
         return Err(format!("{}: offset {} fora de 0..511", name, m));
     }
-    let chans = v["channels"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|c| {
-            Some((
-                c["name"].as_str()?.to_string(),
-                c["offset"].as_u64()? as u16,
-            ))
-        })
-        .collect();
     Ok(Perfil {
         name,
         size: m as u16 + 1,
-        chans,
         json: v,
     })
 }
@@ -415,12 +400,9 @@ pub struct LevelSetArgs {
     pub universe: u16,
     /// Primeiro canal DMX (1..512).
     pub address: u16,
-    /// Um valor 0..255; use `values` para escrever varios canais seguidos.
+    /// Valores 0..255 a partir de `address`; lista vazia escreve zero no canal.
     #[serde(default)]
-    pub value: Option<f64>,
-    /// Valores a partir de `address`.
-    #[serde(default)]
-    pub values: Option<Vec<f64>>,
+    pub values: Vec<f64>,
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -648,10 +630,10 @@ pub fn register(r: &mut Registry) {
         "level_set",
         "Programmer: escreve valores no override manual, por cima da timeline (HTP). Exige player em execucao.",
         |a| {
-            let v = match (a.value, a.values) {
-                (_, Some(v)) => v,
-                (Some(x), None) => vec![x],
-                (None, None) => return Err("level_set: passe value ou values".into()),
+            let v = if a.values.is_empty() {
+                vec![0.0]
+            } else {
+                a.values
             };
             let h = vivo()?;
             h.level_set(a.universe, a.address, &v);
@@ -661,12 +643,7 @@ pub fn register(r: &mut Registry) {
     r.add::<LevelArgs>(
         "level_clear",
         "Solta o override do programmer (um universo, ou todos sem universe). Devolve quantos canais sairam.",
-        |a| {
-            let h = vivo()?;
-            let n = h.levels(a.universe).len();
-            h.level_clear(a.universe);
-            Ok(json!(n))
-        },
+        |a| Ok(json!(vivo()?.level_clear(a.universe))),
     );
     r.add::<LevelArgs>(
         "level_get",
@@ -692,24 +669,22 @@ pub fn register(r: &mut Registry) {
         "Escreve num canal de uma fixture do patch pelo nome do canal no perfil (via level_set).",
         |a| {
             let (u, base, pr) = fixture(&a.name)?;
-            let off = match pr.chans.iter().find(|(n, _)| *n == a.channel) {
-                Some((_, o)) => *o,
-                None => a.channel.parse::<u16>().map_err(|_| {
+            let chans = pr.json["channels"].as_array().into_iter().flatten();
+            let off = chans
+                .clone()
+                .find(|c| c["name"].as_str() == Some(a.channel.as_str()))
+                .and_then(|c| c["offset"].as_u64())
+                .ok_or_else(|| {
                     format!(
                         "{}: o perfil {:?} nao tem canal {:?}; tem {:?}",
                         a.name,
                         pr.name,
                         a.channel,
-                        pr.chans.iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>()
+                        chans
+                            .filter_map(|c| c["name"].as_str())
+                            .collect::<Vec<_>>()
                     )
-                })?,
-            };
-            if off >= pr.size {
-                return Err(format!(
-                    "{}: offset {} passa dos {} ch do perfil",
-                    a.name, off, pr.size
-                ));
-            }
+                })? as u16;
             let h = vivo()?;
             h.level_set(u, base + off, &[a.value]);
             Ok(json!({"universe": u, "address": base + off, "value": a.value}))

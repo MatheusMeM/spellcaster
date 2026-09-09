@@ -40,7 +40,9 @@ function intensidade(ch) {
 
 // O que cada fixture do patch está mostrando AGORA, a partir do que saiu na rede.
 // `patch` = [{name, profile, universe, address, pos}], `profiles` = {nome do arquivo: perfil}.
+// `pos` ja sai resolvido: quem nunca foi arrastado cai numa fileira, como uma vara de luz.
 function look(patch, profiles, dmx) {
+  const n = (patch || []).length;
   return (patch || []).map((f, i) => {
     const p = profiles[f.profile] || null;
     const u = f.universe || 1;
@@ -51,7 +53,7 @@ function look(patch, profiles, dmx) {
       profile: f.profile,
       universe: u,
       address: f.address || 1,
-      pos: Array.isArray(f.pos) ? f.pos : null,
+      pos: Array.isArray(f.pos) ? f.pos : [0.08 + (0.84 * (i + 0.5)) / n, 0.3],
       channels: ch,
       rgb: cor(ch),
       intensity: intensidade(ch),
@@ -59,12 +61,7 @@ function look(patch, profiles, dmx) {
   });
 }
 
-// Posição padrão de quem ainda não foi arrastado: uma fileira, como uma vara de luz.
-function posicao(f, n) {
-  return f.pos || [0.08 + (0.84 * (f.i + 0.5)) / Math.max(1, n), 0.3];
-}
-
-const TEATRO = { canais, cor, intensidade, look, posicao };
+const TEATRO = { canais, cor, intensidade, look };
 if (typeof module !== "undefined") module.exports = TEATRO;
 
 // -------------------------------------------------------------- barramento
@@ -266,7 +263,7 @@ TEATRO.mount = function (el) {
     ctx.stroke();
     const fs = look(st.show.patch, st.perfis, bus.dmx);
     fs.forEach(f => {
-      const [x, y] = posicao(f, fs.length);
+      const [x, y] = f.pos;
       const [px, py] = [x * w, y * h];
       const [r, g, b] = f.rgb;
       const a = f.intensity;
@@ -300,7 +297,7 @@ TEATRO.mount = function (el) {
     let melhor = -1;
     let d = 0.04;
     fs.forEach(f => {
-      const [x, y] = posicao(f, fs.length);
+      const [x, y] = f.pos;
       const dd = Math.hypot((x - p[0]) * b.width, (y - p[1]) * b.height);
       if (dd < d * b.width) { d = dd / b.width; melhor = f.i; }
     });
@@ -390,18 +387,12 @@ TEATRO.mount = function (el) {
     if (d.cue !== st.cue) { st.cue = d.cue; cues(); }
     q("cue-viva").textContent = st.cue < 0 ? "—" : `${st.cue} ${(st.show.cues[st.cue] || {}).name || ""}`;
   });
-  bus.on("dmx", () => { st.pinta = true; });
+  bus.on("dmx", desenha);
 
-  (function laco() {
-    if (st.pinta) { st.pinta = false; desenha(); }
-    requestAnimationFrame(laco);
-  })();
   addEventListener("resize", desenha);
   addEventListener("keydown", e => {
     if (e.key === "Enter" && e.target.tagName !== "INPUT") q("go").click();
   });
   desenha();
   bus.open();
-  // o estado vai de volta com os tres desenhadores: e' por onde se redesenha sem barramento
-  return Object.assign(st, { patch, cues, desenha });
 };

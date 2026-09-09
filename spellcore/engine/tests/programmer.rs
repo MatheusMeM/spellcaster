@@ -1,7 +1,7 @@
 //! Programmer (a camada manual do operador) num player vivo: `level_set` por cima da timeline
-//! com HTP, `level_clear` devolvendo o canal, `cue_capture` virando cue e `fixture_set`
-//! resolvendo nome de fixture + nome de canal do perfil. Binario proprio porque mexe no
-//! `CURRENT` do player e no `OPEN` do registry, que sao globais do processo.
+//! E da cue viva com HTP, `level_clear` devolvendo o canal, `cue_capture` virando cue e
+//! `fixture_set` resolvendo nome de fixture + nome de canal do perfil. Binario proprio porque
+//! mexe no `CURRENT` do player e no `OPEN` do registry, que sao globais do processo.
 //!
 //! Show sem `outputs`: nada de socket, o teste roda em maquina com firewall fechado.
 
@@ -52,7 +52,7 @@ fn programmer_htp_clear_captura_e_fixture_set() {
     let r = base();
     // sem player, todo comando do programmer devolve o erro padrao
     for (c, a) in [
-        ("level_set", json!({"address": 1, "value": 10})),
+        ("level_set", json!({"address": 1, "values": [10]})),
         ("level_clear", json!({})),
         ("level_get", json!({})),
         ("cue_capture", json!({})),
@@ -62,7 +62,8 @@ fn programmer_htp_clear_captura_e_fixture_set() {
 
     let sh: Show = serde_json::from_value(json!({
         "name": "programmer", "fps": 60, "version": 1, "outputs": [],
-        "tracks": [{"type": "dmx", "universe": 1, "address": 1, "keys": [[0, 100], [60, 100]]}]
+        "tracks": [{"type": "dmx", "universe": 1, "address": 1, "keys": [[0, 100], [60, 100]]}],
+        "cues": [{"name": "viva", "fade": 0, "values": {"1/30": [60]}}]
     }))
     .expect("show de teste");
     let esp = Arc::new(Mutex::new([0u8; 512]));
@@ -76,14 +77,14 @@ fn programmer_htp_clear_captura_e_fixture_set() {
 
     // 1. override acima da timeline: o programmer ganha
     assert_eq!(
-        ok(&r, "level_set", json!({"address": 1, "value": 200})),
+        ok(&r, "level_set", json!({"address": 1, "values": [200]})),
         json!(1)
     );
     let d = espera(&esp, 2.0, |d| d[0] == 200);
     assert_eq!(d[0], 200, "level_set nao subiu o canal 1");
 
     // 2. HTP: override abaixo da timeline nao derruba o canal
-    ok(&r, "level_set", json!({"address": 1, "value": 50}));
+    ok(&r, "level_set", json!({"address": 1, "values": [50]}));
     let d = espera(&esp, 0.3, |_| false);
     assert_eq!(d[0], 100, "HTP: 50 do programmer sob 100 da timeline");
 
@@ -153,14 +154,14 @@ fn programmer_htp_clear_captura_e_fixture_set() {
     let d = espera(&esp, 2.0, |d| d[10] == 180);
     assert_eq!(&d[9..12], &[0, 180, 0]);
 
-    // canal por numero tambem serve; nome que nao existe explica o que o perfil tem
-    ok(
-        &r,
-        "fixture_set",
-        json!({"name": "par 1", "channel": "2", "value": 90}),
-    );
-    let d = espera(&esp, 2.0, |d| d[11] == 90);
-    assert_eq!(&d[9..12], &[0, 180, 90]);
+    // canal so' por nome: numero nao resolve, e o erro explica o que o perfil tem
+    assert!(r
+        .call(
+            "fixture_set",
+            json!({"name": "par 1", "channel": "2", "value": 90})
+        )
+        .unwrap_err()
+        .contains("nao tem canal"));
     let e = r
         .call(
             "fixture_set",
@@ -179,6 +180,15 @@ fn programmer_htp_clear_captura_e_fixture_set() {
         )
         .unwrap_err()
         .contains("nao esta no patch"));
+
+    // 9. o operador sobrepoe a cue viva: o programmer roda DEPOIS de `CueList::update`.
+    // HTP, entao o valor do operador tem que ser maior que o da cue para vencer.
+    p.handle().cue_go(Some(0));
+    let d = espera(&esp, 2.0, |d| d[29] == 60);
+    assert_eq!(d[29], 60, "a cue nao chegou a escrever o canal 30");
+    ok(&r, "level_set", json!({"address": 30, "values": [200]}));
+    let d = espera(&esp, 2.0, |d| d[29] == 200);
+    assert_eq!(d[29], 200, "cue viva reescreveu o canal do operador");
 
     p.close();
 }
