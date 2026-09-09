@@ -1,7 +1,9 @@
 import os
 ROOT = os.path.dirname(os.path.abspath(__file__))
 src = open(os.path.join(ROOT, "cracktro.tpl.html"), encoding="utf-8").read()
-b64 = open(os.path.join(ROOT, "wmz", "revert.b64")).read().strip()
+import base64, glob
+WMZ = os.environ.get("REVERT_WMZ") or glob.glob(r"C:\Windows\WinSxS\amd64_microsoft-windows-mediaplayer-skins_*\Revert.wmz")[0]
+b64 = base64.b64encode(open(WMZ, "rb").read()).decode()  # ponytail: skin da Microsoft lida do Windows; nao entra no repo
 
 
 def rep(old, new, count=1):
