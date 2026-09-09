@@ -309,7 +309,17 @@ fn abre(reg: Arc<Registry>, file: String) {
 ///
 /// `port` 0 = porta aleatoria (a linha `serve http://127.0.0.1:<porta>` no stderr diz qual);
 /// `dir` = raiz do estatico; `show` = .spell aberto no boot, com o player parado em t=0.
-pub fn serve(reg: Registry, port: u16, dir: PathBuf, show: Option<String>) -> Result<(), String> {
+///
+/// `ligou` recebe uma vez o endereco de fato ligado, antes do primeiro request: e' por ele que a
+/// janela (`spellcaster.exe`) descobre a porta quando pede `port` 0 e roda isto numa thread. A
+/// CLI, que imprime a linha do stderr e nao precisa do numero, passa `|_| {}`.
+pub fn serve(
+    reg: Registry,
+    port: u16,
+    dir: PathBuf,
+    show: Option<String>,
+    ligou: impl FnOnce(std::net::SocketAddr),
+) -> Result<(), String> {
     let (tx, _rx) = broadcast::channel(256);
     let st = Arc::new(St {
         reg: Arc::new(reg),
@@ -354,8 +364,9 @@ pub fn serve(reg: Registry, port: u16, dir: PathBuf, show: Option<String>) -> Re
         let l = tokio::net::TcpListener::bind(("127.0.0.1", port))
             .await
             .map_err(|e| format!("porta {}: {}", port, e))?;
-        let porta = l.local_addr().map_err(|e| e.to_string())?.port();
-        eprintln!("serve http://127.0.0.1:{}", porta);
+        let addr = l.local_addr().map_err(|e| e.to_string())?;
+        eprintln!("serve http://127.0.0.1:{}", addr.port());
+        ligou(addr);
         if let Some(f) = show {
             abre(st.reg.clone(), f);
         }

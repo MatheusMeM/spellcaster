@@ -92,3 +92,10 @@ Consequências:
 - **Paths declarados sem implementação.** `modules/laser.json` declara `dev/type`, `dev/host`, `dev/pps`, `ilda/fps`, `curve/r|g|b`, `safe/zone`, `safe/armed` e `test/pattern`; `laser_param` não aceita nenhum deles (`dev/*` e `ilda/*` são argumento de `laser_open`/`laser_play`, o resto espera LUT de cor e `optimize` paramétrico). O manifesto é a declaração do app, não do comando: o voto decide se ele só declara o que já roda, ou se declara o alvo e o comando cresce até ele.
 - **`shutter` está dos dois lados.** É `command` no `modules/laser.json` e `path` no `laser_param`. Uma das duas some.
 - Motivo: a convenção está no código (seis linhas no sink da CLI, com comentário `ponytail:`) e funciona para um laser; registrar aqui evita que ela vire contrato por omissão.
+
+## 09/09/2026 · A barra de navegação na Face (modo kiosk) — aguarda voto
+
+- **O que existe.** `spellgui/web/nav.js` põe a mesma barra (abas TIMELINE/PATCHBAY/TEATRO/FACE/LASER, `Shift+1`..`Shift+5`, ENGINE/`rev` e o nome do show editável) no topo das cinco páginas, `face.html` inclusive. Sem isso a Face é a única página sem saída: quem abre nela não tem como voltar.
+- **O conflito.** O PRD §10 e `spellgui/web/README.md` descrevem a Face como kiosk: sem chrome, sem nada editável, alvo de toque. Uma barra com o nome do show num campo de texto é chrome, e é editável.
+- **O que o voto decide:** a barra some da Face (e o operador volta pelo `Shift+1`, que continua valendo), ou some só no modo `performance` (e fica no `editor`), ou fica como está.
+- Motivo: é decisão de produto, não de implementação — as três saídas custam a mesma linha de código.

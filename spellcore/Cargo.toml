@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["engine", "protocols", "laser", "script", "pixelmap", "mcp", "serve", "cli", "bench"]
+members = ["engine", "protocols", "laser", "script", "pixelmap", "mcp", "serve", "cli", "gui", "bench"]
 
 [workspace.package]
 version = "0.1.0"
@@ -24,6 +24,7 @@ protocols = { path = "protocols" }
 script = { path = "script" }
 mcp = { path = "mcp" }
 serve = { path = "serve" }
+cli = { path = "cli" }
 
 [profile.release]
 lto = "thin"
