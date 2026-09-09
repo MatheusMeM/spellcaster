@@ -105,6 +105,8 @@ fn handshake_tools_e_resources() {
         "patch_check",
         "play_show",
         "net",
+        "laser_open",
+        "laser_play",
     ] {
         assert!(nomes.contains(&n), "tool {} ausente: {:?}", n, nomes);
     }

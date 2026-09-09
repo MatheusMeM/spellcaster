@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Spellcaster — laser</title>
+<link rel="stylesheet" href="../../design/tokens/spellcaster.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: var(--sc-bg); color: var(--sc-fg);
+               font: var(--sc-text-sm)/1.4 var(--sc-mono); }
+  body { display: flex; flex-direction: column; }
+  .bar { display: flex; align-items: center; gap: var(--sc-gap); padding: 6px 8px;
+         background: var(--sc-panel); border-bottom: 1px solid var(--sc-line); flex: 0 0 auto;
+         flex-wrap: wrap; }
+  button, input, select { background: var(--sc-panel-2); color: var(--sc-fg);
+    border: 1px solid var(--sc-line); border-radius: var(--sc-radius);
+    font: 12px var(--sc-mono); padding: 5px 9px; }
+  button:hover:enabled { border-color: var(--sc-fg-3); cursor: pointer; }
+  button:disabled { opacity: .35; }
+  button.on { border-color: var(--sc-accent); color: var(--sc-accent); }
+  button.live { border-color: var(--sc-live); color: var(--sc-live); }
+  .sep { width: 1px; height: 20px; background: var(--sc-line); }
+  .over { color: var(--sc-fg-3); font-size: var(--sc-text-xs); letter-spacing: var(--sc-tracking);
+          text-transform: uppercase; font-family: var(--sc-label); }
+  main { flex: 1 1 auto; display: flex; min-height: 0; }
+  .panel { flex: 0 0 340px; padding: 10px; border-right: 1px solid var(--sc-line); overflow: auto; }
+  .panel h2 { font: var(--sc-text-xs)/1 var(--sc-label); letter-spacing: var(--sc-tracking);
+              text-transform: uppercase; color: var(--sc-fg-3); margin: 14px 0 6px; }
+  .panel h2:first-child { margin-top: 0; }
+  .row { display: grid; grid-template-columns: 82px 1fr 52px; align-items: center;
+         gap: 6px; margin: 4px 0; }
+  .row label { color: var(--sc-fg-2); }
+  .row .v { text-align: right; color: var(--sc-accent); font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: var(--sc-accent); padding: 0; border: 0;
+                      background: none; }
+  .stats { flex: 1 1 auto; padding: 10px; overflow: auto; }
+  .stats table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .stats td { padding: 2px 16px 2px 0; }
+  .stats td:first-child { color: var(--sc-fg-3); }
+  .cli { flex: 0 0 auto; padding: 4px 8px; background: var(--sc-panel);
+         border-top: 1px solid var(--sc-line); color: var(--sc-fg-3); font-size: var(--sc-text-xs); }
+  #msg { color: var(--sc-live); }
+</style>
+</head>
+<body>
+<div class="bar">
+  <span class="over">laser</span>
+  <select id="dacs"><option value="">(procure DACs)</option></select>
+  <button id="scan">Procurar</button>
+  <input type="text" id="host" size="20" placeholder="ip:porta">
+  <label class="over">kpps</label><input type="number" id="kpps" value="30" min="1" max="200" style="width:64px">
+  <button id="open">Abrir</button>
+  <button id="close" disabled>Fechar</button>
+  <span class="sep"></span>
+  <select id="files"><option value="">(arquivos .ild)</option></select>
+  <input type="text" id="dir" size="12" value="shows">
+  <button id="ls">Listar</button>
+  <button id="play" disabled>Play</button>
+  <button id="stop" disabled>Stop</button>
+  <button id="shutter" disabled>Shutter</button>
+  <span class="sep"></span>
+  <span class="over" id="msg"></span>
+</div>
+<main>
+  <section class="panel">
+    <h2>geometria</h2>
+    <div class="row"><label>geo/scale</label><input type="range" id="p_geo_scale" min="0" max="2" step="0.01" value="1"><span class="v">1.00</span></div>
+    <div class="row"><label>geo/rot</label><input type="range" id="p_geo_rot" min="-180" max="180" step="1" value="0"><span class="v">0</span></div>
+    <div class="row"><label>geo/x</label><input type="range" id="p_geo_x" min="-16000" max="16000" step="100" value="0"><span class="v">0</span></div>
+    <div class="row"><label>geo/y</label><input type="range" id="p_geo_y" min="-16000" max="16000" step="100" value="0"><span class="v">0</span></div>
+    <h2>limites de cor</h2>
+    <div class="row"><label>limit/r</label><input type="range" id="p_limit_r" min="0" max="1" step="0.01" value="1"><span class="v">1.00</span></div>
+    <div class="row"><label>limit/g</label><input type="range" id="p_limit_g" min="0" max="1" step="0.01" value="1"><span class="v">1.00</span></div>
+    <div class="row"><label>limit/b</label><input type="range" id="p_limit_b" min="0" max="1" step="0.01" value="1"><span class="v">1.00</span></div>
+    <h2>safety</h2>
+    <div class="row"><label>min_size</label><input type="range" id="p_safety_min_size" min="0" max="8000" step="100" value="2000"><span class="v">2000</span></div>
+    <div class="row"><label>max</label><input type="range" id="p_safety_max" min="0" max="255" step="1" value="255"><span class="v">255</span></div>
+  </section>
+  <section class="stats">
+    <h2 class="over">stats</h2>
+    <table id="st"><tbody><tr><td>feed</td><td>sem feed aberto</td></tr></tbody></table>
+  </section>
+</main>
+<div class="cli" id="cli">comandos do registry (MCP, OSC, GUI): laser_dacs{timeout} &nbsp;|&nbsp; laser_open{dac,host,kpps} &nbsp;|&nbsp; laser_play{feed,file,fps,loop} &nbsp;|&nbsp; laser_param{feed,path,value} &nbsp;|&nbsp; laser_stop{feed} &nbsp;|&nbsp; laser_close{feed}</div>
+<script src="laser.js"></script>
+</body>
+</html>

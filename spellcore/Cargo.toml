@@ -18,6 +18,7 @@ tokio = { version = "1", default-features = false, features = ["rt", "time"] }
 socket2 = { version = "0.5", features = ["all"] }
 criterion = { version = "0.5", default-features = false, features = ["cargo_bench_support"] }
 engine = { path = "engine" }
+laser = { path = "laser" }
 protocols = { path = "protocols" }
 script = { path = "script" }
 mcp = { path = "mcp" }

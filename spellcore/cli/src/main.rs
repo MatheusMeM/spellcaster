@@ -13,6 +13,8 @@
 //! `PlayArgs` e `NetArgs` servem as duas pontas: `clap::Args` para o argv e `JsonSchema` +
 //! `Deserialize` para o registry (e, por ele, para as tools do MCP).
 
+mod laser_cmd;
+
 use clap::{Args, Parser, Subcommand};
 use engine::registry::Registry;
 use engine::schemars::JsonSchema;
@@ -246,6 +248,7 @@ fn registry() -> Registry {
         "Varre a rede: interfaces, nos Art-Net, fontes sACN, Ether Dream e sugestoes.",
         net,
     );
+    laser_cmd::register(&mut r);
     r
 }
 

@@ -11,6 +11,7 @@ path = "src/main.rs"
 engine = { workspace = true }
 protocols = { workspace = true }
 script = { workspace = true }
+laser = { workspace = true }
 mcp = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -184,6 +184,7 @@ CI, sem tocar no que já está conforme):
 | Frente | Entrega | Aceite | Depende de |
 |---|---|---|---|
 | Design | rodada 7 (FÓSFORO, PATCHBAY) | voto do dono | voto das rodadas 5 e 6 |
+| F9 LASER app | `laser_*` no registry (dacs, open, play, stop, close, param, stats, files) + página `spellgui/web/laser.html` | `cli/tests/laser.rs` verde contra o `Emulator` Ether Dream | contrato do barramento (F1) para a página |
 
 Bloqueadas até instalar SDK (decisão do dono, não de agente): R2 (GStreamer + NDI SDK),
 R6 (Godot 4). R9 espera R5.
