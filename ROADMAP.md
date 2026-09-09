@@ -150,7 +150,7 @@ O plano acima (F0–F7) foi o do protótipo Python e está concluído até F6. O
 | R2 mídia (GStreamer, NDI, RTSP, Spout) | 1080p60 no alvo de CPU | pendente | SDKs não instalados (GStreamer, NDI) |
 | R3 pixel mapping wgpu + rayon | 100 000 px a 60 Hz < 2 ms | pendente | nenhum: Rust puro |
 | R4 laser multi-feed | Ether Dream, Helios, IDN; safety no engine; 4 feeds | concluída (0,83 % cpu) | — |
-| R5 GUI Tauri | show de 3 min do zero; Face em modo performance | pendente | voto das rodadas 5 e 6 do design |
+| R5 GUI Tauri | show de 3 min do zero; Face em modo performance | base pronta: canvaskit + timeline; falta Tauri, painéis, Theme/Face | voto das rodadas 5 e 6 do design |
 | R6 previz Godot | 60 fps, 64 fixtures, 2 LED walls | pendente | Godot não instalado |
 | R7 MCP com rmcp | sessão de IA monta e toca um show sem GUI | pendente | nenhum: registry pronto |
 | R8 empacotamento | onedir, Linux, Pi estático; CI com bench como gate | parcial | Pi estático (musl) pendente; só CI |
