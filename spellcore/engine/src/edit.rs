@@ -428,7 +428,7 @@ pub struct CueCaptureArgs {
 pub struct FixtureSetArgs {
     /// Nome da fixture no patch.
     pub name: String,
-    /// Nome do canal no perfil ("dim", "r") ou o offset como numero ("0").
+    /// Nome do canal no perfil ("dim", "r"); numero nao resolve.
     pub channel: String,
     /// 0..255.
     pub value: f64,

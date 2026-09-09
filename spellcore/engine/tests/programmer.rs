@@ -3,25 +3,29 @@
 //! `fixture_set` resolvendo nome de fixture + nome de canal do perfil. Binario proprio porque
 //! mexe no `CURRENT` do player e no `OPEN` do registry, que sao globais do processo.
 //!
-//! Show sem `outputs`: nada de socket, o teste roda em maquina com firewall fechado.
+//! O que o teste observa e' a SAIDA do frame, nao o buffer no meio dele: o `Espelho` e' um
+//! `Output` de teste, o ultimo passo do tick. Show sem `outputs` de rede: nada de socket, o
+//! teste roda em maquina com firewall fechado.
 
-use engine::hook::FrameHook;
 use engine::registry::{base, Registry};
-use engine::{Player, Show, Universes};
+use engine::{Player, Show};
+use protocols::Output;
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-/// Gancho de frame que guarda o universo 1 como saiu (timeline + programmer).
+/// Saida de teste que guarda o universo 1 como foi enviado (timeline + cues + programmer).
 struct Espelho(Arc<Mutex<[u8; 512]>>);
 
-impl FrameHook for Espelho {
-    fn frame(&mut self, _t: f64, uni: &mut Universes) {
-        if let Some(u) = uni.get(1) {
-            *self.0.lock().expect("espelho") = u.data;
+impl Output for Espelho {
+    fn send(&mut self, universe: u16, data: &[u8; 512]) {
+        if universe == 1 {
+            *self.0.lock().expect("espelho") = *data;
         }
     }
+
+    fn close(&mut self) {}
 }
 
 fn lock(m: &Arc<Mutex<[u8; 512]>>) -> [u8; 512] {
@@ -68,7 +72,7 @@ fn programmer_htp_clear_captura_e_fixture_set() {
     .expect("show de teste");
     let esp = Arc::new(Mutex::new([0u8; 512]));
     let mut p = Player::new(sh, PathBuf::from("."), false).expect("player sem saidas");
-    p.hook(Box::new(Espelho(esp.clone())));
+    p.output(Box::new(Espelho(esp.clone())));
     p.start(None).expect("start");
     p.handle().play();
 

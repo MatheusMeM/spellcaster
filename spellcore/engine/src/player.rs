@@ -4,11 +4,11 @@
 //!
 //! Ordem de avaliacao de um frame (contrato do README, secao "R1"):
 //!   1. `Timeline::apply` (tracks `dmx` e `artnet`) e os tracks `media` do Capture;
-//!   2. tracks de efeito colateral: `osc`, `media` nao-Capture e `cue`;
-//!   3. `CueList::update` escreve o snapshot corrente;
-//!   4. o programmer (`Prog`): o override manual do operador, HTP por canal, POR CIMA da cue
+//!   2. cada `FrameHook` na ordem em que foi registrado;
+//!   3. tracks de efeito colateral: `osc`, `media` nao-Capture e `cue`;
+//!   4. `CueList::update` escreve o snapshot corrente;
+//!   5. o programmer (`Prog`): o override manual do operador, HTP por canal, POR CIMA da cue
 //!      viva (o operador sobrepoe o que a cue esta segurando);
-//!   5. cada `FrameHook` na ordem em que foi registrado;
 //!   6. I/O: cada universo escrito vai para todas as saidas.
 //!
 //! O transporte remoto por OSC (`/spellcaster/play|pause|stop|locate f`) nunca toca nos
@@ -351,7 +351,11 @@ impl Rt {
                 }
             }
         }
-        // 2. efeito colateral: OSC, media nao-Capture e cue
+        // 2. ganchos de frame (tracks fx e Graph), na ordem de registro
+        for h in hooks.iter_mut() {
+            h.frame(t, uni);
+        }
+        // 3. efeito colateral: OSC, media nao-Capture e cue
         if let Some(o) = osc_out.as_ref() {
             for &i in osc.iter() {
                 send_osc(&mut tracks[i], t, o, false);
@@ -376,15 +380,11 @@ impl Rt {
                 cues.go(t, idx);
             }
         }
-        // 3. snapshot das cues
+        // 4. snapshot das cues
         cues.update(t, uni);
         s.cue.store(cues.index(), Ordering::Relaxed);
-        // 4. programmer: o override manual do operador, HTP sobre timeline E cue viva
+        // 5. programmer: o override manual do operador, HTP sobre timeline E cue viva
         lock(&s.prog).apply(uni);
-        // 5. ganchos de frame (tracks fx e Graph), na ordem de registro
-        for h in hooks.iter_mut() {
-            h.frame(t, uni);
-        }
         // 6. I/O
         // ponytail: todo universo escrito vai para TODAS as saidas do show (igual a R0)
         // ; separar por saida quando um show misturar "dmx" e "artnet" no mesmo universo.
@@ -522,6 +522,13 @@ impl Player {
     pub fn hook(&mut self, h: Box<dyn FrameHook>) {
         if let Some(rt) = self.rt.as_mut() {
             rt.hooks.push(h);
+        }
+    }
+
+    /// Saida extra alem das declaradas no show, antes de `start()`.
+    pub fn output(&mut self, o: Box<dyn Output>) {
+        if let Some(rt) = self.rt.as_mut() {
+            rt.outs.push(o);
         }
     }
 

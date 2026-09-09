@@ -349,12 +349,12 @@ MCP, Rhai e laser.
 ## Ordem de avaliação de um frame (fixa; é o que a conformidade mede)
 
 1. `Timeline::apply(&mut universes, t)` — tracks `dmx` e `artnet`.
-2. Tracks de efeito colateral: `osc` e `media` não-Capture (envia quando o valor muda), `cue`
+2. Cada `FrameHook` na ordem em que foi registrado (tracks `fx` na ordem do `.spell`, depois o Graph).
+3. Tracks de efeito colateral: `osc` e `media` não-Capture (envia quando o valor muda), `cue`
    (`crossed(prev, t)` dispara `CueList::go`).
-3. `CueList::update(t)` escreve o snapshot corrente nos Universes.
-4. O programmer (`player::Prog`): o override manual do operador, HTP por canal, por cima da
+4. `CueList::update(t)` escreve o snapshot corrente nos Universes.
+5. O programmer (`player::Prog`): o override manual do operador, HTP por canal, por cima da
    timeline **e** da cue viva — o operador sobrepõe o que a cue está segurando.
-5. Cada `FrameHook` na ordem em que foi registrado (tracks `fx` na ordem do `.spell`, depois o Graph).
 6. I/O: cada universo escrito vai para todas as saídas.
 
 Igual ao `_tick` + `_side` do Python.
@@ -512,7 +512,7 @@ porque `OPEN` é um por processo.
 ### Programmer — a camada manual do operador (tema TEATRO DE PAPEL)
 
 `Prog`, em `player.rs`: um `Option<u8>` por canal (valor e máscara de "tocado" na mesma
-estrutura), aplicado **depois de `CueList::update` e antes dos ganchos**, HTP por canal: o
+estrutura), aplicado **depois de `CueList::update` e antes do I/O**, HTP por canal: o
 operador sobrepõe a cue viva no mesmo canal. Soltar um canal zera o valor preso no buffer no
 frame seguinte, antes da timeline, para o que a timeline possui voltar a valer. O programmer não vai para o `.spell`: quem grava é a cue.
 
