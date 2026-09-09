@@ -152,7 +152,7 @@ O plano acima (F0–F7) foi o do protótipo Python e está concluído até F6. O
 | R4 laser multi-feed | Ether Dream, Helios, IDN; safety no engine; 4 feeds | concluída (0,83 % cpu) | — |
 | R5 GUI Tauri | show de 3 min do zero; Face em modo performance | base pronta em `main` (`spellgui/web`: canvaskit + timeline); falta Tauri, painéis, Theme/Face | voto das rodadas 5 e 6 do design |
 | R6 previz Godot | 60 fps, 64 fixtures, 2 LED walls | pendente | Godot não instalado |
-| R7 MCP com rmcp | sessão de IA monta e toca um show sem GUI | concluída em stdio; edição de show (patch, track, key, cue) no registry (`engine::edit`) | `spell://face`/`spell://graph` e transporte HTTP pendentes |
+| R7 MCP com rmcp | sessão de IA monta e toca um show sem GUI | concluída em stdio; edição de show (patch, track, key, cue) no registry (`engine::edit`) | `spell://face`/`spell://graph` pendentes; transporte HTTP streamable em `/mcp` entregue pela F1 (`serve`) |
 | R8 empacotamento | onedir, Linux, Pi estático; CI com bench como gate | concluída | — |
 | R9 editores de Face/Graph + painel Agent | operador monta uma Face em 10 min | pendente | depende de R5 |
 
@@ -184,6 +184,7 @@ CI, sem tocar no que já está conforme):
 | Frente | Entrega | Aceite | Depende de |
 |---|---|---|---|
 | Design | rodada 7 (FÓSFORO, PATCHBAY) | voto do dono | voto das rodadas 5 e 6 |
+| F1 serve | crate `spellcore/serve` e `spellcore serve`: HTTP (`/commands`, `/show`, estático), WebSocket JSON-RPC com eventos `show`/`transport`/`log`/`widget`, monitor DMX binário a 40 Hz, MCP streamable em `/mcp`, comandos `input` e `resume`; `--dir` = raiz do repo | feita: `cli/tests/serve.rs` sobe o binário e fecha o contrato ponta a ponta | — |
 
 Bloqueadas até instalar SDK (decisão do dono, não de agente): R2 (GStreamer + NDI SDK),
 R6 (Godot 4). R9 espera R5.

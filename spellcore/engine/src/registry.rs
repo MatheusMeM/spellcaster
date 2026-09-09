@@ -106,6 +106,15 @@ pub struct ShowGetArgs {
     pub full: bool,
 }
 
+#[derive(Deserialize, JsonSchema)]
+pub struct InputArgs {
+    /// Chave do evento: "widget:go", "key:Space", "osc:/spell/go", "module:laser/geo/scale".
+    pub key: String,
+    /// Valor do evento; trigger manda 1.
+    #[serde(default)]
+    pub value: f64,
+}
+
 /// Comando sem parametro.
 #[derive(Deserialize, JsonSchema)]
 pub struct NoArgs {}
@@ -213,6 +222,14 @@ pub fn base() -> Registry {
             }
         },
     );
+    // metade que faltava do `pause`: `serve --show` deixa o player parado em t=0, e sem isto
+    // nenhum cliente do registry conseguiria solta-lo. Chama-se `resume`, nao `play`: `play` e' o
+    // subcomando da CLI que toca um arquivo, e para isso o registry ja' tem `play_show`.
+    r.add::<NoArgs>("resume", "Continua o player pausado neste processo.", |_| {
+        let h = vivo()?;
+        h.play();
+        estado(&h)
+    });
     r.add::<NoArgs>("pause", "Pausa o player em execucao neste processo.", |_| {
         let h = vivo()?;
         h.pause();
@@ -236,6 +253,14 @@ pub fn base() -> Registry {
     r.add::<NoArgs>("transport_state", "Estado do transporte do player em execucao.", |_| {
         estado(&vivo()?)
     });
+    r.add::<InputArgs>(
+        "input",
+        "Entrega um evento de entrada aos ganchos do player vivo (o Graph): key + value.",
+        |a| {
+            vivo()?.input(&a.key, a.value);
+            Ok(json!({"key": a.key, "value": a.value}))
+        },
+    );
     crate::edit::register(&mut r);
     r
 }
@@ -271,17 +296,21 @@ mod tests {
     #[test]
     fn base_tem_transporte_e_load() {
         let r = base();
-        for c in ["load", "show_get", "pause", "stop", "locate", "cue_go", "transport_state"] {
+        let esperados = ["load", "show_get", "resume", "pause", "stop", "locate", "cue_go",
+                         "transport_state", "input"];
+        for c in esperados {
             assert!(r.get(c).is_some(), "comando {} ausente", c);
         }
         // ponytail: o teste so' vale quando nao ha player neste processo — os testes do player
         // sobem o seu em outro binario (tests/player.rs), entao aqui nunca ha CURRENT.
         for (c, a) in [
+            ("resume", json!({})),
             ("pause", json!({})),
             ("stop", json!({})),
             ("locate", json!({"t": 3.5})),
             ("cue_go", json!({})),
             ("transport_state", json!({})),
+            ("input", json!({"key": "widget:go", "value": 1.0})),
         ] {
             assert_eq!(
                 r.call(c, a).unwrap_err(),
