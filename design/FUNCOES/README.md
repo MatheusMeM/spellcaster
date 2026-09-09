@@ -21,8 +21,9 @@ E no topo de cada um, a tabela de veredito: qual app resolveu melhor cada item.
 | Cenário interativo | `cenario-interativo.md` | (Face sobre o patch) | TEATRO DE PAPEL |
 | Aprendiz (menu principal) | `aprendiz-menu.md` | paleta de comandos | todos |
 | Laser como módulo do graph | `integracao-laser.md` | `spell graph add laser/1` | LASER |
+| Timeline como DAW | `timeline-daw.md` | `spell timeline` (painel `Shift+2`) | todos |
 
-As auditorias por app, com `path:linha` em cada afirmação, estão em `fontes/` (`blender.md`, `touchdesigner.md`, `resolume.md`, `madmapper.md`, `capture.md`, `chataigne.md`). Os arquivos de função citam as fontes como `[fontes/app.md § Seção]`; a evidência mora lá, não aqui.
+As auditorias por app, com `path:linha` em cada afirmação, estão em `fontes/` (`blender.md`, `touchdesigner.md`, `resolume.md`, `madmapper.md`, `capture.md`, `chataigne.md`). Os arquivos de função citam as fontes como `[fontes/app.md § Seção]`; a evidência mora lá, não aqui. Exceção: `timeline-daw.md` cita Ableton Live e DaVinci Resolve na própria linha da tabela (seção do manual, ou página do PDF instalado), porque cada afirmação vale uma linha e um arquivo de auditoria seria a mesma tabela de novo.
 
 ## Regras transversais
 
