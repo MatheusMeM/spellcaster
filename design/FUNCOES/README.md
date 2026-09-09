@@ -24,6 +24,13 @@ E no topo de cada um, a tabela de veredito: qual app resolveu melhor cada item.
 
 As auditorias por app, com `path:linha` em cada afirmação, estão em `fontes/` (`blender.md`, `touchdesigner.md`, `resolume.md`, `madmapper.md`, `capture.md`, `chataigne.md`). Os arquivos de função citam as fontes como `[fontes/app.md § Seção]`; a evidência mora lá, não aqui.
 
+Além das auditorias de app instalado, há digests de **documentação oficial**, com `p.N` ou seção em cada afirmação. Os PDFs e os textos extraídos **não entram no repositório** — ficam no scratchpad da sessão, e o caminho está no cabeçalho de cada digest. Todos baixados em **09/09/2026**:
+
+- `fontes/ableton12.md` — "Ableton Live 12 Manual", 1009 páginas. https://cdn-resources.ableton.com/resources/manuals/live12-manual-en.pdf
+- `fontes/resolve20-guia.md` — "The Beginner's Guide to DaVinci Resolve 20", Blackmagic Design Learning Series, 643 páginas. https://documents.blackmagicdesign.com/DaVinciResolve/20/The%20Beginners%20Guide%20to%20DaVinci%20Resolve%2020.pdf
+- `fontes/resolume-quickstart.md` — "Quickstart Tutorial" do Resolume 7, uma página. https://resolume.com/support/en/quickstart
+- `fontes/chataigne-doc.md` — "The Amazing Chataigne Documentation" (Notion, 30 páginas capturadas pelo painel Browser; as de Detective e Parrot estão vazias na origem). https://benkuper.notion.site/The-Amazing-Chataigne-Documentation-079bd5a0b7e648bbbfe34c3c869a3985
+
 ## Regras transversais
 
 Apareceram em mais de um app e valem para todas as seis funções. Cada arquivo de função assume estas e só acrescenta o que é dele.
