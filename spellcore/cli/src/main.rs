@@ -1,61 +1,56 @@
-//! `spellcore` — CLI da R1. Os subcomandos NAO sao escritos a mao: sao construidos em runtime a
-//! partir de `Registry::schema()`, exatamente como o `spellcaster/cli.py` faz com o registry
-//! Python. Quem tem logica e o registry; a CLI so traduz argv <-> JSON e imprime.
+//! `spellcore` — CLI da R1/R7. Quatro subcomandos, escritos com `clap::Parser`:
 //!
 //!   spellcore play <show.spell> [--loop] [--osc-port N]
 //!   spellcore net [--json] [--timeout N]
 //!   spellcore commands
+//!   spellcore mcp [install --target desktop|code [--path P] [--yes]]
+//!
+//! Quem tem logica e' o registry; a CLI so' chama e imprime. Os subcomandos NAO sao mais
+//! gerados em runtime a partir do `Registry::schema()`: `load`, `pause`, `stop`, `locate`,
+//! `cue_go`, `transport_state` e `show_get` agem no player VIVO NESTE PROCESSO e nao faziam
+//! sentido como processo separado. Eles continuam no registry, que e' o que o MCP expoe.
+//!
+//! `PlayArgs` e `NetArgs` servem as duas pontas: `clap::Args` para o argv e `JsonSchema` +
+//! `Deserialize` para o registry (e, por ele, para as tools do MCP).
 
-use clap::{Arg, ArgAction, ArgMatches};
+use clap::{Args, Parser, Subcommand};
 use engine::registry::Registry;
+use engine::schemars::JsonSchema;
 use engine::{show, Ev, EventSink, Player, TransportState};
 use protocols::{netscan, osc};
-use schemars::JsonSchema;
 use serde::Deserialize;
-use serde_json::{json, Map, Value};
+use serde_json::{json, Value};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-/// Subcomando da CLI -> comando do registry. UMA entrada: o verbo do produto chama-se
-/// `play_show` (igual ao Python), o operador digita `play`.
-const ALIAS: [(&str, &str); 1] = [("play", "play_show")];
-
-fn as_cli(reg: &str) -> &str {
-    ALIAS
-        .iter()
-        .find(|(_, r)| *r == reg)
-        .map_or(reg, |(c, _)| *c)
-}
-
-fn as_reg(cli: &str) -> &str {
-    ALIAS
-        .iter()
-        .find(|(c, _)| *c == cli)
-        .map_or(cli, |(_, r)| *r)
-}
-
 // ------------------------------------------------------------------ comandos
 
-#[derive(Deserialize, JsonSchema)]
+#[derive(Args, Deserialize, JsonSchema)]
+#[schemars(crate = "engine::schemars")]
 struct PlayArgs {
     /// Caminho do arquivo .spell.
     file: String,
     /// Repete o show do inicio ao chegar no fim.
+    #[arg(long = "loop")]
     #[serde(default, rename = "loop")]
     #[schemars(rename = "loop")]
     looping: bool,
     /// Porta do transporte remoto por OSC (sobrepoe transport.osc_port do .spell).
+    #[arg(long)]
     #[serde(default)]
     osc_port: Option<u16>,
 }
 
-#[derive(Deserialize, JsonSchema)]
+#[derive(Args, Deserialize, JsonSchema)]
+#[schemars(crate = "engine::schemars")]
 struct NetArgs {
     /// Segundos de escuta por protocolo.
+    #[arg(long, default_value_t = def_timeout())]
     #[serde(default = "def_timeout")]
     timeout: f64,
     /// Devolve o resultado cru em JSON em vez do relatorio de texto.
+    #[arg(long)]
     #[serde(default)]
     json: bool,
 }
@@ -142,6 +137,18 @@ fn status_line(st: &TransportState, jit_p99_ms: f64) -> String {
     )
 }
 
+/// Falso enquanto o servidor MCP roda: la' o stdout e' o canal JSON-RPC e uma linha de status
+/// derruba o protocolo (o Python resolve com `contextlib.redirect_stdout`).
+static STDOUT_LIVRE: AtomicBool = AtomicBool::new(true);
+
+fn saida(l: &str) {
+    if STDOUT_LIVRE.load(Ordering::SeqCst) {
+        println!("{}", l);
+    } else {
+        eprintln!("{}", l);
+    }
+}
+
 static INT: AtomicBool = AtomicBool::new(false);
 
 /// Ctrl+C vira um flag; quem fecha o player e' o laco do `play`, na thread principal (chamar o
@@ -197,7 +204,7 @@ fn play(a: PlayArgs) -> Result<Value, String> {
     // linha de status.
     let st = h.state();
     let dur = st.duration.map_or("sem fim".into(), |d| format!("{:.2}s", d));
-    println!("{}: {} fps, {}", name, st.fps, dur);
+    saida(&format!("{}: {} fps, {}", name, st.fps, dur));
     // ponytail: acorda a cada 200 ms so' para ver o Ctrl+C e imprimir o status ; virar condvar
     // do player se a linha de status precisar de resolucao melhor que 1 s.
     let mut last = Instant::now();
@@ -209,7 +216,7 @@ fn play(a: PlayArgs) -> Result<Value, String> {
             last = Instant::now();
             // ponytail: jit_p99 e' o do ultimo `Clock::run` FECHADO (o Clock so' publica stats no
             // fim do run) ; virar contador vivo se o operador precisar do jitter durante o show.
-            println!("{}", status_line(&h.state(), p.clock().stats().p99 * 1e3));
+            saida(&status_line(&h.state(), p.clock().stats().p99 * 1e3));
         }
     }
     let st = h.state();
@@ -230,6 +237,7 @@ fn net(a: NetArgs) -> Result<Value, String> {
 
 /// `play_show` e `net` moram aqui porque so' a CLI conhece `script` e `protocols`; o resto do
 /// transporte vem de `registry::base()`, que age no player vivo (`player::current()`).
+/// E' este registry que o MCP expoe como tools.
 fn registry() -> Registry {
     let mut r = engine::registry::base();
     r.add::<PlayArgs>("play_show", "Toca um show .spell ate o fim ou Ctrl+C.", play);
@@ -241,124 +249,70 @@ fn registry() -> Registry {
     r
 }
 
-// -------------------------------------------------------- argv <-> JSON
+// ------------------------------------------------------------------- argv
 
-/// Tipo declarado no schema JSON da propriedade ("string" | "number" | "integer" | "boolean").
-fn kind(p: &Value) -> &str {
-    match &p["type"] {
-        Value::String(s) => s.as_str(),
-        Value::Array(a) => a
-            .iter()
-            .filter_map(|v| v.as_str())
-            .find(|s| *s != "null")
-            .unwrap_or("string"),
-        _ => "string",
-    }
+#[derive(Parser)]
+#[command(
+    name = "spellcore",
+    version,
+    about = "Spellcaster core: timeline, cues, fx, graph, sACN, Art-Net, OSC, rede, MCP",
+    subcommand_required = true,
+    arg_required_else_help = true
+)]
+struct Cli {
+    #[command(subcommand)]
+    cmd: Cmd,
 }
 
-/// Converte o texto do argparse para o tipo do schema (o `_coerce` do registry Python).
-fn coerce(k: &str, s: &str) -> Result<Value, String> {
-    match k {
-        "integer" => s
-            .parse::<i64>()
-            .map(Value::from)
-            .map_err(|_| format!("valor inteiro invalido: {}", s)),
-        "number" => s
-            .parse::<f64>()
-            .map(Value::from)
-            .map_err(|_| format!("valor numerico invalido: {}", s)),
-        "boolean" => Ok(Value::Bool(matches!(
-            s.trim().to_ascii_lowercase().as_str(),
-            "1" | "true" | "yes" | "on" | "sim"
-        ))),
-        _ => Ok(Value::String(s.to_string())),
-    }
+#[derive(Subcommand)]
+enum Cmd {
+    /// Toca um show .spell ate o fim ou Ctrl+C.
+    Play(PlayArgs),
+    /// Varre a rede: interfaces, nos Art-Net, fontes sACN, Ether Dream e sugestoes.
+    Net(NetArgs),
+    /// Lista o registry em JSON: nome, doc e schema de cada comando.
+    Commands,
+    /// Servidor MCP em stdio; `spellcore mcp install` registra o servidor no Claude.
+    Mcp(McpArgs),
 }
 
-/// clap exige `&'static str` em nome/long/value_name. O schema so' e' conhecido em runtime.
-// ponytail: vaza um punhado de strings curtas uma vez no boot (< 1 KB, vida = a do processo)
-// ; trocar por `Box<Registry>` vazado inteiro se algum dia a CLI reconstruir os subcomandos.
-fn stat(s: &str) -> &'static str {
-    Box::leak(s.to_string().into_boxed_str())
+#[derive(Args)]
+struct McpArgs {
+    #[command(subcommand)]
+    cmd: Option<McpCmd>,
 }
 
-/// Um subcomando clap por comando do registry. Parametro sem default vira posicional;
-/// `boolean` vira flag `--nome`; o resto vira `--nome VALOR`. Convencao das duas pontas:
-/// JSON em snake_case (`osc_port`), argv com traco (`--osc-port`).
-fn subcommand(name: &str, doc: &str, params: &Value) -> clap::Command {
-    let mut c = clap::Command::new(stat(name)).about(stat(doc));
-    let req: Vec<&str> = params["required"]
-        .as_array()
-        .map(|a| a.iter().filter_map(|v| v.as_str()).collect())
-        .unwrap_or_default();
-    if let Some(props) = params["properties"].as_object() {
-        for (pname, p) in props {
-            let id = stat(pname);
-            let long = stat(&pname.replace('_', "-"));
-            let mut arg = Arg::new(id).help(stat(p["description"].as_str().unwrap_or("")));
-            if kind(p) == "boolean" {
-                arg = arg.long(long).action(ArgAction::SetTrue);
-            } else if req.contains(&pname.as_str()) {
-                arg = arg.required(true).value_name(stat(&pname.to_uppercase()));
-            } else {
-                arg = arg.long(long).value_name(stat(&pname.to_uppercase()));
-            }
-            c = c.arg(arg);
-        }
-    }
-    c
-}
-
-fn args_from(m: &ArgMatches, params: &Value) -> Result<Value, String> {
-    let mut out = Map::new();
-    if let Some(props) = params["properties"].as_object() {
-        for (pname, p) in props {
-            if kind(p) == "boolean" {
-                if m.get_flag(pname) {
-                    out.insert(pname.clone(), Value::Bool(true));
-                }
-            } else if let Some(s) = m.get_one::<String>(pname) {
-                out.insert(pname.clone(), coerce(kind(p), s)?);
-            }
-        }
-    }
-    Ok(Value::Object(out))
+#[derive(Subcommand)]
+enum McpCmd {
+    /// Grava a entrada "spellcaster" no config do Claude (pede confirmacao).
+    Install {
+        /// desktop = claude_desktop_config.json; code = .mcp.json do diretorio corrente.
+        #[arg(long, default_value = "desktop")]
+        target: String,
+        /// Caminho do config; vazio = o padrao do target.
+        #[arg(long, default_value = "")]
+        path: String,
+        /// Grava sem perguntar.
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 fn main() {
-    let reg = registry();
-    let schema = reg.schema();
-    let entries = schema.as_array().cloned().unwrap_or_default();
-
-    let mut app = clap::Command::new("spellcore")
-        .version(env!("CARGO_PKG_VERSION"))
-        .about("Spellcaster core (R1): timeline, cues, fx, graph, sACN, Art-Net, OSC, rede")
-        .subcommand_required(true)
-        .arg_required_else_help(true)
-        .subcommand(clap::Command::new("commands").about("Lista o registry em JSON."));
-    for e in &entries {
-        app = app.subcommand(subcommand(
-            as_cli(e["name"].as_str().unwrap_or("")),
-            e["doc"].as_str().unwrap_or(""),
-            &e["params"],
-        ));
-    }
-
-    let m = app.get_matches();
-    let (cli_name, sub) = m.subcommand().expect("subcomando obrigatorio");
-    if cli_name == "commands" {
-        println!("{}", serde_json::to_string_pretty(&schema).unwrap_or_default());
-        return;
-    }
-    let name = as_reg(cli_name);
-    let params = entries
-        .iter()
-        .find(|e| e["name"] == name)
-        .map(|e| e["params"].clone())
-        .unwrap_or(Value::Null);
-
-    let r = args_from(sub, &params).and_then(|a| reg.call(name, a));
+    let r = match Cli::parse().cmd {
+        Cmd::Play(a) => play(a),
+        Cmd::Net(a) => net(a),
+        Cmd::Commands => Ok(registry().schema()),
+        Cmd::Mcp(m) => match m.cmd {
+            Some(McpCmd::Install { target, path, yes }) => mcp::install::install(&target, &path, yes),
+            None => {
+                STDOUT_LIVRE.store(false, Ordering::SeqCst);
+                mcp::serve_stdio(registry()).map(|_| Value::Null)
+            }
+        },
+    };
     match r {
+        Ok(Value::Null) => {} // servidor MCP encerrado, ou install abortado: ja' se explicou
         // string = relatorio pronto (net sem --json); o resto sai como JSON
         Ok(Value::String(s)) => println!("{}", s),
         Ok(v) => println!("{}", serde_json::to_string_pretty(&v).unwrap_or_default()),
@@ -372,67 +326,89 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use clap::CommandFactory;
 
     #[test]
-    fn coerce_por_tipo() {
-        assert_eq!(coerce("integer", "7").unwrap(), json!(7));
-        assert_eq!(coerce("number", "1.5").unwrap(), json!(1.5));
-        assert_eq!(coerce("boolean", "sim").unwrap(), json!(true));
-        assert_eq!(coerce("boolean", "nao").unwrap(), json!(false));
-        assert_eq!(coerce("string", "x").unwrap(), json!("x"));
-        assert!(coerce("integer", "x").is_err());
+    fn clap_bem_formado() {
+        Cli::command().debug_assert();
     }
 
+    /// O contrato do argv: os quatro subcomandos e as flags que o operador digita hoje.
     #[test]
-    fn kind_aceita_option() {
-        assert_eq!(kind(&json!({"type": "number"})), "number");
-        assert_eq!(kind(&json!({"type": ["string", "null"]})), "string");
-        assert_eq!(kind(&json!({"type": ["integer", "null"]})), "integer");
-        assert_eq!(kind(&json!({})), "string");
-    }
-
-    /// O contrato da CLI: todo comando do registry vira subcomando, e o argv volta como o
-    /// JSON que o registry espera. Se isso quebrar, `spellcore play` para de existir.
-    #[test]
-    fn subcomandos_saem_do_registry() {
-        let reg = registry();
-        let schema = reg.schema();
-        let entries = schema.as_array().unwrap();
-        let nomes: Vec<&str> = entries.iter().map(|e| e["name"].as_str().unwrap()).collect();
-        assert!(nomes.contains(&"play_show"), "registry sem play_show: {:?}", nomes);
-        assert!(nomes.contains(&"net") && nomes.contains(&"load"));
-
-        let e = entries.iter().find(|e| e["name"] == "play_show").unwrap();
-        let cmd = subcommand("play", "", &e["params"]);
-        let m = cmd
-            .try_get_matches_from(vec!["play", "shows/x.spell", "--loop", "--osc-port", "9000"])
+    fn argv_dos_quatro_subcomandos() {
+        let c = Cli::try_parse_from(["spellcore", "play", "shows/x.spell", "--loop", "--osc-port", "9000"])
             .expect("play aceita posicional, --loop e --osc-port");
-        assert_eq!(
-            args_from(&m, &e["params"]).unwrap(),
-            json!({"file": "shows/x.spell", "loop": true, "osc_port": 9000})
-        );
+        match c.cmd {
+            Cmd::Play(a) => {
+                assert_eq!(a.file, "shows/x.spell");
+                assert!(a.looping);
+                assert_eq!(a.osc_port, Some(9000));
+            }
+            _ => panic!("esperava play"),
+        }
 
-        let e = entries.iter().find(|e| e["name"] == "net").unwrap();
-        let cmd = subcommand("net", "", &e["params"]);
-        let m = cmd
-            .try_get_matches_from(vec!["net", "--timeout", "0.5", "--json"])
-            .expect("net aceita --timeout e --json");
-        assert_eq!(
-            args_from(&m, &e["params"]).unwrap(),
-            json!({"timeout": 0.5, "json": true})
-        );
+        match Cli::try_parse_from(["spellcore", "net", "--timeout", "0.5", "--json"])
+            .expect("net aceita --timeout e --json")
+            .cmd
+        {
+            Cmd::Net(a) => {
+                assert_eq!(a.timeout, 0.5);
+                assert!(a.json);
+            }
+            _ => panic!("esperava net"),
+        }
+        match Cli::try_parse_from(["spellcore", "net"]).unwrap().cmd {
+            Cmd::Net(a) => assert_eq!(a.timeout, 2.0, "default do --timeout"),
+            _ => panic!("esperava net"),
+        }
+
+        assert!(matches!(
+            Cli::try_parse_from(["spellcore", "commands"]).unwrap().cmd,
+            Cmd::Commands
+        ));
+        match Cli::try_parse_from(["spellcore", "mcp"]).unwrap().cmd {
+            Cmd::Mcp(m) => assert!(m.cmd.is_none(), "`mcp` sozinho = servidor stdio"),
+            _ => panic!("esperava mcp"),
+        }
+        match Cli::try_parse_from(["spellcore", "mcp", "install", "--target", "code", "--yes"])
+            .unwrap()
+            .cmd
+        {
+            Cmd::Mcp(McpArgs {
+                cmd: Some(McpCmd::Install { target, path, yes }),
+            }) => {
+                assert_eq!(target, "code");
+                assert!(path.is_empty());
+                assert!(yes);
+            }
+            _ => panic!("esperava mcp install"),
+        }
+        assert!(Cli::try_parse_from(["spellcore"]).is_err(), "sem subcomando = ajuda");
     }
 
-    /// O operador digita `play`; o registry (e o MCP depois) so' conhece `play_show`.
+    /// O operador digita `play`; o registry (e o MCP) so' conhece `play_show`. O schema dos
+    /// parametros e' o que vira `inputSchema` da tool.
     #[test]
-    fn alias_play_vira_play_show() {
-        assert_eq!(as_reg("play"), "play_show");
-        assert_eq!(as_cli("play_show"), "play");
-        assert_eq!(as_reg("net"), "net");
-        assert_eq!(as_cli("net"), "net");
+    fn registry_expoe_play_show_e_net_com_schema() {
         let reg = registry();
         assert!(reg.get("play_show").is_some());
+        assert!(reg.get("net").is_some());
         assert!(reg.get("play").is_none(), "sem comando duplicado");
+        let sc = reg.schema();
+        let e = sc
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|e| e["name"] == "play_show")
+            .unwrap();
+        let props = &e["params"]["properties"];
+        assert!(props["file"].is_object());
+        assert!(props["loop"].is_object(), "o campo JSON chama-se loop: {}", props);
+        assert!(props["osc_port"].is_object());
+        assert_eq!(
+            e["params"]["required"].as_array().unwrap(),
+            &vec![json!("file")]
+        );
     }
 
     #[test]

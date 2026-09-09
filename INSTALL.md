@@ -59,7 +59,7 @@ C:\Python313\python.exe -m unittest discover -s tests -v
 
 ### Rust (spellcore)
 
-Toolchain via rustup (`rustc` ≥ 1.75). A pasta do repo mora no Google Drive: o `target/`
+Toolchain via rustup (`rustc` ≥ 1.88, exigência do `rmcp`). A pasta do repo mora no Google Drive: o `target/`
 NUNCA fica dentro dela.
 
 ```powershell
@@ -81,8 +81,23 @@ sh packaging/build_lite.sh [--no-gui] [saída] # tarball Lite (default /tmp)
 
 ### MCP (sessão de IA)
 
+Rust (`spellcore`, é o que o produto usa):
+
 ```
-spell mcp                      # stdio, para Claude Desktop / Claude Code
+spellcore mcp                              # servidor MCP em stdio, para Claude Desktop / Claude Code
+spellcore mcp install --target desktop     # grava a entrada em %APPDATA%\Claude\claude_desktop_config.json
+spellcore mcp install --target code        # grava .mcp.json no diretório corrente (projeto)
+spellcore mcp install --target code --yes  # sem perguntar
+```
+
+`install` mostra a entrada que vai gravar, faz backup `.bak` e só escreve depois de um `s` no
+console. Sem console (pipe), aborta. As tools são os comandos do `spellcore commands`; os
+resources são `spell://show` e `spell://commands`.
+
+Python (protótipo, também traz HTTP streamable):
+
+```
+spell mcp                      # stdio
 spell mcp --transport http --port 8765   # HTTP streamable (Pi Lite, remoto)
 spell mcp_install --target desktop       # grava a entrada em claude_desktop_config.json (--target code = .mcp.json); pede confirmação
 ```

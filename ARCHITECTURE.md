@@ -1,4 +1,4 @@
-# Spellcaster — arquitetura (protótipo Python F0–F6; spellcore Rust R0, R1, R4)
+# Spellcaster — arquitetura (protótipo Python F0–F6; spellcore Rust R0, R1, R4, R7)
 
 ## Árvore
 
@@ -144,7 +144,7 @@ Todas as saídas expõem `send(universe: int, data: bytes)` e `close()`.
 | F5 MCP | `mcp/server.py` gera tools de `registry.schema()`; resources: show, patch, rede, log | registry, `netscan.scan_all` |
 | F6 portátil e Lite | PyInstaller onedir; `spell serve --headless`, `spell tui` (curses); tarball aarch64 | tudo acima sem `pywebview` |
 
-## spellcore (Rust) — estado em R1 + R4
+## spellcore (Rust) — estado em R1 + R4 + R7
 
 Core do produto reescrito em Rust (PRD v1.1). O pacote Python `spellcaster/` continua no repo
 como implementação de referência e gerador dos fixtures de conformidade; não recebe funcionalidade
@@ -159,8 +159,8 @@ spellcore/
   script/        lib.rs (Fx: track `fx` em Rhai), graph.rs (Graph runtime da seção 10 do PRD)
   laser/         frame (otimização + safety), ild, feed (multi-feed), dac/{etherdream,helios,idn}
                  bin/feeds (bench de 4 feeds), benches/laser.rs, tests/conformance.rs + fixtures
-  cli/           binário `spellcore`: play, net, commands, load, pause, stop, locate, cue_go,
-                 transport_state (subcomandos gerados do registry em runtime)
+  mcp/           lib.rs (servidor MCP sobre `rmcp`, stdio), install.rs (`mcp install`)
+  cli/           binário `spellcore`: play, net, commands, mcp (clap derive, structs fixas)
   bench/         Criterion (benches/core.rs, benches/graph.rs) + binários jitter e throughput
 tests/conformance/
   gen.py         gera os fixtures a partir do pacote Python
@@ -172,8 +172,9 @@ shows/
 ```
 
 Grafo de dependências: `protocols` autocontido; `engine -> protocols`; `script -> engine, rhai`;
-`laser -> protocols` (só o beacon Ether Dream); `cli -> engine, protocols, script`;
-`bench -> engine, protocols, script`. O engine não conhece GUI, MCP, Rhai nem laser.
+`laser -> protocols` (só o beacon Ether Dream); `mcp -> engine, rmcp, tokio`;
+`cli -> engine, protocols, script, mcp`; `bench -> engine, protocols, script`. O engine não
+conhece GUI, MCP, Rhai nem laser.
 
 ### Contratos
 
@@ -196,8 +197,17 @@ Grafo de dependências: `protocols` autocontido; `engine -> protocols`; `script 
   `start(osc_port)` (thread de transporte + OscIn `/spellcaster/play|pause|stop|locate`),
   `Handle {play, pause, stop, locate, cue_go, state}`, `player::current()` é o player vivo do processo.
 - `Registry::add::<A: JsonSchema + DeserializeOwned>(nome, doc, fn)`; erro é `String`.
-  `registry::base()` sem `Clock`: `load`, `pause`, `stop`, `locate`, `cue_go`, `transport_state`
-  agem em `player::current()`. `play_show` e `net` são registrados pela CLI (alias `play`).
+  `registry::base()` sem `Clock`: `load`, `show_get`, `pause`, `stop`, `locate`, `cue_go`,
+  `transport_state`; os de transporte agem em `player::current()`. `play_show` e `net` são
+  registrados pela CLI, que é quem conhece `script` e `protocols`.
+- `mcp::Spell` (crate `mcp`) implementa `rmcp::ServerHandler` sobre um `Registry`: uma tool por
+  comando, com o `inputSchema` que o `schemars` gerou; resources `spell://show` (o `show_get`) e
+  `spell://commands` (o `Registry::schema()`). Erro de comando volta como `isError`, não como erro
+  JSON-RPC. `play_show` bloqueia, então roda em thread e a tool volta na hora; enquanto o MCP roda,
+  a linha de status do `play` sai no stderr (no stdio o stdout é o canal JSON-RPC).
+  `mcp::install` grava a entrada "spellcaster" no config do Claude — não é comando do registry,
+  para que a IA não reescreva a própria configuração. Só stdio: o HTTP streamable do `rmcp` é um
+  `tower::Service` e ainda exigiria axum/hyper.
 - `trait Output { fn send(&mut self, universe: u16, data: &[u8; 512]); fn close(&mut self); }`.
   Cada saída tem thread própria e fila de 2 frames por universo; `send()` nunca bloqueia o engine.
 - `script::Fx::new(path, universe)`: compila o `.rhai` uma vez, estado persiste entre frames; API
@@ -253,4 +263,4 @@ cargo bench -p bench
 | `Timeline::apply` do show inteiro | — | 3,73 µs |
 | Graph de 500 nós por frame | < 0,1 ms | 8,4 µs (2,0 µs sem `math.expr`) |
 | 4 feeds laser × 30 kpps, cpu das threads de feed | < 1 % de um núcleo | 0,83 % em 30 s (GetThreadTimes quantiza em 15,6 ms: rodar ≥ 30 s) |
-| Binário `spellcore.exe` release | < 20 MB | 2,5 MB (0,95 MB antes do Rhai) |
+| Binário `spellcore.exe` release | < 20 MB | 3,8 MB (2,5 MB antes do rmcp; 0,95 MB antes do Rhai) |
