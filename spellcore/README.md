@@ -351,6 +351,37 @@ token); mDNS; mais de um show por processo (um `OPEN`, um `CURRENT`).
 
 Regenerar: `C:\Python313\python.exe tests/conformance/gen.py`.
 
+## `laser::trace` — FÓSFORO (bitmap → contorno → ILDA)
+
+A metade do NDI→ILDA que não depende de SDK (`design/FUNCOES/ndi-ilda.md`, algoritmo
+"Contornos"). Puro Rust, sem dependência nova; a entrada é um buffer RGBA cru, venha ele do NDI,
+do Spout ou de um arquivo.
+
+```rust
+/// `color: None` amostra o pixel de origem sob cada ponto.
+pub struct Opts { threshold: u8, epsilon: f32, max_points: usize, invert: bool, color: Option<(u8, u8, u8)> }
+/// Caminhos em coordenadas ILDA, um por objeto, fechados; antes de blanking/optimize/safety.
+pub fn paths(rgba: &[u8], w: usize, h: usize, o: &Opts) -> Vec<Vec<Point>>;
+/// Quadro pronto para o `Feed`: caminhos + salto apagado + `optimize` + `safety` padrão.
+pub fn trace(rgba: &[u8], w: usize, h: usize, o: &Opts) -> Vec<Point>;
+```
+
+Máscara por luma BT.601 · contorno externo por seguimento de borda de Moore, um caminho por
+objeto (buraco não vira caminho) · simplificação Ramer–Douglas–Peucker com `epsilon` em pixels
+da entrada · corte proporcional por caminho até `max_points` (contado **antes** do `optimize`) ·
+ordenação por vizinho mais próximo · teto de `MAX_PATHS = 2000` caminhos por quadro. A imagem
+entra centrada com a proporção preservada, no alcance ILDA ±32767 com Y para cima.
+Determinístico: mesma entrada, mesmos bytes.
+
+```
+trace in.rgba WxH out.ild [--threshold N] [--epsilon F] [--max-points N] [--invert] [--sampled]
+```
+
+Medido em release: **4,4 ms** por quadro 1920×1080 com 20 objetos (meta 8 ms). O custo é das duas
+passadas de quadro inteiro (máscara e varredura de candidatos, 2 Mpx cada); a vetorização em si
+toca só os pixels de contorno — um objeto ou vinte dá o mesmo tempo. Teste: `laser/tests/trace.rs`,
+que gera as entradas RGBA no próprio arquivo.
+
 ## CLI
 
 ```
