@@ -184,6 +184,7 @@ CI, sem tocar no que já está conforme):
 | Frente | Entrega | Aceite | Depende de |
 |---|---|---|---|
 | Design | rodada 7 (FÓSFORO, PATCHBAY) | voto do dono | voto das rodadas 5 e 6 |
+| F5 face | `spellgui/web/bus.js` (cliente do barramento), `widgets.js` (parâmetro tipado → widget: regras 1 e 3 de `design/FUNCOES/README.md`), `face.js`/`face.html` e `faces/quatro.face.json` | a Face de 4 botões abre em kiosk e opera o show só pelo registry | comando `input` e o barramento (F1) |
 
 Bloqueadas até instalar SDK (decisão do dono, não de agente): R2 (GStreamer + NDI SDK),
 R6 (Godot 4). R9 espera R5.

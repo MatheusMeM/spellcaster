@@ -1,0 +1,26 @@
+{
+  "name": "quatro",
+  "theme": "feiticaria",
+  "mode": "performance",
+  "views": {
+    "full": {
+      "grid": "4x2",
+      "widgets": ["go", "next", "stop", "blackout"]
+    },
+    "compact": {
+      "grid": "2x1",
+      "widgets": ["go", "blackout"],
+      "at": {"go": [0, 0, 1, 1], "blackout": [1, 0, 1, 1]}
+    }
+  },
+  "widgets": [
+    {"id": "go", "type": "button", "label": "GO", "tone": "go", "at": [0, 0, 2, 2],
+     "cmd": "cue_go", "args": {}},
+    {"id": "next", "type": "button", "label": "NEXT", "at": [2, 0, 2, 1],
+     "cmd": "cue_go", "args": {}},
+    {"id": "stop", "type": "button", "label": "STOP", "at": [2, 1, 1, 1],
+     "cmd": "stop", "args": {}},
+    {"id": "blackout", "type": "button", "label": "BLACK", "tone": "live", "at": [3, 1, 1, 1],
+     "input": "widget:blackout"}
+  ]
+}
