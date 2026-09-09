@@ -122,7 +122,9 @@ pub fn parse(pk: &[u8]) -> Option<Packet> {
     let vec = be32(pk, 18);
     let mut cid = [0u8; 16];
     cid.copy_from_slice(&pk[22..38]);
-    let name = cstr(&pk[44..108]);
+    // datagrama truncado na rede: o `get` cobre o resto da camada framing (ate 108);
+    // os dois ramos abaixo ja checam o tamanho antes de fatiar o que vem depois.
+    let name = cstr(pk.get(44..108)?);
     if vec == 4 && pk.len() >= 126 {
         return Some(Packet::Data {
             cid,
@@ -434,6 +436,17 @@ mod tests {
             _ => panic!("esperava Data"),
         }
         assert!(parse(b"nao e e1.31").is_none());
+    }
+
+    /// Datagrama E1.31 truncado (o que a rede entrega) nao pode panicar a thread do SacnIn.
+    #[test]
+    fn truncado_nao_panica() {
+        let cid: [u8; 16] = std::array::from_fn(|i| (i as u8) ^ 0x5A);
+        let pk = packet(300, &data512(), &cid, 42, "Fonte X", 77);
+        for n in [0, 16, 47, 48, 60, 100, 107, 108, 119, 125] {
+            assert!(parse(&pk[..n]).is_none(), "truncado em {} devia dar None", n);
+        }
+        assert!(parse(&pk).is_some(), "pacote completo continua parseando");
     }
 
     #[test]
