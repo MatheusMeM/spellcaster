@@ -18,9 +18,10 @@ function load() {
     near: () => -1,
     sel: () => ({}),
   };
+  const TEATRO = require("../teatro.js");           // parte pura: a cor da fixture sai dela
   for (const f of ["timeline.js", "viewer.js"]) {
     const src = fs.readFileSync(path.join(__dirname, "..", f), "utf8");
-    new Function("window", "CK", src)(win, CK);
+    new Function("window", "CK", "TEATRO", src)(win, CK, TEATRO);
   }
   return win;
 }
@@ -136,11 +137,23 @@ test("perfil so com dimmer da branco vezes o dimmer", () => {
   assert.deepStrictEqual(VW.cor([{ name: "dim", offset: 0 }], d, 1), [128, 128, 128]);
 });
 
+// A cor e' a do teatro de papel: `w` entra na mistura e `on` acende, senao as duas plantas
+// mostrariam a mesma fixture de cores diferentes.
+test("canal w e canal on contam, como no teatro", () => {
+  const d = new Uint8Array(512);
+  d[3] = 255;                                             // barra WLED so' no branco
+  const wled = [{ name: "r", offset: 0 }, { name: "g", offset: 1 },
+    { name: "b", offset: 2 }, { name: "w", offset: 3 }];
+  assert.deepStrictEqual(VW.cor(wled, d, 1), [255, 255, 255]);
+  d[0] = 255;
+  assert.deepStrictEqual(VW.cor([{ name: "on", offset: 0 }], d, 1), [255, 255, 255]);
+});
+
 test("dimmer escala o rgb, e sem cor nenhuma a fixture fica vazia", () => {
   const d = new Uint8Array(512);
   d[0] = 200; d[3] = 0;
   const ch = [{ name: "r", offset: 0 }, { name: "dim", offset: 3 }];
-  assert.deepStrictEqual(VW.cor(ch, d, 1), [0, 0, 0]);
+  assert.strictEqual(VW.cor(ch, d, 1), null, "dimmer em zero: apagada, so' o contorno");
   assert.strictEqual(VW.cor([{ name: "pan", offset: 0 }], d, 1), null);
   assert.strictEqual(VW.cor(null, d, 1), null, "perfil que ainda nao chegou");
   assert.strictEqual(VW.cor([{ name: "r", offset: 0 }], null, 1), null, "sem frame de saida");

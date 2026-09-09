@@ -8,11 +8,12 @@
 //
 // Nao desenha: 3D, feixe, thumbnail por lane, video (ROADMAP R6 e' o Godot, outra coisa).
 //
-// Arquivo separado de propOsito: a timeline so' chama `VW.draw(ctx, rect, t)`, e o previz cresce
-// sem tocar em timeline.js. Precisa de `window.TL` — index.html carrega este script depois dela.
+// Arquivo separado de proposito: a timeline so' chama `VW.draw(ctx, rect, t)`, e o previz cresce
+// sem tocar em timeline.js. Precisa de `window.TL` e da parte pura de `teatro.js` (`TEATRO`) —
+// index.html carrega os dois antes deste script.
 
 // IIFE porque script classico compartilha o escopo global: `const TL` ja' e' de timeline.js.
-(function (window) {
+(function (window, TEATRO) {
   const TL = window.TL;
 
   const VW = {
@@ -76,22 +77,15 @@
     return null;
   };
 
-  // Cor da fixture no frame de saida: r/g/b do perfil, escalados pelo dimmer quando ha um. Perfil
-  // so' com dimmer da branco * dimmer. Sem r/g/b e sem dimmer nao ha cor — a bolinha fica vazia.
+  // Cor da fixture no frame de saida: a MESMA conta do teatro de papel (`teatro.js`, parte pura,
+  // coberta por test/teatro.test.js). Copia propria discordava dele na mesma fixture: ignorava o
+  // canal `w` (a barra WLED em branco puro saia preta aqui e branca la') e o canal `on`.
+  // Apagada (intensidade 0) devolve null: a bolinha fica so' com o contorno.
   VW.cor = function (chans, data, address) {
     if (!chans || !chans.length || !data) return null;
-    const at = n => {
-      const c = chans.find(x => x.name === n);
-      return c ? data[address - 1 + (c.offset || 0)] : undefined;
-    };
-    const d = at("dim") !== undefined ? at("dim") : at("dimmer");
-    let r = at("r"), g = at("g"), b = at("b");
-    if (r === undefined && g === undefined && b === undefined) {
-      if (d === undefined) return null;
-      r = g = b = 255;
-    }
-    const k = d === undefined ? 1 : d / 255;
-    return [Math.round((r || 0) * k), Math.round((g || 0) * k), Math.round((b || 0) * k)];
+    const ch = TEATRO.canais({ channels: chans }, address, 1, { 1: data });
+    const k = TEATRO.intensidade(ch);
+    return k ? TEATRO.cor(ch).map(x => Math.round(x * k)) : null;
   };
 
   // ---- desenho ------------------------------------------------------------
@@ -174,8 +168,7 @@
       c.lineTo(Math.round(r.x + i * w) + 0.5, r.y + r.h);
     }
     c.stroke();
-    c.textBaseline = "middle";
-    c.font = "10px " + col.mono;
+    c.font = "10px " + col.mono;          // textBaseline "middle" ja' vem de draw() em timeline.js
     const fs = [barras, quadro, planta];
     for (let i = 0; i < 3; i++) {
       const b = { x: r.x + i * w + 8, y: r.y + 20, w: w - 16, h: r.h - 26 };
@@ -190,4 +183,4 @@
     }
   };
 
-})(window);
+})(window, TEATRO);

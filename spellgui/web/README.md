@@ -11,7 +11,7 @@ o `spellcore serve` (ou qualquer servidor estático) entrega. Cor e tipografia v
 | `face.js` + `face.html` | runtime da Face: `faces/<nome>.face.json` vira grade de widgets em modo kiosk |
 | `canvaskit.js` | pan, zoom, hit-test, marquee, DPR, dirty-flag; compartilhado por timeline e graph |
 | `timeline.js` + `index.html` | timeline em canvas |
-| `viewer.js` | previz 2D na faixa de baixo da timeline (Alt+M): barras DMX do universo da lane focada, o quadro ILDA de cada track laser em `t` (`clip_frame` do engine, com `scale`/`rot` do track) e a planta do patch em grade por endereço. Coluna sem dado escreve “sem laser” / “sem patch” |
+| `viewer.js` | previz 2D na faixa de baixo da timeline (Alt+M): barras DMX do universo da lane focada, o quadro ILDA de cada track laser em `t` (`clip_frame` do engine, com `scale`/`rot` do track) e a planta do patch em grade por endereço, com a cor da fixture saindo da parte pura de `teatro.js` (a mesma conta nas duas plantas). Coluna sem dado escreve “sem laser” / “sem patch” |
 | `dev/commands.json` | `Registry::schema()` congelado, usado no modo offline |
 | `test/*.test.js` | `node --test spellgui/web/test/*.test.js` |
 
