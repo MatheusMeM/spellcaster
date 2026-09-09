@@ -7,7 +7,7 @@ standalone e versão Lite para Raspberry Pi operada por CLI via SSH.
 O repo tem duas camadas:
 
 - `spellcaster/` — protótipo Python 3.13 (stdlib), fases F0–F6 concluídas: CLI `spell`, GUI web
-  com 6 skins, timeline em canvas, MCP (stdio e HTTP), TUI, empacotamento portátil e Lite.
+  com 6 skins, timeline em canvas, MCP (stdio), TUI, empacotamento portátil e Lite.
   Hoje é a implementação de referência e o gerador dos fixtures de conformidade; não recebe
   funcionalidade nova.
 - `spellcore/` — o core do produto em Rust (PRD v1.1 em `PRD.md`). Fases R0 (engine, protocolos,
@@ -22,7 +22,7 @@ Instalação (pendrive Windows, Lite no Pi, código-fonte): `INSTALL.md`. Licen�
 
 | Fase | O que é | Estado |
 |---|---|---|
-| F0–F6 (Python) | protocolos, netscan, perfis/patch, timeline, GUI + skins, MCP, portátil/Lite | concluídas, 101 testes |
+| F0–F6 (Python) | protocolos, netscan, perfis/patch, timeline, GUI + skins, MCP, portátil/Lite | concluídas, 98 testes |
 | R0 (Rust) | `engine`, `protocols`, `cli net/play`, `bench` jitter/throughput | concluída, dentro do alvo |
 | R1 (Rust) | cues, `.spell` completo, `fx` Rhai, Graph, player + OSC, CLI headless | concluída, conformidade ao vivo 89/89 |
 | R4 (Rust) | `laser`: optimize/safety, `.ild`, Ether Dream/Helios/IDN, 4 feeds | concluída, 0,83 % de cpu |
@@ -43,14 +43,13 @@ C:\Python313\python.exe -m spellcaster.cli commands
 C:\Python313\python.exe -m spellcaster.cli play shows\medgrupo.py --fps 30
 C:\Python313\python.exe -m spellcaster.cli play shows\medgrupo.py --loop --universes 1,2
 C:\Python313\python.exe -m spellcaster.cli net --timeout 2
-C:\Python313\python.exe -m spellcaster.cli net --as_json
 C:\Python313\python.exe -m spellcaster.protocols.ilda.generators saida.ild
 C:\Python313\python.exe -m spellcaster.protocols.ilda.generators saida.ild 20000 10000
 ```
 
 - `play` toca um show `.py` por sACN. Opções: `--fps` (padrão 30), `--loop`, `--universes` (lista separada por vírgula, padrão `1`). O show precisa definir `look(t)`; `DUR` é opcional.
 - `commands` imprime o schema do registry em JSON.
-- `net` aceita `--timeout` (segundos, padrão 2) e `--as_json`. Também roda como `-m spellcaster.protocols.netscan`.
+- `net` aceita `--timeout` (segundos, padrão 2), imprime o relatório e devolve o dict do scan (a chave `report` é esse texto); a GUI e o MCP leem o mesmo comando. Também roda como `-m spellcaster.protocols.netscan [--json]`.
 - `generators` grava o laser MED GRUPO em `.ild`. Os dois argumentos opcionais são a meia-largura e a meia-altura da tela em unidades ILDA (padrão 20000 e 10000).
 
 Com o pacote instalado (`pip install -e .`), `spell` substitui `C:\Python313\python.exe -m spellcaster.cli`.
@@ -61,7 +60,7 @@ Com o pacote instalado (`pip install -e .`), `spell` substitui `C:\Python313\pyt
 C:\Python313\python.exe -m unittest discover -s tests -v
 ```
 
-101 testes Python e 105 Rust (`cargo test --workspace`). Loopback UDP em 127.0.0.1 faz o papel de mock. Os testes não imprimem caracteres fora de ASCII.
+98 testes Python e 106 Rust (`cargo test --workspace`). Loopback UDP em 127.0.0.1 faz o papel de mock. Os testes não imprimem caracteres fora de ASCII.
 
 ## Contratos fixos
 

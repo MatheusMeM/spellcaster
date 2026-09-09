@@ -12,8 +12,8 @@ spellcaster/
     registry.py          @command, call, schema, REGISTRY
     universe.py          Universe, Universes
   protocols/
-    sacn.py              E1.31 out/in/discovery
-    artnet.py            Art-Net 4 out/in/poll
+    sacn.py              E1.31 out/in
+    artnet.py            Art-Net 4 out/in
     osc.py               OSC 1.0 out/in
     netscan.py           análise de rede (__main__)
     ilda/
@@ -23,9 +23,8 @@ spellcaster/
       etherdream.py      EtherDream, Emulator
 shows/
   medgrupo.py            look(t), DUR
-seed/                    show_medgrupo.py, bsw_hold.py, bsw_multi.py, ilda_gen.py (referência)
 tests/                   test_artnet, test_clock, test_engine, test_ilda, test_netscan,
-                         test_osc, test_registry, test_sacn, test_show_medgrupo
+                         test_osc, test_registry, test_sacn
 ```
 
 ## Fluxo de dados
@@ -65,8 +64,7 @@ Todas as saídas expõem `send(universe: int, data: bytes)` e `close()`.
 - `interfaces() -> list[str]`: IPs IPv4 locais por `getaddrinfo(gethostname())` mais `127.0.0.1`.
 - `SacnOut(universes=(1,), priority=100, source_name="Spellcaster", interfaces=None)`: um socket por IP com `IP_MULTICAST_IF`. `send` envia multicast em cada socket e unicast em `127.0.0.1`. `close()`.
 - `SacnIn(universes=(1,))`: thread daemon. `get(universe) -> bytes | None`, `.sources`, `close()`.
-- `discover(timeout=3.0) -> list[{cid, name, ip, universes}]`.
-- Sem `ponytail:`. Não implementado: sync E1.31, merge por prioridade na entrada.
+- Sem `ponytail:`. Não implementado: sync E1.31, merge por prioridade na entrada. O discovery da rede é varrido por `netscan.scan_sacn`, que decodifica com este `parse`.
 
 ### artnet (`protocols/artnet.py`)
 
@@ -75,10 +73,9 @@ Todas as saídas expõem `send(universe: int, data: bytes)` e `close()`.
 - `artdmx(universe, data, sequence, physical=0) -> bytes`: dados 2..512 bytes, comprimento par.
 - `artpoll(flags=0x06, priority=0x10) -> bytes`, `artsync() -> bytes`.
 - `parse(packet) -> dict | None`: ArtDmx, ArtPoll, ArtPollReply, ArtSync.
-- `ArtNetOut(targets=None, broadcast=True, port=6454)`: `send(universe, data)`, `sync()`, `close()`. Sequência 1..255.
+- `ArtNetOut(targets=None, broadcast=True, port=6454)`: `send(universe, data)`, `close()`. Sequência 1..255.
 - `ArtNetIn(universes, host="0.0.0.0", port=6454)`: thread. `.frames[universe] -> bytes`, `close()`.
-- `poll(timeout=2.0, targets=BROADCASTS) -> list[dict]`.
-- `artnet.py:142` ponytail: se a porta 6454 está ocupada, `poll` faz bind em porta efêmera e só recebe respostas unicast. Falta: compartilhar o socket com `ArtNetIn`.
+- O ArtPoll da rede é disparado por `netscan.scan_artnet`, que decodifica a resposta com este `parse`.
 - Não implementado: emitir ArtPollReply (o Spellcaster não aparece como nó para outros controladores).
 
 ### osc (`protocols/osc.py`)
@@ -97,13 +94,13 @@ Todas as saídas expõem `send(universe: int, data: bytes)` e `close()`.
 - Executável: `python -m spellcaster.protocols.netscan [--json] [--timeout N]`.
 - `interfaces() -> list[{name, ip, mask, gateway}]`: `ipconfig` no Windows, `ip -j addr` + `ip -j route` no Linux, fallback `parse_ip_addr`. Sem loopback.
 - `parse_ipconfig(text)`, `parse_ip_addr(text, route_text="")`: parsers puros, testados com saída pt-BR e en.
-- `scan_artnet(timeout=2, ifaces=None)`: ArtPoll em broadcast global, 2.x, 10.x e broadcast de cada subrede. `parse_artpollreply(data)`.
-- `scan_sacn(timeout=3, ifaces=None)`: entra no multicast de discovery em cada interface. `parse_sacn_discovery(data)`.
+- `scan_artnet(timeout=2, ifaces=None)`: ArtPoll em broadcast global, 2.x, 10.x e broadcast de cada subrede; decodifica com `artnet.parse`.
+- `scan_sacn(timeout=3, ifaces=None)`: entra no multicast de discovery em cada interface; decodifica com `sacn.parse`.
 - `scan_etherdream(timeout=2)`: beacons UDP 7654.
 - `suggest(ifaces, windows=WINDOWS) -> list[str]`: regras de subrede para Art-Net, comando `netsh` pronto (texto, não executa), aviso de interfaces na mesma subrede.
 - `scan_all(timeout=2) -> dict`: os três scans em threads. `report(d) -> str`.
-- Sem `ponytail:`. Duplicação declarada no docstring do módulo: `parse_artpollreply` e `parse_sacn_discovery` repetem `artnet.parse` e `sacn.parse`. Unificar quando os dois estiverem estáveis.
-- Não implementado (ROADMAP F1): mDNS `_osc._udp`, discovery IDN, medida de latência. Verbo `spell net` existe em `cli.py`.
+- Sem `ponytail:`. Um decodificador por protocolo: os pacotes vêm de `artnet.parse` e `sacn.parse`.
+- Não implementado (ROADMAP F1): mDNS `_osc._udp`, discovery IDN, medida de latência. O verbo `spell net` (único: devolve o dict com `report`, usado também pela GUI e pelo MCP) está em `cli.py`.
 
 ### Dois `interfaces()`
 
@@ -122,7 +119,7 @@ Todas as saídas expõem `send(universe: int, data: bytes)` e `close()`.
 - `frame.optimize(frame, dwell=2, blank_gap=4, max_step=1200, angle=25) -> Frame`: dwell em vértices, pontos apagados nas transições, interpolação de saltos.
 - `frame.safety(frame, min_size=2000, max_intensity=255, zone=None) -> Frame`: escurece figura menor que `min_size`, limita intensidade, apaga fora da zona.
 - `ild.read(path) -> list[Frame]`, `ild.write(path, frames, fmt=5, name="", company="spell", palette=None)`. Formatos 0, 1, 2 (paleta), 4, 5.
-- `generators`: `ellipse`, `circle`, `polyline`, `rect`, `line`, `blank_to`, `ease`, `medgrupo(t, sx=20000, sy=10000) -> Frame`, `render(fn, fps=25, dur=46.8, **kw) -> list[Frame]`.
+- `generators`: `ellipse`, `circle`, `polyline`, `rect`, `blank_to`, `ease`, `medgrupo(t, sx=20000, sy=10000) -> Frame`, `render(fn, fps=25, dur=46.8, **kw) -> list[Frame]`.
 - `etherdream`: beacon UDP 7654, stream TCP 7765, little-endian.
   - `EtherDream(ip, port=7765, capacity=1800)`: `connect(timeout=2)`, `prepare()`, `begin(pps, low_water=0)`, `send(points)`, `ping()`, `play(frames, pps=20000, chunk=None) -> Thread`, `stop()`, `close()`. `send` aqui é o comando `d` do DAC, não o contrato DMX.
   - `Emulator(host="127.0.0.1", port=0, capacity=1800)`: servidor TCP para testes. `start()`, `stop()`, `beacon()`, `.received`, `.commands`.
@@ -141,7 +138,7 @@ Todas as saídas expõem `send(universe: int, data: bytes)` e `close()`.
 | F2 perfis e patch | `fixtures/profile.py`, `fixture.py`, `group.py`, `library/*.json`; verbo `spell calib` | `Universe.set`, registry |
 | F3 timeline, `.spell`, player | `timeline/model.py`, `tracks.py`, `cues.py`, `render.py`; `show.py`; `player/player.py`; track `laser` usa `ilda.frame`, `ild`, `etherdream` | `Clock`, `Engine.apply` recebe o dict de `timeline.render` no lugar de `look(t)` |
 | F4 GUI | `gui/server.py` (HTTP + WebSocket), `gui/web/`, `gui/window.py` (pywebview) | registry via WebSocket; `netscan.scan_all` para o painel Network |
-| F5 MCP | `mcp/server.py` gera tools de `registry.schema()`; resources: show, patch, rede, log | registry, `netscan.scan_all` |
+| F5 MCP | `mcp/server.py` (stdio) gera tools de `registry.schema()`; resources: show, patch, rede, log | registry, comando `net` |
 | F6 portátil e Lite | PyInstaller onedir; `spell serve --headless`, `spell tui` (curses); tarball aarch64 | tudo acima sem `pywebview` |
 
 ## spellcore (Rust) — estado em R1 + R4
