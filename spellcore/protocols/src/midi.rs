@@ -160,9 +160,6 @@ mod tests {
     #[test]
     fn ports_nunca_falha() {
         let p = ports();
-        for n in &p {
-            assert!(!n.is_empty() || n.is_empty(), "nome e' texto");
-        }
         // abrir sem porta e' erro de texto, nunca panico
         if p.is_empty() {
             assert!(MidiIn::open("").is_err());
