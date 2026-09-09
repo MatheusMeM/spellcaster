@@ -14,8 +14,10 @@ jobs:
   python:
     strategy:
       fail-fast: false
+      # ponytail: sem leg arm ; build_lite.sh empacota so .py + shows + profiles, o tarball do
+      # arm sai byte a byte igual ao do x64 (e colidia no merge do release)
       matrix:
-        os: [windows-latest, ubuntu-latest, ubuntu-24.04-arm]
+        os: [windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -66,41 +68,64 @@ jobs:
           - os: ubuntu-24.04-arm
             bin: spellcore
             name: spellcore-linux-aarch64
+          # Pi aarch64 estatico (PRD 6). O runner ja e' aarch64: musl e' so mais um target do
+          # rustup, sem cross nem zigbuild. Nenhuma dep do workspace tem codigo C (Helios e' stub
+          # sem rusb), entao o musl-libc que vem com o std basta.
+          - os: ubuntu-24.04-arm
+            bin: spellcore
+            name: spellcore-linux-aarch64-static
+            target: aarch64-unknown-linux-musl
     runs-on: ${{ matrix.os }}
     env:
       CARGO_TERM_COLOR: always
+      T: ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
+      REL: target/${{ matrix.target && format('{0}/', matrix.target) || '' }}release
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+      - name: target musl
+        if: matrix.target
+        run: rustup target add ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: spellcore
+          key: ${{ matrix.name }}
 
       - name: clippy
         working-directory: spellcore
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets ${{ env.T }} -- -D warnings
 
       - name: testes (inclui conformidade byte a byte com os fixtures)
         working-directory: spellcore
-        run: cargo test --workspace
+        run: cargo test --workspace ${{ env.T }}
 
       - name: release
         working-directory: spellcore
-        run: cargo build --release --workspace
+        run: cargo build --release --workspace ${{ env.T }}
+
+      - name: confirma que o binario e' estatico
+        if: matrix.target
+        shell: bash
+        working-directory: spellcore
+        run: |
+          B="${{ env.REL }}/${{ matrix.bin }}"
+          file "$B"
+          ls -l "$B"
+          if readelf -d "$B" | grep -q NEEDED; then echo "tem dependencia dinamica"; exit 1; fi
 
       - name: bench como gate (jitter e throughput)
         # ponytail: runner compartilhado tem ruido, aqui so reporta ; tirar continue-on-error em runner self-hosted
         continue-on-error: true
         working-directory: spellcore
         run: |
-          ./target/release/jitter --secs 5
-          ./target/release/throughput
+          ./${{ env.REL }}/jitter --secs 5
+          ./${{ env.REL }}/throughput
 
       - name: renomeia o binario
         shell: bash
-        run: cp "spellcore/target/release/${{ matrix.bin }}" "${{ runner.temp }}/${{ matrix.name }}"
+        run: cp "spellcore/${{ env.REL }}/${{ matrix.bin }}" "${{ runner.temp }}/${{ matrix.name }}"
 
       - uses: actions/upload-artifact@v4
         with:

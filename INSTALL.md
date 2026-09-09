@@ -41,8 +41,19 @@ O serviço `spellcaster` sobe `spell serve`; a GUI fica em `http://<hostname>.lo
 para quem tiver navegador na rede. `install.sh <destino>` muda a pasta. Tarball `--no-gui` é o
 mesmo pacote sem os assets da GUI.
 
-Binário Rust para o Pi: `spellcore-linux-aarch64` do release (glibc; o build estático musl é
-pendência do R8).
+Binário Rust para o Pi, dois no release:
+
+- `spellcore-linux-aarch64-static` — musl, sem `NEEDED` no ELF: roda em qualquer Raspberry Pi OS
+  aarch64 (ou Alpine, ou container `scratch`) sem depender da versão do glibc. Use este por padrão.
+- `spellcore-linux-aarch64` — glibc, para o caso de precisar de algo do sistema em runtime.
+
+```bash
+chmod +x spellcore-linux-aarch64-static
+./spellcore-linux-aarch64-static play shows/medgrupo.spell --osc-port 9000
+```
+
+Fora do binário estático: o Helios (USB) já é stub no `laser` em qualquer build — não é limitação
+do musl.
 
 ## 3. A partir do código-fonte (desenvolvimento)
 

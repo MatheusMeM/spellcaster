@@ -153,7 +153,7 @@ O plano acima (F0–F7) foi o do protótipo Python e está concluído até F6. O
 | R5 GUI Tauri | show de 3 min do zero; Face em modo performance | pendente | voto das rodadas 5 e 6 do design |
 | R6 previz Godot | 60 fps, 64 fixtures, 2 LED walls | pendente | Godot não instalado |
 | R7 MCP com rmcp | sessão de IA monta e toca um show sem GUI | pendente | nenhum: registry pronto |
-| R8 empacotamento | onedir, Linux, Pi estático; CI com bench como gate | parcial | Pi estático (musl) pendente; só CI |
+| R8 empacotamento | onedir, Linux, Pi estático; CI com bench como gate | concluída | — |
 | R9 editores de Face/Graph + painel Agent | operador monta uma Face em 10 min | pendente | depende de R5 |
 
 ## 8. Design — rodadas e branches (09/09/2026)
@@ -185,11 +185,11 @@ CI, sem tocar no que já está conforme):
 |---|---|---|---|
 | R3 pixel mapping | crate `pixelmap` com rayon (wgpu depois), bench Criterion | 100 000 px a 60 Hz < 2 ms | nada |
 | R7 MCP | crate `mcp` com rmcp (stdio + HTTP), tools do registry, `spellcore mcp install` | sessão de IA escaneia, patcheia, cria timeline e dá play | nada |
-| R8 Pi estático | job de CI `aarch64-unknown-linux-musl`, artefato `spellcore-linux-aarch64-static` | binário roda num Pi limpo sem glibc da versão | nada |
+| ~~R8 Pi estático~~ | ~~job de CI `aarch64-unknown-linux-musl`, artefato `spellcore-linux-aarch64-static`~~ | feito: leg musl na matriz do `spellcore`, ELF sem `NEEDED` verificado no CI | — |
 | R5 base | `canvaskit.js` (pan, zoom, seleção, hit-test por bisect, dirty-flag, DPR) + timeline canvas portada do Python | testes headless no Chrome; timeline abre `medgrupo.spell` | nada (design só define o cromo) |
 | Design | merge das branches de design; rodada 7 | voto do dono | voto das rodadas 5 e 6 |
 
 Bloqueadas até instalar SDK (decisão do dono, não de agente): R2 (GStreamer + NDI SDK),
 R6 (Godot 4). R9 espera R5.
 
-Já feito: F0–F6, R0, R1, R4, CI com release por tag, docs (README, INSTALL, LICENSE, ARCHITECTURE, PRD).
+Já feito: F0–F6, R0, R1, R4, R8, CI com release por tag, docs (README, INSTALL, LICENSE, ARCHITECTURE, PRD).
