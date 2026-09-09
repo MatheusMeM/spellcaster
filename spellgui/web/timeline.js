@@ -383,6 +383,9 @@ TL.setInOut = function (i, o) {
   if (a >= b) { if (o === null || o === undefined) b = dur; else a = 0; }
   TL.show.in = a;
   TL.show.out = b;
+  // O limite pedido sai SEMPRE, mesmo igual ao velho: no fim do arrasto da alca o `onMove` ja'
+  // escreveu `TL.show.in`, entao `a === velhoA` e' o caso normal — comparar aqui perderia o
+  // arrasto inteiro. O `else if` cobre o outro limite, que so' muda quando foi cruzado.
   const eds = [];
   if (i !== null && i !== undefined) eds.push({ k: "field", path: "/in", value: a });
   else if (a !== velhoA) eds.push({ k: "field", path: "/in", value: a });
@@ -1070,5 +1073,7 @@ TL.mount = function (cv, menuEl, msgEl) {
   }
   addEventListener("keydown", onKey);
   addEventListener("keyup", e => { if (e.key && e.key.toLowerCase() === "k") kHeld = false; });
+  // Alt+Tab com o K na mao nao manda keyup: sem isto, J/L ficam presos no quadro a quadro.
+  addEventListener("blur", () => { kHeld = false; });
   return k;
 };
