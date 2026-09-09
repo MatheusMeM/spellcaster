@@ -73,7 +73,7 @@ Pedido literal (o bloco "Contexto:" que veio junto é de uma tarefa anterior, o 
 > 
 > Republique o protótipo **no mesmo artifact** (`url` = o link acima, `capabilities` omitido). Commit na branch **`design/0.1.3`** criada a partir de `design/0.1.2`, via `git worktree` temporário no scratchpad (a pasta do projeto está em outra branch com outra sessão viva: nunca troque a branch dela). Mensagem em português, uma linha de assunto, sem crédito ao Claude. Push. No relatório: veredito, o que virou endereço e o que ficou fora, link, commit, e o que não foi feito.
 
-- [x] `design/laser/INTEGRACAO.md` (a branch não tem `FUNCOES/`): tabela porta/componente/ação → endereço → tipo → context → porta do graph → retorno; o que fica fora e por quê.
+- [x] `design/FUNCOES/integracao-laser.md` (escrito como `design/laser/INTEGRACAO.md` e movido no merge de 0.1.4): tabela porta/componente/ação → endereço → tipo → context → porta do graph → retorno; o que fica fora e por quê.
 - [x] `design/laser/module.json` no formato de `orquestrador.md §5`, gerado por `Bind.manifest()`.
 - [x] `bind.js`: `addr`, `ctx` (+ `arg`, `t`, `range`, `unit`, `needs`), endereço ao lado do rótulo, `manifest()`, `graph()`; fonte única em `app.js`.
 - [x] Pino 3 abre o painel ORQUESTRADOR (manifesto, rotas com pisca, `graph` com COPIAR); comando `spell graph add laser/1` no canto.

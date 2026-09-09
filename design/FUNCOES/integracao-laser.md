@@ -1,13 +1,11 @@
 # Integração do laser com o orquestrador (rodada 6)
 
-O projetor da rodada 5 vira o módulo `laser/1` do graph (`FUNCOES/orquestrador.md`), e cada binding de tecla/MIDI vira uma **rota** `entrada → filtro → endereço`. Nada de UI nova do PATCHBAY: é contrato e dado. Fonte única das ações: `app.js` (`Bind.def(id, label, fn, {addr, ctx, …})`); `Bind.manifest()` gera `module.json` e `Bind.graph()` gera o trecho `graph` do `.spell`. Os dois arquivos versionados aqui (`module.json`, `graph.json`) são o dump do protótipo com os bindings padrão, e `tests/test_laser_graph.py` valida os dois.
-
-Este arquivo moraria em `design/FUNCOES/integracao-laser.md`; a branch `design/0.1.3` não tem `FUNCOES/` (está em `design/funcoes-referencia`), então fica aqui até o merge.
+O projetor da rodada 5 vira o módulo `laser/1` do graph (`orquestrador.md`), e cada binding de tecla/MIDI vira uma **rota** `entrada → filtro → endereço`. Nada de UI nova do PATCHBAY: é contrato e dado. Fonte única das ações: `app.js` (`Bind.def(id, label, fn, {addr, ctx, …})`); `Bind.manifest()` gera `module.json` e `Bind.graph()` gera o trecho `graph` do `.spell`. Os dois arquivos versionados em `design/laser/` (`module.json`, `graph.json`) são o dump do protótipo com os bindings padrão, e `tests/test_laser_graph.py` valida os dois.
 
 ## Regras
 
 - **Endereço** = `laser/<instância>/<nome>`. O nome é o da CLI (`--kpps`, `limit --r`), agrupado por `/` como o rótulo da tabela de `ilda-player.md §1` (`Cor/Escala R` → `limit/r`, `Dispositivo/Fila` → `queue`, `Geometria/Escala` → `geo/scale`, `ILDA/FPS real` → `fps`, `ILDA/Pontos por frame` → `points`). Nome novo só para o que a tabela não nomeia (`arm`, `play`, `clip`, `net/*`, `dmx/addr`, `temp`, `emitting`).
-- **Tipo**: `trigger` dispara, `toggle` inverte (ou recebe bool), `value` recebe número (ou trigger com argumento, ex.: `kpps {step}`). Regra 3 de `FUNCOES/README.md`.
+- **Tipo**: `trigger` dispara, `toggle` inverte (ou recebe bool), `value` recebe número (ou trigger com argumento, ex.: `kpps {step}`). Regra 3 de `README.md`.
 - **`context`** (Chataigne): `action` só aceita disparo, `mapping` só aceita valor contínuo, `both` os dois. Mais dois contextos nossos que **não** entram em `commands`: `value` (somente leitura → `values` do manifesto) e `view` (só do previz → bloco `view` do `.spell`).
 - **Tipos de porta** do graph: `trigger`, `toggle` (bool), `number`. Cabo só liga tipo compatível: `midi/note:*` e `key/*` são `trigger`; `midi/cc:*` é `number`. `number → number` passa por `filter.lag` (CC contínuo); `trigger → toggle` inverte; `trigger → number` exige argumento (`step`, `file`); `number → trigger` não existe sem filtro de limiar (o PRD §10 não tem; ponto aberto).
 - **Porta** escreve-se `<uid>/<porta>` (`midi/cc:1:7`, `laser/1/kpps`), não `uid.port` como `orquestrador.md §5`: o nome da porta já leva `/` (`limit/r`), e assim a porta **é** o endereço do registry (regra 2). Registrado em `DECISOES.md`.

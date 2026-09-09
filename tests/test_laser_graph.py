@@ -7,7 +7,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1] / "design" / "laser"
 
-# tipo da porta de saida por tipo de comando/parametro do manifesto (INTEGRACAO.md, "Tipos de porta")
+# tipo da porta de saida por tipo de comando/parametro do manifesto (integracao-laser.md, "Tipos de porta")
 PORT = {"trigger": "trigger", "toggle": "toggle", "value": "number", "float": "number", "int": "number", "bool": "toggle"}
 # o que cada tipo de fonte pode ligar sem conversao
 OK = {"trigger": {"trigger", "toggle", "number"}, "number": {"number"}, "toggle": {"toggle"}}

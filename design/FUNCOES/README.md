@@ -20,6 +20,7 @@ E no topo de cada um, a tabela de veredito: qual app resolveu melhor cada item.
 | Cenas e cues DMX | `cenas-cues-dmx.md` | `spell cue`, `spell scene`, `spell patch` | TEATRO DE PAPEL |
 | Cenário interativo | `cenario-interativo.md` | (Face sobre o patch) | TEATRO DE PAPEL |
 | Aprendiz (menu principal) | `aprendiz-menu.md` | paleta de comandos | todos |
+| Laser como módulo do graph | `integracao-laser.md` | `spell graph add laser/1` | LASER |
 
 As auditorias por app, com `path:linha` em cada afirmação, estão em `fontes/` (`blender.md`, `touchdesigner.md`, `resolume.md`, `madmapper.md`, `capture.md`, `chataigne.md`). Os arquivos de função citam as fontes como `[fontes/app.md § Seção]`; a evidência mora lá, não aqui.
 
