@@ -7,6 +7,13 @@
 // `view.zoom` e px por unidade de tempo, `view.y` e a rolagem vertical em px. O eixo Y e do cliente:
 // o kit nao sabe o que e um track. `gutter` e a coluna fixa a esquerda (cabecalho de track).
 //
+// Roda do mouse (vale para as tres paginas de canvas): roda = rola o conteudo (`view.y`),
+// Shift+roda = anda no tempo (`view.x`), Ctrl+roda = zoom no cursor. Todo evento leva
+// `preventDefault` com `passive:false`: e' o que impede a PAGINA de rolar (era a barra de rolagem
+// que levava a toolbar embora) e o Ctrl+roda de dar zoom no navegador. `view.y` nao passa de 0 em
+// baixo nem de `k.ymax` em cima; quem sabe a altura do conteudo escreve `k.ymax` (a timeline faz
+// isso no desenho), e quem nao escreve fica sem teto.
+//
 // ponytail: um contexto 2D por canvas, sem camadas nem cache de tile ; virtualizar por viewport e
 // depois WebGL (PRD §8) so quando o desenho passar de 16 ms com show real.
 
@@ -76,7 +83,7 @@ const CK = {
     const k = {
       cv, cx: cv.getContext("2d"), w: 0, h: 0, dpr: 1,
       view: { x: 0, zoom: 40, y: 0 },
-      gutter: 0, dirty: true, drag: null, marquee: null,
+      gutter: 0, dirty: true, drag: null, marquee: null, ymax: Infinity,
       sel: CK.sel(),
       on: {},                       // down, move, up, hover, menu, marquee, frame — todos opcionais
     };
@@ -97,7 +104,9 @@ const CK = {
       k.dirty = true;
     };
 
-    k.zoomAt = (px, f) => {                             // zoom ancorado no cursor
+    k.panY = y => { k.view.y = CK.clamp(y, 0, Math.max(0, k.ymax)); k.dirty = true; };
+
+    k.zoomAt = (px, f) => {                           // zoom ancorado no cursor
       const t = k.toWorld(px);
       k.view.zoom = CK.clamp(k.view.zoom * f, CK.ZMIN, CK.ZMAX);
       k.view.x = t - (px - k.gutter) / k.view.zoom;
@@ -145,8 +154,7 @@ const CK = {
       if (!d) { if (k.on.hover) k.on.hover(p); return; }
       if (d.mode === "pan") {
         k.view.x = d.vx - (p.x - d.x) / k.view.zoom;
-        k.view.y = Math.max(0, d.vy - (p.y - d.y));
-        k.dirty = true;
+        k.panY(d.vy - (p.y - d.y));
       } else if (d.mode === "marquee") {
         k.marquee.x1 = p.x; k.marquee.y1 = p.y;
         if (k.on.marquee) k.on.marquee(k.rect(), k.marquee.add);
@@ -166,10 +174,14 @@ const CK = {
     cv.addEventListener("pointerup", up);
     cv.addEventListener("pointercancel", up);
 
+    // Roda: sem modificador rola o conteudo, Shift anda no tempo, Ctrl da zoom no cursor.
+    // Com Shift o Windows manda o delta em `deltaX`; com Ctrl o navegador daria zoom na pagina —
+    // por isso o preventDefault vem antes de tudo e o listener e' `passive:false`.
     cv.addEventListener("wheel", e => {
       e.preventDefault();
-      if (e.shiftKey) { k.view.y = Math.max(0, k.view.y + e.deltaY); k.dirty = true; }
-      else k.zoomAt(e.offsetX, Math.exp(-e.deltaY * 0.0015));
+      if (e.ctrlKey) k.zoomAt(e.offsetX, Math.exp(-e.deltaY * 0.0015));
+      else if (e.shiftKey) { k.view.x += (e.deltaX || e.deltaY) / k.view.zoom; k.dirty = true; }
+      else k.panY(k.view.y + e.deltaY);
     }, { passive: false });
 
     cv.addEventListener("contextmenu", e => e.preventDefault());

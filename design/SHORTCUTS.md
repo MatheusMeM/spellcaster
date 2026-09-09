@@ -37,13 +37,14 @@ operador.
 | Marcador anterior / próximo | `Ctrl+Shift+←` / `Ctrl+Shift+→` | Resolve | feito |
 | Monitor DMX do track focado (512 barras) | `Alt+M` | (nosso; `M` já é marcador, `Ctrl+M` já é exportar) | feito |
 | Zoom in / out / ajustar | `=` / `-` / `Shift+Z` ou `\` | Premiere / Resolve | feito |
-| Pan na timeline, arrastando | botão do meio | ambos | feito |
-| Pan na timeline, com a roda | roda com `Shift` | ambos | falta |
+| Rolar as tracks (vertical) | roda | (nosso; a página não rola — quem rola são as tracks) | feito |
+| Pan na timeline (horizontal) | `Shift`+roda, ou arrastar com botão do meio | ambos | feito |
+| Zoom no cursor | `Ctrl`+roda | ambos | feito |
 | Keyframe no playhead (track focado) | `Ctrl+K` | Premiere (add edit) | feito |
 | Adicionar / remover keyframe por parâmetro | `Ctrl+Click` no losango | Resolve | falta |
 | Selecionar tudo / nada | `Ctrl+A` / `Ctrl+Shift+A` | ambos | feito |
 | Copiar / colar / cortar / apagar | `Ctrl+C` / `Ctrl+V` / `Ctrl+X` / `Delete` | ambos | feito |
-| Desfazer / refazer | `Ctrl+Z` / `Ctrl+Shift+Z` | ambos | falta |
+| Desfazer / refazer | `Ctrl+Z` / `Ctrl+Shift+Z` | ambos | feito |
 | Easing do keyframe selecionado: menu | `Ctrl+E` | (nosso) | falta |
 | Easing do keyframe selecionado: ciclar linear→in→out→inout→hold | `Ctrl+Shift+E` | (nosso) | feito |
 | Mute / solo do track focado | `Shift+D` / `Shift+S` | Premiere (disable) / (nosso) | feito |
@@ -67,10 +68,6 @@ operador.
 
 Onde a leitura da coluna não é óbvia:
 
-- **Desfazer / refazer** está `falta` porque quem é dono da ação é a timeline (`timeline.js`), que
-  não liga `Ctrl+Z`; no PATCHBAY (`graph.js`) as duas teclas já funcionam sobre `show_patch`.
-- **Pan com a roda** está `falta` porque hoje `Shift`+roda rola na vertical (`canvaskit.js`), não
-  na horizontal; arrastar com o botão do meio já faz o pan.
 - **Ajuda `?`** está `falta` porque a página existe (`spellgui/web/help.html`, que liga a tecla em
   `help.js`) mas as outras páginas ainda não carregam `help.js` — passa a `feito` quando o
   `nav.js` entrar nelas.

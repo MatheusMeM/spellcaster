@@ -88,6 +88,24 @@
     }
   },
   {
+    "doc": "Liga ou desliga o loop do player no intervalo In-Out do show aberto.",
+    "name": "loop_set",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "on": {
+          "description": "true liga o loop, false desliga.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "on"
+      ],
+      "title": "LoopArgs",
+      "type": "object"
+    }
+  },
+  {
     "doc": "Dispara a proxima cue (ou a de indice dado).",
     "name": "cue_go",
     "params": {
