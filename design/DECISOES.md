@@ -109,3 +109,10 @@ Consequências:
   origem) e se eles entram no `.spell` ou num arquivo de planta ao lado dele.
 - Não implementado e não removido até o voto: a grade por endereço fica, e vira posição real no dia
   em que o patch souber dizer onde a fixture está.
+
+## 09/09/2026 · Entrada DMX e gravação: formato de `inputs` e forma do keyframe gravado — aguarda voto
+
+- **`inputs` é lista de `{type, universe}`, irmã de `outputs`.** `[{"type":"sacn","universe":1},{"type":"artnet","universe":2}]`: um universo por entrada, sem `interfaces` e sem prioridade. A alternativa era espelhar `outputs` (`{"type":"sacn","universes":[1,2],"interfaces":[...]}`), que casa com o que já existe no arquivo mas repete configuração de rede que a entrada não usa (multicast entra em todos os grupos declarados; Art-Net chega por broadcast). O voto decide qual das duas formas vira contrato do `.spell` v1 — trocar depois quebra show gravado.
+- **O que a gravação escreve.** Um keyframe `linear` por MUDANÇA de valor, sem thinning: um fader andando a 60 fps deixa 60 keyframes por segundo no track. A alternativa é gravar reduzido (Douglas-Peucker no fim do take) ou em degrau (`hold`, que reproduz a mesa byte a byte mas não interpola em fps diferente). O voto decide o padrão; o código está com `linear` e um `ponytail:` apontando a redução.
+- **A largura do track (quantos canais gravam) vem do keyframe que já existe**, não de um campo. Track vazio grava um canal só, no `address`. A alternativa é um campo `channels` no track `dmx` — mais um campo no `.spell` para o caso "armei um track novo de 4 canais".
+- **Fora de escopo, e por quê:** merge HTP entrada→saída (passthrough) e gravação de laser/OSC ficam para depois; vídeo (NDI/GStreamer) está bloqueado pelos SDKs não instalados (ROADMAP R2), não por decisão de design.

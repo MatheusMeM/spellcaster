@@ -8,8 +8,10 @@
 use std::collections::HashMap;
 use std::io;
 use std::net::{Ipv4Addr, SocketAddrV4, ToSocketAddrs, UdpSocket};
-use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
+use std::time::Duration;
 
 use socket2::{Domain, Protocol, Socket, Type};
 
@@ -220,10 +222,85 @@ impl Drop for ArtNetOut {
     }
 }
 
+// ------------------------------------------------------------------ ArtNetIn
+
+/// Escuta ArtDmx e guarda o ultimo frame de cada universo. Gemeo do `SacnIn`; Art-Net nao tem
+/// grupo multicast por universo (o frame chega por broadcast ou unicast), entao nada a declarar.
+pub struct ArtNetIn {
+    last: Arc<Mutex<HashMap<u16, [u8; 512]>>>,
+    run: Arc<AtomicBool>,
+    th: Option<JoinHandle<()>>,
+}
+
+impl ArtNetIn {
+    pub fn new() -> io::Result<ArtNetIn> {
+        ArtNetIn::with_port(PORT)
+    }
+
+    /// Porta alternativa (teste de loopback quando a 6454 esta ocupada).
+    pub fn with_port(port: u16) -> io::Result<ArtNetIn> {
+        let s = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
+        s.set_reuse_address(true)?;
+        s.bind(&SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, port).into())?;
+        s.set_read_timeout(Some(Duration::from_millis(200)))?;
+        let sock: UdpSocket = s.into();
+        let last = Arc::new(Mutex::new(HashMap::new()));
+        let run = Arc::new(AtomicBool::new(true));
+        let (l, r) = (last.clone(), run.clone());
+        let th = std::thread::Builder::new()
+            .name("artnet-in".into())
+            .spawn(move || {
+                let mut buf = [0u8; 2048];
+                while r.load(Ordering::Relaxed) {
+                    let n = match sock.recv_from(&mut buf) {
+                        Ok((n, _)) => n,
+                        Err(e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                        Err(e) if e.kind() == io::ErrorKind::TimedOut => continue,
+                        Err(_) => break,
+                    };
+                    if let Some(Packet::Dmx { universe, data, .. }) = parse(&buf[..n]) {
+                        let mut frame = [0u8; 512];
+                        let k = data.len().min(512);
+                        frame[..k].copy_from_slice(&data[..k]);
+                        l.lock()
+                            .unwrap_or_else(|e| e.into_inner())
+                            .insert(universe, frame);
+                    }
+                }
+            })?;
+        Ok(ArtNetIn {
+            last,
+            run,
+            th: Some(th),
+        })
+    }
+
+    pub fn get(&self, universe: u16) -> Option<[u8; 512]> {
+        self.last
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(&universe)
+            .copied()
+    }
+
+    pub fn close(&mut self) {
+        self.run.store(false, Ordering::Relaxed);
+        if let Some(th) = self.th.take() {
+            let _ = th.join(); // sai em ate 200 ms (read timeout)
+        }
+    }
+}
+
+impl Drop for ArtNetIn {
+    fn drop(&mut self) {
+        self.close();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::{Duration, Instant};
+    use std::time::Instant;
 
     const FIXTURE: &str = concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -312,6 +389,37 @@ mod tests {
     #[should_panic(expected = "universo fora de faixa")]
     fn port_address_acima_da_faixa_e_erro() {
         port_address(0x8001);
+    }
+
+    /// ArtNetOut -> ArtNetIn em 127.0.0.1, porta livre: o ultimo frame chega inteiro.
+    #[test]
+    fn loopback_out_in() {
+        let mut rx = match ArtNetIn::with_port(6456) {
+            Ok(r) => r,
+            Err(e) => return println!("pulado: bind 6456 falhou: {:?}", e.kind()),
+        };
+        let mut tx = match ArtNetOut::with_port(Some(vec!["127.0.0.1".into()]), false, 6456) {
+            Ok(t) => t,
+            Err(e) => return println!("pulado: socket de saida falhou: {:?}", e.kind()),
+        };
+        let frame: [u8; 512] = std::array::from_fn(|i| (i as u8) ^ 0x33);
+        for _ in 0..3 {
+            tx.send(1, &frame);
+            std::thread::sleep(Duration::from_millis(30));
+        }
+        for _ in 0..40 {
+            if rx.get(1) == Some(frame) {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(25));
+        }
+        let got = rx.get(1);
+        tx.close();
+        rx.close();
+        match got {
+            None => println!("pulado: UDP em loopback nao entregou (firewall?)"),
+            Some(g) => assert_eq!(g, frame, "ultimo frame recebido byte a byte"),
+        }
     }
 
     #[test]

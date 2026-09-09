@@ -74,6 +74,7 @@
 <div class="mid"><canvas id="cv" tabindex="0"></canvas></div>
 <div class="cli"><b id="msg"></b><span id="keys"></span></div>
 <div class="menu" id="menu"></div>
+<div class="menu" id="tmenu"></div>
 <script src="canvaskit.js"></script>
 <script src="timeline.js"></script>
 <script src="teatro.js"></script>
@@ -86,7 +87,7 @@ q("keys").textContent =
   "Espaco toca | J/K/L shuttle, K+J/K+L quadro a quadro | setas 1 quadro, Shift 5 | I/O intervalo, " +
   "Ctrl+L loop | M marcador, Shift+M edita | S snap, R rec, Shift+D mute, Shift+S solo | " +
   "Ctrl+K keyframe, Ctrl+E easing | Ctrl+Z desfaz, Ctrl+Shift+Z refaz | Ctrl+N novo, Ctrl+O abre, " +
-  "Ctrl+S salva, Ctrl+Shift+S salva como | Alt+M monitor | = / - zoom, \\ ajusta | " +
+  "Ctrl+S salva, Ctrl+Shift+S salva como | Alt+M monitor (entrada quando armado) | = / - zoom, \\ ajusta | " +
   "roda rola, Shift+roda anda, Ctrl+roda zoom";
 TL.mount(q("cv"), q("menu"), msg);
 TL.load({ name: "vazio", fps: 30, duration: 60, tracks: [], markers: [] });
@@ -104,14 +105,46 @@ q("in").onclick = () => TL.setInOut(TL.t, null);
 q("out").onclick = () => TL.setInOut(null, TL.t);
 q("loop").onclick = () => TL.setLoop(!TL.loop);
 q("snap").onclick = () => { TL.snap = !TL.snap; q("snap").classList.toggle("on", TL.snap); TL.k.invalidate(); };
-// ponytail: record arm e so o estado visual da lane (nada grava) ; ligar quando o engine gravar.
+// O arme mora no engine (rec_arm); a barra so' chama o mesmo funil da tecla R.
 q("rec").onclick = () => {
-  if (TL.cur >= 0) TL.lanes[TL.cur].rec = !TL.lanes[TL.cur].rec;
+  if (TL.cur >= 0) TL.recArm(TL.cur);
   TL.onState();
   TL.k.invalidate();
 };
 q("fit").onclick = () => TL.fit();
-q("tadd").onclick = () => TL.trackAdd();
+// +Track abre um menu de tipo. `laser` lista os .ild que o engine ve (laser_files), sem dialogo
+// nativo; `fx` pergunta o .rhai. Video nao entra: GStreamer/NDI dependem de SDK (ROADMAP R2).
+const tmenu = q("tmenu");
+function tItem(txt, fn) {
+  const b = document.createElement("button");
+  b.textContent = txt;
+  b.onclick = fn;
+  tmenu.appendChild(b);
+}
+q("tadd").onclick = () => {
+  const r = q("tadd").getBoundingClientRect();
+  tmenu.innerHTML = "";
+  tItem("dmx", () => { tmenu.style.display = "none"; TL.trackAdd("dmx"); });
+  tItem("laser (.ild)", () => {
+    tmenu.innerHTML = "";
+    TL.laserFiles().then(fs => {
+      if (!fs.length) return tItem("(nenhum .ild)", () => { tmenu.style.display = "none"; });
+      for (const f of fs) tItem(f.name, () => { tmenu.style.display = "none"; TL.trackAdd("laser", f.name); });
+    });
+  });
+  tItem("fx (.rhai)", () => {
+    tmenu.style.display = "none";
+    const n = prompt("script .rhai (ao lado do .spell):", "medgrupo.rhai");
+    if (n) TL.trackAdd("fx", n);
+  });
+  tmenu.style.left = r.left + "px";
+  tmenu.style.top = r.bottom + "px";
+  tmenu.style.display = "block";
+};
+addEventListener("pointerdown", e => {
+  if (tmenu.style.display === "block" && !tmenu.contains(e.target) && e.target !== q("tadd"))
+    tmenu.style.display = "none";
+}, true);
 q("tdel").onclick = () => TL.trackDel();
 q("mon").onclick = () => { TL.mon = !TL.mon; TL.onState(); TL.k.invalidate(); };
 q("undo").onclick = () => TL.undo(-1);

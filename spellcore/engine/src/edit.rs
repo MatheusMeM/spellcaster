@@ -111,6 +111,55 @@ fn lista<'a>(sh: &'a mut Show, k: &str) -> &'a mut Vec<Value> {
     v.as_array_mut().expect("lista")
 }
 
+/// Cria ou substitui o keyframe do track em `t` (`|dt| < 1 us`), com a lista ordenada. Funil
+/// unico da escrita de keyframe: o comando `key_set` e a gravacao (`rec.rs`) passam por aqui, e
+/// os dois sobem `rev` — sem isso a gravacao editaria o show por fora e nenhum cliente saberia.
+pub fn key_put(indice: usize, t: f64, value: Value, curve: &str) -> Result<Value, String> {
+    if !CURVES.contains(&curve) {
+        return Err(format!("curva {:?}: use {:?}", curve, CURVES));
+    }
+    com(|_, sh| {
+        let ks = keys(track(sh, indice)?)?;
+        let v = match value {
+            Value::Null => json!(0),
+            v => valor(v),
+        };
+        let k = json!([t, v, curve]);
+        match ks.iter().position(|x| (tempo(x) - t).abs() < 1e-6) {
+            Some(i) => ks[i] = k,
+            None => ks.push(k),
+        }
+        ks.sort_by(|x, y| tempo(x).total_cmp(&tempo(y)));
+        Ok(json!(ks))
+    })
+}
+
+/// Universo, endereco e largura (quantos canais o keyframe cobre) de um track `dmx`/`artnet` do
+/// show aberto. A largura vem do primeiro keyframe em lista; sem lista, um canal so'.
+// ponytail: largura pelo keyframe existente, nao por campo do track ; virar campo `channels` se
+// gravar um track vazio de 4 canais passar a ser o caso comum.
+pub fn track_dmx(indice: usize) -> Result<(u16, u16, usize), String> {
+    com_ro(|_, sh| {
+        let tr = track(sh, indice)?;
+        let tipo = tr.get("type").and_then(|v| v.as_str()).unwrap_or("");
+        if tipo != "dmx" && tipo != "artnet" {
+            return Err(format!("track {}: tipo {:?} nao e' dmx", indice, tipo));
+        }
+        let u = tr.get("universe").and_then(|v| v.as_u64()).unwrap_or(1) as u16;
+        let a = tr.get("address").and_then(|v| v.as_u64()).unwrap_or(1) as u16;
+        if a == 0 || a > 512 {
+            return Err(format!("track {}: endereco {} fora de 1..512", indice, a));
+        }
+        let w = tr
+            .get("keys")
+            .and_then(|v| v.as_array())
+            .and_then(|ks| ks.iter().find_map(|k| k.get(1).and_then(|v| v.as_array())))
+            .map(|l| l.len().max(1))
+            .unwrap_or(1);
+        Ok((u, a, w.min(512 - a as usize + 1)))
+    })
+}
+
 // ------------------------------------------------------------------ patch
 
 struct Perfil {
@@ -494,7 +543,7 @@ pub struct ShowSaveArgs {
 
 #[derive(Deserialize, JsonSchema)]
 pub struct TrackAddArgs {
-    /// dmx | artnet | osc | media | cue | fx.
+    /// dmx | artnet | osc | media | cue | fx | laser.
     #[serde(default = "dmx", rename = "type")]
     #[schemars(rename = "type")]
     pub kind: String,
@@ -510,6 +559,12 @@ pub struct TrackAddArgs {
     // sobrou chamador) ; tirar na rodada 3.
     #[serde(default, alias = "label")]
     pub name: String,
+    /// Clipe `.ild` do track `laser` (campo `clip`).
+    #[serde(default)]
+    pub clip: String,
+    /// Script `.rhai` do track `fx` (campo `script`).
+    #[serde(default)]
+    pub script: String,
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -711,13 +766,19 @@ pub fn register(r: &mut Registry) {
     );
     r.add::<TrackAddArgs>(
         "track_add",
-        "Acrescenta um track vazio ao show aberto. Devolve o indice do track. O argumento `label` e' o nome velho de `name` (deprecated, sai na proxima rodada).",
+        "Acrescenta um track vazio ao show aberto (type dmx|artnet|osc|media|cue|fx|laser; clip para laser, script para fx). Devolve o indice do track. O argumento `label` e' o nome velho de `name` (deprecated, sai na proxima rodada).",
         |a| {
             com(|_, sh| {
                 let mut tr = json!({"type": a.kind, "universe": a.universe,
                                     "address": a.address, "keys": []});
                 if !a.name.is_empty() {
                     tr["name"] = json!(a.name);
+                }
+                if !a.clip.is_empty() {
+                    tr["clip"] = json!(a.clip);
+                }
+                if !a.script.is_empty() {
+                    tr["script"] = json!(a.script);
                 }
                 sh.tracks.push(tr);
                 Ok(json!(sh.tracks.len() - 1))
@@ -737,25 +798,7 @@ pub fn register(r: &mut Registry) {
     r.add::<KeySetArgs>(
         "key_set",
         "Cria ou substitui o keyframe do track em t. Devolve os keyframes do track.",
-        |a| {
-            if !CURVES.contains(&a.curve.as_str()) {
-                return Err(format!("curva {:?}: use {:?}", a.curve, CURVES));
-            }
-            com(|_, sh| {
-                let ks = keys(track(sh, a.track)?)?;
-                let v = match a.value {
-                    Value::Null => json!(0),
-                    v => valor(v),
-                };
-                let k = json!([a.t, v, a.curve]);
-                match ks.iter().position(|x| (tempo(x) - a.t).abs() < 1e-6) {
-                    Some(i) => ks[i] = k,
-                    None => ks.push(k),
-                }
-                ks.sort_by(|x, y| tempo(x).total_cmp(&tempo(y)));
-                Ok(json!(ks))
-            })
-        },
+        |a| key_put(a.track, a.t, a.value, &a.curve),
     );
     r.add::<KeyDelArgs>(
         "key_del",

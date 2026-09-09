@@ -161,6 +161,24 @@
     }
   },
   {
+    "doc": "Ultimo frame DMX recebido no universo de ENTRADA (show.inputs): 512 valores.",
+    "name": "input_get",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "universe": {
+          "default": 1,
+          "description": "Universo declarado em `show.inputs`.",
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "title": "InputGetArgs",
+      "type": "object"
+    }
+  },
+  {
     "doc": "Zera o show aberto: novo show, sACN no universo 1, 60 s. Devolve o show inteiro.",
     "name": "show_new",
     "params": {
@@ -204,7 +222,7 @@
     }
   },
   {
-    "doc": "Acrescenta um track vazio ao show aberto. Devolve o indice do track. O argumento `label` e' o nome velho de `name` (deprecated, sai na proxima rodada).",
+    "doc": "Acrescenta um track vazio ao show aberto (type dmx|artnet|osc|media|cue|fx|laser; clip para laser, script para fx). Devolve o indice do track. O argumento `label` e' o nome velho de `name` (deprecated, sai na proxima rodada).",
     "name": "track_add",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -216,14 +234,24 @@
           "minimum": 0.0,
           "type": "integer"
         },
+        "clip": {
+          "default": "",
+          "description": "Clipe `.ild` do track `laser` (campo `clip`).",
+          "type": "string"
+        },
         "name": {
           "default": "",
           "description": "Nome do track (campo `name` do .spell). O argumento `label` e' o nome velho deste (deprecated, sai na proxima rodada).",
           "type": "string"
         },
+        "script": {
+          "default": "",
+          "description": "Script `.rhai` do track `fx` (campo `script`).",
+          "type": "string"
+        },
         "type": {
           "default": "dmx",
-          "description": "dmx | artnet | osc | media | cue | fx.",
+          "description": "dmx | artnet | osc | media | cue | fx | laser.",
           "type": "string"
         },
         "universe": {
@@ -758,6 +786,41 @@
         "name"
       ],
       "title": "NameArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Arma (ou desarma) a gravacao de um track dmx: com o transporte tocando, o universo de entrada vira keyframe.",
+    "name": "rec_arm",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "on": {
+          "default": true,
+          "description": "true arma, false desarma.",
+          "type": "boolean"
+        },
+        "track": {
+          "description": "Indice do track em `tracks` (tem que ser `dmx` ou `artnet`).",
+          "format": "uint",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "track"
+      ],
+      "title": "RecArmArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Tracks armados para gravacao neste processo.",
+    "name": "rec_state",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "description": "Comando sem parametro.",
+      "title": "NoArgs",
       "type": "object"
     }
   },

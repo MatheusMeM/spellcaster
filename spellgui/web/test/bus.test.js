@@ -37,12 +37,15 @@ test("rev: o bus guarda o maior visto e nunca anda para tras", () => {
   assert.strictEqual(b.rev, 7);
 });
 
-test("parse binario: so' topic 1 com 515 bytes", () => {
+test("parse binario: topic 1 (saida) e 2 (entrada) com 515 bytes", () => {
   const curto = new Uint8Array(300);
   curto[0] = 1;
   assert.strictEqual(Bus.parse(curto), null);
+  const entrada = new Uint8Array(515);
+  entrada[0] = 2; entrada[1] = 1;
+  assert.strictEqual(Bus.parse(entrada).data.topic, 2);
   const outro = new Uint8Array(515);
-  outro[0] = 2;
+  outro[0] = 3;
   assert.strictEqual(Bus.parse(outro), null);
 });
 

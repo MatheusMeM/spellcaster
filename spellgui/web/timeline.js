@@ -42,7 +42,7 @@ const TL = {
   onState: () => {},                               // index.html sincroniza os botoes de transporte
   onOpen: () => {},                                // Ctrl+O: a pagina decide como se abre um show
   file: "", rev: 0, tstate: null,                  // engine: caminho do show, revisao, transporte
-  mon: false, dmx: new Map(),                      // monitor: ultimo frame binario por universo
+  mon: false, dmx: new Map(), dmxIn: new Map(),    // monitor: ultimo frame binario por universo (saida / entrada)
   fps() { return (this.show && this.show.fps) || 30; },
   dur() { return (this.show && this.show.duration) || 60; },
   inT() { return +((this.show && this.show.in) || 0); },
@@ -81,7 +81,10 @@ const BUS = {
   msg(d) {
     if (typeof d !== "string") {                       // frame binario do monitor
       const f = TL.frameBin(d);
-      if (f) { TL.dmx.set(f.universe, f.data); if (TL.mon) TL.k.dirty = true; }
+      if (f) {
+        (f.topic === 2 ? TL.dmxIn : TL.dmx).set(f.universe, f.data);
+        if (TL.mon) TL.k.dirty = true;
+      }
       return;
     }
     const m = JSON.parse(d);
@@ -113,11 +116,12 @@ const BUS = {
   },
 };
 
-// Frame binario do monitor: topic:u8 | universe:u16 LE | 512 bytes. topic 1 = dmx de saida.
+// Frame binario do monitor: topic:u8 | universe:u16 LE | 512 bytes.
+// topic 1 = dmx de saida; topic 2 = dmx de ENTRADA (show.inputs), o que o engine grava.
 TL.frameBin = function (buf) {
   const b = new Uint8Array(buf);
-  if (b.length < 515 || b[0] !== 1) return null;
-  return { universe: b[1] | (b[2] << 8), data: b.subarray(3, 515) };
+  if (b.length < 515 || (b[0] !== 1 && b[0] !== 2)) return null;
+  return { topic: b[0], universe: b[1] | (b[2] << 8), data: b.subarray(3, 515) };
 };
 
 // Uma lista de edicoes locais vira a lista de chamadas do registry. Funcao pura: e' esta que o
@@ -503,8 +507,10 @@ BUS.on.show = d => {
 BUS.on.log = d => TL.log(d.text);
 
 TL.reload = function () {
-  return fetch("/show").then(r => r.json()).then(swap)
-    .catch(e => TL.log("GET /show: " + e.message));
+  return fetch("/show").then(r => r.json()).then(sh => {
+    swap(sh);
+    return TL.recPull();                  // as lanes nasceram desarmadas: quem sabe e' o engine
+  }).catch(e => TL.log("GET /show: " + e.message));
 };
 
 TL.connect = function () {
@@ -512,11 +518,62 @@ TL.connect = function () {
 };
 
 // ---- tracks -------------------------------------------------------------
-TL.trackAdd = function () {
-  TL.show.tracks.push({ type: "dmx", universe: 1, address: 1, keys: [] });  // igual ao track_add
-  send([{ cmd: "track_add", args: { type: "dmx", universe: 1, address: 1, name: "" } }]);
+// Args de `track_add` por tipo de track. `laser` leva o clipe .ild, `fx` leva o script .rhai
+// (os dois campos que o registry acrescenta ao track). Funcao pura: e' esta que o teste cobre.
+TL.trackArgs = function (kind, file) {
+  const a = { type: kind || "dmx", universe: 1, address: 1, name: "" };
+  if (a.type === "laser") a.clip = file || "";
+  else if (a.type === "fx") a.script = file || "";
+  return a;
+};
+
+TL.trackAdd = function (kind, file) {
+  const args = TL.trackArgs(kind, file);
+  const spec = { type: args.type, universe: 1, address: 1, keys: [] };   // igual ao track_add
+  if (args.clip) spec.clip = args.clip;
+  if (args.script) spec.script = args.script;
+  TL.show.tracks.push(spec);
+  send([{ cmd: "track_add", args: args }]);
   TL.load(TL.show);
   TL.cur = TL.lanes.length - 1;
+};
+
+// Os .ild que o engine enxerga (comando `laser_files`, diretorio padrao `shows/`). Sem servidor
+// nao ha lista: a pagina mostra o menu vazio em vez de um dialogo nativo.
+TL.laserFiles = function () {
+  if (!BUS.live()) return Promise.resolve([]);
+  return BUS.call("laser_files", { dir: "" }).then(r => (r && r.files) || []).catch(e => {
+    TL.log("laser_files: " + e);
+    return [];
+  });
+};
+
+// ---- record arm ---------------------------------------------------------
+// O arme NAO mora no .spell: quem grava e' o engine, e o estado vem dele (`rec_arm`/`rec_state`).
+// Funil unico do botao R, da tecla R e do botao da barra.
+TL.recArm = function (li, on) {
+  const L = TL.lanes[li];
+  if (!L) return;
+  if (on === undefined) on = !L.rec;
+  L.rec = on;                                   // otimista; o `rec_state` da resposta corrige
+  if (TL.k) TL.k.dirty = true;
+  if (!BUS.live()) return TL.log("R: sem servidor, nada grava");
+  BUS.call("rec_arm", { track: L.si, on: on })
+     .then(() => TL.recPull())
+     .catch(e => { L.rec = false; if (TL.k) TL.k.dirty = true; TL.log("rec_arm: " + e); });
+};
+
+TL.recPull = function () {
+  if (!BUS.live()) return Promise.resolve(null);
+  return BUS.call("rec_state", {}).then(st => { TL.recApply(st); return st; }).catch(() => null);
+};
+
+// Marca nas lanes os tracks que o engine diz estarem armados. Funcao pura: e' esta que o teste
+// cobre (uma lane por track, e os parametros de laser compartilham o track do pai).
+TL.recApply = function (st) {
+  const arm = (st && st.tracks) || [];
+  for (const L of TL.lanes) L.rec = !L.param && arm.indexOf(L.si) >= 0;
+  if (TL.k) TL.k.dirty = true;
 };
 
 TL.trackDel = function () {
@@ -797,8 +854,7 @@ function onDown(p) {
       const b = Math.floor((x - (TL.headW - 58)) / 19);
       if (b === 0) { L.mute = !L.mute; trackFlag(L, "mute", L.mute); }
       else if (b === 1) { L.solo = !L.solo; trackFlag(L, "solo", L.solo); }
-      // ponytail: record arm e' so o estado visual da lane ; ligar quando o engine gravar
-      else { L.rec = !L.rec; commit(); }
+      else TL.recArm(li);
     }
     k.sel.clear();
     k.dirty = true;
@@ -1024,7 +1080,7 @@ function onKey(e) {
   } else if (kb === "s" && !ctrl && !shift) TL.snap = !TL.snap;
   else if (kb === "d" && shift && TL.cur >= 0) { const L = TL.lanes[TL.cur]; L.mute = !L.mute; trackFlag(L, "mute", L.mute); }
   else if (kb === "s" && shift && TL.cur >= 0) { const L = TL.lanes[TL.cur]; L.solo = !L.solo; trackFlag(L, "solo", L.solo); }
-  else if (kb === "r" && !ctrl && TL.cur >= 0) { TL.lanes[TL.cur].rec = !TL.lanes[TL.cur].rec; TL.onState(); }
+  else if (kb === "r" && !ctrl && TL.cur >= 0) TL.recArm(TL.cur);
   else used = false;
   if (used) { e.preventDefault(); k.dirty = true; }
 }
