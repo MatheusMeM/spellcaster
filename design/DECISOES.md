@@ -60,3 +60,13 @@ Consequências:
 - Pino 3D substitui o Pino 2D (`design/pino.js` fica como referência): cabo DMX plugado no DMX OUT, ponta macho em pé no case, cinco pinos como botões na cena, balão Win98 ancorado na projeção da cabeça.
 - Design system só desta ferramenta: `tokens.css` (cores LASER/âmbar/vermelho/OLED, Michroma + Share Tech Mono, escala, chanfros, glows) + `SISTEMA.md` + `sistema.html`.
 - Pendente: voto da rodada 5 (traseira, dentro, splash, câmera, bindings, Pino 3D) em `moodboard/round5`.
+
+## 09/09/2026 · rodada 6 (integração com o orquestrador)
+
+- Protótipo republicado no mesmo artifact da rodada 5 (voto `moodboard/round5` intacto). Fontes: `design/laser/INTEGRACAO.md`, `module.json`, `graph.json`, `bind.js`, `app.js`; teste `tests/test_laser_graph.py`. Branch `design/0.1.3`.
+- 2026-09-09 — O projetor é o módulo `laser/1` do graph; cada binding de tecla/MIDI é uma rota `entrada → filtro → endereço`. Endereços: `laser/1/arm`, `power`, `play`, `shutter`, `kpps` (valor, e disparo com `{step}`), `clip {file}`, `net/ndi|spout|artnet|sacn` (comandos); `limit/r|g|b`, `curve/r|g|b`, `geo/scale`, `dmx/addr`, `queue` (parâmetros); `interlock`, `temp`, `fps`, `points`, `emitting` (valores somente leitura). Nome = o da CLI, agrupado por `/` como o rótulo de `ilda-player.md §1`. Motivo: regra 2 de `FUNCOES/README.md`, um endereço é a identidade de tudo.
+- 2026-09-09 — Fica fora do registry: câmera (gesto do viewer; só `cam/view` e `cam/fog` sobrevivem, no bloco `view` do `.spell`), splash, Pino, OLED/encoder/BACK (as páginas já são endereços), ILDA OUT/DMX OUT/USB, mecânica (mesa, dicroicos, dobra, PCBs, fonte), velocidade do driver (calibração do previz). Motivo: nada disso muda o show.
+- 2026-09-09 — Porta do graph escreve-se `<uid>/<porta>` (`midi/cc:1:7`, `laser/1/kpps`), não `uid.port` como em `orquestrador.md §5`: o nome da porta já leva `/` e assim a porta é o próprio endereço do registry. Motivo: um nome só.
+- 2026-09-09 — CC contínuo passa por `filter.lag` (80 ms); nota e tecla são `trigger` direto; `trigger → value` exige argumento; `number → trigger` não tem filtro no PRD §10 (fica como rota sem filtro, o teste não cobre). `dependency` do manifesto leva `target` (o §5 omite).
+- Ponto aberto: **nó de estado** não existe no PRD §10 (`orquestrador.md §1`, "Estado"). `states[]` sai vazio do `Bind.graph()`; "no segundo ato estas rotas valem e aquelas param" hoje é condição em cada rota. Decisão pendente: adotar a semântica do Chataigne inteira (container de rotas com `ativo`, `ao carregar`, transições) e acrescentar `state` ao catálogo de nós do PRD.
+- Ponto aberto: filtro de limiar (`number → trigger`) para CC em ação de disparo; o `bind.js` já trata CC > 63 como disparo, o graph não sabe dizer isso.

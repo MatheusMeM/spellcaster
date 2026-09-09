@@ -1,6 +1,7 @@
 /* Spellcaster LASER · rodada 5 · o app: estado do aparelho, parede (render 2D → textura), cena (mat/body/optics/
    beam/pino), splash (câmera na parede → contorno → brilho → voa para a traseira), câmera SolidWorks, ações com
-   bindings de tecla e MIDI, painéis, OLED, voto. */
+   bindings de tecla e MIDI, painéis, OLED, voto. Rodada 6: cada ação leva o endereço do registry (laser/1/...) e o
+   contexto; o pino 3 do Pino abre o ORQUESTRADOR (manifesto, rotas, graph do .spell). Uma fonte só das ações: aqui. */
 (function () {
   "use strict";
   var $ = function (s) { return document.querySelector(s); }, reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -13,11 +14,11 @@
   function click() { try { var t = ac().currentTime; tone(3000, t, .02, "square", .04); tone(180, t, .04, "triangle", .06); } catch (e) {} }
 
   /* ---------- estado ---------- */
-  var S = { mode: "splash", t0: performance.now(), play: true, key: false, lock: true, power: true, kpps: 30000, buffer: 3, speed: 1, size: 1, fog: .85, frame: 0, pos: 0, show: null, name: "", cam: "rear", lim: { r: 1, g: 1, b: 1 }, gam: { r: 1, g: 1, b: 1 }, dmx: 1, net: { ndi: false, spout: false, artnet: false, sacn: true }, page: 0, field: 0, temp: 31, mem: null, tip: {}, dim: 1, armedOnce: false };
+  var S = { mode: "splash", t0: performance.now(), play: true, key: false, lock: true, power: true, kpps: 30000, buffer: 3, speed: 1, size: 1, fog: .85, frame: 0, pos: 0, show: null, name: "", cam: "rear", lim: { r: 1, g: 1, b: 1 }, gam: { r: 1, g: 1, b: 1 }, dmx: 1, shut: false, net: { ndi: false, spout: false, artnet: false, sacn: true }, page: 0, field: 0, temp: 31, mem: null, tip: {}, dim: 1, armedOnce: false };
   try { S.mem = JSON.parse(localStorage.getItem("sc-laser") || "null"); if (S.mem && S.mem.kpps) S.kpps = S.mem.kpps; } catch (e) {}
   var demo = ILDA.parse(ILDA.write(ILDA.demo()).buffer); S.show = demo.frames; S.name = "demo.ild · " + demo.frames.length + " frames";
   function fps() { var f = S.show[S.frame]; return f && f.length ? S.kpps / f.length : 0; }
-  function armed() { return S.power && S.key; } function live() { return armed() && S.lock; }
+  function armed() { return S.power && S.key; } function live() { return armed() && S.lock && !S.shut; }
   function remember() { try { localStorage.setItem("sc-laser", JSON.stringify({ kpps: S.kpps, name: S.name, when: Date.now() })); } catch (e) {} }
 
   /* ---------- parede ---------- */
@@ -71,13 +72,14 @@
 
   /* ---------- painel ---------- */
   var panel = $("#panel"), pbody = $("#pbody"), pcur = null; panel.querySelector(".x").addEventListener("click", closePanel);
-  function closePanel() { panel.classList.remove("on"); pcur = null; }
+  function closePanel() { panel.classList.remove("on"); pcur = null; $("#cli").textContent = "spell ilda play show.ild --kpps 30"; }
+  function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
   function open(title, sub, html, wide, id) { panel.classList.toggle("wide", !!wide); pbody.innerHTML = "<h3>" + title + "</h3><div class='sub'>" + sub + "</div>" + html; panel.classList.add("on"); pcur = id || null; }
   function get(p) { var a = p.split("."), o = S; for (var i = 0; i < a.length; i++) o = o[a[i]]; return o; } function set(p, v) { var a = p.split("."), o = S; for (var i = 0; i < a.length - 1; i++) o = o[a[i]]; o[a[a.length - 1]] = v; }
   var FMT = { kpps: function (v) { return Math.round(v / 1000) + "k"; }, pct: function (v) { return Math.round(v * 100) + "%"; }, gam: function (v) { return "γ " + (+v).toFixed(2); }, n: function (v) { return v; }, x: function (v) { return "×" + (+v).toFixed(2); } }, fmtOf = {};
   function rg(label, path, min, max, step, f) { fmtOf[path] = FMT[f]; return "<div class='row'><span>" + label + "</span><input type='range' data-p='" + path + "' min='" + min + "' max='" + max + "' step='" + step + "' value='" + get(path) + "'><span class='v' data-v='" + path + "'>" + FMT[f](get(path)) + "</span></div>"; }
   panel.addEventListener("input", function (e) { var r = e.target; if (!r.dataset.p) return; set(r.dataset.p, +r.value); panel.querySelector("[data-v='" + r.dataset.p + "']").textContent = fmtOf[r.dataset.p](+r.value); remember(); if (/^(lim|gam)\./.test(r.dataset.p)) { var old = pbody.querySelector(".cv"); if (old) old.replaceWith(curveCanvas()); } Bind.syncAll(); });
-  panel.addEventListener("click", function (e) { if (Bind.click(e)) { PANELS.bind(); return; } var b = e.target.closest("[data-a]"); if (b) Bind.run(b.dataset.a); });
+  panel.addEventListener("click", function (e) { if (Bind.click(e)) { PANELS.bind(); return; } var c = e.target.closest("[data-copy]"); if (c) { var el = pbody.querySelector("#" + c.dataset.copy); (navigator.clipboard ? navigator.clipboard.writeText(el.textContent) : Promise.reject()).then(function () { c.textContent = "COPIADO"; }, function () { var r = document.createRange(); r.selectNodeContents(el); getSelection().removeAllRanges(); getSelection().addRange(r); c.textContent = "SELECIONADO · CTRL+C"; }); return; } var b = e.target.closest("[data-a]"); if (b) Bind.run(b.dataset.a); });
   function curveCanvas() { var c = document.createElement("canvas"); c.width = 268; c.height = 90; c.className = "cv"; var x = c.getContext("2d"); x.fillStyle = "#050708"; x.fillRect(0, 0, 268, 90); ["r", "g", "b"].forEach(function (k) { x.strokeStyle = { r: "#FF2A1A", g: "#38FF5C", b: "#3A6BFF" }[k]; x.lineWidth = 1.5; x.beginPath(); for (var i = 0; i <= 40; i++) { var t = i / 40, y = S.lim[k] * Math.pow(t, S.gam[k]); x.lineTo(4 + t * 260, 86 - y * 82); } x.stroke(); }); return c; }
   function onoff(a, on, y, n) { return "<button class='lb" + (on ? " on" : "") + "' data-a='" + a + "'>" + (on ? y : n) + "</button>"; }
   var PANELS = {
@@ -100,12 +102,15 @@
     dac: function () { open("PLACA DAC ILDA", "os conectores traseiros nascem aqui", "<pre>DAC 12 bit X/Y · 8 bit RGB · " + Math.round(S.kpps / 1000) + " kpps\nspell ilda play show.ild</pre>"); },
     dichro: function () { open("DICROICOS", "combinam R, G e B num feixe", "<pre>alinhamento: <b>ok</b> · desvio 0,1 mrad\ndois parafusos de ajuste: não mexa sem chave hexagonal</pre>"); },
     fold: function () { open("ESPELHO DE DOBRA", "HR 99,5 % · manda o feixe para os galvos", "<pre>desvio 0,05 mrad · limpo</pre>"); },
-    shutter: function () { open("OBTURADOR", "solenoide · fecha sem chave ou sem interlock", "<pre>estado: <b>" + (live() ? "ABERTO" : "FECHADO") + "</b>\ntempo de fechamento 8 ms</pre>"); },
+    shutter: function () { open("OBTURADOR", "solenoide · fecha sem chave ou sem interlock", "<div class='btns'>" + onoff("shutter", !S.shut, "ABERTO · FECHAR", "FECHADO · ABRIR") + "</div><pre>estado: <b>" + (live() ? "ABERTO" : "FECHADO") + "</b>\ntempo de fechamento 8 ms\nspell laser shutter " + (S.shut ? "close" : "open") + "</pre>", false, "shutter"); },
+    // rodada 6: o laser como módulo do orquestrador; manifesto e graph saem das mesmas definições de Bind.def
+    orq: function () { var g = Bind.graph({ cam: S.cam, fog: +S.fog.toFixed(2) }), m = Bind.manifest(); $("#cli").textContent = "spell graph add laser/1 · spell graph wire midi/cc:1:7 laser/1/kpps --filter lag";
+      open("ORQUESTRADOR", "laser/1 · módulo do graph · cada binding é uma rota entrada → filtro → endereço", "<div class='eyebrow'>manifesto · design/laser/module.json</div><pre class='js'>" + esc(JSON.stringify(m, null, 1)) + "</pre><div class='eyebrow'>rotas ativas · " + g.wires.length + " · a linha pisca quando a ação roda</div><table>" + g.wires.map(function (w) { return "<tr data-r='" + w.from + "'><td class='k'>" + w.from + "</td><td class='b'>" + (w.filter || "—") + "</td><td class='k'>" + w.to + (w.args ? " <small>" + esc(JSON.stringify(w.args)) + "</small>" : "") + "</td></tr>"; }).join("") + "</table><div class='eyebrow'>graph · trecho do .spell</div><pre class='js' id='gjs'>" + esc(JSON.stringify(g, null, 1)) + "</pre><div class='btns'><button class='lb' data-copy='gjs'>COPIAR</button></div>", true, "orq"); },
     bench: function () { open("MESA ÓPTICA", "alumínio 16 mm · furação M4 a 12,5 mm", "<pre>tudo parafusado nela: módulos, suportes, obturador, galvos\nnada solto dentro da caixa</pre>"); },
     aperture: function () { open("ABERTURA", "classe 4 · 10 W", "<pre><b>PERIGO</b>: 10 W a 445-638 nm\ndivergência 1,2 mrad · diâmetro 5 mm\nzona de exclusão: 3 m acima da plateia</pre>"); },
     front: function () { PANELS.aperture(); }, side: function () { PANELS.fan(); }, lid: function () { setCam("inside"); }, pino: function () { pino.say(); },
     bind: function () { open("BINDINGS", "tecla e MIDI · clique, depois aperte a tecla ou mexa no controlador · Esc cancela", "<div class='btns'><button class='lb' data-a='midi.connect'>MIDI: " + Bind.midi + "</button>" + onoff("cam.reverse", CAM.reverse, "RODA: SOLIDWORKS", "RODA: NORMAL") + "<button class='lb amb' data-a='bind.reset'>RESET</button></div>" + Bind.html(), true, "bind"); },
-    nfo: function () { open("SPELLCASTER LASER · RODADA 5", "info · N fecha", "<pre>o programa é o aparelho: portas atrás = menu, tampa aberta = preferências\nparede = kpps ÷ pontos, galvo passa-baixa; feixe em GLSL; câmera SolidWorks; bindings tecla + MIDI\n\nCLI: spell ilda play show.ild --kpps 30\nMCP: ilda.play {file, kpps} · ilda.limit {r,g,b} · bind.learn {action}\n\nGREETZ: PANGOLIN · ETHER DREAM · LSX · KVANT · CHATAIGNE · MADMAPPER\nCRACKED BY FEITIÇARIA iNDUSTRIAL · NO SERIAL NEEDED</pre>", true, "nfo"); } };
+    nfo: function () { open("SPELLCASTER LASER · RODADA 6", "info · N fecha", "<pre>o programa é o aparelho: portas atrás = menu, tampa aberta = preferências; pino 3 = módulo laser/1 do orquestrador\nparede = kpps ÷ pontos, galvo passa-baixa; feixe em GLSL; câmera SolidWorks; bindings tecla + MIDI\n\nCLI: spell ilda play show.ild --kpps 30\nMCP: ilda.play {file, kpps} · ilda.limit {r,g,b} · bind.learn {action}\n\nGREETZ: PANGOLIN · ETHER DREAM · LSX · KVANT · CHATAIGNE · MADMAPPER\nCRACKED BY FEITIÇARIA iNDUSTRIAL · NO SERIAL NEEDED</pre>", true, "nfo"); } };
   ["r", "g", "b"].forEach(function (k) { PANELS[k] = function () { var nm = { r: "638 nm · 2,5 W", g: "520 nm · 3 W", b: "445 nm · 4,5 W" }[k]; open("MÓDULO " + { r: "VERMELHO", g: "VERDE", b: "AZUL" }[k], nm + " · limite e curva", rg("LIMITE", "lim." + k, 0, 1, .01, "pct") + rg("CURVA", "gam." + k, .5, 2.5, .01, "gam") + "<pre>spell ilda limit --" + k + " " + S.lim[k].toFixed(2) + "</pre>", false, k); pbody.appendChild(curveCanvas()); }; });
   function refresh() { if (pcur && PANELS[pcur]) PANELS[pcur](); }
 
@@ -119,25 +124,34 @@
 
   /* ---------- ações ---------- */
   function toggleKey() { S.key = !S.key; if (S.key) { blip(1500); S.armedOnce = true; } else chord(); $("#cams [data-a='cam.show']").disabled = !S.key; refresh(); }
-  Bind.def("cam.show", "vista SHOW", function () { if (!S.key) { pino.say("Arma a chave primeiro. Sem emissão não tem show; a chave está na traseira, à esquerda.", null, false); blip(300); return; } setCam("show"); }, { key: "1" });
-  Bind.def("cam.rear", "vista TRÁS · menu", function () { setCam("rear"); }, { key: "2" });
-  Bind.def("cam.inside", "vista DENTRO · preferências", function () { setCam("inside"); }, { key: "3" });
-  Bind.def("key.toggle", "chave: arma", toggleKey, { key: "S", get: function () { return S.key; } });
-  Bind.def("lock.toggle", "interlock", function () { S.lock = !S.lock; if (!S.lock) { chord(); pino.say("SCAN FAIL. Interlock aberto: obturador fechado, feixe estacionado.", null, false); } else blip(1300); refresh(); }, { key: "I", get: function () { return S.lock; } });
-  Bind.def("power.toggle", "energia", function () { S.power = !S.power; if (!S.power) chord(); else blip(900); drawOled(); refresh(); }, { key: "P", get: function () { return S.power; } });
-  Bind.def("play.toggle", "play / pausa", function () { S.play = !S.play; blip(); refresh(); }, { key: "Space", get: function () { return S.play; } });
-  Bind.def("kpps.down", "kpps −1k", function () { S.kpps = Math.max(5000, S.kpps - 1000); remember(); refresh(); }, { key: "[" });
-  Bind.def("kpps.up", "kpps +1k", function () { S.kpps = Math.min(40000, S.kpps + 1000); remember(); refresh(); }, { key: "]" });
-  Bind.def("kpps", "kpps (fader)", function (v) { S.kpps = Math.round(5000 + v * 35000); remember(); refresh(); }, { type: "cc", get: function () { return (S.kpps - 5000) / 35000; } });
-  Bind.def("size", "tamanho (fader)", function (v) { S.size = .3 + v; refresh(); }, { type: "cc", get: function () { return S.size - .3; } });
-  ["r", "g", "b"].forEach(function (k) { Bind.def("lim." + k, "limite " + { r: "vermelho", g: "verde", b: "azul" }[k] + " (fader)", function (v) { S.lim[k] = v; refresh(); }, { type: "cc", get: function () { return S.lim[k]; } }); });
-  Bind.def("fog", "névoa (fader)", function (v) { S.fog = v; }, { type: "cc", get: function () { return S.fog; } });
-  Bind.def("file.open", "abrir .ild", function () { $("#file").click(); }, { key: "O" });
-  Bind.def("demo", "demo.ild", function () { S.show = demo.frames; S.frame = 0; S.pos = 0; S.name = "demo.ild · " + demo.frames.length + " frames"; refresh(); pino.say("Demo de volta: túnel, pentagrama e a fita.", null, false); }, { key: "D" });
-  ["ndi", "spout", "artnet", "sacn"].forEach(function (k) { Bind.def("net." + k, "rede: " + k.toUpperCase(), function () { S.net[k] = !S.net[k]; blip(1000); drawOled(); refresh(); if (S.net[k] && (k === "ndi" || k === "spout")) pino.say(k.toUpperCase() + " ligado, mas o conversor para ILDA é a próxima rodada: o FÓSFORO, um monitor de rack nesta porta.", null, false); }, { get: function () { return S.net[k]; } }); });
+  Bind.def("cam.show", "vista SHOW", function () { if (!S.key) { pino.say("Arma a chave primeiro. Sem emissão não tem show; a chave está na traseira, à esquerda.", null, false); blip(300); return; } setCam("show"); }, { key: "1", addr: "laser/1/cam/view", ctx: "view", arg: { view: "show" } });
+  Bind.def("cam.rear", "vista TRÁS · menu", function () { setCam("rear"); }, { key: "2", addr: "laser/1/cam/view", ctx: "view", arg: { view: "rear" } });
+  Bind.def("cam.inside", "vista DENTRO · preferências", function () { setCam("inside"); }, { key: "3", addr: "laser/1/cam/view", ctx: "view", arg: { view: "inside" } });
+  Bind.def("key.toggle", "chave: arma", toggleKey, { key: "S", midi: "note:1:60", get: function () { return S.key; }, addr: "laser/1/arm", ctx: "both" });
+  Bind.def("lock.toggle", "interlock", function () { S.lock = !S.lock; if (!S.lock) { chord(); pino.say("SCAN FAIL. Interlock aberto: obturador fechado, feixe estacionado.", null, false); } else blip(1300); refresh(); }, { key: "I", get: function () { return S.lock; }, addr: "laser/1/interlock", ctx: "value" });
+  Bind.def("power.toggle", "energia", function () { S.power = !S.power; if (!S.power) chord(); else blip(900); drawOled(); refresh(); }, { key: "P", get: function () { return S.power; }, addr: "laser/1/power", ctx: "both" });
+  Bind.def("play.toggle", "play / pausa", function () { S.play = !S.play; blip(); refresh(); }, { key: "Space", midi: "note:1:62", get: function () { return S.play; }, addr: "laser/1/play", ctx: "both", needs: "arm" });
+  Bind.def("kpps.down", "kpps −1k", function () { S.kpps = Math.max(5000, S.kpps - 1000); remember(); refresh(); }, { key: "[", addr: "laser/1/kpps", ctx: "action", arg: { step: -1000 } });
+  Bind.def("kpps.up", "kpps +1k", function () { S.kpps = Math.min(40000, S.kpps + 1000); remember(); refresh(); }, { key: "]", addr: "laser/1/kpps", ctx: "action", arg: { step: 1000 } });
+  Bind.def("kpps", "kpps (fader)", function (v) { S.kpps = Math.round(5000 + v * 35000); remember(); refresh(); }, { type: "cc", midi: "cc:1:7", get: function () { return (S.kpps - 5000) / 35000; }, addr: "laser/1/kpps", ctx: "both", t: "int", range: [5000, 40000], unit: "pps" });
+  Bind.def("size", "tamanho (fader)", function (v) { S.size = .3 + v; refresh(); }, { type: "cc", midi: "cc:1:8", get: function () { return S.size - .3; }, addr: "laser/1/geo/scale", ctx: "mapping", range: [.3, 1.3] });
+  ["r", "g", "b"].forEach(function (k, i) { Bind.def("lim." + k, "limite " + { r: "vermelho", g: "verde", b: "azul" }[k] + " (fader)", function (v) { S.lim[k] = v; refresh(); }, { type: "cc", midi: "cc:1:" + (9 + i), get: function () { return S.lim[k]; }, addr: "laser/1/limit/" + k, ctx: "mapping" });
+    Bind.def("curve." + k, "curva " + { r: "vermelho", g: "verde", b: "azul" }[k] + " (fader)", function (v) { S.gam[k] = .5 + v * 2; refresh(); }, { type: "cc", get: function () { return (S.gam[k] - .5) / 2; }, addr: "laser/1/curve/" + k, ctx: "mapping", range: [.5, 2.5] }); });
+  Bind.def("dmx.addr", "endereço DMX (fader)", function (v) { S.dmx = Math.round(1 + v * 511); drawOled(); refresh(); }, { type: "cc", get: function () { return (S.dmx - 1) / 511; }, addr: "laser/1/dmx/addr", ctx: "mapping", t: "int", range: [1, 512] });
+  Bind.def("queue", "fila do galvo (fader)", function (v) { S.buffer = Math.round(1 + v * 7); refresh(); }, { type: "cc", get: function () { return (S.buffer - 1) / 7; }, addr: "laser/1/queue", ctx: "mapping", t: "int", range: [1, 8], unit: "frames" });
+  Bind.def("shutter", "obturador", function () { S.shut = !S.shut; if (S.shut) chord(); else blip(1300); refresh(); }, { midi: "note:1:64", get: function () { return !S.shut; }, addr: "laser/1/shutter", ctx: "both", needs: "arm" });
+  Bind.def("temp", "temperatura", null, { get: function () { return +S.temp.toFixed(1); }, addr: "laser/1/temp", ctx: "value", unit: "°C" });
+  Bind.def("fps", "fps real", null, { get: function () { return +fps().toFixed(1); }, addr: "laser/1/fps", ctx: "value", unit: "Hz" });
+  Bind.def("points", "pontos por frame", null, { get: function () { return (S.show[S.frame] || []).length; }, addr: "laser/1/points", ctx: "value", t: "int", unit: "pts" });
+  Bind.def("emitting", "emitindo", null, { get: live, addr: "laser/1/emitting", ctx: "value" });
+  Bind.def("fog", "névoa (fader)", function (v) { S.fog = v; }, { type: "cc", get: function () { return S.fog; }, addr: "laser/1/cam/fog", ctx: "view" });
+  Bind.def("file.open", "abrir .ild", function () { $("#file").click(); }, { key: "O" }); // sem endereço: o diálogo é UI; a rota só existe com arquivo (demo → laser/1/clip {file})
+  Bind.def("demo", "demo.ild", function () { S.show = demo.frames; S.frame = 0; S.pos = 0; S.name = "demo.ild · " + demo.frames.length + " frames"; refresh(); pino.say("Demo de volta: túnel, pentagrama e a fita.", null, false); }, { key: "D", addr: "laser/1/clip", ctx: "action", arg: { file: "demo.ild" } });
+  ["ndi", "spout", "artnet", "sacn"].forEach(function (k) { Bind.def("net." + k, "rede: " + k.toUpperCase(), function () { S.net[k] = !S.net[k]; blip(1000); drawOled(); refresh(); if (S.net[k] && (k === "ndi" || k === "spout")) pino.say(k.toUpperCase() + " ligado, mas o conversor para ILDA é a próxima rodada: o FÓSFORO, um monitor de rack nesta porta.", null, false); }, { get: function () { return S.net[k]; }, addr: "laser/1/net/" + k, ctx: "both" }); });
   Bind.def("oled.up", "OLED: encoder +", function () { oledTurn(1); }); Bind.def("oled.down", "OLED: encoder −", function () { oledTurn(-1); }); Bind.def("oled.ok", "OLED: OK", oledOk); Bind.def("oled.back", "OLED: BACK", oledBack, { key: "Backspace" });
   Bind.def("nfo", "info", function () { if (pcur === "nfo") closePanel(); else PANELS.nfo(); }, { key: "N" });
   Bind.def("bind", "bindings", function () { if (pcur === "bind") closePanel(); else PANELS.bind(); }, { key: "B" });
+  Bind.def("orq", "orquestrador", function () { if (pcur === "orq") closePanel(); else PANELS.orq(); });
   Bind.def("esc", "fecha painel", function () { closePanel(); pino.hide(); }, { key: "Escape" });
   Bind.def("midi.connect", "MIDI: conectar", function () { Bind.connect(); }); Bind.def("bind.reset", "bindings: reset", function () { Bind.reset(); });
   Bind.def("cam.reverse", "roda: sentido SolidWorks", function () { CAM.reverse = !CAM.reverse; try { localStorage.setItem("sc-laser-wheel", CAM.reverse ? "1" : "0"); } catch (e) {} refresh(); }, { get: function () { return CAM.reverse; } }); try { if (localStorage.getItem("sc-laser-wheel") === "0") CAM.reverse = false; } catch (e) {}
@@ -145,7 +159,7 @@
   Bind.def("cam.fit", "câmera: enquadra", function () { CAM.fit(CENTER, .32); }, { key: "F" });
   [["front", "1"], ["back", "2"], ["left", "3"], ["right", "4"], ["top", "5"], ["bottom", "6"], ["iso", "7"]].forEach(function (v) { Bind.def("cam." + v[0], "vista padrão: " + v[0], function () { CAM.std(v[0], CENTER, .32); }, { key: "Ctrl+" + v[1] }); });
   Bind.def("cam.zoomIn", "câmera: zoom +", function () { CAM.zoom(.8); }, { key: "Z" }); Bind.def("cam.zoomOut", "câmera: zoom −", function () { CAM.zoom(1.25); }, { key: "Shift+Z" });
-  Bind.onChange(function () { if (pcur === "bind") PANELS.bind(); $("#midi").textContent = "MIDI " + Bind.midi + (Bind.learnState() ? " · LEARN: aperte a tecla ou mexa no controlador" : ""); });
+  Bind.onChange(function () { if (pcur === "bind") PANELS.bind(); var l = Bind.last(); if (pcur === "orq" && l) ["key", "midi"].forEach(function (src) { var k = Bind.keyOf(l, src), r = k && pbody.querySelector("[data-r='" + src + "/" + k + "']"); if (r) { r.classList.remove("hit"); void r.offsetWidth; r.classList.add("hit"); } }); $("#midi").textContent = "MIDI " + Bind.midi + (Bind.learnState() ? " · LEARN: aperte a tecla ou mexa no controlador" : ""); });
   $("#midi").textContent = "MIDI " + Bind.midi;
   document.querySelectorAll("#cams [data-a]").forEach(function (b) { b.addEventListener("click", function () { if (S.mode === "splash") return; Bind.run(b.dataset.a); }); });
 
@@ -164,7 +178,7 @@
 
   /* ---------- Pino ---------- */
   var pino = Pino3D.build(THREE, X, scene, pick, stage, cam, { on: onPin });
-  function onPin(k) { blip(1000); if (k === "ilda") { setCam("rear"); PANELS.ilda(); pino.say("ILDA IN, atrás. Solta o .ild na porta ou escolhe no painel.", null, false); } else if (k === "ndi") { setCam("rear"); PANELS.rj45(); pino.say("A porta NET. NDI e Spout viram ILDA no FÓSFORO, próxima rodada.", null, false); } else if (k === "orq") { setCam("rear"); PANELS.rj45(); pino.say("Orquestrador é a rodada do PATCHBAY: cada porta destas vira um jack de latão.", null, false); } else if (k === "cues") { setCam("rear"); PANELS.dmxin(); pino.say("Cenas e cues chegam pelo DMX IN. O TEATRO DE PAPEL vem depois.", null, false); } else if (k === "nfo") PANELS.nfo(); else if (k === "bye") pino.bye(); pino.current(k); }
+  function onPin(k) { blip(1000); if (k === "ilda") { setCam("rear"); PANELS.ilda(); pino.say("ILDA IN, atrás. Solta o .ild na porta ou escolhe no painel.", null, false); } else if (k === "ndi") { setCam("rear"); PANELS.rj45(); pino.say("A porta NET. NDI e Spout viram ILDA no FÓSFORO, próxima rodada.", null, false); } else if (k === "orq") { setCam("rear"); PANELS.orq(); pino.say("O laser virou o nó laser/1 do graph. Cada binding é uma rota: tecla ou MIDI entra, filtro no meio, endereço na saída. O PATCHBAY desenha isto com jacks de latão.", null, false); } else if (k === "cues") { setCam("rear"); PANELS.dmxin(); pino.say("Cenas e cues chegam pelo DMX IN. O TEATRO DE PAPEL vem depois.", null, false); } else if (k === "nfo") PANELS.nfo(); else if (k === "bye") pino.bye(); pino.current(k); }
   pino.current("ilda");
   function tips() { var F = fps(), f = S.show[S.frame]; if (S.mode !== "play" || !f) return; var flick = live() && F > 0 && F < 25, slow = S.kpps > 32000;
     if (flick && !S.tip.flick) { S.tip.flick = true; pino.say("Tá piscando: " + f.length + " pontos a " + Math.round(S.kpps / 1000) + " kpps dá " + Math.round(F) + " fps. Abre a tampa e mexe no galvo.", null, false); } if (!flick) S.tip.flick = false;
@@ -185,7 +199,7 @@
     // feixes externos: abertura → pontos acesos da parede
     var on = S.power && (S.mode === "splash" || live()), step = Math.max(1, Math.ceil(lit.length / 150)), gain = (.05 + .16 * S.fog); segsW.length = 0; if (on) for (var i = 0; i < lit.length; i += step) { var L = lit[i]; segsW.push([[B.APERT.x, B.APERT.y, B.APERT.z], [(L[0][0] / WW - .5) * 8, 2.2 + (.5 - L[0][1] / WH) * 5, -5], [L[1][0] / 255 * gain, L[1][1] / 255 * gain, L[1][2] / 255 * gain]]); } beamsOut.set(segsW, 1);
     // caminho óptico interno
-    var arm = S.power && (S.key || S.mode === "splash"), opn = S.lock, segsI = O.segments(arm, opn, S.lim, gpos).map(function (s) { return [[s[0][0], s[0][1] + .314, s[0][2]], [s[1][0], s[1][1] + .314, s[1][2]], s[2]]; }); beamsIn.set(segsI, 1.2); beamsOut.tick(t); beamsIn.tick(t);
+    var arm = S.power && (S.key || S.mode === "splash"), opn = S.lock && !S.shut, segsI = O.segments(arm, opn, S.lim, gpos).map(function (s) { return [[s[0][0], s[0][1] + .314, s[0][2]], [s[1][0], s[1][1] + .314, s[1][2]], s[2]]; }); beamsIn.set(segsI, 1.2); beamsOut.tick(t); beamsIn.tick(t);
     O.shutter.rotation.y += (((arm && opn) ? 1.2 : 0) - O.shutter.rotation.y) * Math.min(1, dt * 12); O.mirX.rotation.y = -Math.PI / 4 + gpos[0] * .1; O.mirY.rotation.z = gpos[1] * .1;
     ["r", "g", "b"].forEach(function (k) { O.lens[k].m.material.color.setHex(arm ? O.lens[k].c : 0x111111); });
     proj.material.opacity = S.power ? 1 : 0; B.emLed.material.color.setHex(arm ? 0xff2a1a : 0x2a0a08); B.led1.material.color.setHex(S.net.sacn || S.net.artnet ? 0x38ff5c : 0x0a2a10); B.led2.material.color.setHex((S.net.ndi || S.net.spout) && Math.floor(t * 6) % 2 ? 0xffb000 : 0x2a1e00);
@@ -204,7 +218,7 @@
 
   /* ---------- boot: câmera mirada no output; o foco sai do ponto estático e vai para a parede ---------- */
   document.fonts.ready.then(function () { size(); var ol = ILDA.outlines([["SPELLCASTER", "64px Michroma", 272], ["LASER", "64px Michroma", 372]], WW, WH); SP.loops = ol.loops; SP.len = ol.len;
-    var h = location.hash; if (h === "#laser" || h === "#tras" || h === "#dentro") { CAM.setView(VIEWS.rear[0], VIEWS.rear[1], true); start(); if (h === "#laser" || h === "#dentro") { S.key = true; $("#cams [data-a='cam.show']").disabled = false; if (h === "#laser") setCam("show"); } if (h === "#dentro") setCam("inside"); }
+    var h = location.hash; if (h === "#laser" || h === "#tras" || h === "#dentro" || h === "#orq") { CAM.setView(VIEWS.rear[0], VIEWS.rear[1], true); start(); if (h === "#laser" || h === "#dentro") { S.key = true; $("#cams [data-a='cam.show']").disabled = false; if (h === "#laser") setCam("show"); } if (h === "#dentro") setCam("inside"); if (h === "#orq") PANELS.orq(); }
     else { CAM.setView(VIEWS.wall0[0], VIEWS.wall0[1], true); setTimeout(function () { setCam("wall", 2.6); }, 300); S.t0 = performance.now(); }
     requestAnimationFrame(tick); });
 })();
