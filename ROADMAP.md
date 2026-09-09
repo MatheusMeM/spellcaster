@@ -184,6 +184,7 @@ CI, sem tocar no que já está conforme):
 | Frente | Entrega | Aceite | Depende de |
 |---|---|---|---|
 | Design | rodada 7 (FÓSFORO, PATCHBAY) | voto do dono | voto das rodadas 5 e 6 |
+| F7 sequencer | `spellgui/web/timeline.js` ligado ao engine: edição por `key_set`/`key_del`/`show_patch`, transporte e monitor DMX pelo barramento, modo offline intacto | arrastar um keyframe muda o show no engine e o playhead segue o player | contrato do `serve` (F1) |
 
 Bloqueadas até instalar SDK (decisão do dono, não de agente): R2 (GStreamer + NDI SDK),
 R6 (Godot 4). R9 espera R5.

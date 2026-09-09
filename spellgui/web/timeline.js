@@ -3,14 +3,16 @@
 // Portada do prototipo Python (spellcaster/gui/web/timeline.js) e reescrita sobre CK: o kit cuida de
 // pan, zoom, selecao, marquee, DPR e dirty-flag; aqui ficam tracks, keyframes, curvas, regua,
 // snapping, scrub, in/out e loop. Cores so por token de design/tokens/spellcaster.css.
-// Atalhos: design/SHORTCUTS.md (Premiere/Resolve), so os verbos que existem sem engine.
+// Atalhos: design/SHORTCUTS.md (Premiere/Resolve). Ctrl+S salva pelo engine; Alt+M abre o monitor.
 //
 // Modelo: cada lane e um array de keyframes do .spell — spec.keys, ou spec.<param> (scale, rot, x...).
 // Os keyframes moram em Float64Array/Uint8Array paralelos: o desenho nao aloca por frame e o hit-test
-// e por bisect (CK.bisect). A edicao acontece no modelo local e volta pro JSON no commit().
+// e por bisect (CK.bisect). A edicao acontece no modelo local, volta pro JSON no commit() e, quando
+// ha `spellcore serve`, vira chamada do registry (key_set/key_del/show_patch/...) pelo WS.
 //
-// ponytail: sem WebSocket e sem engine ; o transporte e um relogio local e o commit so reescreve o
-// JSON em memoria. Trocar por IPC (PRD §4) quando o app Tauri existir.
+// Sem servidor nada muda: o show vem de fetch, o transporte e o relogio local e o commit so reescreve
+// o JSON em memoria. Com servidor o playhead vem dos eventos `transport` e o show recarrega quando
+// alguem de fora mexe (evento `show` com rev diferente).
 
 const CURVES = ["linear", "hold", "in", "out", "inout", "bezier"];
 // Mesma matematica do engine (spellcaster/timeline/model.py, spellcore/engine): a curva vale para o
@@ -33,6 +35,8 @@ const TL = {
   snap: true, cur: -1, drawn: 0,
   t: 0, rate: 0, loop: false, last: 0,
   col: {}, menuEl: null, msgEl: null,
+  file: "", rev: null, expect: 0, tstate: null,   // engine: caminho do show, revisao, transporte
+  mon: false, dmx: new Map(), monH: 56,            // monitor: ultimo frame binario por universo
   fps() { return (this.show && this.show.fps) || 30; },
   dur() { return (this.show && this.show.duration) || 60; },
   inT() { return +((this.show && this.show.in) || 0); },
@@ -51,6 +55,104 @@ function tc(t, fps) {
   return pad2((t / 3600) | 0) + ":" + pad2(((t / 60) | 0) % 60) + ":" + pad2((t | 0) % 60) + ":" +
          pad2(Math.floor((t % 1) * fps));
 }
+
+TL.log = function (s) { if (TL.msgEl) TL.msgEl.textContent = s; };
+
+// ---- barramento (spellcore/README.md, secao `serve`) --------------------
+// ponytail: cliente WS de 30 linhas aqui dentro ; trocar por bus.js (frente face) quando ele existir.
+const BUS = {
+  ws: null, id: 0, pend: new Map(), on: {}, ever: false, nopatch: false,
+  live() { return !!this.ws && this.ws.readyState === 1; },
+  call(cmd, args) {
+    if (!this.live()) return Promise.reject("sem servidor");
+    const id = ++this.id;
+    this.ws.send(JSON.stringify({ id: id, cmd: cmd, args: args || {} }));
+    return new Promise((ok, no) => this.pend.set(id, [ok, no]));
+  },
+  msg(d) {
+    if (typeof d !== "string") {                       // frame binario do monitor
+      const f = TL.frameBin(d);
+      if (f && BUS.on.dmx) BUS.on.dmx(f);
+      return;
+    }
+    const m = JSON.parse(d);
+    if (m.event) { if (BUS.on[m.event]) BUS.on[m.event](m.data); return; }
+    const p = this.pend.get(m.id);
+    if (!p) return;
+    this.pend.delete(m.id);
+    if (m.error === undefined) p[0](m.result); else p[1](m.error);
+  },
+  open(url) {
+    let w;
+    try { w = this.ws = new WebSocket(url); } catch (e) { TL.log("sem servidor: " + e.message); return; }
+    w.binaryType = "arraybuffer";
+    w.onmessage = e => BUS.msg(e.data);
+    w.onopen = () => { BUS.ever = true; if (BUS.on.open) BUS.on.open(); };
+    w.onerror = () => {};
+    w.onclose = () => {
+      BUS.ws = null;
+      TL.tstate = null;
+      if (TL.k) TL.k.dirty = true;
+      // so reconecta se um dia conectou: sem serve (python -m http.server) a pagina fica offline em paz
+      if (BUS.ever) setTimeout(() => BUS.open(url), 2000);
+      else TL.log("offline: sem spellcore serve");
+    };
+  },
+};
+TL.bus = BUS;
+
+// Frame binario do monitor: topic:u8 | universe:u16 LE | 512 bytes. topic 1 = dmx de saida.
+TL.frameBin = function (buf) {
+  const b = new Uint8Array(buf);
+  if (b.length < 515 || b[0] !== 1) return null;
+  return { universe: b[1] | (b[2] << 8), data: b.subarray(3, 515) };
+};
+
+// Comandos que nao mexem no show (o serve nao emite evento `show` por eles).
+const LEITURA = ["show_get", "transport_state", "profiles", "patch_check", "net", "load"];
+
+// Uma lista de edicoes locais vira a lista de chamadas do registry. Funcao pura: e' esta que o
+// teste cobre. Edicoes: {k:"set"|"move", track, t, from?, value, curve} | {k:"del", track, t} |
+// {k:"field", path, value}. Os `del` saem todos antes dos `set` — mover dois keyframes vizinhos
+// um sobre o outro apagaria o recem-escrito se as ops se intercalassem.
+TL.ops = function (eds) {
+  const del = [], set = [], patch = [];
+  for (const e of eds) {
+    if (e.k === "field") { patch.push({ op: "add", path: e.path, value: e.value }); continue; }
+    if (e.k === "del" || e.k === "move")
+      del.push({ cmd: "key_del", args: { track: e.track, t: e.k === "move" ? e.from : e.t } });
+    if (e.k === "set" || e.k === "move")
+      set.push({ cmd: "key_set", args: { track: e.track, t: e.t, value: e.value, curve: e.curve } });
+  }
+  const out = del.concat(set);
+  if (patch.length) out.push({ cmd: "show_patch", args: { ops: patch } });
+  return out;
+};
+
+// Manda as chamadas. Sem servidor nao faz nada: o modo offline continua o de hoje.
+function send(calls) {
+  if (!BUS.live()) return;
+  for (const c of calls) one(c);
+}
+
+function one(c) {
+  // ponytail: sem show_patch no engine, o show inteiro vai por show_set ; sai quando a frente
+  // patch estiver em main (o commit() ja deixou TL.show atualizado, entao os dois sao equivalentes).
+  if (c.cmd === "show_patch" && BUS.nopatch) c = { cmd: "show_set", args: { data: TL.show } };
+  if (LEITURA.indexOf(c.cmd) < 0) TL.expect++;         // o serve emite um evento `show` por chamada
+  BUS.call(c.cmd, c.args).catch(err => {
+    if (LEITURA.indexOf(c.cmd) < 0 && TL.expect > 0) TL.expect--;   // falhou: nao vem evento `show`
+    if (c.cmd === "show_patch" && /desconhecido/.test(String(err))) {
+      BUS.nopatch = true;
+      return one(c);
+    }
+    TL.log(c.cmd + ": " + err);
+  });
+}
+TL.send = send;
+
+const hasPlayer = () => TL.tstate === "play" || TL.tstate === "pause";
+TL.hasPlayer = hasPlayer;
 
 const isKeys = v => Array.isArray(v) && v.length > 0 && Array.isArray(v[0]) &&
                     v[0].length >= 2 && typeof v[0][0] === "number";
@@ -158,58 +260,199 @@ function addKey(li, t, v, raw, cu) {
 
 function delSelected() {
   let n = 0;
+  const eds = [];
   TL.k.sel.m.forEach((ks, li) => {
     const L = TL.lanes[li];
     let w = 0;
     for (let i = 0; i < L.n; i++) {
-      if (ks.has(i)) { n++; continue; }
+      if (ks.has(i)) { n++; eds.push(eDel(li, L.ts[i])); continue; }
       L.ts[w] = L.ts[i]; L.vs[w] = L.vs[i]; L.cu[w] = L.cu[i]; L.raw[w] = L.raw[i]; w++;
     }
     L.n = w;
   });
   TL.k.sel.clear();
-  if (n) commit();
+  if (n) commit(eds);
   return n;
 }
 
-// Devolve o modelo local para o JSON do show. Sem engine ainda: nada sai daqui pela rede.
-// ponytail: reescreve o show inteiro em memoria ; virar key_set/key_del por keyframe quando houver IPC.
-function commit() {
+const ktime = t => Math.round(t * 1e4) / 1e4;
+const kval = (L, i) => L.raw[i] !== null ? L.raw[i]
+                     : L.vmax === 255 ? Math.round(L.vs[i]) : Math.round(L.vs[i] * 1e4) / 1e4;
+
+function laneOut(L) {
+  const out = new Array(L.n);
+  for (let i = 0; i < L.n; i++) out[i] = [ktime(L.ts[i]), kval(L, i), CURVES[L.cu[i]]];
+  return out;
+}
+
+// Edicao de um keyframe da lane li (indice i depois da mudanca; fromT = tempo antigo, se mudou).
+// Lane de parametro (spec.scale, spec.x, ...) nao tem comando proprio no registry.
+// ponytail: lane de parametro vai inteira por show_patch ; virar key_set quando key_set souber
+// escrever em spec.<param> e nao so' em spec.keys.
+function eKey(li, i, fromT) {
+  const L = TL.lanes[li];
+  if (L.param) return { k: "lane", li: li };
+  const e = { k: "set", track: L.si, t: ktime(L.ts[i]), value: kval(L, i), curve: CURVES[L.cu[i]] };
+  if (fromT !== undefined && Math.abs(ktime(fromT) - e.t) > 1e-9) { e.k = "move"; e.from = ktime(fromT); }
+  return e;
+}
+
+function eDel(li, t) {
+  const L = TL.lanes[li];
+  return L.param ? { k: "lane", li: li } : { k: "del", track: L.si, t: ktime(t) };
+}
+
+// Keyframe recem-criado: o `resort` do addKey ja mexeu nos indices, entao acha pelo tempo.
+function eAt(li, t) {
+  const L = TL.lanes[li];
+  return eKey(li, CK.bisect(L.ts, L.n, t));
+}
+
+// Devolve o modelo local para o JSON do show e, com servidor, manda as edicoes ao registry.
+// `eds` descreve o que mudou; sem `eds` so' reescreve o JSON local (modo offline de hoje).
+function commit(eds) {
   for (const L of TL.lanes) {
-    const out = new Array(L.n), inteiro = L.vmax === 255;
-    for (let i = 0; i < L.n; i++) {
-      const v = L.raw[i] !== null ? L.raw[i]
-              : inteiro ? Math.round(L.vs[i]) : Math.round(L.vs[i] * 1e4) / 1e4;
-      out[i] = [Math.round(L.ts[i] * 1e4) / 1e4, v, CURVES[L.cu[i]]];
-    }
-    if (L.param) L.spec[L.param] = out; else L.spec.keys = out;
+    if (L.param) L.spec[L.param] = laneOut(L); else L.spec.keys = laneOut(L);
     L.spec.mute = L.mute; L.spec.solo = L.solo;
   }
   TL.k.dirty = true;
+  if (!eds || !eds.length || !BUS.live()) return;
+  const vistas = new Set(), fim = [];
+  for (const e of eds) {                                 // lane inteira: uma op por path, ja gravada
+    if (e.k !== "lane") { fim.push(e); continue; }
+    const L = TL.lanes[e.li], path = "/tracks/" + L.si + "/" + L.param;
+    if (vistas.has(path)) continue;
+    vistas.add(path);
+    fim.push({ k: "field", path: path, value: L.spec[L.param] });
+  }
+  send(TL.ops(fim));
 }
 TL.commit = commit;
 
-// ---- transporte local ---------------------------------------------------
-TL.locate = function (t) {
-  TL.t = clamp(t, 0, TL.dur());
-  TL.k.dirty = true;
+// Campo do show por show_patch (in, out, markers, mute/solo de track).
+function field(path, value) { commit([{ k: "field", path: path, value: value }]); }
+TL.field = field;
+
+function trackFlag(L, key, on) { field("/tracks/" + L.si + "/" + key, on); }
+
+TL.setInOut = function (i, o) {
+  const eds = [];
+  if (i !== null && i !== undefined) { TL.show.in = i; eds.push({ k: "field", path: "/in", value: i }); }
+  if (o !== null && o !== undefined) { TL.show.out = o; eds.push({ k: "field", path: "/out", value: o }); }
+  commit(eds);
 };
 
+// ---- transporte ---------------------------------------------------------
+// Um funil so': todo play/pause/stop e todo salto passam por aqui. Com player vivo quem manda e' o
+// engine (o playhead vem dos eventos `transport`); sem ele, o relogio local de sempre.
+function setT(t) {
+  TL.t = clamp(t, 0, TL.dur());
+  TL.k.dirty = true;
+}
+TL.setT = setT;
+
+TL.locate = function (t) {
+  setT(t);
+  if (hasPlayer()) send([{ cmd: "locate", args: { t: TL.t } }]);
+};
+
+// ponytail: o engine nao tem shuttle nem rate reverso ; com player vivo J/L viram pause/play e o
+// x2/x4/x8 continua so' no modo offline. Sai quando o registry ganhar um comando de rate.
 TL.play = function (rate) {
+  if (hasPlayer()) {
+    send([rate > 0 ? { cmd: "resume", args: {} } : { cmd: "pause", args: {} }]);
+    return;
+  }
+  if (rate > 0 && BUS.live() && TL.file) {
+    send([{ cmd: "play_show", args: { file: TL.file, loop: TL.loop } }]);
+    return;
+  }
   TL.rate = rate;
   TL.last = performance.now();
   TL.k.dirty = true;
+};
+
+TL.stop = function () {
+  if (BUS.live()) send([{ cmd: "stop", args: {} }]);
+  TL.tstate = null;
+  TL.rate = 0;
+  setT(0);
+};
+
+TL.save = function () {
+  if (BUS.live()) send([{ cmd: "show_save", args: { file: "" } }]);
+  else TL.log("Ctrl+S: sem servidor (o show fica so' em memoria)");
 };
 
 function frame() {
   if (!TL.rate) return;
   const now = performance.now(), dt = (now - TL.last) / 1000;
   TL.last = now;
-  let t = TL.t + dt * TL.rate;
-  if (TL.loop && TL.rate > 0 && t >= TL.outT()) t = TL.inT();
+  const t = TL.t + dt * TL.rate;
+  if (hasPlayer()) return setT(t);       // o engine manda; aqui so' interpola entre os eventos
+  if (TL.loop && TL.rate > 0 && t >= TL.outT()) return setT(TL.inT());
   if (t <= 0 || t >= TL.dur()) TL.rate = 0;
-  TL.locate(t);
+  setT(t);
 }
+
+// ---- ligacao com o engine ----------------------------------------------
+BUS.on.transport = d => {
+  TL.tstate = d.state;
+  TL.rate = d.state === "play" ? 1 : 0;
+  TL.last = performance.now();
+  setT(d.t);
+};
+
+// Cada comando nosso que muda o show volta como um evento `show`; so' recarrega o que veio de fora.
+BUS.on.show = d => {
+  TL.rev = d.rev;
+  if (TL.expect > 0) { TL.expect--; return; }
+  TL.reload();
+};
+
+BUS.on.log = d => TL.log(d.text);
+
+BUS.on.dmx = f => {
+  TL.dmx.set(f.universe, f.data);
+  if (TL.mon) TL.k.dirty = true;
+};
+
+BUS.on.open = () => {
+  BUS.call("show_get", {}).then(s => { TL.file = (s && s.file) || ""; }).catch(() => {});
+  TL.reload();
+};
+
+TL.reload = function () {
+  return fetch("/show").then(r => r.json()).then(sh => {
+    const cur = TL.cur, view = TL.k && { x: TL.k.view.x, y: TL.k.view.y, zoom: TL.k.view.zoom };
+    TL.load(sh);
+    TL.cur = cur;
+    if (view) { TL.k.view.x = view.x; TL.k.view.y = view.y; TL.k.view.zoom = view.zoom; }
+    TL.k.dirty = true;
+  }).catch(e => TL.log("GET /show: " + e.message));
+};
+
+TL.connect = function (url) {
+  BUS.open(url || ("ws://" + location.host + "/ws"));
+};
+
+// ---- tracks -------------------------------------------------------------
+TL.trackAdd = function () {
+  const tr = { type: "dmx", universe: 1, address: 1, keys: [] };
+  TL.show.tracks.push(tr);                                 // mesmo track que o track_add do engine
+  send([{ cmd: "track_add", args: { type: "dmx", universe: 1, address: 1, label: "" } }]);
+  TL.load(TL.show);
+  TL.cur = TL.lanes.length - 1;
+};
+
+TL.trackDel = function () {
+  const L = TL.lanes[TL.cur];
+  if (!L) return;
+  const i = L.si;
+  TL.show.tracks.splice(i, 1);
+  send([{ cmd: "track_del", args: { index: i } }]);
+  TL.load(TL.show);
+};
 
 // ---- snapping (markers, in/out, playhead, keyframes visiveis) ----------
 function buildSnaps() {
@@ -411,7 +654,8 @@ function draw(k) {
   c.font = "13px " + col.mono;
   c.fillText(tc(TL.t, fps), 8, TL.rulerH / 2);
   c.fillStyle = col.fg3; c.font = "10px " + col.mono;
-  c.fillText(TL.lanes.length + "L " + k.sel.count() + "sel" + (TL.snap ? " snap" : ""), 108, TL.rulerH / 2);
+  c.fillText(TL.lanes.length + "L " + k.sel.count() + "sel" + (TL.snap ? " snap" : "") +
+             (BUS.live() ? " eng" + (TL.rev === null ? "" : ":" + TL.rev) : ""), 108, TL.rulerH / 2);
 
   // ---- playhead ----
   const xp = t2x(TL.t);
@@ -420,6 +664,28 @@ function draw(k) {
     c.beginPath(); c.moveTo(Math.round(xp) + 0.5, 0); c.lineTo(Math.round(xp) + 0.5, H); c.stroke();
     c.fillStyle = TL.rate ? col.live : col.accent;
     c.beginPath(); c.moveTo(xp - 6, 0); c.lineTo(xp + 6, 0); c.lineTo(xp, 10); c.fill();
+  }
+
+  // ---- monitor: 512 barras do ultimo frame binario do universo da lane focada (Alt+M) ----
+  // ponytail: faixa sobreposta no rodape, sem painel proprio ; virar painel quando a GUI tiver layout.
+  if (TL.mon) {
+    const mh = TL.monH, y0 = H - mh, sel = TL.lanes[TL.cur];
+    const u = sel ? +(sel.spec.universe || 1) : 1, d = TL.dmx.get(u);
+    c.fillStyle = col.panel;
+    c.fillRect(0, y0, W, mh);
+    c.strokeStyle = col.line; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(0, y0 + 0.5); c.lineTo(W, y0 + 0.5); c.stroke();
+    if (d) {
+      const bw = (W - 12) / 512, ph = mh - 18;
+      c.fillStyle = col.accent;
+      for (let i = 0; i < 512; i++) {
+        const v = d[i];
+        if (v) c.fillRect(6 + i * bw, y0 + mh - 4 - v / 255 * ph, Math.max(1, bw - 0.4), v / 255 * ph);
+      }
+    }
+    c.fillStyle = col.fg3;
+    c.font = "10px " + col.mono;
+    c.fillText("u" + u + (d ? "" : "  sem frame"), 6, y0 + 8);
   }
 
   // ---- marquee ----
@@ -475,10 +741,10 @@ function onDown(p) {
     const ly = laneY(li) + TL.rowH / 2;
     if (Math.abs(y - ly) < 8 && x > TL.headW - 58 && x < TL.headW - 5) {
       const b = Math.floor((x - (TL.headW - 58)) / 19);
-      if (b === 0) L.mute = !L.mute;
-      else if (b === 1) L.solo = !L.solo;
-      else L.rec = !L.rec;   // ponytail: arma so o visual ; ligar no engine quando houver IPC/gravacao
-      commit();
+      if (b === 0) { L.mute = !L.mute; trackFlag(L, "mute", L.mute); }
+      else if (b === 1) { L.solo = !L.solo; trackFlag(L, "solo", L.solo); }
+      // ponytail: record arm e' so o estado visual da lane ; ligar quando o engine gravar
+      else { L.rec = !L.rec; commit(); }
     }
     k.sel.clear();
     k.dirty = true;
@@ -500,7 +766,7 @@ function onDown(p) {
 
 function onMove(p, d) {
   const k = TL.k;
-  if (d.mode === "scrub") TL.locate(x2t(p.x));
+  if (d.mode === "scrub") { setT(x2t(p.x)); d.moved = true; }
   else if (d.mode === "in") TL.show.in = clamp(snapT(x2t(p.x)), 0, TL.outT() - 0.01);
   else if (d.mode === "out") TL.show.out = clamp(snapT(x2t(p.x)), TL.inT() + 0.01, TL.dur());
   else if (d.mode === "keys") {
@@ -519,8 +785,14 @@ function onMove(p, d) {
 }
 
 function onUp(p, d) {
-  if (d.mode === "keys" && d.moved) { for (const li of d.lanes) resort(li); commit(); }
-  else if (d.mode === "in" || d.mode === "out") commit();
+  if (d.mode === "keys" && d.moved) {
+    // as edicoes saem ANTES do resort: e' o resort que embaralha os indices de d.items
+    const eds = d.items.map(it => eKey(it.li, it.ki, it.t));
+    for (const li of d.lanes) resort(li);
+    commit(eds);
+  } else if (d.mode === "in") TL.setInOut(TL.show.in, null);
+  else if (d.mode === "out") TL.setInOut(null, TL.show.out);
+  else if (d.mode === "scrub" && d.moved) TL.locate(TL.t);   // um locate no fim, nao um por frame
 }
 
 function onMarquee(r, add) {
@@ -555,10 +827,10 @@ function onMenu(p) {
 }
 
 function setCurve(name) {
-  const ci = CURVES.indexOf(name);
-  TL.k.sel.each((li, i) => { TL.lanes[li].cu[i] = ci; });
+  const ci = CURVES.indexOf(name), eds = [];
+  TL.k.sel.each((li, i) => { TL.lanes[li].cu[i] = ci; eds.push(eKey(li, i)); });
   hideMenu();
-  commit();
+  commit(eds);
 }
 TL.setCurve = setCurve;
 
@@ -596,15 +868,21 @@ function onKey(e) {
   else if (key === "ArrowDown") jumpKey(1);
   else if (key === "Home") TL.locate(0);
   else if (key === "End") TL.locate(TL.dur());
-  else if ((key === "i" || key === "I") && alt) { TL.show.in = 0; commit(); }
-  else if ((key === "o" || key === "O") && alt) { TL.show.out = TL.dur(); commit(); }
-  else if ((key === "x" || key === "X") && alt) { TL.show.in = 0; TL.show.out = TL.dur(); commit(); }
+  else if ((key === "m" || key === "M") && alt) { TL.mon = !TL.mon; }
+  else if ((key === "i" || key === "I") && alt) TL.setInOut(0, null);
+  else if ((key === "o" || key === "O") && alt) TL.setInOut(null, TL.dur());
+  else if ((key === "x" || key === "X") && alt) TL.setInOut(0, TL.dur());
   else if (key === "I" && shift) TL.locate(TL.inT());
   else if (key === "O" && shift) TL.locate(TL.outT());
-  else if (key === "i") { TL.show.in = Math.min(TL.t, TL.outT() - 0.01); commit(); }
-  else if (key === "o") { TL.show.out = Math.max(TL.t, TL.inT() + 0.01); commit(); }
+  else if (key === "i") TL.setInOut(Math.min(TL.t, TL.outT() - 0.01), null);
+  else if (key === "o") TL.setInOut(null, Math.max(TL.t, TL.inT() + 0.01));
   else if (ctrl && (key === "l" || key === "L")) TL.loop = !TL.loop;
-  else if ((key === "m" || key === "M") && !ctrl) { TL.show.markers.push(+TL.t.toFixed(4)); TL.show.markers.sort((a, b) => a - b); }
+  else if (ctrl && (key === "s" || key === "S")) TL.save();
+  else if ((key === "m" || key === "M") && !ctrl) {
+    TL.show.markers.push(+TL.t.toFixed(4));
+    TL.show.markers.sort((a, b) => a - b);
+    field("/markers", TL.show.markers);
+  }
   else if (key === "=" || key === "+") k.zoomAt(k.gutter + (k.w - k.gutter) / 2, 1.25);
   else if (key === "-" || key === "_") k.zoomAt(k.gutter + (k.w - k.gutter) / 2, 0.8);
   else if (key === "\\" || (shift && (key === "z" || key === "Z"))) TL.fit();
@@ -613,7 +891,7 @@ function onKey(e) {
       const L = TL.lanes[TL.cur], v = TL.valueAt(L, TL.t);
       k.sel.clear();
       k.sel.add(TL.cur, addKey(TL.cur, TL.t, v === null ? 0 : v, null, 0));
-      commit();
+      commit([eAt(TL.cur, TL.t)]);
     }
   } else if (ctrl && shift && (key === "a" || key === "A")) k.sel.clear();
   else if (ctrl && (key === "a" || key === "A")) {
@@ -632,18 +910,21 @@ function onKey(e) {
     if (key === "x" || key === "X") delSelected();
   } else if (ctrl && (key === "v" || key === "V") && TL.clip) {
     k.sel.clear();
+    const ts = [];
     for (const c of TL.clip) {
       if (c.li >= TL.lanes.length) continue;
       k.sel.add(c.li, addKey(c.li, TL.t + c.t, c.v, c.raw, c.cu));
+      ts.push([c.li, TL.t + c.t]);
     }
-    commit();
+    commit(ts.map(a => eAt(a[0], a[1])));
   } else if (key === "Delete" || key === "Backspace") delSelected();
   else if (ctrl && shift && (key === "e" || key === "E")) {
-    k.sel.each((li, i) => { const L = TL.lanes[li]; L.cu[i] = (L.cu[i] + 1) % CURVES.length; });
-    commit();
+    const eds = [];
+    k.sel.each((li, i) => { const L = TL.lanes[li]; L.cu[i] = (L.cu[i] + 1) % CURVES.length; eds.push(eKey(li, i)); });
+    commit(eds);
   } else if (key === "s" && !ctrl) TL.snap = !TL.snap;
-  else if (key === "D" && shift && TL.cur >= 0) { const L = TL.lanes[TL.cur]; L.mute = !L.mute; commit(); }
-  else if (key === "S" && shift && TL.cur >= 0) { const L = TL.lanes[TL.cur]; L.solo = !L.solo; commit(); }
+  else if (key === "D" && shift && TL.cur >= 0) { const L = TL.lanes[TL.cur]; L.mute = !L.mute; trackFlag(L, "mute", L.mute); }
+  else if (key === "S" && shift && TL.cur >= 0) { const L = TL.lanes[TL.cur]; L.solo = !L.solo; trackFlag(L, "solo", L.solo); }
   else if ((key === "r" || key === "R") && !ctrl && TL.cur >= 0) TL.lanes[TL.cur].rec = !TL.lanes[TL.cur].rec;
   else used = false;
   if (used) { e.preventDefault(); k.dirty = true; }
@@ -652,6 +933,7 @@ TL.onKey = onKey;
 
 TL.fit = function () {
   TL.k.gutter = TL.headW;
+  if (TL.k.w < 2) TL.k.resize();   // show carregado antes do primeiro layout: mede o canvas agora
   TL.k.fit(0, TL.dur());
 };
 

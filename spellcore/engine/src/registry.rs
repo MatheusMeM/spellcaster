@@ -213,6 +213,14 @@ pub fn base() -> Registry {
             }
         },
     );
+    // O par do `pause`: sem ele, quem pausou pelo registry (GUI, MCP, OSC) so' voltava a tocar
+    // subindo outro player com `play_show`. Chama-se `resume` e nao `play` porque `play` e' o
+    // subcomando da CLI que SOBE um player (o `play_show` do registry); aqui nao se sobe nada.
+    r.add::<NoArgs>("resume", "Retoma o player pausado neste processo (o par do pause).", |_| {
+        let h = vivo()?;
+        h.play();
+        estado(&h)
+    });
     r.add::<NoArgs>("pause", "Pausa o player em execucao neste processo.", |_| {
         let h = vivo()?;
         h.pause();
@@ -271,12 +279,14 @@ mod tests {
     #[test]
     fn base_tem_transporte_e_load() {
         let r = base();
-        for c in ["load", "show_get", "pause", "stop", "locate", "cue_go", "transport_state"] {
+        for c in ["load", "show_get", "resume", "pause", "stop", "locate", "cue_go"] {
             assert!(r.get(c).is_some(), "comando {} ausente", c);
         }
+        assert!(r.get("transport_state").is_some());
         // ponytail: o teste so' vale quando nao ha player neste processo — os testes do player
         // sobem o seu em outro binario (tests/player.rs), entao aqui nunca ha CURRENT.
         for (c, a) in [
+            ("resume", json!({})),
             ("pause", json!({})),
             ("stop", json!({})),
             ("locate", json!({"t": 3.5})),

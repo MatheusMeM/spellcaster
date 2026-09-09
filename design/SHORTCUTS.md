@@ -28,6 +28,7 @@ Referência para R5 (GUI) e R9 (editores). Fonte: Adobe Premiere Pro e DaVinci R
 | Loop no intervalo In–Out | `Ctrl+L` | Premiere |
 | Marcador no playhead / editar | `M` / `Shift+M` | ambos |
 | Marcador anterior / próximo | `Ctrl+Shift+←` / `Ctrl+Shift+→` | Resolve |
+| Monitor DMX do track focado (512 barras) | `Alt+M` | (nosso; `M` já é marcador, `Ctrl+M` já é exportar) |
 | Zoom in / out / ajustar | `=` / `-` / `Shift+Z` ou `\` | Premiere / Resolve |
 | Pan na timeline | roda com `Shift`, ou arrastar com botão do meio | ambos |
 | Keyframe no playhead (track focado) | `Ctrl+K` | Premiere (add edit) |
