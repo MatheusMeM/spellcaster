@@ -7,7 +7,9 @@
 //!   2. cada `FrameHook` na ordem em que foi registrado;
 //!   3. tracks de efeito colateral: `osc`, `media` nao-Capture e `cue`;
 //!   4. `CueList::update` escreve o snapshot corrente;
-//!   5. I/O: cada universo escrito vai para todas as saidas.
+//!   5. o programmer (`Prog`): o override manual do operador, HTP por canal, POR CIMA da cue
+//!      viva (o operador sobrepoe o que a cue esta segurando);
+//!   6. I/O: cada universo escrito vai para todas as saidas.
 //!
 //! O transporte remoto por OSC (`/spellcaster/play|pause|stop|locate f`) nunca toca nos
 //! Universes: ele so' age no `Handle`, e a thread de transporte faz o resto no proximo frame.
@@ -21,6 +23,7 @@ use crate::universe::Universes;
 use protocols::osc::{Arg, OscIn, OscOut};
 use protocols::{artnet::ArtNetOut, sacn::SacnOut, Output};
 use serde::Serialize;
+use std::collections::BTreeMap;
 use std::net::Ipv4Addr;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, AtomicUsize, Ordering};
@@ -120,9 +123,89 @@ enum Ctl {
     Input(String, f64),
 }
 
+/// Programmer: a camada manual do operador, por cima da timeline. Um `Option<u8>` por canal =
+/// valor e mascara de "tocado" na mesma estrutura.
+// ponytail: um bloco de 1 KB por universo ; um show tem poucos universos, e um
+// `BTreeMap<(u16,u16),u8>` alocaria por canal dentro do frame.
+#[derive(Default)]
+pub struct Prog {
+    v: BTreeMap<u16, [Option<u8>; 512]>,
+    /// Canais soltos desde o ultimo frame: zerados ANTES da timeline, senao o ultimo valor do
+    /// override fica preso no buffer (ninguem mais escreve aquele canal).
+    freed: Vec<(u16, u16)>,
+}
+
+impl Prog {
+    /// Escreve `values` a partir de `addr` (1-based); clamp 0..255, ignora o que passa de 512.
+    pub fn set(&mut self, u: u16, addr: u16, values: &[f64]) {
+        if addr == 0 || addr > 512 {
+            return;
+        }
+        let i = (addr - 1) as usize;
+        let s = self.v.entry(u).or_insert([None; 512]);
+        for (d, v) in s[i..].iter_mut().zip(values) {
+            *d = Some(*v as u8);
+        }
+    }
+
+    /// Solta o override de um universo (ou de todos); devolve quantos canais sairam.
+    pub fn clear(&mut self, u: Option<u16>) -> usize {
+        let mut n = 0;
+        for (num, s) in self.v.iter_mut() {
+            if u.is_some_and(|x| x != *num) {
+                continue;
+            }
+            for (i, c) in s.iter_mut().enumerate() {
+                if c.take().is_some() {
+                    self.freed.push((*num, i as u16 + 1));
+                    n += 1;
+                }
+            }
+        }
+        n
+    }
+
+    /// Canais tocados, em ordem: (universo, endereco 1-based, valor).
+    pub fn levels(&self, u: Option<u16>) -> Vec<(u16, u16, u8)> {
+        let mut out = Vec::new();
+        for (n, s) in self.v.iter() {
+            if u.is_some_and(|x| x != *n) {
+                continue;
+            }
+            out.extend(
+                s.iter()
+                    .enumerate()
+                    .filter_map(|(i, c)| c.map(|v| (*n, i as u16 + 1, v))),
+            );
+        }
+        out
+    }
+
+    /// Zera no buffer os canais soltos desde o ultimo frame. Roda ANTES de `Timeline::apply`,
+    /// para o que a timeline possui voltar a valer no mesmo frame.
+    fn release(&mut self, uni: &mut Universes) {
+        for (n, a) in self.freed.drain(..) {
+            uni.get_or_create(n).set_bytes(a, &[0]);
+        }
+    }
+
+    /// HTP por canal sobre o que ja esta no buffer.
+    fn apply(&self, uni: &mut Universes) {
+        for (n, s) in self.v.iter() {
+            let d = &mut uni.get_or_create(*n).data;
+            for (i, c) in s.iter().enumerate() {
+                if let Some(v) = c {
+                    d[i] = d[i].max(*v);
+                }
+            }
+        }
+    }
+}
+
 struct Shared {
     clock: Clock,
     ctl: Mutex<Vec<Ctl>>,
+    prog: Mutex<Prog>,
     cue: AtomicI32,
     frames: AtomicU64,
     nuni: AtomicUsize,
@@ -181,6 +264,21 @@ impl Handle {
     /// registry, por onde a GUI e o barramento alimentam o Graph.
     pub fn input(&self, key: &str, value: f64) {
         self.s.push(Ctl::Input(key.to_string(), value));
+    }
+
+    /// Programmer: escreve no override manual (vale no proximo frame).
+    pub fn level_set(&self, u: u16, addr: u16, values: &[f64]) {
+        lock(&self.s.prog).set(u, addr, values);
+    }
+
+    /// Solta o override de um universo, ou de todos; devolve quantos canais sairam.
+    pub fn level_clear(&self, u: Option<u16>) -> usize {
+        lock(&self.s.prog).clear(u)
+    }
+
+    /// (universo, endereco, valor) de cada canal tocado pelo operador.
+    pub fn levels(&self, u: Option<u16>) -> Vec<(u16, u16, u8)> {
+        lock(&self.s.prog).levels(u)
     }
 
     pub fn state(&self) -> TransportState {
@@ -251,6 +349,7 @@ impl Rt {
     fn tick(&mut self, s: &Shared, t: f64) {
         self.drain(s, t);
         // 1. timeline (dmx/artnet) e media do Capture
+        lock(&s.prog).release(&mut self.uni);
         self.tl.apply(&mut self.uni, t);
         let Rt {
             tl,
@@ -309,7 +408,9 @@ impl Rt {
         // 4. snapshot das cues
         cues.update(t, uni);
         s.cue.store(cues.index(), Ordering::Relaxed);
-        // 5. I/O
+        // 5. programmer: o override manual do operador, HTP sobre timeline E cue viva
+        lock(&s.prog).apply(uni);
+        // 6. I/O
         // ponytail: todo universo escrito vai para TODAS as saidas do show (igual a R0)
         // ; separar por saida quando um show misturar "dmx" e "artnet" no mesmo universo.
         for u in uni.iter() {
@@ -414,6 +515,7 @@ impl Player {
             s: Arc::new(Shared {
                 clock: Clock::new(show.fps),
                 ctl: Mutex::new(Vec::new()),
+                prog: Mutex::new(Prog::default()),
                 cue: AtomicI32::new(-1),
                 frames: AtomicU64::new(0),
                 nuni: AtomicUsize::new(0),
@@ -445,6 +547,13 @@ impl Player {
     pub fn hook(&mut self, h: Box<dyn FrameHook>) {
         if let Some(rt) = self.rt.as_mut() {
             rt.hooks.push(h);
+        }
+    }
+
+    /// Saida extra alem das declaradas no show, antes de `start()`.
+    pub fn output(&mut self, o: Box<dyn Output>) {
+        if let Some(rt) = self.rt.as_mut() {
+            rt.outs.push(o);
         }
     }
 

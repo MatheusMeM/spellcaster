@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Spellcaster — teatro de papel</title>
+<link rel="stylesheet" href="../../design/tokens/spellcaster.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: var(--sc-bg); color: var(--sc-fg);
+               font: var(--sc-text-sm)/1.35 var(--sc-mono); }
+  body { display: flex; flex-direction: column; }
+  .bar { display: flex; align-items: center; gap: var(--sc-gap); padding: 6px 8px;
+         background: var(--sc-panel); border-bottom: 1px solid var(--sc-line); flex: 0 0 auto; }
+  .over { color: var(--sc-fg-3); font-size: var(--sc-text-xs); letter-spacing: var(--sc-tracking);
+          text-transform: uppercase; font-family: var(--sc-label); }
+  .sep { width: 1px; height: 20px; background: var(--sc-line); }
+  button, input, select { background: var(--sc-panel-2); color: var(--sc-fg); border: 1px solid var(--sc-line);
+                          border-radius: var(--sc-radius); font: 12px var(--sc-mono); padding: 4px 8px; }
+  button:hover { border-color: var(--sc-fg-3); }
+  #go { background: var(--sc-go); color: var(--sc-bg); border: 0; font-weight: 700;
+        font-size: var(--sc-text-lg); padding: 8px 34px; box-shadow: var(--sc-glow-go); }
+  main { flex: 1 1 auto; display: grid; grid-template-columns: minmax(360px, 40%) 1fr; min-height: 0; }
+  .col { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--sc-line); }
+  section { display: flex; flex-direction: column; min-height: 0; flex: 1 1 0;
+            border-bottom: 1px solid var(--sc-line); }
+  section > h2 { margin: 0; padding: 5px 8px; background: var(--sc-panel);
+                 color: var(--sc-fg-3); font: var(--sc-text-xs) var(--sc-label);
+                 letter-spacing: var(--sc-tracking); text-transform: uppercase; }
+  .rolo { overflow: auto; flex: 1 1 auto; }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { padding: 2px 6px; border-bottom: 1px solid var(--sc-hair); text-align: left;
+           white-space: nowrap; }
+  th { color: var(--sc-fg-3); font: var(--sc-text-xs) var(--sc-label); text-transform: uppercase; }
+  tbody tr:hover { background: var(--sc-panel-2); }
+  tr.alerta td { color: var(--sc-live); }
+  tr.viva td { background: rgba(255, 45, 31, 0.14); color: var(--sc-live); }
+  td input[type=text] { width: 130px; } td input[type=number] { width: 56px; }
+  td button { padding: 1px 6px; }
+  .forma { display: flex; gap: 4px; padding: 5px 8px; background: var(--sc-panel);
+           border-top: 1px solid var(--sc-line); flex-wrap: wrap; }
+  .forma input[type=text] { width: 110px; } .forma input[type=number] { width: 58px; }
+  #patch-erro { color: var(--sc-live); padding: 0 8px 5px; font-size: var(--sc-text-xs); }
+  #cenario { flex: 1 1 0; min-height: 0; width: 100%; display: block; background: var(--sc-well); }
+  #canais { flex: 0 0 auto; max-height: 40%; overflow: auto; padding: 6px 8px;
+            background: var(--sc-panel); border-top: 1px solid var(--sc-line); }
+  #canais label { display: flex; align-items: center; gap: 8px; padding: 1px 0; }
+  #canais label > :first-child { width: 0; }
+  #canais label input { flex: 1 1 auto; padding: 0; accent-color: var(--sc-accent); }
+  #canais label span { width: 30px; text-align: right; color: var(--sc-fg-3); }
+  .cli { flex: 0 0 auto; padding: 4px 8px; background: var(--sc-panel);
+         border-top: 1px solid var(--sc-line); color: var(--sc-fg-3); font-size: var(--sc-text-xs); }
+</style>
+</head>
+<body>
+<div class="bar">
+  <span class="over">teatro de papel</span>
+  <button id="go">GO</button>
+  <span class="over">cue</span><span id="cue-viva">—</span>
+  <span class="sep"></span>
+  <input type="text" id="cena-nome" placeholder="nome da cena">
+  <button id="capturar">Capturar cena</button>
+  <button id="solta">Soltar programmer</button>
+  <span class="sep"></span>
+  <span class="over" id="msg">ligando</span>
+</div>
+<main>
+  <div class="col">
+    <section>
+      <h2>Patch</h2>
+      <div class="rolo">
+        <table><thead><tr><th>nome<th>perfil<th>uni<th>end<th>ch<th></tr></thead>
+        <tbody id="patch"></tbody></table>
+      </div>
+      <div id="patch-erro"></div>
+      <div class="forma">
+        <input type="text" id="f-nome" placeholder="nome">
+        <select id="f-perfil"></select>
+        <input type="number" id="f-uni" value="1" min="1" title="universo">
+        <input type="number" id="f-end" value="1" min="1" max="512" title="endereco">
+        <button id="add">Patchear</button>
+      </div>
+    </section>
+    <section style="border-bottom:0">
+      <h2>Cues — clique duplo dispara, Enter = GO</h2>
+      <div class="rolo">
+        <table><thead><tr><th>#<th>nome<th>fade<th>wait<th>follow<th>valores<th></tr></thead>
+        <tbody id="cues"></tbody></table>
+      </div>
+    </section>
+  </div>
+  <div class="col" style="border-right:0">
+    <h2 class="over" style="padding:5px 8px;background:var(--sc-panel);margin:0">Cenário — arraste para posicionar, clique para abrir os canais</h2>
+    <canvas id="cenario"></canvas>
+    <div id="canais"></div>
+  </div>
+</main>
+<div class="cli">spellcore serve --show shows/medgrupo.spell &nbsp;|&nbsp; o cenário mostra o DMX que está SAINDO, não o que foi pedido</div>
+<script src="teatro.js"></script>
+<script>TEATRO.mount(document);</script>
+</body>
+</html>

@@ -186,7 +186,7 @@ fn resumo(file: &str, sh: &show::Show) -> Value {
 }
 
 /// O player vivo neste processo, ou o erro que todo comando de transporte devolve sem ele.
-fn vivo() -> Result<player::Handle, String> {
+pub(crate) fn vivo() -> Result<player::Handle, String> {
     player::current().ok_or_else(|| "sem player em execucao".to_string())
 }
 

@@ -197,7 +197,8 @@ u, v}]}`; a ligação com o player espera a R2 (mídia), então o crate ainda ro
 - `Timeline::apply(&mut Universes, t)` sem alocação por frame; keys por `partition_point`.
   Curvas: linear, hold, in, out, inout, bezier — mesmas fórmulas do `timeline/model.py`.
 - Ordem fixa do frame: `Timeline::apply` → cada `FrameHook` na ordem de registro (tracks `fx`,
-  depois o Graph) → tracks `osc`/`media`/`cue` → `CueList::update` → I/O. Igual ao `_tick` do Python.
+  depois o Graph) → tracks `osc`/`media`/`cue` → `CueList::update` → programmer → I/O. Igual ao
+  `_tick` do Python.
 - `engine::hook`: `trait FrameHook { frame(t, &mut Universes); input(key, value); reset(t) }`,
   `enum Ev { Cmd, Osc, Widget, Param, Notify }`, `trait EventSink { emit(&Ev) }`. É por aqui que
   `script` se pluga sem o engine conhecer Rhai.

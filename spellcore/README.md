@@ -398,7 +398,9 @@ MCP, Rhai e laser.
 3. Tracks de efeito colateral: `osc` e `media` não-Capture (envia quando o valor muda), `cue`
    (`crossed(prev, t)` dispara `CueList::go`).
 4. `CueList::update(t)` escreve o snapshot corrente nos Universes.
-5. I/O: cada universo escrito vai para todas as saídas.
+5. O programmer (`player::Prog`): o override manual do operador, HTP por canal, por cima da
+   timeline **e** da cue viva — o operador sobrepõe o que a cue está segurando.
+6. I/O: cada universo escrito vai para todas as saídas.
 
 Igual ao `_tick` + `_side` do Python.
 
@@ -547,6 +549,7 @@ em `base()` por `edit::register`. Todo comando age no `OPEN`; sem show aberto, a
 | `show_patch(ops, rev?)` | JSON Patch (RFC 6902: `add`, `remove`, `replace`, `test`) sobre o show aberto; aplica numa cópia e só comita se todas passarem **e** o resultado ainda desserializar em `Show`; `rev` diferente da atual recusa (`"rev 3 != 5"`) | `{rev, undo}` |
 | `graph_get()` | o `graph` do show (seção 10 do PRD) | `{nodes, edges}` |
 | `face_get()` | `face` inline, ou `faces/<nome>.face.json` quando `face` é texto | a face ou `null` |
+| `profile_get(name)` | o perfil inteiro (canais com `offset`, `fine`, `ranges`, `wheel`) para o cliente montar widget | o JSON do perfil |
 
 Transporte, além dos da R0/R7: `resume()` continua o player pausado (a metade que faltava do
 `pause`; chama-se `resume` porque `play` é o subcomando da CLI e o registry já tem `play_show`)
@@ -554,9 +557,9 @@ e `input(key, value)` entrega o evento a `FrameHook::input` do player vivo — �
 widget, tecla e módulo alimentam o Graph.
 
 `profiles/` é a primeira que existir entre: ao lado do `.spell`, um nível acima dele (`shows/` e
-`profiles/` irmãos, como no repo e no pendrive), o cwd e a pasta do executável. O perfil só é
-lido para nome e footprint (`max(offset, fine) + 1`); nomes de canal, faixas e roda continuam no
-Python até o track `fixture` entrar no Rust. Teste: `engine/tests/edit.rs`, binário próprio
+`profiles/` irmãos, como no repo e no pendrive), o cwd e a pasta do executável. O perfil é lido
+para nome e footprint (`max(offset, fine) + 1`); `fixture_set` resolve o nome do canal no JSON
+cru do próprio perfil; faixas e roda só viajam cruas no `profile_get`. Teste: `engine/tests/edit.rs`, binário próprio
 porque `OPEN` é um por processo.
 
 `show_patch` é a via preferida de edição: o cliente manda a lista de ops e recebe `{rev, undo}`,
@@ -632,6 +635,24 @@ Página: `spellgui/web/laser.html` + `laser.js` (DAC, kpps, arquivo, play/stop, 
 `geo/*` e `limit/*`, botão shutter, stats por polling a 4 Hz). Teste: `spellcore/cli/tests/laser.rs`,
 binário próprio, sobe o `Emulator` Ether Dream do crate `laser` e conversa com o registry pelo
 servidor MCP em outro processo (a tabela `FEEDS` é uma por processo).
+
+### Programmer — a camada manual do operador (tema TEATRO DE PAPEL)
+
+`Prog`, em `player.rs`: um `Option<u8>` por canal (valor e máscara de "tocado" na mesma
+estrutura), aplicado **depois de `CueList::update` e antes do I/O**, HTP por canal: o
+operador sobrepõe a cue viva no mesmo canal. Soltar um canal zera o valor preso no buffer no
+frame seguinte, antes da timeline, para o que a timeline possui voltar a valer. O programmer não vai para o `.spell`: quem grava é a cue.
+
+| Comando | Faz | Devolve |
+|---|---|---|
+| `level_set(universe=1, address, values)` | escreve no override a partir de `address`; HTP sobre a timeline e a cue viva; lista vazia escreve zero | quantos canais |
+| `level_clear(universe?)` | solta um universo, ou todos | quantos canais saíram |
+| `level_get(universe?)` | o override atual, no formato `values` de cue | `{"u/end": v}` |
+| `cue_capture(name, fade, wait, follow)` | o override vira cue nova no fim da lista (mesma via de `cue_set`) e o override é solto | índice |
+| `fixture_set(name, channel, value)` | resolve fixture do patch + nome do canal no perfil e chama `level_set` | `{universe, address, value}` |
+
+Sem player vivo, os cinco devolvem `sem player em execucao`. Teste: `engine/tests/programmer.rs`,
+binário próprio (`CURRENT` e `OPEN` são globais do processo).
 
 ## `script` (crate novo)
 
