@@ -546,15 +546,8 @@ Medida de referência antes do Rhai (Windows x64, perfil release do workspace): 
 `time.delay|hold` · `cmd` · `out.widget|out.osc|out.param|out.notify` ·
 `state` · `module` (os dois últimos são proposta desta rodada, `design/DECISOES.md`).
 
-`state`: config `group` (padrão `"main"`) e `initial`, pinos `enter`/`exit` -> `active`; um ativo
-por grupo. `module`: config `module`, que nomeia `modules/<nome>.json` lido ao lado do show
-(`Graph::new_in(spec, sink, dir_do_show)`); uma entrada por `parameter` (mudou ->
-`Ev::Param{target:"<módulo>/<path>"}`, `norm` mapeia 0..1 antes do clamp em `min`..`max`), uma
-saída de nível por `value` (alimentada por `FrameHook::input("module:<módulo>/<path>", v)`) e uma
-entrada de trigger por `command` (-> `Ev::Cmd{name:"<módulo>/<cmd>"}`). Qualquer nó aceita
-`"mute": true` e `"state": "<id de um nó state>"`: o nó não emite (saídas em 0, nenhum evento,
-`time.delay` pendente cancelado) e volta a emitir ao entrar. As outras chaves desconhecidas
-(`x`, `y`, `group`, `label`) continuam ignoradas pelo runtime: posição é do editor.
+Semântica de `state`, `module` e `mute`: `design/DECISOES.md` (e o cabeçalho de
+`script/src/graph.rs`, que é a mesma tabela do runtime).
 
 JSON: `{"nodes":[{"id","type",...}], "edges":[["no.pino","no.pino"], ...]}`. Compila para lista
 de nós em ordem topológica com pinos indexados por inteiro; avaliação por frame sem alocação;

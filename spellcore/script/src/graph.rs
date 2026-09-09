@@ -47,7 +47,8 @@
 //! Chataigne. Trigger que ja' esteja alto no frame em que o estado abre dispara uma vez.
 //!
 //! `state` e' UM ativo por `group`: pulso em `enter` liga este e desliga os outros do mesmo
-//! grupo; pulso em `exit` desliga; `reset()` volta ao `initial`.
+//! grupo; pulso em `exit` desliga; `reset()` volta ao `initial`. No `state` calado tambem nao
+//! emite: o `active` dele sai 0, ainda que a maquina guarde o estado por dentro.
 // ponytail: o estado vale a partir do ponto em que o no `state` e' avaliado, entao um no gated
 // que venha ANTES dele na ordem topologica ve o valor do frame anterior ; virar pre-passe so' dos
 // nos `state` se algum show real depender do frame exato.
@@ -165,13 +166,12 @@ fn carrega_modulo(base: &Path, nome: &str) -> Result<Value, String> {
 }
 
 /// Chaves de um objeto do module.json, em ordem estavel (o layout dos pinos depende dela).
+/// `serde_json::Map` sem `preserve_order` e' um `BTreeMap`: `keys()` ja' sai ordenado.
 fn chaves(m: &Value, k: &str) -> Vec<String> {
-    let mut v: Vec<String> = match m.get(k).and_then(|x| x.as_object()) {
+    match m.get(k).and_then(|x| x.as_object()) {
         Some(o) => o.keys().cloned().collect(),
         None => Vec::new(),
-    };
-    v.sort();
-    v
+    }
 }
 
 /// Pinos deste no. Iguais aos do tipo, menos `module`, que os tira do arquivo.
@@ -198,6 +198,10 @@ fn txt(n: &Value, k: &str, pad: &str) -> String {
 
 fn f(n: &Value, k: &str, pad: f64) -> f64 {
     n.get(k).and_then(|v| v.as_f64()).unwrap_or(pad)
+}
+
+fn b(n: &Value, k: &str, pad: bool) -> bool {
+    n.get(k).and_then(|v| v.as_bool()).unwrap_or(pad)
 }
 
 /// Chave de evento que este no escuta ("widget:go", "key:Space", ...), se for no de evento.
@@ -250,7 +254,7 @@ fn monta(
             i1: f(n, "in_max", 1.0),
             o0: f(n, "out_min", 0.0),
             o1: f(n, "out_max", 1.0),
-            clamp: n.get("clamp").and_then(|v| v.as_bool()).unwrap_or(true),
+            clamp: b(n, "clamp", true),
         },
         "math.curve" => {
             let c = n
@@ -349,9 +353,8 @@ pub struct Graph {
     /// grupo (internado) de cada estado, e o `initial` a que `reset()` volta
     grupos: Vec<usize>,
     iniciais: Vec<bool>,
-    /// slot do pino `active` de cada estado, reescrito no fim do frame (uma exclusao de grupo
-    /// pode acontecer depois do no `state` ter sido avaliado)
-    est_slots: Vec<usize>,
+    /// por estado: slot do pino `active` e indice do no `state` em `nos`
+    est_slots: Vec<(usize, usize)>,
 }
 
 impl Graph {
@@ -401,7 +404,7 @@ impl Graph {
                 let g = *nomes_grupo.entry(g).or_insert(ng);
                 est_de_id.insert(id, grupos.len());
                 grupos.push(g);
-                declarados.push(no.get("initial").and_then(|v| v.as_bool()).unwrap_or(false));
+                declarados.push(b(no, "initial", false));
             }
             if tipo == "module" {
                 let nome = txt(no, "module", "");
@@ -413,17 +416,14 @@ impl Graph {
         let pinos_de: Vec<(Vec<String>, Vec<String>)> =
             (0..n).map(|i| pinos_no(tipos[i], mods.get(&i))).collect();
         // um ativo por grupo tambem na carga: o ultimo `initial` do grupo ganha
-        let mut estados = vec![false; grupos.len()];
-        for i in 0..estados.len() {
-            if declarados[i] {
-                (0..estados.len()).for_each(|j| {
-                    if grupos[j] == grupos[i] {
-                        estados[j] = false;
-                    }
-                });
-                estados[i] = true;
+        let mut venc: Vec<Option<usize>> = vec![None; nomes_grupo.len()];
+        for (i, &d) in declarados.iter().enumerate() {
+            if d {
+                venc[grupos[i]] = Some(i);
             }
         }
+        let mut estados = vec![false; grupos.len()];
+        venc.iter().flatten().for_each(|&i| estados[i] = true);
         let iniciais = estados.clone(); // ja' com a exclusao aplicada: e' onde `reset()` volta
                                         // `"state": "<id>"` de cada no, resolvido para o indice do estado
         let mut gated: Vec<Option<usize>> = Vec::with_capacity(n);
@@ -509,7 +509,7 @@ impl Graph {
         let mut base = 0usize;
         let mut bases = vec![0usize; n];
         let mut ev_slots = Vec::new();
-        let mut est_slots = vec![0usize; grupos.len()];
+        let mut est_slots = vec![(0usize, 0usize); grupos.len()];
         let mut por_chave: HashMap<String, Vec<usize>> = HashMap::new();
         for &i in &ordem {
             let (ins, outs) = &pinos_de[i];
@@ -528,7 +528,7 @@ impl Graph {
                 ev_slots.push(base + ins.len());
             }
             if let Some(&e) = est_de_id.get(id) {
-                est_slots[e] = base + ins.len();
+                est_slots[e] = (base + ins.len(), nos.len());
             }
             if tipos[i] == "module" {
                 // uma SAIDA de nivel por value, alimentada por `input("module:<mod>/<path>")`
@@ -544,10 +544,7 @@ impl Graph {
                 base,
                 nin: ins.len(),
                 nout: outs.len(),
-                mute: brutos[i]
-                    .get("mute")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false),
+                mute: b(&brutos[i], "mute", false),
                 estado: gated[i],
                 ins: Vec::new(),
             });
@@ -585,6 +582,20 @@ impl Graph {
         self.perdidos
     }
 
+    /// Reescreve o pino `active` de cada estado: a exclusao de grupo pode acontecer depois do no
+    /// `state` ter sido avaliado. No `state` calado (`mute`, ou ele proprio dentro de um estado
+    /// inativo) nao emite: o `active` dele fica no 0 que o gate escreveu, ainda que a maquina
+    /// continue guardando o estado por dentro.
+    fn ativos(&mut self) {
+        for i in 0..self.est_slots.len() {
+            let (s, k) = self.est_slots[i];
+            let no = &self.nos[k];
+            if no.mute || no.estado.is_some_and(|j| !self.estados[j]) {
+                continue;
+            }
+            self.vals[s] = b2f(self.estados[i]);
+        }
+    }
 }
 
 fn lig(v: f64) -> bool {
@@ -751,11 +762,7 @@ impl FrameHook for Graph {
                     self.vals[o] = b2f(s);
                     if s {
                         let e = Ev::Cmd { name: nome.clone(), args: args.clone() };
-                        if self.outq.len() < FILA {
-                            self.outq.push(e);
-                        } else {
-                            self.perdidos += 1;
-                        }
+                        emite(&mut self.outq, &mut self.perdidos, e);
                     }
                 }
                 Kind::SaiWidget { id, prop, hold, ate, aceso, p, ult } => {
@@ -780,11 +787,7 @@ impl FrameHook for Graph {
                             prop: prop.clone(),
                             value,
                         };
-                        if self.outq.len() < FILA {
-                            self.outq.push(e);
-                        } else {
-                            self.perdidos += 1;
-                        }
+                        emite(&mut self.outq, &mut self.perdidos, e);
                     }
                 }
                 Kind::SaiOsc { addr, ult } => {
@@ -792,11 +795,7 @@ impl FrameHook for Graph {
                     if v != *ult {
                         *ult = v;
                         let e = Ev::Osc { address: addr.clone(), args: vec![v] };
-                        if self.outq.len() < FILA {
-                            self.outq.push(e);
-                        } else {
-                            self.perdidos += 1;
-                        }
+                        emite(&mut self.outq, &mut self.perdidos, e);
                     }
                 }
                 Kind::SaiParam { alvo, ult } => {
@@ -804,21 +803,13 @@ impl FrameHook for Graph {
                     if v != *ult {
                         *ult = v;
                         let e = Ev::Param { target: alvo.clone(), value: v };
-                        if self.outq.len() < FILA {
-                            self.outq.push(e);
-                        } else {
-                            self.perdidos += 1;
-                        }
+                        emite(&mut self.outq, &mut self.perdidos, e);
                     }
                 }
                 Kind::SaiNotify { txt, p } => {
                     if subiu(self.vals[b], p) {
                         let e = Ev::Notify { text: txt.clone() };
-                        if self.outq.len() < FILA {
-                            self.outq.push(e);
-                        } else {
-                            self.perdidos += 1;
-                        }
+                        emite(&mut self.outq, &mut self.perdidos, e);
                     }
                 }
                 Kind::Estado { i, pe, px } => {
@@ -849,11 +840,7 @@ impl FrameHook for Graph {
                                 target: par.alvo.clone(),
                                 value: v,
                             };
-                            if self.outq.len() < FILA {
-                                self.outq.push(e);
-                            } else {
-                                self.perdidos += 1;
-                            }
+                            emite(&mut self.outq, &mut self.perdidos, e);
                         }
                     }
                     let np = params.len();
@@ -863,22 +850,15 @@ impl FrameHook for Graph {
                                 name: nome.clone(),
                                 args: Value::Object(Default::default()),
                             };
-                            if self.outq.len() < FILA {
-                                self.outq.push(e);
-                            } else {
-                                self.perdidos += 1;
-                            }
+                            emite(&mut self.outq, &mut self.perdidos, e);
                         }
                     }
                 }
             }
         }
 
-        // 3. o pino `active` guarda o estado do FIM do frame (a exclusao de grupo pode ter
-        //    acontecido depois do no `state` ter sido avaliado)
-        for (i, &s) in self.est_slots.iter().enumerate() {
-            self.vals[s] = b2f(self.estados[i]);
-        }
+        // 3. o pino `active` guarda o estado do FIM do frame
+        self.ativos();
 
         // 4. drena as saidas para o mundo
         for e in &self.outq {
@@ -904,52 +884,16 @@ impl FrameHook for Graph {
         self.inq.clear();
         self.outq.clear();
         self.estados.copy_from_slice(&self.iniciais);
-        for (i, &s) in self.est_slots.iter().enumerate() {
-            self.vals[s] = b2f(self.estados[i]);
-        }
+        self.ativos();
+        // reset = silenciar (bordas, delay pendente, saidas de nivel) mais o VALOR guardado,
+        // que o silencio preserva de proposito
         for no in self.nos.iter_mut() {
+            silencia(&mut no.kind);
             match &mut no.kind {
                 Kind::Timer { prox, .. } => *prox = t,
-                Kind::Latch { q } => *q = 0.0,
-                Kind::Toggle { q, p } => {
-                    *q = 0.0;
-                    *p = 0.0;
-                }
-                Kind::Debounce { ult, p, .. } => {
-                    *ult = f64::NEG_INFINITY;
-                    *p = 0.0;
-                }
-                Kind::Counter { n, p, pr, .. } => {
-                    *n = 0.0;
-                    *p = 0.0;
-                    *pr = 0.0;
-                }
-                Kind::Delay { n, ult, p, .. } => {
-                    *n = 0;
-                    *ult = 0.0;
-                    *p = 0.0;
-                }
-                Kind::Hold { ate, p, .. } => {
-                    *ate = f64::NEG_INFINITY;
-                    *p = 0.0;
-                }
-                Kind::Cmd { p, .. } => *p = 0.0,
-                Kind::SaiWidget { ate, aceso, p, ult, .. } => {
-                    *ate = 0.0;
-                    *aceso = false;
-                    *p = 0.0;
-                    *ult = f64::NAN;
-                }
-                Kind::SaiOsc { ult, .. } | Kind::SaiParam { ult, .. } => *ult = f64::NAN,
-                Kind::SaiNotify { p, .. } => *p = 0.0,
-                Kind::Estado { pe, px, .. } => {
-                    *pe = 0.0;
-                    *px = 0.0;
-                }
-                Kind::Modulo { params, cmds } => {
-                    params.iter_mut().for_each(|p| p.ult = f64::NAN);
-                    cmds.iter_mut().for_each(|c| c.1 = 0.0);
-                }
+                Kind::Latch { q } | Kind::Toggle { q, .. } => *q = 0.0,
+                Kind::Debounce { ult, .. } => *ult = f64::NEG_INFINITY,
+                Kind::Counter { n, .. } => *n = 0.0,
                 _ => {}
             }
         }
@@ -994,6 +938,15 @@ fn silencia(k: &mut Kind) {
             cmds.iter_mut().for_each(|c| c.1 = 0.0);
         }
         _ => {}
+    }
+}
+
+/// Enfileira um evento de saida. Fila cheia nao cresce: conta em `perdidos`.
+fn emite(outq: &mut Vec<Ev>, perdidos: &mut u64, e: Ev) {
+    if outq.len() < FILA {
+        outq.push(e);
+    } else {
+        *perdidos += 1;
     }
 }
 
@@ -1289,6 +1242,35 @@ mod tests {
         g.frame(0.1, &mut u);
         assert!(s.0.lock().unwrap().is_empty(), "no mutado nao emite");
         assert_eq!(saida(&g, "c"), 0.0, "e a saida dele fica em 0");
+    }
+
+    #[test]
+    fn state_calado_nao_reescreve_o_active() {
+        // "sm" tem mute; "sg" esta' dentro de "s0", que nunca liga. Nenhum dos dois pode sair 1,
+        // nem pela fase que reescreve o `active` no fim do frame.
+        let (mut g, s) = monta_graph(
+            r#"{"nodes":[{"id":"e","type":"in.widget","widget":"e"},
+                         {"id":"go","type":"in.widget","widget":"go"},
+                         {"id":"s0","type":"state","group":"g0"},
+                         {"id":"sm","type":"state","group":"gm","initial":true,"mute":true},
+                         {"id":"sg","type":"state","group":"gg","initial":true,"state":"s0"},
+                         {"id":"c","type":"cmd","cmd":"cue_go","state":"sm"}],
+                "edges":[["e.press","sm.enter"],["go.press","c.trigger"]]}"#,
+        );
+        let mut u = Universes::new();
+        g.frame(0.0, &mut u);
+        assert_eq!(saida(&g, "sm"), 0.0, "state mutado sai 0 mesmo com initial");
+        assert_eq!(saida(&g, "sg"), 0.0, "state dentro de estado inativo sai 0");
+        g.input("widget:e", 1.0);
+        g.frame(0.1, &mut u);
+        assert_eq!(saida(&g, "sm"), 0.0, "o enter tambem nao passa pelo mute");
+        // o mute cala o pino, nao a maquina: "sm" segue ativo por dentro e libera "c"
+        s.0.lock().unwrap().clear();
+        g.input("widget:go", 1.0);
+        g.frame(0.2, &mut u);
+        assert_eq!(s.0.lock().unwrap().len(), 1, "o gate por sm continua valendo");
+        g.reset(0.0);
+        assert_eq!(saida(&g, "sm"), 0.0, "e o reset nao acende o pino calado");
     }
 
     #[test]
