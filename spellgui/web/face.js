@@ -48,6 +48,9 @@ function el(tag, cls, txt) {
 
 /// Prop vinda do `out.widget` e' o nome da classe; a pagina decide o que cada uma pinta.
 Face.applyProp = function (node, prop, value) {
+  // `prop` vem da rede: `classList.toggle` LANCA com nome vazio ou com espaco, e o evento
+  // que chega dentro do `emit` derrubaria os assinantes seguintes.
+  if (!/^[\w-]+$/.test(prop)) return;
   node.classList.toggle(prop, +value !== 0);
 };
 

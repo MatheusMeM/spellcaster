@@ -15,26 +15,29 @@
 // ponytail: offline nao simula o engine, so' deixa a pagina montar e mostrar o que faria
 // ; apagar quando o `serve` for a unica forma de abrir a GUI.
 
-const DEV = "dev/commands.json";
-const SHOW = "../../shows/medgrupo.spell";
-
 function Bus(opts) {
   this.subs = {};                       // topico -> [fn]
   this.pend = new Map();                // id -> {ok, err}
   this.seq = 0;
   this.offline = !!(opts && opts.offline);
   this.ws = null;
+  this.rev = 0;                         // maior revisao do show ja' vista numa resposta
 }
+
+// As paginas vivem em /spellgui/web/: caminho relativo nao acha /commands nem /show.
+Bus.DEV = "/spellgui/web/dev/commands.json";
+Bus.SHOW = "/shows/medgrupo.spell";
 
 // ---- parse: a unica funcao com regra, e a unica testada sem DOM ----------
 // Devolve {id, result} | {id, error} | {event, data} | null (mensagem que nao e' do contrato).
 Bus.parse = function (m) {
   if (typeof m !== "string") {
     const b = m instanceof Uint8Array ? m : new Uint8Array(m);
-    if (b.length < 3) return null;
+    // topic 1 = dmx de saida, 515 bytes; qualquer outro topico ainda nao tem consumidor
+    if (b.length < 515 || b[0] !== 1) return null;
     return {
       event: "dmx",
-      data: { topic: b[0], universe: b[1] | (b[2] << 8), data: b.subarray(3) },
+      data: { topic: b[0], universe: b[1] | (b[2] << 8), data: b.subarray(3, 515) },
     };
   }
   let v;
@@ -45,7 +48,10 @@ Bus.parse = function (m) {
   }
   if (!v || typeof v !== "object") return null;
   if (typeof v.id === "number") {
-    return v.error != null ? { id: v.id, error: String(v.error) } : { id: v.id, result: v.result };
+    const r = typeof v.rev === "number" ? v.rev : undefined;
+    return v.error != null
+      ? { id: v.id, error: String(v.error), rev: r }
+      : { id: v.id, result: v.result, rev: r };
   }
   if (typeof v.event === "string") return { event: v.event, data: v.data };
   return null;
@@ -64,6 +70,7 @@ Bus.prototype.emit = function (topic, data) {
 Bus.prototype.recv = function (m) {
   const p = Bus.parse(m);
   if (!p) return;
+  if (typeof p.rev === "number") this.rev = Math.max(this.rev, p.rev);
   if (p.event) return this.emit(p.event, p.data);
   const w = this.pend.get(p.id);
   if (!w) return;
@@ -111,11 +118,11 @@ Bus.prototype.input = function (key, value) {
 };
 
 Bus.prototype.commands = function () {
-  return fetch(this.offline ? DEV : "commands").then(r => r.json());
+  return fetch(this.offline ? Bus.DEV : "/commands").then(r => r.json());
 };
 
 Bus.prototype.showGet = function () {
-  return fetch(this.offline ? SHOW : "show").then(r => r.json());
+  return fetch(this.offline ? Bus.SHOW : "/show").then(r => r.json());
 };
 
 /// Offline nao tem engine: a chamada vira eco, para a pagina montar e o log mostrar o que faria.

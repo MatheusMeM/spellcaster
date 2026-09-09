@@ -7,17 +7,43 @@ const assert = require("node:assert");
 const Bus = require("../bus.js");
 
 test("parse: resposta com result", () => {
-  const p = Bus.parse('{"id":7,"result":{"t":12.5}}');
-  assert.deepStrictEqual(p, { id: 7, result: { t: 12.5 } });
+  const p = Bus.parse('{"id":7,"result":{"t":12.5},"rev":3}');
+  assert.deepStrictEqual(p, { id: 7, result: { t: 12.5 }, rev: 3 });
+  // resposta sem `rev` (barramento velho) nao inventa numero
+  assert.deepStrictEqual(Bus.parse('{"id":7,"result":1}'), { id: 7, result: 1, rev: undefined });
 });
 
 test("parse: resposta com erro", () => {
-  assert.deepStrictEqual(Bus.parse('{"id":7,"error":"sem player em execucao"}'), {
+  assert.deepStrictEqual(Bus.parse('{"id":7,"error":"sem player em execucao","rev":9}'), {
     id: 7,
     error: "sem player em execucao",
+    rev: 9,
   });
   // result null com erro ausente continua sendo resultado
-  assert.deepStrictEqual(Bus.parse('{"id":1,"result":null}'), { id: 1, result: null });
+  assert.deepStrictEqual(Bus.parse('{"id":1,"result":null,"rev":0}'), {
+    id: 1,
+    result: null,
+    rev: 0,
+  });
+});
+
+test("rev: o bus guarda o maior visto e nunca anda para tras", () => {
+  const b = new Bus({ offline: true });
+  b.recv('{"id":1,"result":1,"rev":4}');
+  assert.strictEqual(b.rev, 4);
+  b.recv('{"id":2,"result":1,"rev":2}');
+  assert.strictEqual(b.rev, 4);
+  b.recv('{"id":3,"result":1,"rev":7}');
+  assert.strictEqual(b.rev, 7);
+});
+
+test("parse binario: so' topic 1 com 515 bytes", () => {
+  const curto = new Uint8Array(300);
+  curto[0] = 1;
+  assert.strictEqual(Bus.parse(curto), null);
+  const outro = new Uint8Array(515);
+  outro[0] = 2;
+  assert.strictEqual(Bus.parse(outro), null);
 });
 
 test("parse: evento", () => {

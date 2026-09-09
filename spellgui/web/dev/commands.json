@@ -39,6 +39,16 @@
     }
   },
   {
+    "doc": "Continua o player pausado neste processo.",
+    "name": "resume",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "description": "Comando sem parametro.",
+      "title": "NoArgs",
+      "type": "object"
+    }
+  },
+  {
     "doc": "Pausa o player em execucao neste processo.",
     "name": "pause",
     "params": {
@@ -109,6 +119,30 @@
     }
   },
   {
+    "doc": "Entrega um evento de entrada aos ganchos do player vivo (o Graph): key + value.",
+    "name": "input",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "key": {
+          "description": "Chave do evento: \"widget:go\", \"key:Space\", \"osc:/spell/go\", \"module:laser/stat/fps\".",
+          "type": "string"
+        },
+        "value": {
+          "default": 0.0,
+          "description": "Valor do evento; trigger manda 1.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "title": "InputArgs",
+      "type": "object"
+    }
+  },
+  {
     "doc": "Zera o show aberto: novo show, sACN no universo 1, 60 s. Devolve o show inteiro.",
     "name": "show_new",
     "params": {
@@ -119,7 +153,7 @@
     }
   },
   {
-    "doc": "Substitui o show aberto pelo JSON dado. Devolve o show inteiro.",
+    "doc": "Substitui o show aberto pelo JSON dado (para IMPORTAR um show inteiro; para editar, prefira show_patch). Devolve o show inteiro.",
     "name": "show_set",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -406,6 +440,299 @@
     }
   },
   {
+    "doc": "Edita o show aberto por JSON Patch (RFC 6902: add, remove, replace, test). Uma op que falha cancela todas. Devolve {rev, undo}: `undo` e' a lista de ops que volta ao estado anterior, ja' na ordem de aplicacao.",
+    "name": "show_patch",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "definitions": {
+        "PatchOp": {
+          "properties": {
+            "op": {
+              "description": "add | remove | replace | test.",
+              "type": "string"
+            },
+            "path": {
+              "description": "JSON Pointer (RFC 6901) dentro do show: \"/fps\", \"/tracks/-\", \"/tracks/0/keys/2\", \"/graph/nodes\". O documento inteiro (\"\") nao e' alvo: para isso ha' show_set.",
+              "type": "string"
+            },
+            "value": {
+              "default": null,
+              "description": "Valor de add, replace e test; `remove` nao usa. Ausente nos tres primeiros = erro."
+            }
+          },
+          "required": [
+            "op",
+            "path"
+          ],
+          "type": "object"
+        }
+      },
+      "properties": {
+        "ops": {
+          "description": "As operacoes, em ordem; a primeira que falhar cancela todas.",
+          "items": {
+            "$ref": "#/definitions/PatchOp"
+          },
+          "type": "array"
+        },
+        "rev": {
+          "default": null,
+          "description": "A revisao que o cliente tinha; diferente da atual = recusa (\"rev 3 != 5\").",
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "ops"
+      ],
+      "title": "ShowPatchArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "O graph do show aberto (secao 10 do PRD: nodes e edges); vazio quando o show nao tem graph.",
+    "name": "graph_get",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "description": "Comando sem parametro.",
+      "title": "NoArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "A face do show aberto: o objeto inline de `face`, ou faces/<nome>.face.json quando `face` e' texto. null quando o show nao tem face.",
+    "name": "face_get",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "description": "Comando sem parametro.",
+      "title": "NoArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "O perfil inteiro (nome, canais com offset, ranges e wheel) para o cliente montar os widgets.",
+    "name": "profile_get",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "name": {
+          "description": "Perfil em profiles/ (sem .json) ou caminho de um .json.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ProfileGetArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Programmer: escreve valores no override manual, por cima da timeline (HTP). Exige player em execucao.",
+    "name": "level_set",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "address": {
+          "description": "Primeiro canal DMX (1..512).",
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "universe": {
+          "default": 1,
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "values": {
+          "default": [],
+          "description": "Valores 0..255 a partir de `address`; lista vazia escreve zero no canal.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "address"
+      ],
+      "title": "LevelSetArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Solta o override do programmer (um universo, ou todos sem universe). Devolve quantos canais sairam.",
+    "name": "level_clear",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "universe": {
+          "default": null,
+          "description": "Universo; ausente = todos.",
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "title": "LevelArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Override do programmer como {\"universo/endereco\": valor}.",
+    "name": "level_get",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "universe": {
+          "default": null,
+          "description": "Universo; ausente = todos.",
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "title": "LevelArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Grava o override do programmer como uma cue nova no fim da lista e solta o override. Devolve o indice.",
+    "name": "cue_capture",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "fade": {
+          "default": 0.0,
+          "format": "double",
+          "type": "number"
+        },
+        "follow": {
+          "default": false,
+          "type": "boolean"
+        },
+        "name": {
+          "default": "",
+          "type": "string"
+        },
+        "wait": {
+          "default": 0.0,
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "title": "CueCaptureArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Escreve num canal de uma fixture do patch pelo nome do canal no perfil (via level_set).",
+    "name": "fixture_set",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "channel": {
+          "description": "Nome do canal no perfil (\"dim\", \"r\"); numero nao resolve.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Nome da fixture no patch.",
+          "type": "string"
+        },
+        "value": {
+          "description": "0..255.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "channel",
+        "name",
+        "value"
+      ],
+      "title": "FixtureSetArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Carrega um module.json (file=) ou o manifesto (data=), valida e poe na tabela de modulos vivos; mesmo nome substitui. Devolve nome e versao.",
+    "name": "module_add",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "data": {
+          "default": null,
+          "description": "O manifesto inteiro, quando nao vem de arquivo."
+        },
+        "file": {
+          "default": "",
+          "description": "Nome em modules/ (sem .json) ou caminho de um .json.",
+          "type": "string"
+        }
+      },
+      "title": "ModuleArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Tira o modulo da tabela pelo nome. Devolve o manifesto removido.",
+    "name": "module_del",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "name": {
+          "description": "Nome do modulo (o campo `name` do manifesto).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "NameArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Modulos vivos: nome, tipo e versao.",
+    "name": "module_list",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "description": "Comando sem parametro.",
+      "title": "NoArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Manifesto inteiro do modulo carregado (parameters, values, commands).",
+    "name": "module_get",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "name": {
+          "description": "Nome do modulo (o campo `name` do manifesto).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "NameArgs",
+      "type": "object"
+    }
+  },
+  {
     "doc": "Toca um show .spell ate o fim ou Ctrl+C.",
     "name": "play_show",
     "params": {
@@ -457,6 +784,208 @@
         }
       },
       "title": "NetArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Compila o graph do show aberto sem rodar. Devolve {nodes, error}.",
+    "name": "graph_check",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "description": "Comando sem parametro.",
+      "title": "NoArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Procura DACs de laser: Ether Dream por beacon e IDN por scan.",
+    "name": "laser_dacs",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "timeout": {
+          "default": 2.0,
+          "description": "Segundos de escuta por protocolo.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "title": "DacsArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Abre um DAC de laser e devolve o id do feed. A safety e' obrigatoria e nunca desliga.",
+    "name": "laser_open",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "dac": {
+          "description": "etherdream, helios ou idn.",
+          "type": "string"
+        },
+        "host": {
+          "default": "",
+          "description": "Ether Dream e IDN: \"ip\" ou \"ip:porta\" (o `host` de `laser_dacs`). Helios: indice USB.",
+          "type": "string"
+        },
+        "kpps": {
+          "default": 30.0,
+          "description": "Milhares de pontos por segundo entregues ao DAC.",
+          "format": "double",
+          "type": "number"
+        },
+        "safety": {
+          "default": null,
+          "description": "Safety do feed: {\"min_size\": 2000, \"max_intensity\": 255, \"zone\": [x0,y0,x1,y1]} em unidades ILDA. Ausente = o padrao. Nunca desligavel."
+        }
+      },
+      "required": [
+        "dac"
+      ],
+      "title": "OpenArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Toca um .ild no feed: le os frames e empurra a fps (o .ild nao carrega taxa).",
+    "name": "laser_play",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "feed": {
+          "description": "Id devolvido por `laser_open`.",
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "file": {
+          "description": "Caminho do .ild.",
+          "type": "string"
+        },
+        "fps": {
+          "default": 30.0,
+          "description": "Frames por segundo empurrados ao DAC (o .ild nao carrega taxa).",
+          "format": "double",
+          "type": "number"
+        },
+        "loop": {
+          "default": false,
+          "description": "Recomeca do primeiro frame ao chegar no fim.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "feed",
+        "file"
+      ],
+      "title": "LaserPlayArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Para o playback do feed; o DAC continua aberto.",
+    "name": "laser_stop",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "feed": {
+          "description": "Id devolvido por `laser_open`.",
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "feed"
+      ],
+      "title": "FeedArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Para e fecha o feed (apaga o DAC).",
+    "name": "laser_close",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "feed": {
+          "description": "Id devolvido por `laser_open`.",
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "feed"
+      ],
+      "title": "FeedArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Ajusta um parametro do feed: geo/x geo/y geo/scale geo/rot limit/r limit/g limit/b safe/min_size safe/max_intensity shutter.",
+    "name": "laser_param",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "feed": {
+          "description": "Id devolvido por `laser_open`.",
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "path": {
+          "description": "geo/x, geo/y, geo/scale, geo/rot, limit/r, limit/g, limit/b, safe/min_size, safe/max_intensity, shutter.",
+          "type": "string"
+        },
+        "value": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "feed",
+        "path",
+        "value"
+      ],
+      "title": "ParamArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Estado do feed: playing, arquivo, stat/sent, stat/dropped, stat/errors, jitter e cpu.",
+    "name": "laser_stats",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "feed": {
+          "description": "Id devolvido por `laser_open`.",
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "feed"
+      ],
+      "title": "FeedArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Lista os .ild de um diretorio (vazio = shows/).",
+    "name": "laser_files",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "dir": {
+          "default": "",
+          "description": "Diretorio a listar; vazio = `shows/`.",
+          "type": "string"
+        }
+      },
+      "title": "FilesArgs",
       "type": "object"
     }
   }

@@ -56,3 +56,12 @@ test("quatro.face.json: os quatro botoes do show-alvo cabem na grade", () => {
     assert.ok(c + dc <= cols && r + dr <= rows, w.id + " sai da grade");
   }
 });
+
+test("applyProp: nome de classe invalido da rede nao lanca", () => {
+  const cls = [];
+  const node = { classList: { toggle: (c, on) => { if (!/^[\w-]+$/.test(c)) throw new Error("bad"); cls.push([c, on]); } } };
+  Face.applyProp(node, "glow", 1);
+  Face.applyProp(node, "", 1);
+  Face.applyProp(node, "a b", 1);
+  assert.deepStrictEqual(cls, [["glow", true]]);
+});

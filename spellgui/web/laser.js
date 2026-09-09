@@ -1,38 +1,13 @@
 "use strict";
 // Pagina do ILDA player. Cliente do registry, nunca dona de logica: cada controle e' um
 // comando `laser_*` e o rotulo na tela e' o nome do comando (regra 2 de design/FUNCOES).
-//
-// ponytail: cliente WS de 30 linhas aqui dentro ; troca por `bus.js` (frente face) quando ele
-// estiver em main — a assinatura `call(cmd, args)` ja' e' a mesma.
 
 const q = id => document.getElementById(id);
 const msg = q("msg");
 
-const Bus = {
-  ws: null, id: 0, waits: new Map(),
-  connect() {
-    const u = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws";
-    this.ws = new WebSocket(u);
-    this.ws.binaryType = "arraybuffer";
-    this.ws.onmessage = e => {
-      if (typeof e.data !== "string") return;              // frame de monitor: a pagina nao usa
-      const m = JSON.parse(e.data);
-      const w = this.waits.get(m.id);
-      if (!w) return;
-      this.waits.delete(m.id);
-      m.error === undefined ? w.ok(m.result) : w.no(new Error(m.error));
-    };
-    this.ws.onclose = () => { msg.textContent = "sem servidor (spellcore serve)"; };
-    this.ws.onerror = () => { msg.textContent = "sem servidor (spellcore serve)"; };
-  },
-  call(cmd, args) {
-    if (!this.ws || this.ws.readyState !== 1) return Promise.reject(new Error("sem servidor"));
-    const id = ++this.id;
-    this.ws.send(JSON.stringify({ id, cmd, args: args || {} }));
-    return new Promise((ok, no) => this.waits.set(id, { ok, no }));
-  },
-};
-Bus.connect();
+// `bus.js` e' o cliente do barramento de todas as paginas: aqui so' sobra a ligacao dos eventos.
+const bus = new Bus({}).connect();
+bus.on("close", () => { msg.textContent = "sem servidor (spellcore serve)"; });
 
 // ------------------------------------------------------------------ estado local
 
@@ -41,7 +16,7 @@ let tocando = false;
 let obturado = false;
 
 const erro = e => { msg.textContent = e.message || String(e); };
-const call = (cmd, args) => Bus.call(cmd, args).catch(e => { erro(e); throw e; });
+const call = (cmd, args) => bus.call(cmd, args).catch(e => { erro(e); throw e; });
 
 function botoes() {
   q("close").disabled = q("play").disabled = q("shutter").disabled = feed === null;
@@ -122,7 +97,7 @@ for (const el of document.querySelectorAll("input[type=range]")) el.oninput = ()
 
 setInterval(() => {
   if (feed === null) return;
-  Bus.call("laser_stats", { feed }).then(s => {
+  bus.call("laser_stats", { feed }).then(s => {
     tocando = !!s.playing;
     obturado = !!s.shutter;
     botoes();
