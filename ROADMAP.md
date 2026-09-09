@@ -184,6 +184,7 @@ CI, sem tocar no que já está conforme):
 | Frente | Entrega | Aceite | Depende de |
 |---|---|---|---|
 | Design | rodada 7 (FÓSFORO, PATCHBAY) | voto do dono | voto das rodadas 5 e 6 |
+| patchbay | editor do graph em `spellgui/web` (`catalog.js`, `graph.js`, `patchbay.html`), edição por `show_patch` com undo | abrir `shows/patchbay_demo.spell`, criar nó, cabear, agrupar, desfazer | `serve` (barramento) e `show_patch`/`graph_check` para sair do modo offline |
 
 Bloqueadas até instalar SDK (decisão do dono, não de agente): R2 (GStreamer + NDI SDK),
 R6 (Godot 4). R9 espera R5.

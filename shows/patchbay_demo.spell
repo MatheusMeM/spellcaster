@@ -1,0 +1,36 @@
+{
+ "name": "PATCHBAY - demo do editor de graph",
+ "fps": 30,
+ "duration": 60,
+ "version": 1,
+ "outputs": [
+  {
+   "type": "sacn",
+   "universes": [1],
+   "priority": 100,
+   "source_name": "Spellcaster"
+  }
+ ],
+ "tracks": [],
+ "cues": [
+  { "name": "abertura", "fade": 2, "values": { "1/1": 255 } }
+ ],
+ "graph": {
+  "nodes": [
+   { "id": "space", "type": "in.key", "key": "Space", "x": 40, "y": 60 },
+   { "id": "toggle", "type": "logic.toggle", "x": 280, "y": 60 },
+   { "id": "go", "type": "cmd", "cmd": "cue_go", "args": {}, "x": 520, "y": 60 },
+   { "id": "black", "type": "in.osc", "address": "/spell/blackout", "x": 40, "y": 280,
+     "group": "seguranca" },
+   { "id": "hold", "type": "time.hold", "ms": 500, "x": 280, "y": 280, "group": "seguranca" },
+   { "id": "param", "type": "out.param", "target": "laser/limit/r", "x": 520, "y": 280,
+     "group": "seguranca" }
+  ],
+  "edges": [
+   ["space.down", "toggle.in"],
+   ["toggle.out", "go.trigger"],
+   ["space.down", "hold.in"],
+   ["black.out", "param.in"]
+  ]
+ }
+}

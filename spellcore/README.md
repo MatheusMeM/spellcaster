@@ -549,6 +549,19 @@ fila `in.*` pré-alocada (`FrameHook::input`); saídas saem por fila `out.*` pr�
 para o `EventSink` no fim do frame. Aceite: 500 nós em menos de 0,1 ms por frame
 (`bench/benches/graph.rs`).
 
+#### PATCHBAY — o editor do graph (`spellgui/web/patchbay.html`)
+
+O mesmo catálogo, como dado, em `spellgui/web/catalog.js`: config e pinos de cada tipo, mais o
+**tipo de porta** (`trigger, bool, number, color, xy, frame, dmx`), que é regra do editor — o
+runtime carrega tudo como `f64`. Cabo só liga tipos compatíveis (`trigger` e `bool` são o mesmo
+fio); conversão é nó visível (`math.map`, `logic.toggle`), nunca coerção escondida. Um
+`module.json` (frente `module`) vira nó por `CATALOG.moduleDef`. `spellgui/web/graph.js` tem o
+modelo puro (`GM`: JSON Patch com inverso, ops de nó/cabo/chave, `Shift+Delete` religando, grupo
+fechado) e a página. Toda edição sai como `show_patch {ops}` em `/graph/...` e a resposta `undo`
+empilha; sem engine a mesma lista roda local. `x`, `y`, `group`, `mute`, `lock`, `label` moram no
+nó (o runtime ignora chaves desconhecidas). Demonstração: `shows/patchbay_demo.spell`.
+Testes: `node --test spellgui/web/test/graph.test.js`.
+
 ## CLI
 
 ```
