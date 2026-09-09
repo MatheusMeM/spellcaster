@@ -105,7 +105,6 @@ fn handshake_tools_e_resources() {
         "patch_check",
         "show_patch",
         "graph_get",
-        "graph_set",
         "graph_check",
         "face_get",
         "play_show",
@@ -172,12 +171,17 @@ fn handshake_tools_e_resources() {
     let g: Value = serde_json::from_str(g["contents"][0]["text"].as_str().unwrap()).unwrap();
     assert_eq!(g, json!({"nodes": [], "edges": []}));
 
-    // graph_set + resource: o que a IA grava e' o que o resource devolve
+    // show_patch em /graph + resource: o que a IA grava e' o que o resource devolve
     let g = json!({"nodes": [{"id": "k", "type": "in.key", "key": "Space"},
                              {"id": "t", "type": "logic.toggle"},
                              {"id": "c", "type": "cmd", "cmd": "cue_go"}],
                    "edges": [["k.down", "t.in"], ["t.out", "c.trigger"]]});
-    let r = m.call(9, "tools/call", json!({"name": "graph_set", "arguments": {"graph": g}}));
+    let r = m.call(
+        9,
+        "tools/call",
+        json!({"name": "show_patch",
+               "arguments": {"ops": [{"op": "add", "path": "/graph", "value": g}]}}),
+    );
     assert_eq!(r["isError"], json!(false));
     let lido = m.call(10, "resources/read", json!({"uri": "spell://graph"}));
     let lido: Value = serde_json::from_str(lido["contents"][0]["text"].as_str().unwrap()).unwrap();
@@ -193,14 +197,20 @@ fn handshake_tools_e_resources() {
     let ciclo = json!({"nodes": [{"id": "a", "type": "logic.not"},
                                  {"id": "b", "type": "logic.not"}],
                        "edges": [["a.out", "b.in"], ["b.out", "a.in"]]});
-    let r = m.call(12, "tools/call", json!({"name": "graph_check", "arguments": {"graph": ciclo}}));
+    m.call(
+        12,
+        "tools/call",
+        json!({"name": "show_patch",
+               "arguments": {"ops": [{"op": "replace", "path": "/graph", "value": ciclo}]}}),
+    );
+    let r = m.call(13, "tools/call", json!({"name": "graph_check", "arguments": {}}));
     let c: Value = serde_json::from_str(&texto(&r)).expect("graph_check devolve JSON");
     let e = c["error"].as_str().unwrap_or("");
     assert!(e.contains("ciclo") && e.contains('a') && e.contains('b'), "{}", e);
 
     // show_patch: edita e devolve as ops de undo
     let r = m.call(
-        13,
+        14,
         "tools/call",
         json!({"name": "show_patch",
                "arguments": {"ops": [{"op": "replace", "path": "/fps", "value": 25}]}}),

@@ -168,10 +168,6 @@ pub fn recurso_dir(spell: &str, nome: &str) -> PathBuf {
         .unwrap_or_else(|| PathBuf::from(nome))
 }
 
-pub fn profiles_dir(spell: &str) -> PathBuf {
-    recurso_dir(spell, "profiles")
-}
-
 /// Uma linha da grade por fixture; para no primeiro erro (perfil ausente, fora de 512,
 /// sobreposicao — o bug dos 17 ch em espacamento de 16 acusa aqui).
 fn checar(sh: &Show, dir: &Path) -> (Vec<Value>, Option<String>) {
@@ -302,8 +298,6 @@ fn remove(doc: &mut Value, path: &str) -> Result<Value, String> {
 }
 
 /// Uma operacao; devolve a operacao que a desfaz (`test` nao desfaz nada).
-// ponytail: o inverso de `move` supoe que ninguem mexeu no meio ; a pilha de undo e' do cliente,
-// que so' desfaz a propria ultima edicao — trocar por snapshot do show se undo virar colaborativo.
 fn operar(doc: &mut Value, o: &PatchOp) -> Result<Option<Value>, String> {
     Ok(Some(match o.op.as_str() {
         "add" => match add(doc, &o.path, o.value.clone())? {
@@ -321,11 +315,6 @@ fn operar(doc: &mut Value, o: &PatchOp) -> Result<Option<Value>, String> {
             let v = std::mem::replace(alvo, o.value.clone());
             json!({"op": "replace", "path": o.path, "value": v})
         }
-        "move" => {
-            let v = remove(doc, &o.from)?;
-            let (p, _) = add(doc, &o.path, v)?;
-            json!({"op": "move", "from": p, "path": o.from})
-        }
         "test" => {
             let v = doc
                 .pointer(&o.path)
@@ -335,7 +324,7 @@ fn operar(doc: &mut Value, o: &PatchOp) -> Result<Option<Value>, String> {
             }
             return Ok(None);
         }
-        x => return Err(format!("op {:?}: use add, remove, replace, move ou test", x)),
+        x => return Err(format!("op {:?}: use add, remove, replace ou test", x)),
     }))
 }
 
@@ -383,11 +372,7 @@ fn face() -> Result<Value, String> {
     match f {
         None | Some(Value::Null) => Ok(Value::Null),
         Some(Value::String(n)) => {
-            let p = if Path::new(&n).extension().is_some() {
-                PathBuf::from(&n)
-            } else {
-                recurso_dir(&spell, "faces").join(format!("{}.face.json", n))
-            };
+            let p = recurso_dir(&spell, "faces").join(format!("{}.face.json", n));
             let t = std::fs::read_to_string(&p)
                 .map_err(|e| format!("face {:?}: {} ({})", n, e, p.display()))?;
             serde_json::from_str(&t).map_err(|e| format!("{}: {}", p.display(), e))
@@ -510,7 +495,7 @@ pub struct PatchDelArgs {
 
 #[derive(Deserialize, JsonSchema)]
 pub struct PatchOp {
-    /// add | remove | replace | move | test.
+    /// add | remove | replace | test.
     pub op: String,
     /// JSON Pointer (RFC 6901) dentro do show: "/fps", "/tracks/-", "/tracks/0/keys/2",
     /// "/graph/nodes". O documento inteiro ("") nao e' alvo: para isso ha' show_set.
@@ -518,9 +503,6 @@ pub struct PatchOp {
     /// Valor de add, replace e test.
     #[serde(default)]
     pub value: Value,
-    /// Origem do move.
-    #[serde(default)]
-    pub from: String,
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -530,12 +512,6 @@ pub struct ShowPatchArgs {
     /// A revisao que o cliente tinha; diferente da atual = recusa ("rev 3 != 5").
     #[serde(default)]
     pub rev: Option<u64>,
-}
-
-#[derive(Deserialize, JsonSchema)]
-pub struct GraphSetArgs {
-    /// `{"nodes": [...], "edges": [["no.pino", "no.pino"]]}` (secao 10 do PRD).
-    pub graph: Value,
 }
 
 // ------------------------------------------------------------------ comandos
@@ -692,7 +668,7 @@ pub fn register(r: &mut Registry) {
         "Patcheia uma fixture (perfil, universo, endereco); recusa sobreposicao e estouro de 512. Devolve a grade do patch.",
         |a| {
             com(|p, sh| {
-                let dir = profiles_dir(p);
+                let dir = recurso_dir(p, "profiles");
                 lista(sh, "patch").push(json!({"name": a.name, "profile": a.profile,
                                                "universe": a.universe, "address": a.address}));
                 match checar(sh, &dir) {
@@ -723,13 +699,13 @@ pub fn register(r: &mut Registry) {
         "Grade do patch do show aberto (nome, perfil, universo, endereco, canais) e o erro de sobreposicao, se houver.",
         |_| {
             com_ro(|p, sh| {
-                let (rows, error) = checar(sh, &profiles_dir(p));
+                let (rows, error) = checar(sh, &recurso_dir(p, "profiles"));
                 Ok(json!({"rows": rows, "error": error}))
             })
         },
     );
     r.add::<NoArgs>("profiles", "Nomes dos perfis disponiveis em profiles/.", |_| {
-        let dir = com_ro(|p, _| Ok(profiles_dir(p)))?;
+        let dir = com_ro(|p, _| Ok(recurso_dir(p, "profiles")))?;
         let mut v: Vec<String> = std::fs::read_dir(&dir)
             .map_err(|e| format!("{}: {}", dir.display(), e))?
             .flatten()
@@ -746,24 +722,13 @@ pub fn register(r: &mut Registry) {
     });
     r.add::<ShowPatchArgs>(
         "show_patch",
-        "Edita o show aberto por JSON Patch (RFC 6902: add, remove, replace, move, test). Uma op que falha cancela todas. Devolve {rev, undo}: `undo` e' a lista de ops que volta ao estado anterior, ja' na ordem de aplicacao.",
+        "Edita o show aberto por JSON Patch (RFC 6902: add, remove, replace, test). Uma op que falha cancela todas. Devolve {rev, undo}: `undo` e' a lista de ops que volta ao estado anterior, ja' na ordem de aplicacao.",
         |a| patch(&a),
     );
     r.add::<NoArgs>(
         "graph_get",
         "O graph do show aberto (secao 10 do PRD: nodes e edges); vazio quando o show nao tem graph.",
         |_| Ok(graph()),
-    );
-    r.add::<GraphSetArgs>(
-        "graph_set",
-        "Substitui o graph do show aberto. NAO compila (o engine nao conhece o runtime de graph): chame graph_check para saber se ele roda.",
-        |a| {
-            let g = valor(a.graph);
-            com(|_, sh| {
-                sh.extra.insert("graph".into(), g);
-                Ok(sh.extra["graph"].clone())
-            })
-        },
     );
     r.add::<NoArgs>(
         "face_get",

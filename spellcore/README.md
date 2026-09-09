@@ -499,9 +499,8 @@ em `base()` por `edit::register`. Todo comando age no `OPEN`; sem show aberto, a
 | `patch_del(name)` | tira pelo nome | a entrada |
 | `patch_check()` | grade (`name`, `profile`, `universe`, `address`, `channels`) + `error` da primeira fixture que não entra | `{rows, error}` |
 | `profiles()` | nomes dos `.json` em `profiles/` | lista |
-| `show_patch(ops, rev?)` | JSON Patch (RFC 6902: `add`, `remove`, `replace`, `move`, `test`) sobre o show aberto; aplica numa cópia e só comita se todas passarem **e** o resultado ainda desserializar em `Show`; `rev` diferente da atual recusa (`"rev 3 != 5"`) | `{rev, undo}` |
+| `show_patch(ops, rev?)` | JSON Patch (RFC 6902: `add`, `remove`, `replace`, `test`) sobre o show aberto; aplica numa cópia e só comita se todas passarem **e** o resultado ainda desserializar em `Show`; `rev` diferente da atual recusa (`"rev 3 != 5"`) | `{rev, undo}` |
 | `graph_get()` | o `graph` do show (seção 10 do PRD) | `{nodes, edges}` |
-| `graph_set(graph)` | substitui o `graph`; **não** compila (o engine não conhece `script`) | o graph |
 | `face_get()` | `face` inline, ou `faces/<nome>.face.json` quando `face` é texto | a face ou `null` |
 
 `profiles/` é a primeira que existir entre: ao lado do `.spell`, um nível acima dele (`shows/` e
@@ -517,10 +516,10 @@ que sobe a cada edição bem-sucedida e é o que o barramento faz broadcast. Dua
 quem manda com `rev` velha leva erro em vez de sobrescrever a edição do outro. `show_set` continua
 existindo para **importar** um show inteiro. Teste: `engine/tests/patch.rs`.
 
-`graph_get`/`graph_set` são edição pura e moram no engine; **compilar** o graph é `graph_check`,
-registrado pela CLI (só ela conhece o crate `script`), que devolve `{nodes, error}` — `error` é
-texto, não exceção, para o editor mostrar ao lado do nó. Sem argumento ele checa o graph do show
-aberto; com `graph`, o que vier no argumento.
+`graph_get` é leitura e mora no engine; editar o graph é `show_patch` em `/graph`. **Compilar** o
+graph é `graph_check`, registrado pela CLI (só ela conhece o crate `script`), que compila o graph
+do show aberto e devolve `{nodes, error}` — `error` é texto, não exceção, para o editor mostrar ao
+lado do nó.
 
 ## `script` (crate novo)
 
@@ -623,7 +622,7 @@ spellcore mcp install --target code [--path P]      # .mcp.json do diretório co
 
 | Superfície | Conteúdo |
 |---|---|
-| tools | uma por comando de `Registry::iter()`: `load`, `show_get`, `pause`, `stop`, `locate`, `cue_go`, `transport_state`, os de edição de `engine::edit` (`show_new`, `show_set`, `show_save`, `track_add`, `track_del`, `key_set`, `key_del`, `cue_set`, `cue_del`, `patch_add`, `patch_del`, `patch_check`, `profiles`, `show_patch`, `graph_get`, `graph_set`, `face_get`), `play_show`, `net`, `graph_check`. `inputSchema` = o schema que o `schemars` gerou do struct de argumentos |
+| tools | uma por comando de `Registry::iter()`: `load`, `show_get`, `pause`, `stop`, `locate`, `cue_go`, `transport_state`, os de edição de `engine::edit` (`show_new`, `show_set`, `show_save`, `track_add`, `track_del`, `key_set`, `key_del`, `cue_set`, `cue_del`, `patch_add`, `patch_del`, `patch_check`, `profiles`, `show_patch`, `graph_get`, `face_get`), `play_show`, `net`, `graph_check`. `inputSchema` = o schema que o `schemars` gerou do struct de argumentos |
 | resources | `spell://show` (o `.spell` aberto: fps, duração, saídas, patch, tracks, cues, transporte vivo), `spell://commands` (o registry inteiro em JSON), `spell://graph` (o `graph_get`) e `spell://face` (o `face_get`). Cada resource é uma chamada de comando do registry: o crate `mcp` não tem lógica de produto |
 | erro | erro de comando volta como `isError: true` com o texto (o cliente lê); só rota inexistente vira erro JSON-RPC |
 | `play_show` | bloqueia até o fim do show, então roda em thread e a tool volta na hora (o `BACKGROUND` do Python). Enquanto o MCP roda, a linha de status do `play` vai para o **stderr**: no stdio o stdout é o canal JSON-RPC |

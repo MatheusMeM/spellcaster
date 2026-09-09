@@ -33,8 +33,8 @@ const INSTRUCTIONS: &str = concat!(
     "resources spell://show, spell://commands, spell://graph e spell://face dao o show aberto, o ",
     "registry inteiro, o graph e a face sem gastar uma chamada de tool. Para editar o show, ",
     "prefira `show_patch` (JSON Patch, devolve as ops de undo) a `show_set`; o comportamento do ",
-    "show (teclas, OSC, botoes) se le com `graph_get`, se troca com `graph_set` e se valida com ",
-    "`graph_check`."
+    "show (teclas, OSC, botoes) se le com `graph_get`, se edita com `show_patch` em /graph e se ",
+    "valida com `graph_check`."
 );
 
 /// Comandos que bloqueiam ate o fim do show ou ate Ctrl+C: rodam em thread e a tool volta na hora

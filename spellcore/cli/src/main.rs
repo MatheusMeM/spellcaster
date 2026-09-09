@@ -14,7 +14,7 @@
 //! `Deserialize` para o registry (e, por ele, para as tools do MCP).
 
 use clap::{Args, Parser, Subcommand};
-use engine::registry::Registry;
+use engine::registry::{NoArgs, Registry};
 use engine::schemars::JsonSchema;
 use engine::{show, Ev, EventSink, Player, TransportState};
 use protocols::{netscan, osc};
@@ -235,18 +235,10 @@ fn net(a: NetArgs) -> Result<Value, String> {
     }
 }
 
-#[derive(Deserialize, JsonSchema)]
-#[schemars(crate = "engine::schemars")]
-struct GraphCheckArgs {
-    /// O graph a compilar; ausente = o do show aberto (o mesmo que `graph_get` devolve).
-    #[serde(default)]
-    graph: Option<Value>,
-}
-
-/// Compila o graph sem rodar: quantos nos ele tem, ou o erro. Mora aqui porque so' a CLI
-/// conhece o crate `script` — `graph_get`/`graph_set`, que sao edicao pura, ficam no engine.
-fn graph_check(a: GraphCheckArgs) -> Result<Value, String> {
-    let g = a.graph.unwrap_or_else(engine::edit::graph);
+/// Compila o graph do show aberto sem rodar: quantos nos ele tem, ou o erro. Mora aqui porque
+/// so' a CLI conhece o crate `script` — `graph_get`, que e' edicao pura, fica no engine.
+fn graph_check(_: NoArgs) -> Result<Value, String> {
+    let g = engine::edit::graph();
     match script::graph::Graph::new(&g, Box::new(engine::NullSink)) {
         Ok(gr) => Ok(json!({"nodes": gr.nodes(), "error": Value::Null})),
         Err(e) => Ok(json!({"nodes": 0, "error": e})),
@@ -265,9 +257,9 @@ fn registry() -> Registry {
         "Varre a rede: interfaces, nos Art-Net, fontes sACN, Ether Dream e sugestoes.",
         net,
     );
-    r.add::<GraphCheckArgs>(
+    r.add::<NoArgs>(
         "graph_check",
-        "Compila o graph (o do show aberto, ou o passado em `graph`) sem rodar. Devolve {nodes, error}.",
+        "Compila o graph do show aberto sem rodar. Devolve {nodes, error}.",
         graph_check,
     );
     r

@@ -1,4 +1,4 @@
-//! `show_patch` (JSON Patch), `graph_get`/`graph_set`, `face_get` e o contador `rev`. Binario
+//! `show_patch` (JSON Patch), `graph_get`, `face_get` e o contador `rev`. Binario
 //! proprio porque `OPEN` e `REV` sao um por processo; e um `#[test]` so' porque os testes de um
 //! mesmo binario rodam em paralelo e todos aqui mexem nesse estado.
 
@@ -59,20 +59,21 @@ fn tudo_ou_nada(r: &Registry) {
     assert_eq!(full(r), antes, "undo devolve o show identico");
     assert_eq!(rev(), rev0 + 2, "desfazer tambem e' edicao");
 
-    // remove e move
+    // reordenar e' remove + add (nao ha' op `move`)
     let out = ops(
         r,
         json!([
             {"op": "remove", "path": "/tracks/0"},
-            {"op": "move", "from": "/tracks/1", "path": "/tracks/0"},
+            {"op": "remove", "path": "/tracks/1"},
+            {"op": "add", "path": "/tracks/0", "value": antes["tracks"][2]},
         ]),
     )
     .unwrap();
     let d = full(r);
     assert_eq!(d["tracks"].as_array().unwrap().len(), n - 2);
-    assert_eq!(d["tracks"][0], antes["tracks"][2], "o move trocou a ordem");
+    assert_eq!(d["tracks"][0], antes["tracks"][2], "remove + add reordena");
     ops(r, out["undo"].clone()).unwrap();
-    assert_eq!(full(r), antes, "undo de remove + move");
+    assert_eq!(full(r), antes, "undo de remove + add");
 
     // test que falha: a op anterior, que ja' tinha passado, nao fica
     let e = ops(
@@ -91,12 +92,12 @@ fn tudo_ou_nada(r: &Registry) {
         r,
         json!([
             {"op": "replace", "path": "/name", "value": "nem esta"},
-            {"op": "copy", "path": "/fps", "from": "/version"},
+            {"op": "move", "path": "/fps", "from": "/version"},
             {"op": "replace", "path": "/fps", "value": 1},
         ]),
     )
     .unwrap_err();
-    assert!(e.contains("copy"), "{}", e);
+    assert!(e.contains("move"), "{}", e);
     assert_eq!(full(r), antes);
 
     // path que nao existe, indice fora da lista, pointer sem a barra
@@ -181,16 +182,16 @@ fn graph_e_face(r: &Registry) {
     );
     assert_eq!(r.call("face_get", json!({})).unwrap(), Value::Null);
 
+    // o graph se edita por show_patch: inteiro de uma vez, ou um no' de cada vez
     let g = json!({"nodes": [{"id": "k", "type": "in.key", "key": "Space"},
                              {"id": "c", "type": "cmd", "cmd": "cue_go"}],
                    "edges": [["k.down", "c.trigger"]]});
     let v0 = rev();
-    assert_eq!(r.call("graph_set", json!({ "graph": g })).unwrap(), g);
-    assert_eq!(rev(), v0 + 1, "graph_set e' edicao");
+    ops(r, json!([{"op": "add", "path": "/graph", "value": g}])).unwrap();
+    assert_eq!(rev(), v0 + 1);
     assert_eq!(r.call("graph_get", json!({})).unwrap(), g);
     assert_eq!(full(r)["graph"], g, "o graph mora no show, nao ao lado");
 
-    // o graph tambem se edita por show_patch: o editor mexe em um no de cada vez
     ops(
         r,
         json!([{"op": "add", "path": "/graph/nodes/-",
