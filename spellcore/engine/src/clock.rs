@@ -233,6 +233,9 @@ mod rt {
 mod rt {
     /// ponytail: no-op fora do Windows ; o Pi ganha SCHED_FIFO/nice na R1.
     pub struct Boost;
+    impl Drop for Boost {
+        fn drop(&mut self) {} // o run() faz drop(_boost) explicito antes das estatisticas; clippy (drop_non_drop) exige Drop real
+    }
     impl Boost {
         pub fn on() -> Boost {
             Boost
