@@ -301,7 +301,7 @@ enche, o frame velho é descartado (`send` nunca bloqueia o engine).
 ### `serve` — barramento
 
 ```
-spellcore serve [--port 8000] [--dir spellgui/web] [--show x.spell]
+spellcore serve [--port 8000] [--dir .] [--show x.spell]
 ```
 
 Um processo toca o hardware; toda página e toda IA falam com ele. Porta `0` = uma livre; ao
@@ -310,10 +310,10 @@ subir, o servidor imprime **no stderr** a linha `serve http://127.0.0.1:<porta>`
 Contrato (as outras frentes leem daqui, palavra por palavra):
 
 ```
-HTTP  GET /commands -> Registry::schema()   GET /show -> show_get full   GET /<arquivo> -> spellgui/web/<arquivo>
+HTTP  GET /commands -> Registry::schema()   GET /show -> show_get full   GET /<arquivo> -> <--dir>/<arquivo>
 WS    /ws  request  {"id":7,"cmd":"locate","args":{"t":12.5}}
            resposta {"id":7,"result":...} | {"id":7,"error":"texto"}
-           evento   {"event":"transport","data":<TransportState>} | {"event":"show","data":{"rev":n}} | {"event":"log","data":{"text":...}}
+           evento   {"event":"transport","data":<TransportState>} | {"event":"show","data":{"rev":n}} | {"event":"log","data":{"text":...}} | {"event":"widget","data":{"id","prop","value"}}
            binário  topic:u8 | universe:u16 LE | 512 bytes   (topic 1 = dmx de saída)
 Comando `input {key, value}` no registry alimenta FrameHook::input do player vivo (chaves "widget:go", "key:Space", "module:laser/geo/scale").
 ```
@@ -321,12 +321,14 @@ Comando `input {key, value}` no registry alimenta FrameHook::input do player viv
 | Detalhe | Regra |
 |---|---|
 | cabeçalho | toda resposta HTTP leva `Cache-Control: no-store` |
+| `--dir` | padrão `.` = **raiz do repositório**, não `spellgui/web`: as páginas referenciam `../../design/tokens/spellcaster.css` e `../../shows/*.spell`, então a página abre em `/spellgui/web/index.html` e o que ela referencia sai do mesmo servidor. Em troca, o repositório inteiro (`.git` incluído) fica legível em 127.0.0.1 — aceitável enquanto o socket for só loopback |
 | estático | só segmentos simples relativos: `..`, segmento vazio, `\` e `:` são recusados com 403 antes de tocar o disco; o caminho não é percent-decodificado. `/` = `index.html` |
 | comando | cada request do WS chama `Registry::call`; erro do comando volta como `{"id","error"}` e **não** derruba a conexão |
 | `play_show` | está no `BACKGROUND` do crate `mcp`: roda em thread e a resposta volta na hora, com `"<cmd> iniciado em background"`; erro vira evento `log` |
-| `rev` | contador do processo. Todo comando bem-sucedido cujo nome **não** esteja em `LEITURA = [show_get, transport_state, profiles, patch_check, net, load]` incrementa `rev` e faz broadcast `{"event":"show","data":{"rev":n}}` |
+| `rev` | contador do processo. Todo comando bem-sucedido cujo nome **não** esteja em `LEITURA = [show_get, transport_state, profiles, patch_check, net]` incrementa `rev` e faz broadcast `{"event":"show","data":{"rev":n}}`. `load` **não** é leitura: troca o show inteiro |
 | `transport` | a cada mudança de estado e a 10 Hz enquanto o player anda (sondagem de `player::current()`) |
-| monitor | um `FrameHook` global copia os universos que mudaram desde o último envio, no máximo a 40 Hz e só quando há cliente WS; sai como frame binário de 515 bytes |
+| `widget` | `out.widget` do graph (o `Ev::Widget` que o sink da CLI recebe) vira `{"event":"widget","data":{"id","prop","value"}}` |
+| monitor | um `FrameHook` global copia os universos do frame, no máximo a 40 Hz e só quando há cliente WS; sai como frame binário de 515 bytes |
 | `/mcp` | `StreamableHttpService` do `rmcp` (feature `transport-streamable-http-server`) sobre o mesmo `Spell` do stdio, sem sessão e com resposta JSON: `POST /mcp` de um `initialize` devolve o JSON-RPC direto |
 | `--show` | `load` (é o que `GET /show` lê) e o player parado em `t=0`; solta-se com o comando `resume` |
 
@@ -658,9 +660,6 @@ spellcore mcp install --target code [--path P]      # .mcp.json do diretório co
 
 Fora por enquanto, e por quê:
 
-- **HTTP streamable.** O `rmcp` traz `StreamableHttpService`, mas é um `tower::Service`: virar
-  servidor ainda exige axum/hyper (feature `server-side-http`, +11 crates). Entra quando houver
-  MCP remoto no Pi, junto com o `serve` da GUI.
 - **`face_get`/`face_patch`/`graph_get`/`graph_patch`/`theme_set`** (PRD §10). O `engine::show`
   não tem Face nem Theme serializados, e o Graph só existe compilado dentro do `script`; sem
   estrutura para ler e aplicar JSON Patch, essas tools não teriam backend.

@@ -18,30 +18,20 @@ use engine::universe::Universes;
 use rmcp::transport::streamable_http_server::session::local::LocalSessionManager;
 use rmcp::transport::streamable_http_server::{StreamableHttpServerConfig, StreamableHttpService};
 use serde_json::{json, Value};
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 use tokio::sync::broadcast;
 
-pub struct Opts {
-    /// 0 = porta aleatoria (a linha `serve http://127.0.0.1:<porta>` no stderr diz qual).
-    pub port: u16,
-    /// Raiz do estatico (`spellgui/web`).
-    pub dir: PathBuf,
-    /// .spell aberto no boot, com o player parado em t=0.
-    pub show: Option<String>,
-}
-
-/// Comandos que so' leem: nao mudam o show, entao nao mexem no `rev`.
-const LEITURA: [&str; 6] = [
+/// Comandos que so' leem: nao mudam o show, entao nao mexem no `rev`. `load` NAO esta aqui:
+/// carregar outro arquivo troca o show inteiro, e a GUI precisa saber.
+const LEITURA: [&str; 5] = [
     "show_get",
     "transport_state",
     "profiles",
     "patch_check",
     "net",
-    "load",
 ];
 
 /// Frame binario do monitor: `topic:u8 | universe:u16 LE | 512 bytes`.
@@ -54,7 +44,7 @@ const MONITOR_MS: u64 = 25;
 #[derive(Clone)]
 enum Out {
     Text(String),
-    Bin(Arc<Vec<u8>>),
+    Bin(Vec<u8>),
 }
 
 struct St {
@@ -66,8 +56,25 @@ struct St {
 
 impl St {
     fn evento(&self, event: &str, data: Value) {
-        let m = json!({"event": event, "data": data}).to_string();
-        let _ = self.tx.send(Out::Text(m));
+        let _ = self.tx.send(Out::Text(texto(event, data)));
+    }
+}
+
+fn texto(event: &str, data: Value) -> String {
+    json!({"event": event, "data": data}).to_string()
+}
+
+/// O sink de evento do graph vive na CLI e nao tem `St`: `out.widget` chega ao WS por aqui.
+/// Sem `serve` no ar, nao faz nada.
+static TX: OnceLock<broadcast::Sender<Out>> = OnceLock::new();
+
+/// `{"event":"widget","data":{"id","prop","value"}}` para todo cliente do barramento.
+pub fn widget(id: &str, prop: &str, value: f64) {
+    if let Some(tx) = TX.get() {
+        let _ = tx.send(Out::Text(texto(
+            "widget",
+            json!({"id": id, "prop": prop, "value": value}),
+        )));
     }
 }
 
@@ -77,23 +84,21 @@ async fn commands(State(st): State<Arc<St>>) -> Response {
     axum::Json(st.reg.schema()).into_response()
 }
 
-async fn show(State(st): State<Arc<St>>) -> Response {
+async fn show_get(State(st): State<Arc<St>>) -> Response {
     match st.reg.call("show_get", json!({"full": true})) {
         Ok(v) => axum::Json(v).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
     }
 }
 
+// ponytail: quatro tipos ; o `--dir` tem html, js, css e .spell — imagem e fonte entram quando
+// alguma pagina trouxer uma.
 fn mime(p: &str) -> &'static str {
     match p.rsplit('.').next().unwrap_or("") {
         "html" => "text/html; charset=utf-8",
         "js" => "text/javascript; charset=utf-8",
         "css" => "text/css; charset=utf-8",
-        "json" | "spell" | "map" => "application/json",
-        "svg" => "image/svg+xml",
-        "png" => "image/png",
-        "ico" => "image/x-icon",
-        "woff2" => "font/woff2",
+        "json" | "spell" => "application/json",
         _ => "application/octet-stream",
     }
 }
@@ -101,6 +106,8 @@ fn mime(p: &str) -> &'static str {
 /// Arquivo de `--dir`. Limite de confianca: so' segmentos simples relativos. `..`, segmento
 /// vazio, `\` e `:` (unidade, ADS do Windows) sao recusados ANTES de tocar o disco, e o caminho
 /// nao e' percent-decodificado — `%2e%2e` fica literal e vira 404, nao subida de diretorio.
+// ponytail: `--dir` padrao e' a raiz do repo, entao tudo que esta nela (`.git` inclusive) e'
+// legivel em 127.0.0.1 ; filtrar por lista quando o `--host` e o token existirem.
 async fn estatico(State(st): State<Arc<St>>, uri: Uri) -> Response {
     let p = uri.path().trim_start_matches('/');
     let p = if p.is_empty() { "index.html" } else { p };
@@ -140,9 +147,6 @@ async fn request(st: &Arc<St>, txt: &str) -> String {
         .unwrap_or("")
         .to_string();
     let args = v.get("args").cloned().unwrap_or_else(|| json!({}));
-    if cmd.is_empty() {
-        return json!({"id": id, "error": "request sem cmd"}).to_string();
-    }
     if st.reg.get(&cmd).is_none() {
         return json!({"id": id, "error": format!("comando desconhecido: {}", cmd)}).to_string();
     }
@@ -199,7 +203,7 @@ async fn cliente(mut sock: WebSocket, st: Arc<St>) {
                     }
                 }
                 Ok(Out::Bin(b)) => {
-                    if sock.send(Message::Binary(b.to_vec().into())).await.is_err() {
+                    if sock.send(Message::Binary(b.into())).await.is_err() {
                         break;
                     }
                 }
@@ -226,51 +230,40 @@ async fn transporte(st: Arc<St>) {
             last.clear();
             continue;
         };
-        let s = serde_json::to_string(&h.state()).unwrap_or_default();
+        let v = serde_json::to_value(h.state()).unwrap_or(Value::Null);
+        let s = v.to_string();
         if s != last {
             last = s;
-            st.evento(
-                "transport",
-                serde_json::to_value(h.state()).unwrap_or(Value::Null),
-            );
+            st.evento("transport", v);
         }
     }
 }
 
 // ------------------------------------------------------------------ monitor
 
-/// Copia para o WS os universos que mudaram desde o ultimo envio. Instalado como gancho global,
-/// roda depois dos ganchos do show: e' o frame que de fato sai na rede.
+/// Copia para o WS os universos do frame. Instalado como gancho global, roda depois dos ganchos
+/// do show: e' o frame que de fato sai na rede.
 struct Monitor {
     tx: broadcast::Sender<Out>,
-    last: HashMap<u16, [u8; 512]>,
     at: Instant,
 }
 
 impl FrameHook for Monitor {
+    // ponytail: manda todo universo do frame, sem cache do ultimo enviado ; o teto de 40 Hz em
+    // loopback ja' segura a banda — cachear entra se um show com dezenas de universos parados
+    // aparecer no perfil.
     fn frame(&mut self, _t: f64, uni: &mut Universes) {
         if self.tx.receiver_count() == 0 || self.at.elapsed() < Duration::from_millis(MONITOR_MS) {
             return;
         }
         self.at = Instant::now();
         for u in uni.iter() {
-            if self.last.get(&u.number).is_some_and(|p| p == &u.data) {
-                continue;
-            }
-            self.last.insert(u.number, u.data);
-            // ponytail: um Vec de 515 bytes por universo mudado, no maximo 40 Hz ; virar buffer
-            // reaproveitado se um show com 32 universos vivos aparecer no perfil.
             let mut b = Vec::with_capacity(FRAME);
             b.push(TOPIC_DMX);
             b.extend_from_slice(&u.number.to_le_bytes());
             b.extend_from_slice(&u.data);
-            let _ = self.tx.send(Out::Bin(Arc::new(b)));
+            let _ = self.tx.send(Out::Bin(b));
         }
-    }
-
-    /// locate/stop: o proximo frame vale como novo, mesmo igual ao ultimo enviado.
-    fn reset(&mut self, _t: f64) {
-        self.last.clear();
     }
 }
 
@@ -281,9 +274,6 @@ impl FrameHook for Monitor {
 fn abre(reg: Arc<Registry>, file: String) {
     if let Err(e) = reg.call("load", json!({ "path": file })) {
         return eprintln!("--show {}: {}", file, e);
-    }
-    if reg.get("play_show").is_none() {
-        return; // registry sem a CLI: fica so' o show aberto, sem player
     }
     let (r, f) = (reg.clone(), file.clone());
     std::thread::spawn(move || {
@@ -310,18 +300,21 @@ fn abre(reg: Arc<Registry>, file: String) {
 
 /// Sobe o barramento e bloqueia ate o processo morrer. `reg` e' o registry completo da CLI:
 /// e' ele que o WS, o `GET /commands` e as tools do MCP expoem.
-pub fn serve(reg: Registry, o: Opts) -> Result<(), String> {
+///
+/// `port` 0 = porta aleatoria (a linha `serve http://127.0.0.1:<porta>` no stderr diz qual);
+/// `dir` = raiz do estatico; `show` = .spell aberto no boot, com o player parado em t=0.
+pub fn serve(reg: Registry, port: u16, dir: PathBuf, show: Option<String>) -> Result<(), String> {
     let (tx, _rx) = broadcast::channel(256);
     let st = Arc::new(St {
         reg: Arc::new(reg),
         rev: AtomicU64::new(0),
         tx: tx.clone(),
-        dir: o.dir,
+        dir,
     });
+    let _ = TX.set(tx.clone());
     engine::player::hook_global(move || {
         Box::new(Monitor {
             tx: tx.clone(),
-            last: HashMap::new(),
             at: Instant::now(),
         })
     });
@@ -339,7 +332,7 @@ pub fn serve(reg: Registry, o: Opts) -> Result<(), String> {
 
     let app = Router::new()
         .route("/commands", get(commands))
-        .route("/show", get(show))
+        .route("/show", get(show_get))
         .route("/ws", get(upgrade))
         .nest_service("/mcp", mcp_http)
         .fallback(estatico)
@@ -353,12 +346,12 @@ pub fn serve(reg: Registry, o: Opts) -> Result<(), String> {
     rt.block_on(async move {
         // ponytail: so' loopback ; autenticacao esta fora de escopo, e sem ela abrir a LAN
         // entrega o hardware a quem estiver no wifi — `--host` entra junto com o token.
-        let l = tokio::net::TcpListener::bind(("127.0.0.1", o.port))
+        let l = tokio::net::TcpListener::bind(("127.0.0.1", port))
             .await
-            .map_err(|e| format!("porta {}: {}", o.port, e))?;
+            .map_err(|e| format!("porta {}: {}", port, e))?;
         let porta = l.local_addr().map_err(|e| e.to_string())?.port();
         eprintln!("serve http://127.0.0.1:{}", porta);
-        if let Some(f) = o.show {
+        if let Some(f) = show {
             abre(st.reg.clone(), f);
         }
         tokio::spawn(transporte(st.clone()));
@@ -406,6 +399,22 @@ mod tests {
         let r: Value = serde_json::from_str(&request(&st, "isso nao e json").await).unwrap();
         assert!(r["error"].as_str().unwrap().starts_with("json invalido"));
         assert_eq!(st.rev.load(Ordering::SeqCst), 1, "erro nao conta rev");
+    }
+
+    /// `out.widget` do graph, vindo do sink da CLI, sai no WS com a forma do contrato.
+    #[test]
+    fn widget_vira_evento() {
+        let (tx, mut rx) = broadcast::channel(4);
+        TX.set(tx).expect("TX ainda livre neste binario de teste");
+        widget("go", "hold", 1.0);
+        let Ok(Out::Text(t)) = rx.try_recv() else {
+            panic!("nada no barramento");
+        };
+        let v: Value = serde_json::from_str(&t).unwrap();
+        assert_eq!(
+            v,
+            json!({"event": "widget", "data": {"id": "go", "prop": "hold", "value": 1.0}})
+        );
     }
 
     #[test]

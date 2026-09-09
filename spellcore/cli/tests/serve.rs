@@ -22,7 +22,7 @@ impl Servidor {
     fn start() -> Servidor {
         let mut p = Command::new(env!("CARGO_BIN_EXE_spellcore"))
             .args(["serve", "--port", "0", "--dir"])
-            .arg(format!("{}/spellgui/web", RAIZ))
+            .arg(RAIZ)
             .arg("--show")
             .arg(format!("{}/shows/medgrupo.spell", RAIZ))
             .stdout(Stdio::null())
@@ -201,7 +201,11 @@ fn barramento_http_ws_monitor_e_mcp() {
     assert_eq!(sh["fps"], json!(30), "--show deixou o .spell aberto");
     assert!(sh["tracks"].is_array(), "/show e' o .spell inteiro: {}", b);
 
-    assert_eq!(sv.code("/index.html"), 200);
+    // `--dir` e' a raiz do repo: a pagina e o que ela referencia (`../../design/tokens`,
+    // `../../shows`) saem do mesmo servidor
+    assert_eq!(sv.code("/spellgui/web/index.html"), 200);
+    assert_eq!(sv.code("/design/tokens/spellcaster.css"), 200);
+    assert_eq!(sv.code("/shows/medgrupo.spell"), 200);
     // limite de confianca: nada de subir de diretorio
     assert_eq!(sv.code("/../../Cargo.toml"), 403);
     assert_eq!(sv.code("/nao_existe.js"), 404);
@@ -225,6 +229,17 @@ fn barramento_http_ws_monitor_e_mcp() {
     ws.ate(5.0, |v| v["id"] == json!(4));
     let ev = ws.ate(5.0, |v| v["event"] == json!("show"));
     assert_eq!(ev["data"]["rev"], json!(2));
+
+    // `load` de outro arquivo troca o show inteiro: nao e' leitura, tem que avisar a GUI
+    ws.send(
+        10,
+        "load",
+        json!({"path": format!("{}/shows/medgrupo_r0.spell", RAIZ)}),
+    );
+    let r = ws.ate(10.0, |v| v["id"] == json!(10));
+    assert!(r["error"].is_null(), "load: {}", r);
+    let ev = ws.ate(5.0, |v| v["event"] == json!("show"));
+    assert_eq!(ev["data"]["rev"], json!(3), "load incrementa rev: {}", ev);
 
     // ---- transporte e monitor binario: `--show` deixou o player parado em t=0
     let ev = ws.ate(5.0, |v| {

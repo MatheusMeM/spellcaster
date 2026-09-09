@@ -184,7 +184,7 @@ CI, sem tocar no que já está conforme):
 | Frente | Entrega | Aceite | Depende de |
 |---|---|---|---|
 | Design | rodada 7 (FÓSFORO, PATCHBAY) | voto do dono | voto das rodadas 5 e 6 |
-| F1 serve | crate `spellcore/serve` e `spellcore serve`: HTTP (`/commands`, `/show`, estático), WebSocket JSON-RPC com eventos `show`/`transport`/`log`, monitor DMX binário a 40 Hz, MCP streamable em `/mcp`, comandos `input` e `resume` | feita: `cli/tests/serve.rs` sobe o binário e fecha o contrato ponta a ponta | — |
+| F1 serve | crate `spellcore/serve` e `spellcore serve`: HTTP (`/commands`, `/show`, estático), WebSocket JSON-RPC com eventos `show`/`transport`/`log`/`widget`, monitor DMX binário a 40 Hz, MCP streamable em `/mcp`, comandos `input` e `resume`; `--dir` = raiz do repo | feita: `cli/tests/serve.rs` sobe o binário e fecha o contrato ponta a ponta | — |
 
 Bloqueadas até instalar SDK (decisão do dono, não de agente): R2 (GStreamer + NDI SDK),
 R6 (Godot 4). R9 espera R5.

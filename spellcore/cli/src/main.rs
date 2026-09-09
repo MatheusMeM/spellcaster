@@ -104,7 +104,12 @@ impl EventSink for CliSink {
                 }
                 None => eprintln!("osc {}: show sem saida osc", address),
             },
-            Ev::Widget { id, prop, value } => eprintln!("widget {}.{}={}", id, prop, value),
+            // `out.widget` e' da GUI: vai para o barramento (nada acontece sem `serve` no ar) e
+            // para o stderr, que e' o unico monitor do `spellcore play`.
+            Ev::Widget { id, prop, value } => {
+                serve::widget(id, prop, *value);
+                eprintln!("widget {}.{}={}", id, prop, value);
+            }
             Ev::Param { target, value } => eprintln!("param {}={}", target, value),
             Ev::Notify { text } => eprintln!("notify {}", text),
         }
@@ -270,12 +275,13 @@ struct ServeArgs {
     /// Porta HTTP; 0 = uma livre (a linha `serve http://...` no stderr diz qual).
     #[arg(long, default_value_t = 8000)]
     port: u16,
-    /// Raiz dos arquivos da GUI.
-    #[arg(long, default_value = "spellgui/web")]
+    /// Raiz do estatico; padrao = raiz do repo, porque as paginas de `spellgui/web`
+    /// referenciam `../../design/tokens` e `../../shows`.
+    #[arg(long, default_value = ".")]
     dir: String,
     /// .spell aberto no boot, com o player parado em t=0.
-    #[arg(long, default_value = "")]
-    show: String,
+    #[arg(long)]
+    show: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -322,12 +328,7 @@ fn main() {
         Cmd::Serve(a) => {
             // o stdout de um servidor nao e' canal de dado: status e log vao para o stderr
             STDOUT_LIVRE.store(false, Ordering::SeqCst);
-            let o = serve::Opts {
-                port: a.port,
-                dir: a.dir.into(),
-                show: Some(a.show).filter(|s| !s.is_empty()),
-            };
-            serve::serve(registry(), o).map(|_| Value::Null)
+            serve::serve(registry(), a.port, a.dir.into(), a.show).map(|_| Value::Null)
         }
         Cmd::Mcp(m) => match m.cmd {
             Some(McpCmd::Install { target, path, yes }) => mcp::install::install(&target, &path, yes),
@@ -415,8 +416,8 @@ mod tests {
         {
             Cmd::Serve(a) => {
                 assert_eq!(a.port, 0);
-                assert_eq!(a.dir, "spellgui/web", "default do --dir");
-                assert_eq!(a.show, "x.spell");
+                assert_eq!(a.dir, ".", "default do --dir e' a raiz do repo");
+                assert_eq!(a.show.as_deref(), Some("x.spell"));
             }
             _ => panic!("esperava serve"),
         }
