@@ -1,4 +1,4 @@
-# spellcore — core do Spellcaster em Rust (R0, R1, R4)
+# spellcore — core do Spellcaster em Rust (R0, R1, R3, R4)
 
 Workspace Cargo com o engine, os protocolos, a CLI e o bench. Sem GUI, sem Godot, sem mídia.
 O pacote Python `spellcaster/` continua sendo a implementação de referência: o spellcore tem
@@ -9,6 +9,7 @@ spellcore/
   Cargo.toml        workspace (edition 2021, release: lto thin, codegen-units 1, panic abort)
   engine/           clock, universe, timeline (keys/curvas), show (.spell v1), registry
   protocols/        trait Output, sacn, artnet, osc, netscan
+  pixelmap/         amostragem de frame -> bytes DMX por universo (rayon); bin `map_bench`
   cli/              binário `spellcore`: play, net, commands
   bench/            Criterion + binários `jitter` e `throughput`
 ```
@@ -40,8 +41,13 @@ para quem esquecer da variável. `target/` está no `.gitignore` do repo como se
 $env:CARGO_TARGET_DIR = "$env:TEMP\spellcore_target"
 cargo run --release -p bench --bin jitter        # Clock a 60 Hz por 10 s: p50/p99/max e drift
 cargo run --release -p bench --bin throughput    # 16 sACN + 16 Art-Net a 60 Hz por 10 s: %CPU
+cargo run --release -p pixelmap --bin map_bench   # 100 000 px de um 1080p: ms/frame, gate de 2 ms
 cargo bench -p bench                             # Criterion (curvas, packet, timeline)
+cargo bench -p pixelmap                          # Criterion (100k px nearest e bilinear)
 ```
+
+`map_bench` aceita `--pixels N --frames N --width N --height N --bilinear` e sai com código 1
+se o p99 por frame passar de 2 ms.
 
 Alvos da tabela do PRD (desktop x64) e o que foi medido nesta máquina (Windows 11, R0):
 
@@ -53,6 +59,7 @@ Alvos da tabela do PRD (desktop x64) e o que foi medido nesta máquina (Windows 
 | Boot até o primeiro frame DMX | < 2 s | 0,002 s |
 | RSS em repouso | < 60 MB | 5,6 MB |
 | `spellcore.exe` release | < 20 MB | 0,95 MB |
+| Pixel mapping, 100 000 px a 60 Hz (CPU) | < 2 ms por frame | 0,105 ms p50, 0,316 ms p99 |
 
 Criterion: `Timeline::apply` do show inteiro (219 tracks, 67 161 keyframes) em 3,73 µs;
 `Keys::eval` 862 ns; `sacn::packet` 44 ns; `artnet::artdmx` 37 ns.
@@ -71,7 +78,8 @@ C:\Python313\python.exe tests/conformance/capture_sacn.py --secs 3
 | `schemars` | engine (registry), cli | schema JSON de cada comando, consumido pela CLI e depois pelo MCP |
 | `clap` | cli | parser de argumentos com subcomandos gerados do registry em runtime |
 | `socket2` | protocols | `std::net::UdpSocket` não expõe `IP_MULTICAST_IF` nem `SO_REUSEADDR`, exigidos por sACN |
-| `criterion` | bench (dev) | medida estatística de jitter/latência exigida pelo PRD |
+| `criterion` | bench, laser, pixelmap (dev) | medida estatística de jitter/latência exigida pelo PRD |
+| `rayon` | pixelmap | 100 000 px por frame em ~590 universos independentes; pool de trabalho sem escrever um |
 
 Nada mais entra sem justificativa e sem medir o tamanho do binário.
 Windows API (`timeBeginPeriod`, `SetThreadPriority`, `GetProcessTimes`) é declarada com

@@ -148,7 +148,7 @@ O plano acima (F0–F7) foi o do protótipo Python e está concluído até F6. O
 | R0 core e protocolos | fixtures byte a byte, `bench/jitter` no alvo, CLI `net` | concluída | — |
 | R1 timeline, cues, .spell, fx, Graph, OSC | graph de 500 nós < 0,1 ms/frame; player headless | concluída (8,4 µs) | — |
 | R2 mídia (GStreamer, NDI, RTSP, Spout) | 1080p60 no alvo de CPU | pendente | SDKs não instalados (GStreamer, NDI) |
-| R3 pixel mapping wgpu + rayon | 100 000 px a 60 Hz < 2 ms | pendente | nenhum: Rust puro |
+| R3 pixel mapping (rayon; wgpu depois) | 100 000 px a 60 Hz < 2 ms | concluída (0,105 ms p50 / 0,316 ms p99 por frame; bilinear 0,196 / 0,493) | crate autônomo: ligar a fonte de frame ao player espera a R2 |
 | R4 laser multi-feed | Ether Dream, Helios, IDN; safety no engine; 4 feeds | concluída (0,83 % cpu) | — |
 | R5 GUI Tauri | show de 3 min do zero; Face em modo performance | pendente | voto das rodadas 5 e 6 do design |
 | R6 previz Godot | 60 fps, 64 fixtures, 2 LED walls | pendente | Godot não instalado |
@@ -183,7 +183,6 @@ CI, sem tocar no que já está conforme):
 
 | Frente | Entrega | Aceite | Depende de |
 |---|---|---|---|
-| R3 pixel mapping | crate `pixelmap` com rayon (wgpu depois), bench Criterion | 100 000 px a 60 Hz < 2 ms | nada |
 | R7 MCP | crate `mcp` com rmcp (stdio + HTTP), tools do registry, `spellcore mcp install` | sessão de IA escaneia, patcheia, cria timeline e dá play | nada |
 | ~~R8 Pi estático~~ | ~~job de CI `aarch64-unknown-linux-musl`, artefato `spellcore-linux-aarch64-static`~~ | feito: leg musl na matriz do `spellcore`, ELF sem `NEEDED` verificado no CI | — |
 | R5 base | `canvaskit.js` (pan, zoom, seleção, hit-test por bisect, dirty-flag, DPR) + timeline canvas portada do Python | testes headless no Chrome; timeline abre `medgrupo.spell` | nada (design só define o cromo) |
@@ -192,4 +191,4 @@ CI, sem tocar no que já está conforme):
 Bloqueadas até instalar SDK (decisão do dono, não de agente): R2 (GStreamer + NDI SDK),
 R6 (Godot 4). R9 espera R5.
 
-Já feito: F0–F6, R0, R1, R4, R8, CI com release por tag, docs (README, INSTALL, LICENSE, ARCHITECTURE, PRD).
+Já feito: F0–F6, R0, R1, R3, R4, R8, CI com release por tag, docs (README, INSTALL, LICENSE, ARCHITECTURE, PRD).

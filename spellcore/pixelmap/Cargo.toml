@@ -1,0 +1,22 @@
+[package]
+name = "pixelmap"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+# ~600 universos independentes por frame: paralelismo de dados puro, sem thread pool propria
+rayon = "1"
+# o bloco "pixelmaps" do .spell e JSON (serde_json fica no chamador; o crate so declara os tipos)
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+criterion = { workspace = true }
+
+[[bin]]
+name = "map_bench"
+path = "src/bin/map_bench.rs"
+
+[[bench]]
+name = "pixelmap"
+harness = false
