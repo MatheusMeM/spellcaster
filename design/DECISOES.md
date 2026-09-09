@@ -70,3 +70,9 @@ Consequências:
 - 2026-09-09 — CC contínuo passa por `filter.lag` (80 ms); nota e tecla são `trigger` direto; `trigger → value` exige argumento; `number → trigger` não tem filtro no PRD §10 (fica como rota sem filtro, o teste não cobre). `dependency` do manifesto leva `target` (o §5 omite).
 - Ponto aberto: **nó de estado** não existe no PRD §10 (`orquestrador.md §1`, "Estado"). `states[]` sai vazio do `Bind.graph()`; "no segundo ato estas rotas valem e aquelas param" hoje é condição em cada rota. Decisão pendente: adotar a semântica do Chataigne inteira (container de rotas com `ativo`, `ao carregar`, transições) e acrescentar `state` ao catálogo de nós do PRD.
 - Ponto aberto: filtro de limiar (`number → trigger`) para CC em ação de disparo; o `bind.js` já trata CC > 63 como disparo, o graph não sabe dizer isso.
+
+## 09/09/2026 · limpeza da árvore de design (0.1.4)
+
+- 2026-09-09 — `design/funcoes-referencia` entra em `design/0.1.4` por merge: `design/FUNCOES/` (funções, regras transversais e auditorias em `fontes/`) passa a conviver com `design/laser/`. Motivo: função antes de UI, as duas metades na mesma branch.
+- 2026-09-09 — `design/laser/INTEGRACAO.md` vira `design/FUNCOES/integracao-laser.md` e entra na tabela de `FUNCOES/README.md`. Motivo: era contrato de função, morava em `laser/` só porque a branch não tinha `FUNCOES/`.
+- 2026-09-09 — Rodadas 2, 3 e 4 saem da árvore (`design/rodada2/`, `design/rodada3/`, `design/rodada4/`, `design/pino.js`); o histórico fica no git (commits `6fe8b23`, `6cc9bfa`, `7dacf8f`). Motivo: a rodada 2 foi reprovada no voto e as rodadas 3 e 4 foram absorvidas por `design/laser/`; código morto na árvore custa leitura e não guarda nada que o git já não guarde.
