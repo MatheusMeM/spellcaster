@@ -27,6 +27,7 @@ pub enum Arg {
     Impulse,
 }
 
+#[allow(clippy::manual_is_multiple_of)]
 fn pad(out: &mut Vec<u8>) {
     // ponytail: `% 4` e nao `is_multiple_of` (que so existe a partir do Rust 1.87)
     // ; o workspace declara rust-version 1.75.

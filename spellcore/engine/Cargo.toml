@@ -4,6 +4,12 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+protocols = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 schemars = { workspace = true }
+
+# os testes de integracao (tests/) nao veem as dependencias normais do crate
+[dev-dependencies]
+protocols = { workspace = true }
+serde_json = { workspace = true }

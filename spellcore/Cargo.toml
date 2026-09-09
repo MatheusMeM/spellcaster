@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["engine", "protocols", "cli", "bench"]
+members = ["engine", "protocols", "laser", "script", "cli", "bench"]
 
 [workspace.package]
 version = "0.1.0"
@@ -16,6 +16,7 @@ socket2 = { version = "0.5", features = ["all"] }
 criterion = { version = "0.5", default-features = false, features = ["cargo_bench_support"] }
 engine = { path = "engine" }
 protocols = { path = "protocols" }
+script = { path = "script" }
 
 [profile.release]
 lto = "thin"

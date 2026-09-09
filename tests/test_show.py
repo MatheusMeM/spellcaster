@@ -42,10 +42,10 @@ class TestSpell(unittest.TestCase):
         mod = load_show(str(ROOT / "shows" / "medgrupo.py"))
         self.assertAlmostEqual(sh["duration"], mod.DUR, delta=0.01)
         tl = Timeline(sh, sh["_dir"])
-        self.assertEqual([k.type for k in tl.tracks], ["pyfx", "laser"])
+        self.assertEqual([k.type for k in tl.tracks], ["pyfx", "fx", "laser"])
         self.assertEqual(len(tl.dmx), 1)
         self.assertEqual(tl.dmx[0].fn(0.0), mod.look(0.0))         # pyfx aponta para o look do show
-        self.assertTrue((ROOT / "shows" / sh["tracks"][1]["clip"]).exists())
+        self.assertTrue((ROOT / "shows" / sh["tracks"][2]["clip"]).exists())
 
 
 if __name__ == "__main__":

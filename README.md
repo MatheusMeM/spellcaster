@@ -1,32 +1,32 @@
 # Spellcaster
 
-Spellcaster é um media server de luz e laser portátil da Feitiçaria Industrial. Ele roda em Python 3.13 com a stdlib como primeira opção e fala sACN, Art-Net, OSC e ILDA (Ether Dream). O plano inclui GUI web com skins, servidor MCP gerado do registro de comandos e uma versão Lite para Raspberry Pi operada só por CLI via SSH.
+Spellcaster é um media server de luz e laser portátil da Feitiçaria Industrial: timeline, cues,
+sACN, Art-Net, OSC e ILDA (Ether Dream, Helios, IDN), GUI web com skins, MCP embutido, player
+standalone e versão Lite para Raspberry Pi operada por CLI via SSH.
 
-Pacote Python: `spellcaster`. CLI: `spell`. Arquivo de show futuro: `.spell` (JSON).
+O repo tem duas camadas:
+
+- `spellcaster/` — protótipo Python 3.13 (stdlib), fases F0–F6 concluídas: CLI `spell`, GUI web
+  com 6 skins, timeline em canvas, MCP (stdio e HTTP), TUI, empacotamento portátil e Lite.
+  Hoje é a implementação de referência e o gerador dos fixtures de conformidade; não recebe
+  funcionalidade nova.
+- `spellcore/` — o core do produto em Rust (PRD v1.1 em `PRD.md`). Fases R0 (engine, protocolos,
+  bench), R1 (cues, `.spell` completo, `fx` em Rhai, Graph runtime, player com transporte OSC) e
+  R4 (laser multi-feed com safety) concluídas e conformes byte a byte com o Python.
+
+Arquivo de show: `.spell` (JSON, versão 1), o mesmo para os dois lados.
 
 ## Estado atual
 
-Fases F0 (fundação e protocolos) e F1 (análise de rede) estão concluídas. Módulos existentes:
+| Fase | O que é | Estado |
+|---|---|---|
+| F0–F6 (Python) | protocolos, netscan, perfis/patch, timeline, GUI + skins, MCP, portátil/Lite | concluídas, 101 testes |
+| R0 (Rust) | `engine`, `protocols`, `cli net/play`, `bench` jitter/throughput | concluída, dentro do alvo |
+| R1 (Rust) | cues, `.spell` completo, `fx` Rhai, Graph, player + OSC, CLI headless | concluída, conformidade ao vivo 89/89 |
+| R4 (Rust) | `laser`: optimize/safety, `.ild`, Ether Dream/Helios/IDN, 4 feeds | concluída, 0,83 % de cpu |
+| R2 mídia, R3 pixelmap, R5 GUI Tauri, R6 previz Godot, R7 MCP rmcp, R8 empacotamento, R9 editores | ver `PRD.md` §6 | pendentes |
 
-| Módulo | Função |
-|---|---|
-| `spellcaster/cli.py` | CLI `spell`: verbos `play`, `net` e `commands`, gerados do registry |
-| `spellcaster/core/clock.py` | Relógio único com tick fixo e transporte play/pause/stop/locate |
-| `spellcaster/core/registry.py` | `@command`: registro de comandos com schema tipado |
-| `spellcaster/core/universe.py` | Buffers DMX de 512 canais, endereço 1-based |
-| `spellcaster/core/engine.py` | Loop `look(t)` → universos → saídas |
-| `spellcaster/protocols/sacn.py` | sACN E1.31: saída multicast, entrada, discovery |
-| `spellcaster/protocols/artnet.py` | Art-Net 4: ArtDmx out/in, ArtPoll, ArtSync |
-| `spellcaster/protocols/osc.py` | OSC 1.0 sobre UDP: mensagens, bundles, pattern matching |
-| `spellcaster/protocols/netscan.py` | Interfaces, nós Art-Net, fontes sACN, Ether Dream, sugestões de IP |
-| `spellcaster/protocols/ilda/frame.py` | Ponto e frame ILDA, otimização de scan, safety |
-| `spellcaster/protocols/ilda/ild.py` | Leitura e escrita de `.ild` (formatos 0, 1, 2, 4, 5) |
-| `spellcaster/protocols/ilda/generators.py` | Geradores de figura e o laser do show MED GRUPO |
-| `spellcaster/protocols/ilda/etherdream.py` | Cliente Ether Dream (TCP) e emulador para testes |
-| `shows/medgrupo.py` | Show MED GRUPO RJ em modo compatibilidade (`look(t)`, `DUR`) |
-| `seed/` | Código de origem (gerador sACN, calibração, ILDA) mantido como referência |
-
-F2 em diante (perfis e patch, timeline, GUI, MCP, portátil, Lite) está pendente. Consulte `ROADMAP.md`.
+Design (tokens, princípios, atalhos herdados de Premiere/Resolve, canvas de moodboard) em `design/`.
 
 ## Como rodar no Windows
 
@@ -70,26 +70,24 @@ C:\Python313\python.exe -m unittest discover -s tests -v
 
 ## spellcore (Rust)
 
-O core do produto está sendo reescrito em Rust em `spellcore/` (PRD, fase R0: engine, protocolos,
-CLI `net` e bench). O pacote Python acima continua como implementação de referência e gerador dos
-fixtures de conformidade. A pasta do repo está no Google Drive, então o `target/` do cargo fica
-fora dela.
+A pasta do repo está no Google Drive, então o `target/` do cargo fica fora dela.
 
 ```powershell
 $env:CARGO_TARGET_DIR = "$env:TEMP\spellcore_target"
 cd spellcore
 cargo test --workspace
-cargo build --release
+cargo build --release --workspace
 
 # binario em %TEMP%/spellcore_target/release/spellcore.exe
-spellcore play ..\shows\medgrupo_r0.spell
-spellcore net --timeout 2
-spellcore net --timeout 2 --json
-spellcore commands
+spellcore play ..\shows\medgrupo.spell            # fx em Rhai + laser; Ctrl+C para
+spellcore play ..\shows\medgrupo.spell --osc-port 9000   # transporte por /spellcaster/play|pause|stop|locate
+spellcore net --timeout 2 [--json]
+spellcore commands                                 # registry em JSON (o mesmo que vira MCP)
 
 # bench (gate do PRD)
 cargo run --release -p bench --bin jitter
 cargo run --release -p bench --bin throughput
+cargo run --release -p laser --bin feeds -- --secs 30
 cargo bench -p bench
 ```
 
@@ -99,13 +97,34 @@ Fixtures de conformidade (regerar com `C:\Python313\python.exe tests/conformance
 
 ```
 C:\Python313\python.exe tests/conformance/capture_sacn.py --secs 3
+C:\Python313\python.exe tests/conformance/capture_sacn.py --secs 3 --show shows/medgrupo.spell
 ```
 
-Detalhes de árvore, contratos e números do bench em `ARCHITECTURE.md`; dependências e
-justificativa em `spellcore/README.md`.
+Árvore, contratos, tabela de conformidade e números do bench em `ARCHITECTURE.md`; dependências
+e justificativa em `spellcore/README.md`.
+
+## Deploy no GitHub
+
+`.github/workflows/build.yml` roda em todo push em `main` e em todo PR: testes Python nas três
+plataformas, `clippy -D warnings` + testes + bench do `spellcore`, e publica como artefatos o
+onedir do Windows (zip), o tarball Lite (x64 e aarch64) e o binário `spellcore` (Windows x64,
+Linux x64, Linux aarch64).
+
+Release = tag. O mesmo workflow, ao receber uma tag `v*`, cria a GitHub Release com esses
+artefatos anexados e notas geradas do histórico:
+
+```bash
+git tag -a v0.1.0 -m "Spellcaster 0.1.0: R0, R1 e R4 do spellcore; protótipo Python F0–F6"
+git push origin main --tags
+```
+
+Regras: commits e pushes só na conta do dono do repo, mensagem em português, sem crédito a
+ferramenta nenhuma; nunca commitar `target/`, `build/`, `dist/`; o bench é o gate.
 
 ## Documentos
 
-- `ARCHITECTURE.md`: árvore, fluxo de dados, assinaturas públicas e simplificações por protocolo.
-- `ROADMAP.md`: decisões de stack, fases F0 a F7, riscos.
+- `PRD.md`: produto v1 (core Rust, previz Godot, Theme/Face/Graph), tabela de performance, fases R0–R9.
+- `ARCHITECTURE.md`: árvore, fluxo de dados, contratos, conformidade e números medidos.
+- `ROADMAP.md`: decisões de stack, fases F0–F7 do protótipo e estado das fases R0–R9.
+- `design/`: `DECISOES.md`, `PRINCIPIOS.md`, `SHORTCUTS.md`, `tokens/`, `canvas/`.
 - `CLAUDE.md`: regras do repositório.

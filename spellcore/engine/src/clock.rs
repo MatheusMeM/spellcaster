@@ -125,7 +125,9 @@ impl Clock {
         let _boost = rt::Boost::on();
         let mut next = Instant::now();
         while self.state() != State::Stop {
-            let t = self.time();
+            // Tempo travado no quadro: n/fps exato, como o gerador do fixture (t = i/fps). Sem isso um fx
+            // continuo (sin) amostrado no tempo medido (i/fps + overshoot) diverge em +-1 na truncagem.
+            let t = (self.time() * self.i.fps as f64).round() / self.i.fps as f64;
             if let Some(d) = duration {
                 if t >= d {
                     break;
@@ -231,6 +233,9 @@ mod rt {
 mod rt {
     /// ponytail: no-op fora do Windows ; o Pi ganha SCHED_FIFO/nice na R1.
     pub struct Boost;
+    impl Drop for Boost {
+        fn drop(&mut self) {} // o run() faz drop(_boost) explicito antes das estatisticas; clippy (drop_non_drop) exige Drop real
+    }
     impl Boost {
         pub fn on() -> Boost {
             Boost

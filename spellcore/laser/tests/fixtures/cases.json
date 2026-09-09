@@ -1,0 +1,136 @@
+[
+ {
+  "name": "opt_salto",
+  "op": "optimize",
+  "params": {
+   "dwell": 2,
+   "blank_gap": 4,
+   "max_step": 1200,
+   "angle": 25
+  },
+  "n_in": 6,
+  "n_out": 41
+ },
+ {
+  "name": "opt_quad",
+  "op": "optimize",
+  "params": {
+   "dwell": 3,
+   "blank_gap": 2,
+   "max_step": 800,
+   "angle": 40
+  },
+  "n_in": 20,
+  "n_out": 134
+ },
+ {
+  "name": "opt_med0",
+  "op": "optimize",
+  "params": {
+   "dwell": 2,
+   "blank_gap": 4,
+   "max_step": 1200,
+   "angle": 25
+  },
+  "n_in": 126,
+  "n_out": 259
+ },
+ {
+  "name": "opt_med300",
+  "op": "optimize",
+  "params": {
+   "dwell": 1,
+   "blank_gap": 6,
+   "max_step": 2000,
+   "angle": 10
+  },
+  "n_in": 129,
+  "n_out": 154
+ },
+ {
+  "name": "opt_med900",
+  "op": "optimize",
+  "params": {
+   "dwell": 2,
+   "blank_gap": 4,
+   "max_step": 1200,
+   "angle": 25
+  },
+  "n_in": 126,
+  "n_out": 188
+ },
+ {
+  "name": "saf_pequeno",
+  "op": "safety",
+  "params": {
+   "min_size": 2000,
+   "max_intensity": 255,
+   "zone": null
+  },
+  "n_in": 20,
+  "n_out": 20
+ },
+ {
+  "name": "saf_zona",
+  "op": "safety",
+  "params": {
+   "min_size": 2000,
+   "max_intensity": 100,
+   "zone": [
+    -1000,
+    -1000,
+    1000,
+    1000
+   ]
+  },
+  "n_in": 20,
+  "n_out": 20
+ },
+ {
+  "name": "saf_ponto",
+  "op": "safety",
+  "params": {
+   "min_size": 2000,
+   "max_intensity": 255,
+   "zone": null
+  },
+  "n_in": 5,
+  "n_out": 5
+ },
+ {
+  "name": "saf_med0",
+  "op": "safety",
+  "params": {
+   "min_size": 20000,
+   "max_intensity": 200,
+   "zone": [
+    -18000,
+    -9000,
+    18000,
+    9000
+   ]
+  },
+  "n_in": 126,
+  "n_out": 126
+ },
+ {
+  "name": "optsaf_med600",
+  "op": "optimize+safety",
+  "params": {
+   "dwell": 2,
+   "blank_gap": 4,
+   "max_step": 1200,
+   "angle": 25,
+   "min_size": 2000,
+   "max_intensity": 180,
+   "zone": [
+    -16000,
+    -8000,
+    16000,
+    8000
+   ]
+  },
+  "n_in": 126,
+  "n_out": 187
+ }
+]

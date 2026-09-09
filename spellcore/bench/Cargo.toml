@@ -14,10 +14,16 @@ path = "src/bin/throughput.rs"
 [dependencies]
 engine = { workspace = true }
 protocols = { workspace = true }
+script = { workspace = true }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
 
 [[bench]]
 name = "core"
+harness = false
+
+[[bench]]
+name = "graph"
 harness = false

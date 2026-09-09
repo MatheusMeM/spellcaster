@@ -21,14 +21,14 @@ class TestGuiApi(unittest.TestCase):
         sh = registry.call("show_open", file=SPELL)
         self.assertEqual(sh["name"], "MED GRUPO RJ - plenaria 09/2026")
         self.assertEqual(sh["fps"], 30)
-        self.assertEqual(len(sh["tracks"]), 2)
+        self.assertEqual(len(sh["tracks"]), 3)
         self.assertNotIn("_dir", sh)                      # chaves internas nao vazam para a GUI
         self.assertTrue(api.SHOW["_dir"].endswith("shows"))
 
     def test_editar_e_gravar_ida_e_volta(self):
         registry.call("show_open", file=SPELL)
         i = registry.call("track_add", type="dmx", universe="2", address="10", label="teste")
-        self.assertEqual(i, 2)
+        self.assertEqual(i, 3)
         registry.call("key_set", track=i, t="0", value="[0, 0, 0]")
         registry.call("key_set", track=i, t="2.5", value="[255, 128, 0]", curve="inout")
         registry.call("key_set", track=i, t="1", value="[10, 10, 10]")
@@ -64,7 +64,7 @@ class TestGuiApi(unittest.TestCase):
         registry.call("show_open", file=SPELL)
         tr = registry.call("track_del", index="0")
         self.assertEqual(tr["type"], "pyfx")
-        self.assertEqual(len(registry.call("show_get")["tracks"]), 1)
+        self.assertEqual(len(registry.call("show_get")["tracks"]), 2)
 
     def test_show_set_valida_e_substitui(self):
         sh = {"name": "x", "fps": 25, "duration": 3.0, "tracks": [{"type": "dmx", "keys": [[0, 1]]}]}
