@@ -109,8 +109,8 @@ test("frame de outro topico ou curto demais e ignorado", () => {
   assert.strictEqual(TL.frameBin(new Uint8Array(10).buffer), null);
 });
 
-// Evento `show`: o serve conta uma revisao por comando aceito, e a pagina adianta a conta a cada
-// chamada que manda. Recarregar so' quando o numero passa do que as nossas chamadas explicam.
+// Evento `show`: ha' UM contador, o do engine, e toda resposta do barramento o traz. `TL.rev` e'
+// o maior `rev` ja' visto numa resposta; recarregar so' quando o evento passa desse numero.
 test("eco da propria edicao nao recarrega", () => {
   assert.deepStrictEqual(TL.revEvento(5, 5), { rev: 5, reload: false });
 });
@@ -123,22 +123,22 @@ test("evento atrasado com edicoes ainda em voo nao recarrega nem atrasa a conta"
   assert.deepStrictEqual(TL.revEvento(4, 6), { rev: 6, reload: false });
 });
 
-// O contador antigo nunca voltava de um desvio (comando contado a mais, evento perdido, pagina
-// aberta contra um serve que ja' tinha revisoes): engolia os reloads de fora para sempre. Com `rev`
-// o desvio custa um reload e a conta volta ao numero do servidor.
+// O contador antigo (`expect++` por chamada) nunca voltava de um desvio (comando contado a mais,
+// evento perdido, pagina aberta contra um engine que ja' tinha revisoes): engolia os reloads de
+// fora para sempre. Com `rev` o desvio custa um reload e a conta volta ao numero do engine.
 test("conta desalinhada se conserta no primeiro evento", () => {
   const r = TL.revEvento(9, 1);
   assert.deepStrictEqual(r, { rev: 9, reload: true });
   assert.deepStrictEqual(TL.revEvento(10, r.rev), { rev: 10, reload: true });
 });
 
-// Reconexao: o serve novo comeca em rev = 0. `revEvento` so' corrige a conta para cima, entao o
-// onopen zera TL.rev antes do reload; sem isso o primeiro `show` do serve novo (rev 1) cairia
+// Reconexao: o processo novo comeca em rev = 0. `revEvento` so' corrige a conta para cima, entao
+// o onopen zera TL.rev antes do reload; sem isso o primeiro `show` do engine novo (rev 1) cairia
 // abaixo da conta velha e nao recarregaria nada.
-test("depois do reset da reconexao, o primeiro evento do serve novo recarrega", () => {
+test("depois do reset da reconexao, o primeiro evento do engine novo recarrega", () => {
   assert.deepStrictEqual(TL.revEvento(1, 0), { rev: 1, reload: true });
 });
 
-test("sem o reset, o serve reiniciado seria engolido", () => {
+test("sem o reset, o engine reiniciado seria engolido", () => {
   assert.deepStrictEqual(TL.revEvento(1, 37), { rev: 37, reload: false });
 });

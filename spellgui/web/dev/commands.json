@@ -39,7 +39,7 @@
     }
   },
   {
-    "doc": "Continua o player pausado neste processo.",
+    "doc": "Retoma o player pausado neste processo (o par do pause).",
     "name": "resume",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",

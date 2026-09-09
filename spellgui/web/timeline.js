@@ -12,7 +12,7 @@
 //
 // Sem servidor nada muda: o show vem de fetch, o transporte e o relogio local e o commit so reescreve
 // o JSON em memoria. Com servidor o playhead vem dos eventos `transport` e o show recarrega quando
-// alguem de fora mexe (evento `show` com rev acima do que as nossas chamadas explicam).
+// alguem de fora mexe (evento `show` com rev acima do que a ultima resposta trouxe).
 
 const CURVES = ["linear", "hold", "in", "out", "inout", "bezier"];
 // Mesma matematica do engine (spellcaster/timeline/model.py, spellcore/engine): a curva vale para o
@@ -79,6 +79,9 @@ const BUS = {
     }
     const m = JSON.parse(d);
     if (m.event) { if (BUS.on[m.event]) BUS.on[m.event](m.data); return; }
+    // Toda resposta do barramento carrega o `rev` do engine: e' o que separa o eco da nossa
+    // propria edicao da edicao de outro cliente.
+    if (typeof m.rev === "number") TL.rev = Math.max(TL.rev, m.rev);
     const p = this.pend.get(m.id);
     if (!p) return;
     this.pend.delete(m.id);
@@ -89,8 +92,8 @@ const BUS = {
     try { w = this.ws = new WebSocket(url); } catch (e) { TL.log("sem servidor: " + e.message); return; }
     w.binaryType = "arraybuffer";
     w.onmessage = e => BUS.msg(e.data);
-    // serve reiniciado volta com rev = 0, e TL.revEvento so' corrige a conta para cima: sem zerar
-    // aqui, todo evento `show` do serve novo viria abaixo do numero velho e seria engolido.
+    // engine reiniciado volta com rev = 0, e TL.revEvento so' corrige a conta para cima: sem
+    // zerar aqui, todo evento `show` do processo novo viria abaixo do numero velho e engolido.
     w.onopen = () => { BUS.ever = true; TL.rev = 0; TL.reload(); };
     w.onclose = () => {
       BUS.ws = null;
@@ -129,30 +132,21 @@ TL.ops = function (eds) {
 };
 
 // Manda as chamadas. Sem servidor nao faz nada: o modo offline continua o de hoje.
-// TL.rev e' a conta do SERVE: `st.rev` (serve/src/lib.rs) sobe um por request aceito fora da lista
-// de LEITURA, e e' esse numero que volta no evento `show`. Adiantamos a conta aqui para reconhecer
-// o eco das nossas proprias edicoes (ver TL.revEvento) — o `TL.rev++` antes do envio ja' fecha a
-// conta, e o `--` desfaz o comando recusado.
-// A resposta do `show_patch` tambem traz um `rev`, mas e' OUTRO contador: o REV do engine
-// (engine/src/edit.rs), que so' sobe em edicao de show (MCP/OSC/CLI incluidos) e nao sobe em
-// locate/pause/etc. Escrever esse numero em TL.rev jogaria o esperado para cima assim que o
-// contador do engine passasse o do serve, e todo evento `show` de outro cliente viraria
-// `rev <= esperado`: reload de fora engolido. Por isso a resposta e' ignorada.
-// ponytail: `play_show` (background no serve, unico que nao conta revisao) pelo nome ; sai quando
-// toda resposta do barramento trouxer o rev do serve.
+// Ha' UM contador de revisao, o do engine (`engine::edit::rev()`): toda resposta o traz e
+// `BUS.msg` o guarda em `TL.rev`. Nada de adiantar a conta antes do envio.
+// ponytail: o eco da nossa propria edicao que chegue ANTES da resposta custa um reload
+// (`d.rev > TL.rev` porque a resposta ainda nao veio) ; some quando o evento `show` carregar o
+// id do cliente que editou.
 function send(calls) {
   if (!BUS.live()) return;
   for (const c of calls) {
-    const conta = c.cmd !== "play_show";
-    if (conta) TL.rev++;
-    BUS.call(c.cmd, c.args)
-      .catch(err => { if (conta) TL.rev--; TL.log(c.cmd + ": " + err); });   // recusado: sem revisao
+    BUS.call(c.cmd, c.args).catch(err => TL.log(c.cmd + ": " + err));
   }
 }
 
-// Evento `show` do serve: rev maior que o esperado (o das nossas chamadas) veio de outro cliente e
-// manda recarregar; menor ou igual e' eco nosso, ou evento atrasado. Funcao pura: e' esta que o
-// teste cobre. O maximo ressincroniza a conta local em qualquer desvio.
+// Evento `show`: rev maior que o ultimo visto numa resposta veio de outro cliente e manda
+// recarregar; menor ou igual e' eco nosso, ou evento atrasado. Funcao pura: e' esta que o teste
+// cobre. O maximo ressincroniza a conta local em qualquer desvio.
 TL.revEvento = (rev, esperado) => ({ rev: Math.max(rev, esperado), reload: rev > esperado });
 
 const hasPlayer = () => TL.tstate === "play" || TL.tstate === "pause";
@@ -409,7 +403,7 @@ BUS.on.transport = d => {
   setT(d.t);
 };
 
-// Cada comando nosso que muda o show volta como um evento `show`; so' recarrega o que veio de fora.
+// O `show` so' sai quando o `rev` do engine muda; so' recarrega o que veio de fora.
 BUS.on.show = d => {
   const r = TL.revEvento(d.rev, TL.rev);
   TL.rev = r.rev;
