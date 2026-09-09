@@ -29,6 +29,11 @@
    "universe": 1
   },
   {
+   "type": "fx",
+   "script": "medgrupo.rhai",
+   "universe": 1
+  },
+  {
    "type": "laser",
    "clip": "medgrupo_laser.ild",
    "fps": 30,

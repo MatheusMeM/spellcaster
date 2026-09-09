@@ -1,4 +1,4 @@
-# spellcore — core do Spellcaster em Rust (R0)
+# spellcore — core do Spellcaster em Rust (R0, R1, R4)
 
 Workspace Cargo com o engine, os protocolos, a CLI e o bench. Sem GUI, sem Godot, sem mídia.
 O pacote Python `spellcaster/` continua sendo a implementação de referência: o spellcore tem
@@ -309,3 +309,236 @@ spellcore commands                       lista o registry (nome, doc, schema)
 ```
 
 Os subcomandos são construídos em runtime a partir de `Registry::schema()`.
+
+---
+
+# R1 — contratos fixados (orquestrador, antes de qualquer código)
+
+Escopo da R1: cues, `.spell` completo, track `fx` em Rhai, Graph runtime, Player com transporte
+remoto por OSC, CLI `play` headless. Sem GUI, sem mídia, sem laser (outro agente escreve
+`spellcore/laser/`; nada aqui toca nesse diretório).
+
+Novo membro do workspace: `script/` (crate `script`). Grafo de dependências da R1:
+
+```
+protocols  (autocontido)
+engine     -> protocols, serde, serde_json, schemars
+script     -> engine, rhai, serde_json
+cli        -> engine, protocols, script, clap
+bench      -> engine, protocols, script
+```
+
+`engine -> protocols` é novo e deliberado: o Player abre as saídas do `.spell` e escuta o
+transporte remoto por OSC, exatamente como `spellcaster/player/player.py` importa `..protocols`.
+`protocols` continua sem conhecer `engine`; não há ciclo. O engine continua sem conhecer GUI,
+MCP, Rhai e laser.
+
+## Ordem de avaliação de um frame (fixa; é o que a conformidade mede)
+
+1. `Timeline::apply(&mut universes, t)` — tracks `dmx` e `artnet`.
+2. Cada `FrameHook` na ordem em que foi registrado (tracks `fx` na ordem do `.spell`, depois o Graph).
+3. Tracks de efeito colateral: `osc` e `media` não-Capture (envia quando o valor muda), `cue`
+   (`crossed(prev, t)` dispara `CueList::go`).
+4. `CueList::update(t)` escreve o snapshot corrente nos Universes.
+5. I/O: cada universo escrito vai para todas as saídas.
+
+Igual ao `_tick` + `_side` do Python.
+
+## Tipos de track no `.spell` (R1)
+
+| `type` | Campos | Semântica |
+|---|---|---|
+| `dmx` | `universe`, `address`, `keys` | R0, inalterado |
+| `artnet` | idem | R0, inalterado |
+| `osc` | `address` (texto), `keys`, `args?` | envia por OSC quando o valor muda (`last != v`) |
+| `media` | `universe`, `address`, `clip`, `keys` (texto `play`/`replay`/`stop`) | Capture: ch1 = 10/20/28, ch2 = `clip`. Com `"player"` diferente de `"capture"` vira track OSC (`address/valor`) |
+| `cue` | `keys` (texto `GO` ou número = índice) | `crossed(prev, t)` dispara a cue |
+| `fx` | `script` (caminho relativo ao `.spell`), `universe` | script Rhai com estado persistente entre frames |
+| `fixture` | reservado | parseado e ignorado com aviso (a F2 do Python resolve; o Rust não na R1) |
+
+Track de tipo desconhecido continua sendo ignorado com aviso.
+
+## `engine::hook` (novo módulo)
+
+```rust
+use crate::universe::Universes;
+
+/// Escreve nos Universes uma vez por frame, depois de Timeline::apply.
+/// É por aqui que `script` (Rhai fx e Graph) se pluga sem o engine conhecer Rhai.
+pub trait FrameHook: Send {
+    fn frame(&mut self, t: f64, uni: &mut Universes);
+    /// Evento de entrada para o Graph. Chave: "widget:go", "key:Space", "osc:/spell/go",
+    /// "midi:144/60", "marker:pico". Enfileirado; consumido no próximo frame(). Default: ignora.
+    fn input(&mut self, _key: &str, _value: f64) {}
+    /// locate/stop: zera o estado persistente. Default: no-op.
+    fn reset(&mut self, _t: f64) {}
+}
+
+/// Saída de evento do Graph para o mundo. Uma implementação em `cli` (comando do registry,
+/// OscOut, stderr); o engine só declara o trait porque não conhece o registry vivo nem a GUI.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Ev {
+    Cmd { name: String, args: serde_json::Value },   // nó `cmd`
+    Osc { address: String, args: Vec<f64> },         // `out.osc`
+    Widget { id: String, prop: String, value: f64 }, // `out.widget`
+    Param { target: String, value: f64 },            // `out.param` ("fixture.canal")
+    Notify { text: String },                         // `out.notify`
+}
+pub trait EventSink: Send { fn emit(&mut self, e: &Ev); }
+```
+
+`Ev` aloca `String`: eventos são raros (um GO, um OSC de entrada), não acontecem por frame.
+`// ponytail: Ev com String ; virar índice no catálogo se algum graph passar a emitir por frame.`
+
+## `engine::cues` (porte de `spellcaster/timeline/cues.py`)
+
+```rust
+pub struct Cue { pub name: String, pub fade: f64, pub wait: f64, pub follow: bool,
+                 pub values: Vec<((u16, u16), Vec<f64>)> }   // ordem do JSON preservada
+pub struct CueList { /* state, index, cue corrente, from, pending */ }
+impl CueList {
+    pub fn new(specs: &[serde_json::Value]) -> CueList;
+    pub fn len(&self) -> usize;
+    pub fn index(&self) -> i32;                       // -1 = nenhuma disparada
+    /// Dispara a próxima cue (ou a de índice dado). O fade começa depois do `wait` dela.
+    pub fn go(&mut self, t: f64, index: Option<usize>) -> bool;
+    /// Avança o fade e escreve o snapshot corrente nos Universes. Zero alocação por frame.
+    pub fn update(&mut self, t: f64, uni: &mut Universes);
+    pub fn reset(&mut self);
+}
+```
+
+Chave `"1/100"` -> `(1, 100)`; `"100"` -> `(1, 100)` (o `key()` do Python). Fade linear,
+`u = 1` quando `fade <= 0`; ao chegar em `u >= 1` com `follow`, dispara a próxima.
+
+## `engine::player`
+
+```rust
+pub struct Player { /* timeline, cues, hooks, saídas, Arc<Shared> */ }
+
+#[derive(Clone)]
+pub struct Handle { /* Arc<Shared>: clock + fila de cue + contadores */ }
+
+#[derive(Serialize)]
+pub struct TransportState { pub t: f64, pub state: &'static str, // "stop"|"play"|"pause"
+                            pub cue: i32, pub frames: u64, pub fps: u32,
+                            pub duration: Option<f64>, pub universes: Vec<u16> }
+
+impl Player {
+    /// Carrega timeline + cues e abre as saídas de `show.outputs` (sacn, artnet, osc).
+    /// `base` = diretório do .spell (caminhos de `fx`/clipes são relativos a ele).
+    pub fn new(show: Show, base: PathBuf, looping: bool) -> Result<Player, String>;
+    /// Hooks de script/graph, antes de `start()`, na ordem em que devem rodar.
+    pub fn hook(&mut self, h: Box<dyn FrameHook>);
+    pub fn handle(&self) -> Handle;
+    pub fn clock(&self) -> Clock;
+    /// Sobe a thread de transporte e, se `osc_port` (argumento ou `transport.osc_port`),
+    /// o OscIn com /spellcaster/play|pause|stop|locate f. Registra este player como o CURRENT.
+    pub fn start(&mut self, osc_port: Option<u16>) -> Result<(), String>;
+    pub fn wait(&self, timeout: Option<Duration>) -> bool;   // bloqueia até stop/fim
+    pub fn close(&mut self);                                  // idempotente; limpa o CURRENT
+}
+
+impl Handle {
+    pub fn play(&self); pub fn pause(&self); pub fn stop(&self);
+    pub fn locate(&self, t: f64);
+    pub fn cue_go(&self, index: Option<usize>);
+    pub fn state(&self) -> TransportState;
+}
+
+/// Player vivo neste processo (o `CURRENT` do Python). Usado pelos comandos do registry.
+pub fn current() -> Option<Handle>;
+```
+
+`locate`/`stop` chamam `reset()` em todo hook e `CueList::reset()`. `looping` sem `duration`
+não repete (não há fim). O transporte remoto por OSC nunca toca nos Universes direto.
+
+## `engine::registry::base()`
+
+Assinatura muda para `pub fn base() -> Registry` (sem `Clock`: o transporte age no player vivo).
+Comandos: `load` (R0), `pause`, `stop`, `locate`, `cue_go`, `transport_state`. Todos usam
+`player::current()`; sem player vivo devolvem `Err("sem player em execucao")`.
+`play_show` **não** entra aqui: ele monta os hooks de `script` e é registrado pela CLI, como
+`play` e `net` na R0.
+
+## `script` (crate novo)
+
+```rust
+/// Track {"type":"fx","script":"medgrupo.rhai","universe":N}. Compila o .rhai uma vez,
+/// mantém o estado entre frames, expõe `set(universe, addr, values)` ao script.
+pub struct Fx;
+impl Fx { pub fn new(path: &Path, universe: u16) -> Result<Fx, String>; }
+impl engine::FrameHook for Fx { }
+
+/// Graph da seção 10 do PRD, compilado do JSON de `show["graph"]`.
+pub struct Graph;
+impl Graph {
+    pub fn new(spec: &serde_json::Value, sink: Box<dyn engine::EventSink>) -> Result<Graph, String>;
+    pub fn nodes(&self) -> usize;
+}
+impl engine::FrameHook for Graph { }
+
+/// Hooks de um show, na ordem de execução: um Fx por track "fx" + o Graph, se houver.
+pub fn hooks(show: &engine::Show, base: &Path, sink: Box<dyn engine::EventSink>)
+    -> Result<Vec<Box<dyn engine::FrameHook>>, String>;
+```
+
+API mínima exposta ao script Rhai (fixa; o resto é escolha do crate, documentada aqui depois):
+`set(universe, addr, values)` — `values` array de números ou número solto; mesma semântica de
+`Universe::set` (clamp 0..255, truncagem para zero, 1-based, ignora o que passar de 512).
+
+Rhai entra com `default-features = false` e o conjunto mínimo de features que faça o show rodar.
+O tamanho do `spellcore.exe` release é medido antes e depois e vai para a tabela de dependências.
+Medida de referência antes do Rhai (Windows x64, perfil release do workspace): **970 240 bytes**.
+
+### Graph: catálogo fechado (seção 10 do PRD)
+
+`in.widget | in.key | in.osc | in.midi (stub) | in.timer | in.marker | in.state` ·
+`logic.and|or|not|latch|toggle|debounce|counter|select` · `math.map|curve|expr` ·
+`time.delay|hold` · `cmd` · `out.widget|out.osc|out.param|out.notify`.
+
+JSON: `{"nodes":[{"id","type",...}], "edges":[["no.pino","no.pino"], ...]}`. Compila para lista
+de nós em ordem topológica com pinos indexados por inteiro; avaliação por frame sem alocação;
+`math.expr` compila o Rhai uma vez. Ciclo no grafo é erro na compilação. Entradas chegam por
+fila `in.*` pré-alocada (`FrameHook::input`); saídas saem por fila `out.*` pré-alocada, drenada
+para o `EventSink` no fim do frame. Aceite: 500 nós em menos de 0,1 ms por frame
+(`bench/benches/graph.rs`).
+
+## CLI
+
+```
+spellcore play <show.spell> [--loop] [--osc-port N]
+```
+
+`play` é o nome do subcomando; o comando do registry chama-se `play_show` (tabela de alias de
+uma entrada na CLI). A CLI monta `Player`, pede os hooks a `script::hooks`, passa um `EventSink`
+próprio (`Ev::Cmd` -> registry, `Ev::Osc` -> OscOut, `Ev::Notify`/`Widget`/`Param` -> stderr) e
+imprime, **uma linha por segundo, só ASCII**:
+
+```
+t=  12.35s state=play cue=3 frames=372 jit_p99=0.41ms u=1,2
+```
+
+`--osc-port` sobrepõe `transport.osc_port` do `.spell`. Ctrl+C fecha o player e as saídas.
+
+## O show MED GRUPO na R1
+
+`shows/medgrupo.spell` ganha um track `{"type":"fx","script":"medgrupo.rhai","universe":1}` **ao
+lado** do track `pyfx`, que continua no arquivo: o Python ignora `fx` e o Rust ignora `pyfx`, e
+assim `tests/conformance/gen.py` continua regenerando os fixtures a partir do mesmo arquivo.
+`shows/medgrupo_r0.spell` (219 tracks `dmx` assados) continua sendo o show da conformidade
+offline e do bench Criterion.
+
+Aceite do `fx`: `shows/medgrupo.rhai`, portado de `shows/medgrupo.py`, reproduz
+`tests/conformance/medgrupo_u1.bin` nos 2577 frames do universo 1, byte a byte. Divergência de
+ponto flutuante que sobreviver é documentada byte a byte (frame, canal, valor, motivo).
+
+## Ambiente dos agentes
+
+```bash
+export PATH="$PATH:/c/Users/email/.cargo/bin"
+export CARGO_TARGET_DIR="C:/Users/email/AppData/Local/Temp/spellcore_target"
+```
+
+Worktree: `C:\Users\email\AppData\Local\Temp\spellcaster-main`. Nunca `target/` dentro dele.
+Sem `git commit`, sem `git push`. Testes e saída de bench só em ASCII (console cp1252).

@@ -1,4 +1,4 @@
-# Spellcaster — arquitetura (estado em F1)
+# Spellcaster — arquitetura (protótipo Python F0–F6; spellcore Rust R0, R1, R4)
 
 ## Árvore
 
@@ -144,48 +144,83 @@ Todas as saídas expõem `send(universe: int, data: bytes)` e `close()`.
 | F5 MCP | `mcp/server.py` gera tools de `registry.schema()`; resources: show, patch, rede, log | registry, `netscan.scan_all` |
 | F6 portátil e Lite | PyInstaller onedir; `spell serve --headless`, `spell tui` (curses); tarball aarch64 | tudo acima sem `pywebview` |
 
-## spellcore (Rust)
+## spellcore (Rust) — estado em R1 + R4
 
-Core do produto reescrito em Rust (PRD, fase R0). O pacote Python `spellcaster/` continua no repo
+Core do produto reescrito em Rust (PRD v1.1). O pacote Python `spellcaster/` continua no repo
 como implementação de referência e gerador dos fixtures de conformidade; não recebe funcionalidade
-nova. O `spellcore` tem que reproduzir byte a byte a saída sACN/Art-Net do `shows/medgrupo.spell`.
+nova. O `spellcore` reproduz byte a byte a saída sACN/Art-Net do `shows/medgrupo.spell` e os
+bytes/números do `spellcaster/protocols/ilda/`.
 
 ```
 spellcore/
   Cargo.toml     workspace, edition 2021; release: lto "thin", codegen-units 1, panic abort
-  engine/        clock.rs, universe.rs, timeline.rs, show.rs, registry.rs
-  protocols/     lib.rs (trait Output + fila), sacn.rs, artnet.rs, osc.rs, netscan.rs
-  cli/           binário `spellcore`: play, net, commands (gerados do registry em runtime)
-  bench/         Criterion (benches/core.rs) + binários jitter e throughput
+  engine/        clock, universe, timeline, show, registry, cues, hook, player
+  protocols/     lib.rs (trait Output + fila), sacn, artnet, osc, netscan
+  script/        lib.rs (Fx: track `fx` em Rhai), graph.rs (Graph runtime da seção 10 do PRD)
+  laser/         frame (otimização + safety), ild, feed (multi-feed), dac/{etherdream,helios,idn}
+                 bin/feeds (bench de 4 feeds), benches/laser.rs, tests/conformance.rs + fixtures
+  cli/           binário `spellcore`: play, net, commands, load, pause, stop, locate, cue_go,
+                 transport_state (subcomandos gerados do registry em runtime)
+  bench/         Criterion (benches/core.rs, benches/graph.rs) + binários jitter e throughput
 tests/conformance/
   gen.py         gera os fixtures a partir do pacote Python
   medgrupo_u1.bin, sacn_packet.bin, artnet_packet.bin
   capture_sacn.py  valida o binário Rust contra o fixture, ao vivo, em 127.0.0.1
+shows/
+  medgrupo.spell   tracks pyfx (Python) + fx (Rust, `medgrupo.rhai`) + laser; cada lado ignora o outro
+  medgrupo_r0.spell  219 tracks dmx assados (67 161 keys hold): conformidade offline e bench Criterion
 ```
+
+Grafo de dependências: `protocols` autocontido; `engine -> protocols`; `script -> engine, rhai`;
+`laser -> protocols` (só o beacon Ether Dream); `cli -> engine, protocols, script`;
+`bench -> engine, protocols, script`. O engine não conhece GUI, MCP, Rhai nem laser.
 
 ### Contratos
 
 - `Clock::new(fps)`, `Clock::run(FnMut(f64), Option<f64>)`, `stats() -> Stats {p50,p99,max,frames,drift}`.
   Thread em prioridade alta, `timeBeginPeriod(1)` no Windows, fase fixa (`next += period`).
-  A margem de spin antes do alvo é **calibrada em runtime** pelo overshoot medido do `sleep`
-  (EWMA, limitada a 0,3–2 ms): margem fixa de 1 ms custava ~6 % de um núcleo a 60 Hz.
+  Margem de spin calibrada em runtime pelo overshoot medido do `sleep` (EWMA, 0,3–2 ms).
+  **O `t` entregue ao frame é travado no quadro** (`round(t·fps)/fps`): é o mesmo `i/fps` do
+  gerador de fixtures, e sem isso um `fx` contínuo (seno) amostrado no tempo medido diverge em ±1.
 - `Universes` 1-based, buffers `[u8; 512]` pré-alocados, `get_or_create` por busca binária.
 - `Timeline::apply(&mut Universes, t)` sem alocação por frame; keys por `partition_point`.
   Curvas: linear, hold, in, out, inout, bezier — mesmas fórmulas do `timeline/model.py`.
-- `Registry::add::<A: JsonSchema + DeserializeOwned>(nome, doc, fn)`; erro é `String`, sem `anyhow`.
-  CLI, e depois OSC-API, GUI e MCP, são clientes: `Registry::schema()` gera os subcomandos.
+- Ordem fixa do frame: `Timeline::apply` → cada `FrameHook` na ordem de registro (tracks `fx`,
+  depois o Graph) → tracks `osc`/`media`/`cue` → `CueList::update` → I/O. Igual ao `_tick` do Python.
+- `engine::hook`: `trait FrameHook { frame(t, &mut Universes); input(key, value); reset(t) }`,
+  `enum Ev { Cmd, Osc, Widget, Param, Notify }`, `trait EventSink { emit(&Ev) }`. É por aqui que
+  `script` se pluga sem o engine conhecer Rhai.
+- `engine::cues`: `CueList::new(&[Value])`, `go(t, Option<usize>)`, `update(t, &mut Universes)`,
+  `reset()`. Chave `"1/100"` → `(1, 100)`; fade linear; `follow` encadeia.
+- `engine::player`: `Player::new(show, base, looping)`, `hook(Box<dyn FrameHook>)`,
+  `start(osc_port)` (thread de transporte + OscIn `/spellcaster/play|pause|stop|locate`),
+  `Handle {play, pause, stop, locate, cue_go, state}`, `player::current()` é o player vivo do processo.
+- `Registry::add::<A: JsonSchema + DeserializeOwned>(nome, doc, fn)`; erro é `String`.
+  `registry::base()` sem `Clock`: `load`, `pause`, `stop`, `locate`, `cue_go`, `transport_state`
+  agem em `player::current()`. `play_show` e `net` são registrados pela CLI (alias `play`).
 - `trait Output { fn send(&mut self, universe: u16, data: &[u8; 512]); fn close(&mut self); }`.
-  `close(&mut self)` e não `close(self)` do PRD: `Box<dyn Output>` exige object safety.
-- Cada saída tem thread própria e fila de 2 frames **por universo**; ao encher, o frame velho
-  daquele universo é descartado. `send()` nunca bloqueia o engine.
+  Cada saída tem thread própria e fila de 2 frames por universo; `send()` nunca bloqueia o engine.
+- `script::Fx::new(path, universe)`: compila o `.rhai` uma vez, estado persiste entre frames; API
+  exposta ao script: `set(universe, addr, values)`, `set(addr, values)`, `st(i)`/`st(i, v)`
+  (estado). Rhai com `default-features = false` + `std, sync, no_custom_syntax, no_time, only_i64,
+  no_module, no_closure`; `max_expr_depths(256, 256)` porque o default (64/32) recusa o show.
+- `script::Graph::new(&Value, Box<dyn EventSink>)`: catálogo fechado (`in.*`, `logic.*`, `math.*`,
+  `time.*`, `cmd`, `out.*`), ordem topológica na compilação, pinos por índice, zero alocação por frame.
+- `laser`: `Point`, `Frame`, `optimize(&[Point], Safety) -> Vec<Point>` (dwell, blanking,
+  interpolação, limite de kpps, tamanho mínimo de figura), `ild::read/write` (formatos 0, 1, 2, 4, 5),
+  `trait Dac` para Ether Dream (TCP, com `Emulator`), Helios (USB) e IDN (UDP),
+  `Feed::start(Box<dyn Dac>, pps, buffer_frames, Safety)` com thread própria por DAC.
+  Safety é obrigatória no `Feed`: não há caminho para o DAC sem ela.
 
-### O show MED GRUPO na R0
+### Conformidade (o que "byte a byte" mede)
 
-O track `pyfx` é Python e usa estado entre frames (histerese de pan dos movings), logo não existe
-em Rust. `tests/conformance/gen.py` assa o resultado frame a frame em `shows/medgrupo_r0.spell`:
-219 tracks `dmx`, 67 161 keyframes com curva `hold` (degrau exato), tempos truncados em 1 µs para
-nunca arredondarem para cima. É o arquivo que o `spellcore play` toca. O equivalente vivo do
-`pyfx` volta na R1 como track `fx` em script.
+| Teste | Referência | Resultado |
+|---|---|---|
+| `cargo test -p engine` (timeline R0) | `medgrupo_u1.bin` (2577 frames × 512) | igual |
+| `cargo test -p script --test medgrupo` (`medgrupo.rhai`) | `medgrupo_u1.bin` | igual nos 2577 frames |
+| `cargo test -p laser --test conformance` | fixtures de `optimize`/`safety`/`.ild` gerados do Python | igual |
+| `capture_sacn.py` (ao vivo, `medgrupo_r0.spell`) | pacotes sACN recebidos em 127.0.0.1 | 89/89 iguais |
+| `capture_sacn.py --show shows/medgrupo.spell` (ao vivo, fx Rhai) | idem | 89/89 iguais |
 
 ### Como buildar
 
@@ -195,23 +230,27 @@ A pasta do repo está no Google Drive: `target/` nunca pode nascer dentro dela.
 $env:CARGO_TARGET_DIR = "$env:TEMP\spellcore_target"
 cd spellcore
 cargo test --workspace
-cargo build --release
+cargo clippy --workspace --all-targets -- -D warnings
+cargo build --release --workspace
 cargo run --release -p bench --bin jitter
 cargo run --release -p bench --bin throughput
+cargo run --release -p laser --bin feeds -- --secs 30
 cargo bench -p bench
 ```
 
 `spellcore/.cargo/config.toml` (não versionado) fixa o mesmo caminho para quem esquecer a variável;
 `target/` está no `.gitignore` como segunda barreira. Dependências e justificativa: `spellcore/README.md`.
 
-### Números medidos (desktop x64, Windows 11)
+### Números medidos (desktop x64, Windows 11, release)
 
 | Métrica | Alvo do PRD | Medido |
 |---|---|---|
-| Jitter entre frames, 60 Hz, p99 | < 1 ms | 0,42 ms (max 0,57 ms) |
+| Jitter entre frames, 60 Hz, p99 | < 1 ms | 0,22 ms (max 0,28 ms) |
 | Drift em 10 s a 60 Hz | 0 frames | 0 |
-| 16 sACN + 16 Art-Net a 60 Hz | < 3 % de um núcleo | 0,78 % |
+| 16 sACN + 16 Art-Net a 60 Hz | < 3 % de um núcleo | 0,2 % (2,7 % na primeira execução, cache frio) |
 | Boot até o primeiro frame DMX | < 2 s | 0,002 s |
 | RSS em repouso | < 60 MB | 5,6 MB |
-| `Timeline::apply` do show inteiro | — | 3,73 µs (33 ms de orçamento a 30 fps) |
-| Binário `spellcore.exe` release | < 20 MB | 0,95 MB |
+| `Timeline::apply` do show inteiro | — | 3,73 µs |
+| Graph de 500 nós por frame | < 0,1 ms | 8,4 µs (2,0 µs sem `math.expr`) |
+| 4 feeds laser × 30 kpps, cpu das threads de feed | < 1 % de um núcleo | 0,83 % em 30 s (GetThreadTimes quantiza em 15,6 ms: rodar ≥ 30 s) |
+| Binário `spellcore.exe` release | < 20 MB | 2,5 MB (0,95 MB antes do Rhai) |

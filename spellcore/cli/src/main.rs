@@ -1,21 +1,39 @@
-//! `spellcore` — CLI da R0. Os subcomandos NAO sao escritos a mao: sao construidos em runtime a
+//! `spellcore` — CLI da R1. Os subcomandos NAO sao escritos a mao: sao construidos em runtime a
 //! partir de `Registry::schema()`, exatamente como o `spellcaster/cli.py` faz com o registry
-//! Python. Quem tem logica e o registry; a CLI so traduz argv <-> JSON.
+//! Python. Quem tem logica e o registry; a CLI so traduz argv <-> JSON e imprime.
 //!
-//!   spellcore play <show.spell> [--loop]
+//!   spellcore play <show.spell> [--loop] [--osc-port N]
 //!   spellcore net [--json] [--timeout N]
 //!   spellcore commands
 
 use clap::{Arg, ArgAction, ArgMatches};
 use engine::registry::Registry;
-use engine::{show, Clock, Timeline, Universes};
-use protocols::{artnet::ArtNetOut, netscan, sacn::SacnOut, Output};
+use engine::{show, Ev, EventSink, Player, TransportState};
+use protocols::{netscan, osc};
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
-use std::net::Ipv4Addr;
 use std::path::Path;
-use std::time::Duration;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{Duration, Instant};
+
+/// Subcomando da CLI -> comando do registry. UMA entrada: o verbo do produto chama-se
+/// `play_show` (igual ao Python), o operador digita `play`.
+const ALIAS: [(&str, &str); 1] = [("play", "play_show")];
+
+fn as_cli(reg: &str) -> &str {
+    ALIAS
+        .iter()
+        .find(|(_, r)| *r == reg)
+        .map_or(reg, |(c, _)| *c)
+}
+
+fn as_reg(cli: &str) -> &str {
+    ALIAS
+        .iter()
+        .find(|(c, _)| *c == cli)
+        .map_or(cli, |(_, r)| *r)
+}
 
 // ------------------------------------------------------------------ comandos
 
@@ -27,6 +45,9 @@ struct PlayArgs {
     #[serde(default, rename = "loop")]
     #[schemars(rename = "loop")]
     looping: bool,
+    /// Porta do transporte remoto por OSC (sobrepoe transport.osc_port do .spell).
+    #[serde(default)]
+    osc_port: Option<u16>,
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -43,88 +64,159 @@ fn def_timeout() -> f64 {
     2.0
 }
 
-/// Abre as saidas declaradas em `outputs`. Tipo desconhecido vira aviso, nao erro.
-fn open_outputs(sh: &show::Show) -> Result<Vec<Box<dyn Output>>, String> {
-    let mut outs: Vec<Box<dyn Output>> = Vec::new();
-    for c in &sh.outputs {
-        match c {
-            show::OutputCfg::Sacn {
-                universes,
-                priority,
-                source_name,
-                interfaces,
-            } => {
-                let ifaces = interfaces.as_ref().map(|v| {
-                    v.iter()
-                        .filter_map(|s| s.parse::<Ipv4Addr>().ok())
-                        .collect::<Vec<_>>()
-                });
-                let o = SacnOut::with(universes, *priority, source_name, ifaces)
-                    .map_err(|e| format!("sacn: {}", e))?;
-                outs.push(Box::new(o));
+// ------------------------------------------------------------- sink de evento
+
+/// Saida de evento do Graph: `Cmd` vai para o registry, `Osc` para a saida OSC do show, o
+/// resto para o stderr em uma linha ASCII.
+struct CliSink {
+    reg: Registry,
+    osc: Option<osc::OscOut>,
+}
+
+impl CliSink {
+    // ponytail: o sink monta seu proprio `registry::base()` (o transporte age no player vivo por
+    // `player::current()`, nao precisa do registry da CLI) ; passar o registry inteiro quando um
+    // no `cmd` precisar de `net` ou `play_show`.
+    fn new(target: Option<(String, u16)>) -> CliSink {
+        let osc = target.and_then(|(h, p)| match osc::OscOut::new(&h, p) {
+            Ok(o) => Some(o),
+            Err(e) => {
+                eprintln!("aviso: saida osc {}:{} indisponivel: {}", h, p, e);
+                None
             }
-            show::OutputCfg::ArtNet { targets, broadcast } => {
-                let o = ArtNetOut::new(targets.clone(), *broadcast)
-                    .map_err(|e| format!("artnet: {}", e))?;
-                outs.push(Box::new(o));
-            }
-            show::OutputCfg::Unknown(t) => eprintln!("aviso: saida \"{}\" ignorada na R0", t),
+        });
+        CliSink {
+            reg: engine::registry::base(),
+            osc,
         }
     }
-    Ok(outs)
+}
+
+impl EventSink for CliSink {
+    fn emit(&mut self, e: &Ev) {
+        match e {
+            Ev::Cmd { name, args } => {
+                if let Err(err) = self.reg.call(name, args.clone()) {
+                    eprintln!("cmd {}: {}", name, err);
+                }
+            }
+            Ev::Osc { address, args } => match &self.osc {
+                // float32 e' o que o `spellcaster/protocols/osc.py` emite para numero solto.
+                Some(o) => {
+                    let a: Vec<osc::Arg> = args.iter().map(|v| osc::Arg::Float(*v as f32)).collect();
+                    o.send(address, &a);
+                }
+                None => eprintln!("osc {}: show sem saida osc", address),
+            },
+            Ev::Widget { id, prop, value } => eprintln!("widget {}.{}={}", id, prop, value),
+            Ev::Param { target, value } => eprintln!("param {}={}", target, value),
+            Ev::Notify { text } => eprintln!("notify {}", text),
+        }
+    }
+}
+
+/// Host/porta da saida `osc` do .spell. `show::OutputCfg` guarda so' o nome dos tipos que nao
+/// conhece, entao o destino do `out.osc` do Graph sai do JSON cru.
+// ponytail: reabre o arquivo so' para isso ; sair daqui quando `OutputCfg` ganhar variante Osc.
+fn osc_target(path: &Path) -> Option<(String, u16)> {
+    let v: Value = serde_json::from_str(&std::fs::read_to_string(path).ok()?).ok()?;
+    let c = v["outputs"].as_array()?.iter().find(|c| c["type"] == "osc")?;
+    let host = c["host"].as_str().unwrap_or("127.0.0.1").to_string();
+    Some((host, c["port"].as_u64()? as u16))
+}
+
+// ------------------------------------------------------------ play (headless)
+
+/// Uma linha por segundo, largura estavel no `t`, so' ASCII. Sem `\r` e sem barra de progresso:
+/// a saida do play tem que sobreviver a um `ssh ... | tee` no Pi.
+fn status_line(st: &TransportState, jit_p99_ms: f64) -> String {
+    let u: Vec<String> = st.universes.iter().map(|n| n.to_string()).collect();
+    format!(
+        "t={:>7.2}s state={} cue={} frames={} jit_p99={:.2}ms u={}",
+        st.t,
+        st.state,
+        st.cue,
+        st.frames,
+        jit_p99_ms,
+        u.join(",")
+    )
+}
+
+static INT: AtomicBool = AtomicBool::new(false);
+
+/// Ctrl+C vira um flag; quem fecha o player e' o laco do `play`, na thread principal (chamar o
+/// engine de dentro de um handler de sinal nao e' seguro).
+#[cfg(windows)]
+mod sig {
+    use std::sync::atomic::Ordering;
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn SetConsoleCtrlHandler(h: Option<extern "system" fn(u32) -> i32>, add: i32) -> i32;
+    }
+    extern "system" fn on_ctrl(_ty: u32) -> i32 {
+        super::INT.store(true, Ordering::SeqCst);
+        1 // TRUE: tratado, o processo continua vivo ate o `close()`
+    }
+    pub fn trap() {
+        unsafe { SetConsoleCtrlHandler(Some(on_ctrl), 1) };
+    }
+}
+
+#[cfg(not(windows))]
+mod sig {
+    use std::sync::atomic::Ordering;
+    unsafe extern "C" {
+        fn signal(sig: i32, h: usize) -> usize;
+    }
+    extern "C" fn on_sigint(_s: i32) {
+        super::INT.store(true, Ordering::SeqCst);
+    }
+    pub fn trap() {
+        unsafe { signal(2, on_sigint as usize) }; // SIGINT
+    }
 }
 
 fn play(a: PlayArgs) -> Result<Value, String> {
     let path = Path::new(&a.file);
     let sh = show::load(path)?;
-    let mut tl = Timeline::new(&sh)?;
-    let ignored = tl.ignored().join(", ");
-    if !ignored.is_empty() {
-        eprintln!("aviso: tracks ignorados na R0: {}", ignored);
-    }
-    let mut outs = open_outputs(&sh)?;
-    if outs.is_empty() {
-        return Err("show sem saida utilizavel (outputs vazio)".into());
-    }
-    let mut uni = Universes::new();
-    let clock = Clock::new(sh.fps);
-    println!(
-        "{}: {} tracks, {} fps, {:?}s, {} saidas",
-        sh.name,
-        tl.tracks.len(),
-        sh.fps,
-        sh.duration,
-        outs.len()
-    );
+    let base = path.parent().unwrap_or_else(|| Path::new(".")).to_path_buf();
+    let sink: Box<dyn EventSink> = Box::new(CliSink::new(osc_target(path)));
+    let hooks = script::hooks(&sh, &base, sink)?;
+    let name = sh.name.clone();
 
-    // ponytail: todo universo escrito vai para TODAS as saidas do show ; separar os universos
-    // por saida quando um show misturar tracks "dmx" e "artnet" no mesmo numero de universo.
-    let mut frames: u64 = 0;
-    loop {
-        clock.run(
-            |t| {
-                tl.apply(&mut uni, t);
-                for u in uni.iter() {
-                    for o in outs.iter_mut() {
-                        o.send(u.number, &u.data);
-                    }
-                }
-                frames += 1;
-            },
-            sh.duration,
-        );
-        if !a.looping || sh.duration.is_none() {
+    let mut p = Player::new(sh, base, a.looping)?;
+    for h in hooks {
+        p.hook(h);
+    }
+    p.start(a.osc_port)?;
+    let h = p.handle();
+    h.play();
+    sig::trap();
+
+    // Cabecalho sem universos: eles so' existem depois do primeiro frame; quem os mostra e' a
+    // linha de status.
+    let st = h.state();
+    let dur = st.duration.map_or("sem fim".into(), |d| format!("{:.2}s", d));
+    println!("{}: {} fps, {}", name, st.fps, dur);
+    // ponytail: acorda a cada 200 ms so' para ver o Ctrl+C e imprimir o status ; virar condvar
+    // do player se a linha de status precisar de resolucao melhor que 1 s.
+    let mut last = Instant::now();
+    while !p.wait(Some(Duration::from_millis(200))) {
+        if INT.load(Ordering::SeqCst) {
             break;
         }
-        clock.locate(0.0);
-        clock.play();
+        if last.elapsed() >= Duration::from_secs(1) {
+            last = Instant::now();
+            // ponytail: jit_p99 e' o do ultimo `Clock::run` FECHADO (o Clock so' publica stats no
+            // fim do run) ; virar contador vivo se o operador precisar do jitter durante o show.
+            println!("{}", status_line(&h.state(), p.clock().stats().p99 * 1e3));
+        }
     }
-    for o in outs.iter_mut() {
-        o.close();
-    }
-    let st = clock.stats();
-    Ok(json!({"name": sh.name, "frames": frames, "jitter_p99_ms": st.p99 * 1e3,
-              "jitter_max_ms": st.max * 1e3, "drift": st.drift}))
+    let st = h.state();
+    p.close();
+    let s = p.clock().stats();
+    Ok(json!({"name": name, "frames": st.frames, "jitter_p99_ms": s.p99 * 1e3,
+              "jitter_max_ms": s.max * 1e3, "drift": s.drift}))
 }
 
 fn net(a: NetArgs) -> Result<Value, String> {
@@ -136,12 +228,11 @@ fn net(a: NetArgs) -> Result<Value, String> {
     }
 }
 
+/// `play_show` e `net` moram aqui porque so' a CLI conhece `script` e `protocols`; o resto do
+/// transporte vem de `registry::base()`, que age no player vivo (`player::current()`).
 fn registry() -> Registry {
-    // O relogio do `locate` do engine e o do transporte remoto; o `play` cria o seu.
-    // ponytail: `locate`/`pause`/`stop` so agem num player deste processo, que a R0 nao tem
-    // ; ligar no transporte quando a R1 trouxer o Player com OSC.
-    let mut r = engine::registry::base(Clock::new(30));
-    r.add::<PlayArgs>("play", "Toca um show .spell ate o fim ou Ctrl+C.", play);
+    let mut r = engine::registry::base();
+    r.add::<PlayArgs>("play_show", "Toca um show .spell ate o fim ou Ctrl+C.", play);
     r.add::<NetArgs>(
         "net",
         "Varre a rede: interfaces, nos Art-Net, fontes sACN, Ether Dream e sugestoes.",
@@ -192,7 +283,8 @@ fn stat(s: &str) -> &'static str {
 }
 
 /// Um subcomando clap por comando do registry. Parametro sem default vira posicional;
-/// `boolean` vira flag `--nome`; o resto vira `--nome VALOR`.
+/// `boolean` vira flag `--nome`; o resto vira `--nome VALOR`. Convencao das duas pontas:
+/// JSON em snake_case (`osc_port`), argv com traco (`--osc-port`).
 fn subcommand(name: &str, doc: &str, params: &Value) -> clap::Command {
     let mut c = clap::Command::new(stat(name)).about(stat(doc));
     let req: Vec<&str> = params["required"]
@@ -202,13 +294,14 @@ fn subcommand(name: &str, doc: &str, params: &Value) -> clap::Command {
     if let Some(props) = params["properties"].as_object() {
         for (pname, p) in props {
             let id = stat(pname);
+            let long = stat(&pname.replace('_', "-"));
             let mut arg = Arg::new(id).help(stat(p["description"].as_str().unwrap_or("")));
             if kind(p) == "boolean" {
-                arg = arg.long(id).action(ArgAction::SetTrue);
+                arg = arg.long(long).action(ArgAction::SetTrue);
             } else if req.contains(&pname.as_str()) {
                 arg = arg.required(true).value_name(stat(&pname.to_uppercase()));
             } else {
-                arg = arg.long(id).value_name(stat(&pname.to_uppercase()));
+                arg = arg.long(long).value_name(stat(&pname.to_uppercase()));
             }
             c = c.arg(arg);
         }
@@ -239,24 +332,25 @@ fn main() {
 
     let mut app = clap::Command::new("spellcore")
         .version(env!("CARGO_PKG_VERSION"))
-        .about("Spellcaster core (R0): timeline, sACN, Art-Net, OSC, varredura de rede")
+        .about("Spellcaster core (R1): timeline, cues, fx, graph, sACN, Art-Net, OSC, rede")
         .subcommand_required(true)
         .arg_required_else_help(true)
         .subcommand(clap::Command::new("commands").about("Lista o registry em JSON."));
     for e in &entries {
         app = app.subcommand(subcommand(
-            e["name"].as_str().unwrap_or(""),
+            as_cli(e["name"].as_str().unwrap_or("")),
             e["doc"].as_str().unwrap_or(""),
             &e["params"],
         ));
     }
 
     let m = app.get_matches();
-    let (name, sub) = m.subcommand().expect("subcomando obrigatorio");
-    if name == "commands" {
+    let (cli_name, sub) = m.subcommand().expect("subcomando obrigatorio");
+    if cli_name == "commands" {
         println!("{}", serde_json::to_string_pretty(&schema).unwrap_or_default());
         return;
     }
+    let name = as_reg(cli_name);
     let params = entries
         .iter()
         .find(|e| e["name"] == name)
@@ -293,6 +387,7 @@ mod tests {
     fn kind_aceita_option() {
         assert_eq!(kind(&json!({"type": "number"})), "number");
         assert_eq!(kind(&json!({"type": ["string", "null"]})), "string");
+        assert_eq!(kind(&json!({"type": ["integer", "null"]})), "integer");
         assert_eq!(kind(&json!({})), "string");
     }
 
@@ -304,16 +399,17 @@ mod tests {
         let schema = reg.schema();
         let entries = schema.as_array().unwrap();
         let nomes: Vec<&str> = entries.iter().map(|e| e["name"].as_str().unwrap()).collect();
-        assert!(nomes.contains(&"play") && nomes.contains(&"net") && nomes.contains(&"load"));
+        assert!(nomes.contains(&"play_show"), "registry sem play_show: {:?}", nomes);
+        assert!(nomes.contains(&"net") && nomes.contains(&"load"));
 
-        let e = entries.iter().find(|e| e["name"] == "play").unwrap();
+        let e = entries.iter().find(|e| e["name"] == "play_show").unwrap();
         let cmd = subcommand("play", "", &e["params"]);
         let m = cmd
-            .try_get_matches_from(vec!["play", "shows/x.spell", "--loop"])
-            .expect("play aceita posicional + --loop");
+            .try_get_matches_from(vec!["play", "shows/x.spell", "--loop", "--osc-port", "9000"])
+            .expect("play aceita posicional, --loop e --osc-port");
         assert_eq!(
             args_from(&m, &e["params"]).unwrap(),
-            json!({"file": "shows/x.spell", "loop": true})
+            json!({"file": "shows/x.spell", "loop": true, "osc_port": 9000})
         );
 
         let e = entries.iter().find(|e| e["name"] == "net").unwrap();
@@ -325,5 +421,47 @@ mod tests {
             args_from(&m, &e["params"]).unwrap(),
             json!({"timeout": 0.5, "json": true})
         );
+    }
+
+    /// O operador digita `play`; o registry (e o MCP depois) so' conhece `play_show`.
+    #[test]
+    fn alias_play_vira_play_show() {
+        assert_eq!(as_reg("play"), "play_show");
+        assert_eq!(as_cli("play_show"), "play");
+        assert_eq!(as_reg("net"), "net");
+        assert_eq!(as_cli("net"), "net");
+        let reg = registry();
+        assert!(reg.get("play_show").is_some());
+        assert!(reg.get("play").is_none(), "sem comando duplicado");
+    }
+
+    #[test]
+    fn linha_de_status() {
+        let st = TransportState {
+            t: 12.345,
+            state: "play",
+            cue: 3,
+            frames: 372,
+            fps: 30,
+            duration: Some(60.0),
+            universes: vec![1, 2],
+        };
+        assert_eq!(
+            status_line(&st, 0.41),
+            "t=  12.35s state=play cue=3 frames=372 jit_p99=0.41ms u=1,2"
+        );
+        // largura do campo `t` estavel: a linha nao muda de forma entre um segundo e o proximo
+        let parado = TransportState {
+            t: 0.0,
+            state: "stop",
+            cue: -1,
+            frames: 0,
+            fps: 30,
+            duration: None,
+            universes: Vec::new(),
+        };
+        let l = status_line(&parado, 0.0);
+        assert_eq!(l, "t=   0.00s state=stop cue=-1 frames=0 jit_p99=0.00ms u=");
+        assert!(l.is_ascii() && !l.contains('\r'));
     }
 }

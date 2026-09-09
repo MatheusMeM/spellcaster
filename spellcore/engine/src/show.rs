@@ -19,6 +19,11 @@ pub enum OutputCfg {
         targets: Option<Vec<String>>,
         broadcast: bool,
     },
+    /// Saida OSC do Player: tracks `osc` e `media` de reprodutor nao-Capture.
+    Osc {
+        host: String,
+        port: u16,
+    },
     // ponytail: tipo desconhecido guarda so' o nome (o resto da config se perde ao regravar)
     // ; virar Unknown(String, Map) quando laser/media entrarem no `outputs` do Rust.
     Unknown(String),
@@ -54,6 +59,15 @@ impl<'de> Deserialize<'de> for OutputCfg {
                 targets: list("targets"),
                 broadcast: v.get("broadcast").and_then(|x| x.as_bool()).unwrap_or(true),
             },
+            "osc" => OutputCfg::Osc {
+                host: v
+                    .get("host")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("127.0.0.1")
+                    .to_string(),
+                // sem "port" a saida fica em 0 e o Player a ignora (o Python levanta KeyError)
+                port: v.get("port").and_then(|x| x.as_u64()).unwrap_or(0) as u16,
+            },
             "" => return Err(D::Error::custom("output sem \"type\"")),
             other => OutputCfg::Unknown(other.to_string()),
         })
@@ -78,6 +92,9 @@ impl Serialize for OutputCfg {
             }
             OutputCfg::ArtNet { targets, broadcast } => {
                 json!({"type": "artnet", "targets": targets, "broadcast": broadcast}).serialize(s)
+            }
+            OutputCfg::Osc { host, port } => {
+                json!({"type": "osc", "host": host, "port": port}).serialize(s)
             }
             OutputCfg::Unknown(t) => json!({ "type": t }).serialize(s),
         }

@@ -1,4 +1,4 @@
-# Spellcaster — roadmap
+# Spellcaster — roadmap (protótipo Python F0–F7; estado das fases Rust na seção 7)
 
 Show-control portátil da Feitiçaria Industrial: timeline + sACN / Art-Net / OSC / ILDA (laser), GUI web com skins, MCP embutido, player standalone, versão Lite para Raspberry Pi (CLI pura por SSH). Repositório: github.com/MatheusMeM/spellcaster. Pacote Python `spellcaster`, CLI `spell`.
 
@@ -137,3 +137,21 @@ Timecode LTC/MTC in, MIDI in/out, GDTF/MVR import, LaserCube/outros DACs proprie
 
 ## 6. Primeiro passo
 F0 começa extraindo `protocols/sacn.py` e `core/clock.py` de `show_medgrupo.py`, com o show do MED GRUPO como teste de regressão: mesma saída, byte a byte.
+
+## 7. Fases Rust (PRD v1.1) — estado em 09/09/2026
+
+O plano acima (F0–F7) foi o do protótipo Python e está concluído até F6. O produto segue o
+`PRD.md`: core em Rust, previz em Godot, GUI Tauri com Theme/Face/Graph.
+
+| Fase | Aceite (PRD §6) | Estado |
+|---|---|---|
+| R0 core e protocolos | fixtures byte a byte, `bench/jitter` no alvo, CLI `net` | concluída |
+| R1 timeline, cues, .spell, fx, Graph, OSC | graph de 500 nós < 0,1 ms/frame; player headless | concluída (8,4 µs) |
+| R2 mídia (GStreamer, NDI, RTSP, Spout) | 1080p60 no alvo de CPU | pendente (GStreamer não instalado) |
+| R3 pixel mapping wgpu + rayon | 100 000 px a 60 Hz < 2 ms | pendente |
+| R4 laser multi-feed | Ether Dream, Helios, IDN; safety no engine; 4 feeds | concluída (0,83 % cpu) |
+| R5 GUI Tauri | show de 3 min do zero; Face em modo performance | pendente; base em `design/` |
+| R6 previz Godot | 60 fps, 64 fixtures, 2 LED walls | pendente (Godot não instalado) |
+| R7 MCP com rmcp | sessão de IA monta e toca um show sem GUI | pendente (o Python já tem MCP) |
+| R8 empacotamento | onedir, Linux, Pi estático; CI com bench como gate | parcial: CI e artefatos prontos, Pi estático pendente |
+| R9 editores de Face/Graph + painel Agent | operador monta uma Face em 10 min | pendente |

@@ -1,0 +1,16 @@
+[package]
+name = "script"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+engine = { workspace = true }
+serde_json = { workspace = true }
+# rhai minimo: std (sem no_std, precisa de arquivo e float), sync (FrameHook: Send),
+# no_custom_syntax (nenhuma sintaxe nova no show), no_time (relogio vem do engine),
+# only_i64 (um so tipo inteiro), no_module (script nao importa modulo),
+# no_closure (nenhum closure no show). Testado e recusado: no_object corta a sintaxe
+# de metodo `x.len()` e quebra o medgrupo.rhai; no_position poupa 28 672 bytes mas
+# apaga linha/coluna do erro de compilacao do show. ponytail: fila de features fixa ;
+# revisar quando o .rhai do show precisar de mapa, modulo ou closure.
+rhai = { version = "1.26", default-features = false, features = ["std", "sync", "no_custom_syntax", "no_time", "only_i64", "no_module", "no_closure"] }
