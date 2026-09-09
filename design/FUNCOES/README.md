@@ -21,6 +21,14 @@ E no topo de cada um, a tabela de veredito: qual app resolveu melhor cada item.
 | Cenário interativo | `cenario-interativo.md` | (Face sobre o patch) | TEATRO DE PAPEL |
 | Aprendiz (menu principal) | `aprendiz-menu.md` | paleta de comandos | todos |
 | Laser como módulo do graph | `integracao-laser.md` | `spell graph add laser/1` | LASER |
+| Timeline como Arrangement View | `daw-arranjo.md` | `spell timeline` | (editor) |
+| Session View (cues em grade) | `daw-sessao.md` | `spell cue` | TEATRO DE PAPEL |
+| Browser e drag and drop | `browser-dnd.md` | (painel `Alt+5`) | (editor) |
+| Modo de mapeamento | `mapping.md` | `Ctrl+Shift+A` | todos |
+| Áudio e vídeo | `audio-video.md` | `spell play` | (editor) |
+| Pontos falhos da interface atual | `pontos-falhos.md` | (auditoria) | — |
+
+Os seis últimos vieram da frente `daw-pesquisa`: o pedido do Matheus de *"uma interface de uso e funcionalidade e usabilidade e interface que nem o ABLETON"*, com drag and drop de mídia e saídas e mapeamento *"que nem o resolume Ctrl shift A"*. As fontes deles são os manuais do **Ableton Live 12** (online, citado por seção), do **DaVinci Resolve 20** (PDF local, citado por página) e do **Resolume Arena** (online, citado por página); a citação fica na própria linha, como em `timeline-daw.md`, e não há arquivo em `fontes/` para eles.
 
 As auditorias por app, com `path:linha` em cada afirmação, estão em `fontes/` (`blender.md`, `touchdesigner.md`, `resolume.md`, `madmapper.md`, `capture.md`, `chataigne.md`). Os arquivos de função citam as fontes como `[fontes/app.md § Seção]`; a evidência mora lá, não aqui.
 
