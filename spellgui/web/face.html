@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Spellcaster — face</title>
+<link rel="stylesheet" href="../../design/tokens/spellcaster.css">
+<style>
+  /* Kiosk: sem chrome, fonte grande, alvo de toque. Cor so' por token. */
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; overflow: hidden; background: var(--sc-bg); color: var(--sc-fg);
+               font: var(--sc-text-md)/1.2 var(--sc-mono); -webkit-user-select: none; user-select: none; }
+  body { display: flex; flex-direction: column; touch-action: manipulation; }
+  #grid { flex: 1 1 auto; display: grid; gap: var(--sc-gap); padding: var(--sc-gap); }
+  .w { display: flex; flex-direction: column; align-items: center; justify-content: center;
+       gap: var(--sc-gap); background: var(--sc-panel); border: 1px solid var(--sc-line);
+       border-radius: var(--sc-radius); cursor: pointer; outline: none;
+       font-family: var(--sc-label); font-size: var(--sc-text-2xl); letter-spacing: var(--sc-tracking);
+       text-transform: uppercase; color: var(--sc-fg); transition: none; }
+  .w:focus-visible { border-color: var(--sc-accent); }
+  .w-label { cursor: default; font-size: var(--sc-text-lg); color: var(--sc-fg-2); }
+  /* `prop` do out.widget e' o nome da classe (face.js): a pagina pinta as que conhece. */
+  .w.hit, .w.on, .w.glow { background: var(--sc-panel-2); border-color: var(--sc-accent);
+                  color: var(--sc-accent); box-shadow: var(--sc-glow-accent); }
+  .w.alert, .w.live { border-color: var(--sc-live); color: var(--sc-live); box-shadow: var(--sc-glow-live); }
+  .w.off { color: var(--sc-fg-3); border-color: var(--sc-line); box-shadow: none; }
+  .tone-go.on, .tone-go.hit, .tone-go.glow { border-color: var(--sc-go); color: var(--sc-go); box-shadow: var(--sc-glow-go); }
+  .tone-live.on, .tone-live.hit, .tone-live.glow { border-color: var(--sc-live); color: var(--sc-live); box-shadow: var(--sc-glow-live); }
+  .w-fader { width: 90%; }
+  .bar { flex: 0 0 auto; display: flex; gap: var(--sc-gap); align-items: center;
+         padding: 4px 8px; background: var(--sc-panel); border-top: 1px solid var(--sc-line);
+         font-family: var(--sc-label); font-size: var(--sc-text-xs); letter-spacing: var(--sc-tracking);
+         text-transform: uppercase; color: var(--sc-fg-3); }
+  .bar b { color: var(--sc-fg-2); font-weight: normal; }
+  .bar .live { color: var(--sc-go); }
+  #log { margin-left: auto; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 50%; }
+</style>
+</head>
+<body>
+<div id="grid"></div>
+<div class="bar">
+  <span>face <b id="nome">—</b></span>
+  <span>view <b id="view">—</b></span>
+  <span>t <b id="t">00:00:00</b></span>
+  <span>cue <b id="cue">—</b></span>
+  <span id="conn">offline</span>
+  <span id="log"></span>
+</div>
+<script src="bus.js"></script>
+<script src="face.js"></script>
+<script>
+"use strict";
+const q = id => document.getElementById(id);
+const p = new URLSearchParams(location.search);
+const nome = p.get("face") || "quatro";
+// ?offline=1 abre sem engine (python -m http.server); sem isso tenta o WS do `spellcore serve`.
+const bus = new Bus({ offline: p.get("offline") === "1" }).connect();
+
+bus.on("open", () => { q("conn").textContent = "ao vivo"; q("conn").className = "live"; });
+bus.on("close", () => { q("conn").textContent = "offline"; q("conn").className = ""; });
+bus.on("log", d => { q("log").textContent = (d && d.text) || ""; });
+bus.on("transport", d => {
+  if (!d) return;
+  q("t").textContent = new Date((d.t || 0) * 1000).toISOString().slice(11, 19);
+  q("cue").textContent = d.cue === undefined || d.cue < 0 ? "—" : d.cue;
+});
+
+q("nome").textContent = nome;
+// a raiz servida e' a do repo (README de spellgui/web): a face esta' em ../../faces.
+Face.mount(q("grid"), "../../faces/" + nome + ".face.json", bus, { view: p.get("view") })
+  .then(st => { q("view").textContent = st.view.name; })
+  .catch(e => { q("log").textContent = e.message; });
+
+// SHORTCUTS.md: Enter = cue GO, Esc segurado 0,5 s = blackout, Shift+F = tela cheia.
+let esc = 0;
+addEventListener("keydown", e => {
+  if (e.key === "Enter") bus.call("cue_go", {});
+  else if (e.key === "F" && e.shiftKey) document.documentElement.requestFullscreen().catch(() => {});
+  else if (e.key === "Escape" && !esc) esc = setTimeout(() => bus.input("widget:blackout", 1), 500);
+});
+addEventListener("keyup", e => {
+  if (e.key === "Escape") { clearTimeout(esc); esc = 0; }
+});
+</script>
+</body>
+</html>

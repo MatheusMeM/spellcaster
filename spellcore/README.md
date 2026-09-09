@@ -812,3 +812,23 @@ Fora por enquanto, e por quê:
 Teste: `spellcore/cli/tests/mcp.rs` sobe o binário de verdade em stdio, faz `initialize`,
 `tools/list`, `tools/call show_get` no `shows/medgrupo.spell`, lê `spell://commands` e
 `spell://show`, e confere que `play_show` volta na hora sem sujar o stdout.
+
+## `spellgui/web` — o catálogo de comandos como widget
+
+As páginas (`face.html`, `index.html`) não conhecem comando nenhum: leem o `Registry::schema()`
+e montam o formulário a partir do schema de cada `Args` (`widgets.js`: `number` com `min`/`max`
+vira slider, `integer` vira spin, `boolean` vira toggle, `enum` vira select, comando sem
+propriedade vira botão). O congelado desse schema é `spellgui/web/dev/commands.json`, que a
+página usa quando abre sem engine.
+
+| Comando | Faz | Devolve |
+|---|---|---|
+| `commands` (subcomando da CLI) | imprime `Registry::schema()`; é a fonte do `spellgui/web/dev/commands.json` | a lista de comandos com doc e schema |
+
+```
+spellcore commands > spellgui/web/dev/commands.json
+```
+
+`cli/tests/commands_json.rs` falha se algum comando sair do registry ou mudar de schema sem o
+JSON ser regerado. O resto (barramento, Face, como abrir) está em
+`spellgui/web/README.md`.

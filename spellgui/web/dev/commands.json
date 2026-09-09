@@ -1,0 +1,463 @@
+[
+  {
+    "doc": "Carrega um .spell e devolve nome, fps, duracao e tracks.",
+    "name": "load",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "path": {
+          "description": "Caminho do arquivo .spell.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "LoadArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Resumo do .spell aberto (ou do arquivo dado): nome, fps, duracao, saidas, patch, tracks, cues. full=true devolve o .spell inteiro.",
+    "name": "show_get",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "file": {
+          "default": "",
+          "description": "Caminho do .spell a abrir; vazio = o ultimo aberto neste processo.",
+          "type": "string"
+        },
+        "full": {
+          "default": false,
+          "description": "true = o .spell inteiro (o que a GUI desenha) em vez do resumo.",
+          "type": "boolean"
+        }
+      },
+      "title": "ShowGetArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Pausa o player em execucao neste processo.",
+    "name": "pause",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "description": "Comando sem parametro.",
+      "title": "NoArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Para o player em execucao neste processo.",
+    "name": "stop",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "description": "Comando sem parametro.",
+      "title": "NoArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Salta o player para o instante t (segundos).",
+    "name": "locate",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "t": {
+          "description": "Posicao em segundos.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "t"
+      ],
+      "title": "LocateArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Dispara a proxima cue (ou a de indice dado).",
+    "name": "cue_go",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "index": {
+          "default": null,
+          "description": "Indice da cue; ausente = a proxima.",
+          "format": "uint",
+          "minimum": 0.0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "title": "CueGoArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Estado do transporte do player em execucao.",
+    "name": "transport_state",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "description": "Comando sem parametro.",
+      "title": "NoArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Zera o show aberto: novo show, sACN no universo 1, 60 s. Devolve o show inteiro.",
+    "name": "show_new",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "description": "Comando sem parametro.",
+      "title": "NoArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Substitui o show aberto pelo JSON dado. Devolve o show inteiro.",
+    "name": "show_set",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "data": {
+          "description": "O show inteiro: objeto JSON (ou texto JSON)."
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "title": "ShowSetArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Grava o show aberto (sem file, no caminho do ultimo aberto). Devolve o caminho.",
+    "name": "show_save",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "file": {
+          "default": "",
+          "description": "Caminho do .spell; vazio = o do ultimo load/show_get/show_save.",
+          "type": "string"
+        }
+      },
+      "title": "ShowSaveArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Acrescenta um track vazio ao show aberto. Devolve o indice do track.",
+    "name": "track_add",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "address": {
+          "default": 1,
+          "description": "Endereco DMX 1..512 (tracks osc usam texto: passe pelo show_set).",
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "label": {
+          "default": "",
+          "description": "Nome do track (campo `name` do .spell).",
+          "type": "string"
+        },
+        "type": {
+          "default": "dmx",
+          "description": "dmx | artnet | osc | media | cue | fx.",
+          "type": "string"
+        },
+        "universe": {
+          "default": 1,
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "title": "TrackAddArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Remove o track de indice dado. Devolve o track removido.",
+    "name": "track_del",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "index": {
+          "description": "Indice do track em `tracks`.",
+          "format": "uint",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "index"
+      ],
+      "title": "TrackDelArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Cria ou substitui o keyframe do track em t. Devolve os keyframes do track.",
+    "name": "key_set",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "curve": {
+          "default": "linear",
+          "description": "linear | hold | in | out | inout | bezier (curva do segmento que CHEGA neste keyframe).",
+          "type": "string"
+        },
+        "t": {
+          "description": "Instante em segundos.",
+          "format": "double",
+          "type": "number"
+        },
+        "track": {
+          "description": "Indice do track.",
+          "format": "uint",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "value": {
+          "default": null,
+          "description": "255, [255, 0, 0] ou texto (\"play\"); ausente = 0."
+        }
+      },
+      "required": [
+        "t",
+        "track"
+      ],
+      "title": "KeySetArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Apaga o keyframe do track em t (tolerancia 1 ms). Devolve quantos sairam.",
+    "name": "key_del",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "t": {
+          "description": "Instante do keyframe (tolerancia 1 ms).",
+          "format": "double",
+          "type": "number"
+        },
+        "track": {
+          "format": "uint",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "t",
+        "track"
+      ],
+      "title": "KeyDelArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Cria (sem index) ou substitui uma cue: nome, fade, wait, follow e valores DMX. Devolve o indice.",
+    "name": "cue_set",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "fade": {
+          "default": 0.0,
+          "description": "Segundos de fade linear ate os valores.",
+          "format": "double",
+          "type": "number"
+        },
+        "follow": {
+          "default": false,
+          "description": "Ao terminar, dispara a proxima.",
+          "type": "boolean"
+        },
+        "index": {
+          "default": null,
+          "description": "Indice da cue a substituir; ausente = acrescenta no fim.",
+          "format": "uint",
+          "minimum": 0.0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "name": {
+          "default": "",
+          "type": "string"
+        },
+        "values": {
+          "additionalProperties": true,
+          "default": {},
+          "description": "{\"universo/endereco\": valor ou [valores]}; \"100\" = universo 1.",
+          "type": "object"
+        },
+        "wait": {
+          "default": 0.0,
+          "description": "Segundos entre o GO e o inicio do fade.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "title": "CueSetArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Remove a cue de indice dado. Devolve a cue removida.",
+    "name": "cue_del",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "index": {
+          "format": "uint",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "index"
+      ],
+      "title": "CueDelArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Patcheia uma fixture (perfil, universo, endereco); recusa sobreposicao e estouro de 512. Devolve a grade do patch.",
+    "name": "patch_add",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "address": {
+          "default": 1,
+          "description": "Primeiro canal DMX (1..512).",
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "name": {
+          "description": "Nome unico da fixture no show.",
+          "type": "string"
+        },
+        "profile": {
+          "description": "Perfil em profiles/ (sem .json) ou caminho de um .json.",
+          "type": "string"
+        },
+        "universe": {
+          "default": 1,
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "profile"
+      ],
+      "title": "PatchAddArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Tira a fixture do patch pelo nome. Devolve a entrada removida.",
+    "name": "patch_del",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "PatchDelArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Grade do patch do show aberto (nome, perfil, universo, endereco, canais) e o erro de sobreposicao, se houver.",
+    "name": "patch_check",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "description": "Comando sem parametro.",
+      "title": "NoArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Nomes dos perfis disponiveis em profiles/.",
+    "name": "profiles",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "description": "Comando sem parametro.",
+      "title": "NoArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Toca um show .spell ate o fim ou Ctrl+C.",
+    "name": "play_show",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "file": {
+          "description": "Caminho do arquivo .spell.",
+          "type": "string"
+        },
+        "loop": {
+          "default": false,
+          "description": "Repete o show do inicio ao chegar no fim.",
+          "type": "boolean"
+        },
+        "osc_port": {
+          "default": null,
+          "description": "Porta do transporte remoto por OSC (sobrepoe transport.osc_port do .spell).",
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "file"
+      ],
+      "title": "PlayArgs",
+      "type": "object"
+    }
+  },
+  {
+    "doc": "Varre a rede: interfaces, nos Art-Net, fontes sACN, Ether Dream e sugestoes.",
+    "name": "net",
+    "params": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "json": {
+          "default": false,
+          "description": "Devolve o resultado cru em JSON em vez do relatorio de texto.",
+          "type": "boolean"
+        },
+        "timeout": {
+          "default": 2.0,
+          "description": "Segundos de escuta por protocolo.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "title": "NetArgs",
+      "type": "object"
+    }
+  }
+]
