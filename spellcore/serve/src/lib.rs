@@ -19,20 +19,9 @@ use rmcp::transport::streamable_http_server::session::local::LocalSessionManager
 use rmcp::transport::streamable_http_server::{StreamableHttpServerConfig, StreamableHttpService};
 use serde_json::{json, Value};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 use tokio::sync::broadcast;
-
-/// Comandos que so' leem: nao mudam o show, entao nao mexem no `rev`. `load` NAO esta aqui:
-/// carregar outro arquivo troca o show inteiro, e a GUI precisa saber.
-const LEITURA: [&str; 5] = [
-    "show_get",
-    "transport_state",
-    "profiles",
-    "patch_check",
-    "net",
-];
 
 /// Frame binario do monitor: `topic:u8 | universe:u16 LE | 512 bytes`.
 const TOPIC_DMX: u8 = 1;
@@ -49,7 +38,6 @@ enum Out {
 
 struct St {
     reg: Arc<Registry>,
-    rev: AtomicU64,
     tx: broadcast::Sender<Out>,
     dir: PathBuf,
 }
@@ -136,12 +124,18 @@ async fn no_store(req: axum::extract::Request, next: axum::middleware::Next) -> 
 
 // ----------------------------------------------------------------- WebSocket
 
-/// Uma request do WS. `{"id":7,"cmd":"locate","args":{...}}` responde `{"id":7,"result":...}`
-/// ou `{"id":7,"error":"texto"}`; erro de comando NAO derruba a conexao.
+/// Uma request do WS. `{"id":7,"cmd":"locate","args":{...}}` responde
+/// `{"id":7,"result":...,"rev":n}` ou `{"id":7,"error":"texto","rev":n}`; TODA resposta carrega a
+/// revisao do show, e' por ela que a pagina sabe se o `show` que chegar e' eco proprio ou de
+/// outro cliente. Erro de comando NAO derruba a conexao.
 async fn request(st: &Arc<St>, txt: &str) -> String {
     let v: Value = match serde_json::from_str(txt) {
         Ok(v) => v,
-        Err(e) => return json!({"id": null, "error": format!("json invalido: {}", e)}).to_string(),
+        Err(e) => {
+            return json!({"id": null, "error": format!("json invalido: {}", e),
+                          "rev": engine::edit::rev()})
+            .to_string()
+        }
     };
     let id = v.get("id").cloned().unwrap_or(Value::Null);
     let cmd = v
@@ -151,7 +145,9 @@ async fn request(st: &Arc<St>, txt: &str) -> String {
         .to_string();
     let args = v.get("args").cloned().unwrap_or_else(|| json!({}));
     if st.reg.get(&cmd).is_none() {
-        return json!({"id": id, "error": format!("comando desconhecido: {}", cmd)}).to_string();
+        return json!({"id": id, "error": format!("comando desconhecido: {}", cmd),
+                      "rev": engine::edit::rev()})
+        .to_string();
     }
     // `play_show` bloqueia ate o fim do show: roda em thread e a resposta volta na hora (a mesma
     // lista BACKGROUND do MCP; um so' lugar decide o que e' comando de longa duracao).
@@ -163,21 +159,26 @@ async fn request(st: &Arc<St>, txt: &str) -> String {
             }
         });
         let t = format!("{} iniciado em background", cmd);
-        return json!({"id": id, "result": t}).to_string();
+        return json!({"id": id, "result": t, "rev": engine::edit::rev()}).to_string();
     }
     // comando do registry e' sincrono e pode bloquear (arquivo, varredura de rede)
     let (reg, nome) = (st.reg.clone(), cmd.clone());
+    // Nao ha' lista de comandos de leitura: quem diz se o show mudou e' o proprio contador do
+    // engine. Comando que edita sobe `edit::rev()`; comando que so' le, nao.
+    let antes = engine::edit::rev();
     let r = tokio::task::spawn_blocking(move || reg.call(&nome, args)).await;
+    let depois = engine::edit::rev();
     match r {
         Ok(Ok(v)) => {
-            if !LEITURA.contains(&cmd.as_str()) {
-                let rev = st.rev.fetch_add(1, Ordering::SeqCst) + 1;
-                st.evento("show", json!({ "rev": rev }));
+            if depois != antes {
+                st.evento("show", json!({ "rev": depois }));
             }
-            json!({"id": id, "result": v}).to_string()
+            json!({"id": id, "result": v, "rev": depois}).to_string()
         }
-        Ok(Err(e)) => json!({"id": id, "error": e}).to_string(),
-        Err(e) => json!({"id": id, "error": format!("{} caiu: {}", cmd, e)}).to_string(),
+        Ok(Err(e)) => json!({"id": id, "error": e, "rev": depois}).to_string(),
+        Err(e) => {
+            json!({"id": id, "error": format!("{} caiu: {}", cmd, e), "rev": depois}).to_string()
+        }
     }
 }
 
@@ -310,7 +311,6 @@ pub fn serve(reg: Registry, port: u16, dir: PathBuf, show: Option<String>) -> Re
     let (tx, _rx) = broadcast::channel(256);
     let st = Arc::new(St {
         reg: Arc::new(reg),
-        rev: AtomicU64::new(0),
         tx: tx.clone(),
         dir,
     });
@@ -370,13 +370,12 @@ mod tests {
         let (tx, _rx) = broadcast::channel(8);
         Arc::new(St {
             reg: Arc::new(engine::registry::base()),
-            rev: AtomicU64::new(0),
             tx,
             dir: PathBuf::from("."),
         })
     }
 
-    /// A forma da resposta e o contador `rev`: leitura nao mexe nele, edicao mexe.
+    /// A forma da resposta e o contador unico do engine: leitura nao mexe nele, edicao mexe.
     #[tokio::test]
     async fn request_responde_por_id_e_conta_rev() {
         let st = st();
@@ -385,12 +384,13 @@ mod tests {
                 .unwrap();
         assert_eq!(r["id"], json!(7));
         assert!(r["result"]["name"].is_string(), "{}", r);
-        assert_eq!(st.rev.load(Ordering::SeqCst), 1, "show_new e' edicao");
+        let apos_edicao = r["rev"].as_u64().expect("resposta carrega rev");
+        assert_eq!(apos_edicao, engine::edit::rev(), "show_new e' edicao");
 
         let r: Value =
             serde_json::from_str(&request(&st, r#"{"id":8,"cmd":"show_get"}"#).await).unwrap();
         assert_eq!(r["id"], json!(8));
-        assert_eq!(st.rev.load(Ordering::SeqCst), 1, "show_get e' leitura");
+        assert_eq!(r["rev"], json!(apos_edicao), "show_get e' leitura");
 
         // erro de comando volta como {"id","error"}, nao como panico nem conexao fechada
         let r: Value =
@@ -401,7 +401,7 @@ mod tests {
         assert_eq!(r["error"], json!("comando desconhecido: nao_existe"));
         let r: Value = serde_json::from_str(&request(&st, "isso nao e json").await).unwrap();
         assert!(r["error"].as_str().unwrap().starts_with("json invalido"));
-        assert_eq!(st.rev.load(Ordering::SeqCst), 1, "erro nao conta rev");
+        assert_eq!(engine::edit::rev(), apos_edicao, "erro nao conta rev");
     }
 
     /// `out.widget` do graph, vindo do sink da CLI, sai no WS com a forma do contrato.

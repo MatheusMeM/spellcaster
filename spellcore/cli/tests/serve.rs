@@ -216,19 +216,20 @@ fn barramento_http_ws_monitor_e_mcp() {
     let r = ws.ate(5.0, |v| v["id"] == json!(1));
     assert_eq!(r["result"]["fps"], json!(30), "{}", r);
 
+    // toda resposta carrega o `rev` do engine; edicao emite `show` com o MESMO numero
+    let rev0 = r["rev"].as_u64().expect("resposta carrega rev");
     ws.send(2, "key_set", json!({"track": 0, "t": 3.0, "value": 42}));
     let r = ws.ate(5.0, |v| v["id"] == json!(2));
     assert!(r["error"].is_null(), "key_set: {}", r);
+    let rev1 = r["rev"].as_u64().expect("resposta carrega rev");
+    assert!(rev1 > rev0, "key_set edita: {} > {}", rev1, rev0);
     let ev = ws.ate(5.0, |v| v["event"] == json!("show"));
-    assert_eq!(ev["data"]["rev"], json!(1), "primeira edicao = rev 1");
+    assert_eq!(ev["data"]["rev"], json!(rev1), "show com o rev da resposta");
 
-    // leitura nao mexe no rev: a proxima edicao ainda e' a 2
-    ws.send(3, "show_get", json!({}));
-    ws.ate(5.0, |v| v["id"] == json!(3));
-    ws.send(4, "key_del", json!({"track": 0, "t": 3.0}));
-    ws.ate(5.0, |v| v["id"] == json!(4));
-    let ev = ws.ate(5.0, |v| v["event"] == json!("show"));
-    assert_eq!(ev["data"]["rev"], json!(2));
+    // leitura nao mexe no rev e NAO emite show: o `locate` abaixo so' aparece na resposta
+    ws.send(3, "locate", json!({"t": 1.0}));
+    let r = ws.ate(5.0, |v| v["id"] == json!(3));
+    assert_eq!(r["rev"], json!(rev1), "locate e' leitura: {}", r);
 
     // `load` de outro arquivo troca o show inteiro: nao e' leitura, tem que avisar a GUI
     ws.send(
@@ -238,8 +239,11 @@ fn barramento_http_ws_monitor_e_mcp() {
     );
     let r = ws.ate(10.0, |v| v["id"] == json!(10));
     assert!(r["error"].is_null(), "load: {}", r);
+    let rev2 = r["rev"].as_u64().expect("resposta carrega rev");
+    assert!(rev2 > rev1, "load incrementa rev: {} > {}", rev2, rev1);
+    // o unico `show` pendente e' o do load: o `locate` no meio nao emitiu nenhum
     let ev = ws.ate(5.0, |v| v["event"] == json!("show"));
-    assert_eq!(ev["data"]["rev"], json!(3), "load incrementa rev: {}", ev);
+    assert_eq!(ev["data"]["rev"], json!(rev2), "load incrementa rev: {}", ev);
 
     // ---- transporte e monitor binario: `--show` deixou o player parado em t=0
     let ev = ws.ate(5.0, |v| {

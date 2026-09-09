@@ -307,8 +307,13 @@ fn remove(doc: &mut Value, path: &str) -> Result<Value, String> {
 
 /// Uma operacao; devolve a operacao que a desfaz (`test` nao desfaz nada).
 fn operar(doc: &mut Value, o: &PatchOp) -> Result<Option<Value>, String> {
+    let valor = || {
+        o.value
+            .clone()
+            .ok_or_else(|| format!("op {:?} em {:?}: falta value", o.op, o.path))
+    };
     Ok(Some(match o.op.as_str() {
-        "add" => match add(doc, &o.path, o.value.clone())? {
+        "add" => match add(doc, &o.path, valor()?)? {
             (p, Some(v)) => json!({"op": "replace", "path": p, "value": v}),
             (p, None) => json!({"op": "remove", "path": p}),
         },
@@ -320,15 +325,16 @@ fn operar(doc: &mut Value, o: &PatchOp) -> Result<Option<Value>, String> {
             let alvo = doc
                 .pointer_mut(&o.path)
                 .ok_or_else(|| format!("path {:?} nao existe", o.path))?;
-            let v = std::mem::replace(alvo, o.value.clone());
+            let v = std::mem::replace(alvo, valor()?);
             json!({"op": "replace", "path": o.path, "value": v})
         }
         "test" => {
             let v = doc
                 .pointer(&o.path)
                 .ok_or_else(|| format!("test: path {:?} nao existe", o.path))?;
-            if *v != o.value {
-                return Err(format!("test: {} e' {} e nao {}", o.path, v, o.value));
+            let esperado = valor()?;
+            if *v != esperado {
+                return Err(format!("test: {} e' {} e nao {}", o.path, v, esperado));
             }
             return Ok(None);
         }
@@ -508,9 +514,9 @@ pub struct PatchOp {
     /// JSON Pointer (RFC 6901) dentro do show: "/fps", "/tracks/-", "/tracks/0/keys/2",
     /// "/graph/nodes". O documento inteiro ("") nao e' alvo: para isso ha' show_set.
     pub path: String,
-    /// Valor de add, replace e test.
+    /// Valor de add, replace e test; `remove` nao usa. Ausente nos tres primeiros = erro.
     #[serde(default)]
-    pub value: Value,
+    pub value: Option<Value>,
 }
 
 #[derive(Deserialize, JsonSchema)]

@@ -312,7 +312,7 @@ Contrato (as outras frentes leem daqui, palavra por palavra):
 ```
 HTTP  GET /commands -> Registry::schema()   GET /show -> show_get full   GET /<arquivo> -> <--dir>/<arquivo>
 WS    /ws  request  {"id":7,"cmd":"locate","args":{"t":12.5}}
-           resposta {"id":7,"result":...} | {"id":7,"error":"texto"}
+           resposta {"id":7,"result":...,"rev":n} | {"id":7,"error":"texto","rev":n}
            evento   {"event":"transport","data":<TransportState>} | {"event":"show","data":{"rev":n}} | {"event":"log","data":{"text":...}} | {"event":"widget","data":{"id","prop","value"}}
            binário  topic:u8 | universe:u16 LE | 512 bytes   (topic 1 = dmx de saída)
 Comando `input {key, value}` no registry alimenta FrameHook::input do player vivo (chaves "widget:go", "key:Space", "module:laser/stat/fps").
@@ -325,7 +325,7 @@ Comando `input {key, value}` no registry alimenta FrameHook::input do player viv
 | estático | só segmentos simples relativos: `..`, segmento vazio, `\` e `:` são recusados com 403 antes de tocar o disco; o caminho não é percent-decodificado. `/` = `index.html` |
 | comando | cada request do WS chama `Registry::call`; erro do comando volta como `{"id","error"}` e **não** derruba a conexão |
 | `play_show` | está no `BACKGROUND` do crate `mcp`: roda em thread e a resposta volta na hora, com `"<cmd> iniciado em background"`; erro vira evento `log` |
-| `rev` | contador do processo. Todo comando bem-sucedido cujo nome **não** esteja em `LEITURA = [show_get, transport_state, profiles, patch_check, net]` incrementa `rev` e faz broadcast `{"event":"show","data":{"rev":n}}`. `load` **não** é leitura: troca o show inteiro |
+| `rev` | contador único, o do engine (`engine::edit::rev()`). Não há lista de comandos de leitura: o `serve` lê `rev()` antes e depois de cada chamada, **toda** resposta carrega o `rev` de depois, e o broadcast `{"event":"show","data":{"rev":n}}` sai **só** quando o número mudou. `load` e `show_get {file}` trocam o show inteiro e por isso incrementam |
 | `transport` | a cada mudança de estado e a 10 Hz enquanto o player anda (sondagem de `player::current()`) |
 | `widget` | `out.widget` do graph (o `Ev::Widget` que o sink da CLI recebe) vira `{"event":"widget","data":{"id","prop","value"}}` |
 | monitor | um `FrameHook` global copia os universos do frame, no máximo a 40 Hz e só quando há cliente WS; sai como frame binário de 515 bytes |
