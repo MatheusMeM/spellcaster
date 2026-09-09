@@ -9,6 +9,7 @@ use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::path::Path;
+use std::sync::Mutex;
 
 pub struct Command {
     pub name: String,
@@ -107,9 +108,75 @@ pub struct CueGoArgs {
     pub index: Option<usize>,
 }
 
+#[derive(Deserialize, JsonSchema)]
+pub struct ShowGetArgs {
+    /// Caminho do .spell a abrir; vazio = o ultimo aberto neste processo.
+    #[serde(default)]
+    pub file: String,
+}
+
 /// Comando sem parametro.
 #[derive(Deserialize, JsonSchema)]
 pub struct NoArgs {}
+
+/// Ultimo .spell aberto neste processo (o `OPEN` do `spellcaster/mcp/tools.py`): (caminho, show).
+// ponytail: um show aberto por processo, gravado por `load` e `show_get` ; virar id de sessao
+// quando a GUI abrir dois shows ao mesmo tempo. `play_show` NAO grava aqui (mora na CLI, que
+// nao ve este estado): depois de um play, `show_get` continua pedindo `file`.
+static OPEN: Mutex<Option<(String, show::Show)>> = Mutex::new(None);
+
+fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// Resumo do show para a IA e para o resource `spell://show` (mesmos campos do `summary()` do
+/// `spellcaster/mcp/tools.py`), mais o transporte vivo quando ha player rodando.
+fn resumo(file: &str, sh: &show::Show) -> Value {
+    let outputs: Vec<String> = sh
+        .outputs
+        .iter()
+        .map(|o| {
+            serde_json::to_value(o)
+                .ok()
+                .and_then(|v| v["type"].as_str().map(str::to_string))
+                .unwrap_or_default()
+        })
+        .collect();
+    let campo = |t: &Value, ks: [&str; 3]| {
+        ks.iter()
+            .find_map(|k| t.get(*k).filter(|v| !v.is_null()).cloned())
+            .unwrap_or(Value::Null)
+    };
+    let tracks: Vec<Value> = sh
+        .tracks
+        .iter()
+        .map(|t| {
+            json!({"type": t.get("type").cloned().unwrap_or(Value::Null),
+                   "name": campo(t, ["name", "fixture", "script"]),
+                   "universe": t.get("universe").cloned().unwrap_or(json!(1))})
+        })
+        .collect();
+    let cues: Vec<Value> = sh
+        .extra
+        .get("cues")
+        .and_then(|c| c.as_array())
+        .map(|a| {
+            a.iter()
+                .map(|c| {
+                    json!({"name": c.get("name").cloned().unwrap_or(Value::Null),
+                           "fade": c.get("fade").cloned().unwrap_or(json!(0.0)),
+                           "wait": c.get("wait").cloned().unwrap_or(json!(0.0)),
+                           "follow": c.get("follow").and_then(|v| v.as_bool()).unwrap_or(false)})
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let transport = player::current()
+        .and_then(|h| serde_json::to_value(h.state()).ok())
+        .unwrap_or(Value::Null);
+    json!({"aberto": true, "name": sh.name, "file": file, "fps": sh.fps, "duration": sh.duration,
+           "outputs": outputs, "tracks": tracks, "cues": cues, "transport": transport})
+}
 
 /// O player vivo neste processo, ou o erro que todo comando de transporte devolve sem ele.
 fn vivo() -> Result<player::Handle, String> {
@@ -127,9 +194,26 @@ pub fn base() -> Registry {
     r.add::<LoadArgs>("load", "Carrega um .spell e devolve nome, fps, duracao e tracks.", |a| {
         let sh = show::load(Path::new(&a.path))?;
         let tl = Timeline::new(&sh)?;
-        Ok(json!({"name": sh.name, "fps": tl.fps, "duration": tl.duration,
-                  "tracks": tl.tracks.len(), "ignored": tl.ignored()}))
+        let out = json!({"name": sh.name, "fps": tl.fps, "duration": tl.duration,
+                         "tracks": tl.tracks.len(), "ignored": tl.ignored()});
+        *lock(&OPEN) = Some((a.path.clone(), sh));
+        Ok(out)
     });
+    r.add::<ShowGetArgs>(
+        "show_get",
+        "Resumo do .spell aberto (ou do arquivo dado): nome, fps, duracao, saidas, tracks, cues.",
+        |a| {
+            if !a.file.is_empty() {
+                let sh = show::load(Path::new(&a.file))?;
+                *lock(&OPEN) = Some((a.file.clone(), sh));
+            }
+            match &*lock(&OPEN) {
+                Some((f, sh)) => Ok(resumo(f, sh)),
+                None => Ok(json!({"aberto": false,
+                                  "dica": "chame show_get com file=<caminho.spell>"})),
+            }
+        },
+    );
     r.add::<NoArgs>("pause", "Pausa o player em execucao neste processo.", |_| {
         let h = vivo()?;
         h.pause();
@@ -188,7 +272,7 @@ mod tests {
     #[test]
     fn base_tem_transporte_e_load() {
         let r = base();
-        for c in ["load", "pause", "stop", "locate", "cue_go", "transport_state"] {
+        for c in ["load", "show_get", "pause", "stop", "locate", "cue_go", "transport_state"] {
             assert!(r.get(c).is_some(), "comando {} ausente", c);
         }
         // ponytail: o teste so' vale quando nao ha player neste processo — os testes do player
@@ -208,5 +292,24 @@ mod tests {
             );
         }
         assert!(r.call("load", json!({"path": "nao_existe.spell"})).is_err());
+    }
+
+    /// `show_get` sem show aberto avisa; com `file` abre, resume e fica aberto para a proxima
+    /// chamada (e' o que alimenta o resource `spell://show` do MCP).
+    #[test]
+    fn show_get_abre_e_lembra() {
+        let r = base();
+        assert_eq!(r.call("show_get", json!({})).unwrap()["aberto"], json!(false));
+        let p = concat!(env!("CARGO_MANIFEST_DIR"), "/../../shows/medgrupo.spell");
+        let d = r.call("show_get", json!({ "file": p })).unwrap();
+        assert_eq!(d["aberto"], json!(true));
+        assert_eq!(d["fps"], json!(30));
+        assert!(d["file"].as_str().unwrap().ends_with("medgrupo.spell"));
+        assert!(!d["tracks"].as_array().unwrap().is_empty());
+        assert!(d["outputs"].as_array().unwrap().iter().any(|o| o == "sacn"));
+        assert_eq!(d["transport"], Value::Null, "sem player neste binario de teste");
+        // sem `file`, devolve o mesmo show
+        assert_eq!(r.call("show_get", json!({})).unwrap(), d);
+        assert!(r.call("show_get", json!({"file": "nao_existe.spell"})).is_err());
     }
 }

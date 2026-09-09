@@ -1,4 +1,4 @@
-# spellcore — core do Spellcaster em Rust (R0, R1, R3, R4)
+# spellcore — core do Spellcaster em Rust (R0, R1, R3, R4, R7)
 
 Workspace Cargo com o engine, os protocolos, a CLI e o bench. Sem GUI, sem Godot, sem mídia.
 O pacote Python `spellcaster/` continua sendo a implementação de referência: o spellcore tem
@@ -10,7 +10,8 @@ spellcore/
   engine/           clock, universe, timeline (keys/curvas), show (.spell v1), registry
   protocols/        trait Output, sacn, artnet, osc, netscan
   pixelmap/         amostragem de frame -> bytes DMX por universo (rayon); bin `map_bench`
-  cli/              binário `spellcore`: play, net, commands
+  mcp/              servidor MCP (rmcp, stdio) + `mcp install`
+  cli/              binário `spellcore`: play, net, commands, mcp
   bench/            Criterion + binários `jitter` e `throughput`
 ```
 
@@ -58,7 +59,7 @@ Alvos da tabela do PRD (desktop x64) e o que foi medido nesta máquina (Windows 
 | 16 sACN + 16 Art-Net a 60 Hz | < 3 % de um núcleo | 0,78 % |
 | Boot até o primeiro frame DMX | < 2 s | 0,002 s |
 | RSS em repouso | < 60 MB | 5,6 MB |
-| `spellcore.exe` release | < 20 MB | 0,95 MB |
+| `spellcore.exe` release | < 20 MB | 0,95 MB (R0) / 3,8 MB com Rhai e rmcp |
 | Pixel mapping, 100 000 px a 60 Hz (CPU) | < 2 ms por frame | 0,105 ms p50, 0,316 ms p99 |
 
 Criterion: `Timeline::apply` do show inteiro (219 tracks, 67 161 keyframes) em 3,73 µs;
@@ -75,8 +76,9 @@ C:\Python313\python.exe tests/conformance/capture_sacn.py --secs 3
 | Crate | Onde | Por quê |
 |---|---|---|
 | `serde` + `serde_json` | engine, protocols, cli | o `.spell` e o `net --json` são JSON; nada na stdlib lê JSON |
-| `schemars` | engine (registry), cli | schema JSON de cada comando, consumido pela CLI e depois pelo MCP |
-| `clap` | cli | parser de argumentos com subcomandos gerados do registry em runtime |
+| `schemars` | engine (registry) | schema JSON de cada comando, consumido pela CLI e pelas tools do MCP; reexportado em `engine::schemars` para que `cli` não pine a própria versão |
+| `clap` (feature `derive`) | cli | parser de argumentos; quatro subcomandos em structs fixas |
+| `rmcp` + `tokio` | mcp | SDK oficial do Model Context Protocol; é async, e o runtime `current_thread` mora só dentro de `mcp::serve_stdio` |
 | `socket2` | protocols | `std::net::UdpSocket` não expõe `IP_MULTICAST_IF` nem `SO_REUSEADDR`, exigidos por sACN |
 | `criterion` | bench, laser, pixelmap (dev) | medida estatística de jitter/latência exigida pelo PRD |
 | `rayon` | pixelmap | 100 000 px por frame em ~590 universos independentes; pool de trabalho sem escrever um |
@@ -311,12 +313,18 @@ Regenerar: `C:\Python313\python.exe tests/conformance/gen.py`.
 ## CLI
 
 ```
-spellcore play <show.spell> [--loop]     toca o show (sACN / Art-Net conforme "outputs")
-spellcore net [--json] [--timeout N]     varredura de rede (Art-Net, sACN, Ether Dream) + sugestões
-spellcore commands                       lista o registry (nome, doc, schema)
+spellcore play <show.spell> [--loop] [--osc-port N]   toca o show (sACN / Art-Net conforme "outputs")
+spellcore net [--json] [--timeout N]                  varredura de rede + sugestões
+spellcore commands                                    lista o registry (nome, doc, schema)
+spellcore mcp                                         servidor MCP em stdio
+spellcore mcp install --target desktop|code [--yes]   registra o servidor no Claude
 ```
 
-Os subcomandos são construídos em runtime a partir de `Registry::schema()`.
+Os quatro subcomandos são structs `clap::Args` fixas. `PlayArgs` e `NetArgs` servem as duas
+pontas: `clap` para o argv e `JsonSchema` + `Deserialize` para o registry. O transporte
+(`load`, `show_get`, `pause`, `stop`, `locate`, `cue_go`, `transport_state`) continua no
+registry mas **não** é subcomando: ele age no player vivo NESTE processo, e um segundo
+processo não tem player nenhum. Quem os usa é o MCP (e, depois, a GUI).
 
 ---
 
@@ -464,8 +472,11 @@ não repete (não há fim). O transporte remoto por OSC nunca toca nos Universes
 ## `engine::registry::base()`
 
 Assinatura muda para `pub fn base() -> Registry` (sem `Clock`: o transporte age no player vivo).
-Comandos: `load` (R0), `pause`, `stop`, `locate`, `cue_go`, `transport_state`. Todos usam
-`player::current()`; sem player vivo devolvem `Err("sem player em execucao")`.
+Comandos: `load` (R0), `pause`, `stop`, `locate`, `cue_go`, `transport_state` e, desde a R7,
+`show_get`. Os de transporte usam `player::current()`; sem player vivo devolvem
+`Err("sem player em execucao")`. `show_get(file="")` abre o `.spell` (ou reusa o último aberto
+neste processo, o `OPEN` do `spellcaster/mcp/tools.py`) e resume nome, fps, duração, saídas,
+tracks, cues e o transporte vivo; é ele que alimenta o resource `spell://show`.
 `play_show` **não** entra aqui: ele monta os hooks de `script` e é registrado pela CLI, como
 `play` e `net` na R0.
 
@@ -518,8 +529,8 @@ para o `EventSink` no fim do frame. Aceite: 500 nós em menos de 0,1 ms por fram
 spellcore play <show.spell> [--loop] [--osc-port N]
 ```
 
-`play` é o nome do subcomando; o comando do registry chama-se `play_show` (tabela de alias de
-uma entrada na CLI). A CLI monta `Player`, pede os hooks a `script::hooks`, passa um `EventSink`
+`play` é o nome do subcomando; o comando do registry chama-se `play_show` (a partir da R7 são
+dois nomes literais no código da CLI, não mais uma tabela de alias). A CLI monta `Player`, pede os hooks a `script::hooks`, passa um `EventSink`
 próprio (`Ev::Cmd` -> registry, `Ev::Osc` -> OscOut, `Ev::Notify`/`Widget`/`Param` -> stderr) e
 imprime, **uma linha por segundo, só ASCII**:
 
@@ -550,3 +561,39 @@ export CARGO_TARGET_DIR="C:/Users/email/AppData/Local/Temp/spellcore_target"
 
 Worktree: `C:\Users\email\AppData\Local\Temp\spellcaster-main`. Nunca `target/` dentro dele.
 Sem `git commit`, sem `git push`. Testes e saída de bench só em ASCII (console cp1252).
+
+---
+
+# R7 — MCP (crate `mcp`)
+
+Servidor MCP sobre o SDK oficial `rmcp` 3.2. Porte do `spellcaster/mcp/server.py`: **as tools
+saem do registry**, nada de lógica de produto no crate.
+
+```
+spellcore mcp                                       # stdio: uma mensagem JSON-RPC por linha
+spellcore mcp install --target desktop              # %APPDATA%\Claude\claude_desktop_config.json
+spellcore mcp install --target code [--path P]      # .mcp.json do diretório corrente
+```
+
+| Superfície | Conteúdo |
+|---|---|
+| tools | uma por comando de `Registry::iter()`: `load`, `show_get`, `pause`, `stop`, `locate`, `cue_go`, `transport_state`, `play_show`, `net`. `inputSchema` = o schema que o `schemars` gerou do struct de argumentos |
+| resources | `spell://show` (o `.spell` aberto: fps, duração, saídas, tracks, cues, transporte vivo) e `spell://commands` (o registry inteiro em JSON) |
+| erro | erro de comando volta como `isError: true` com o texto (o cliente lê); só rota inexistente vira erro JSON-RPC |
+| `play_show` | bloqueia até o fim do show, então roda em thread e a tool volta na hora (o `BACKGROUND` do Python). Enquanto o MCP roda, a linha de status do `play` vai para o **stderr**: no stdio o stdout é o canal JSON-RPC |
+
+Fora por enquanto, e por quê:
+
+- **HTTP streamable.** O `rmcp` traz `StreamableHttpService`, mas é um `tower::Service`: virar
+  servidor ainda exige axum/hyper (feature `server-side-http`, +11 crates). Entra quando houver
+  MCP remoto no Pi, junto com o `serve` da GUI.
+- **`face_get`/`face_patch`/`graph_get`/`graph_patch`/`theme_set`** (PRD §10). O `engine::show`
+  não tem Face nem Theme serializados, e o Graph só existe compilado dentro do `script`; sem
+  estrutura para ler e aplicar JSON Patch, essas tools não teriam backend.
+- **`mcp_install` como comando do registry.** No Python ele é `@command` e portanto uma tool.
+  Aqui não: uma sessão de IA não deve reescrever a própria configuração — quem instala é o
+  operador, pelo terminal.
+
+Teste: `spellcore/cli/tests/mcp.rs` sobe o binário de verdade em stdio, faz `initialize`,
+`tools/list`, `tools/call show_get` no `shows/medgrupo.spell`, lê `spell://commands` e
+`spell://show`, e confere que `play_show` volta na hora sem sujar o stdout.

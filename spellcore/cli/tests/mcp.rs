@@ -1,0 +1,194 @@
+//! O servidor MCP como o Claude o ve: `spellcore mcp` em stdio, uma mensagem JSON-RPC por linha.
+//! Sobe o binario de verdade (nao o `Spell` em memoria) porque o que quebra na pratica e' o
+//! empacotamento: subcomando errado, stdout sujo, registry incompleto.
+
+use serde_json::{json, Value};
+use std::io::{BufRead, BufReader, Write};
+use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+
+const SHOW: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../shows/medgrupo.spell");
+
+struct Mcp {
+    p: Child,
+    inp: ChildStdin,
+    out: BufReader<ChildStdout>,
+}
+
+impl Mcp {
+    fn start() -> Mcp {
+        let mut p = Command::new(env!("CARGO_BIN_EXE_spellcore"))
+            .arg("mcp")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("spellcore mcp");
+        let inp = p.stdin.take().expect("stdin");
+        let out = BufReader::new(p.stdout.take().expect("stdout"));
+        Mcp { p, inp, out }
+    }
+
+    fn send(&mut self, m: Value) {
+        writeln!(self.inp, "{}", m).expect("escrever no servidor");
+        self.inp.flush().expect("flush");
+    }
+
+    /// Envia a request e devolve o `result` da resposta com o mesmo id (pula notificacoes).
+    fn call(&mut self, id: u32, method: &str, params: Value) -> Value {
+        self.send(json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params}));
+        loop {
+            let mut l = String::new();
+            let n = self.out.read_line(&mut l).expect("ler do servidor");
+            assert!(n > 0, "servidor fechou o stdout esperando {}", method);
+            let v: Value = match serde_json::from_str(&l) {
+                Ok(v) => v,
+                Err(e) => panic!("stdout nao e' JSON-RPC ({}): {:?}", e, l),
+            };
+            if v["id"] == json!(id) {
+                assert!(v["error"].is_null(), "{}: {}", method, v["error"]);
+                return v["result"].clone();
+            }
+        }
+    }
+}
+
+impl Drop for Mcp {
+    fn drop(&mut self) {
+        self.p.kill().ok();
+        self.p.wait().ok();
+    }
+}
+
+/// Texto da primeira parte de um `tools/call`.
+fn texto(r: &Value) -> String {
+    r["content"][0]["text"].as_str().unwrap_or_default().to_string()
+}
+
+#[test]
+fn handshake_tools_e_resources() {
+    let mut m = Mcp::start();
+
+    let init = m.call(
+        1,
+        "initialize",
+        json!({"protocolVersion": "2025-06-18", "capabilities": {},
+               "clientInfo": {"name": "teste", "version": "0"}}),
+    );
+    assert_eq!(init["serverInfo"]["name"], json!("spellcaster"));
+    assert!(init["capabilities"]["tools"].is_object());
+    assert!(init["capabilities"]["resources"].is_object());
+    assert!(init["instructions"].as_str().unwrap().contains("show_get"));
+    m.send(json!({"jsonrpc": "2.0", "method": "notifications/initialized"}));
+
+    // tools/list: uma tool por comando do registry da CLI, com o schema do schemars
+    let tools = m.call(2, "tools/list", json!({}));
+    let nomes: Vec<&str> = tools["tools"]
+        .as_array()
+        .expect("tools")
+        .iter()
+        .map(|t| t["name"].as_str().unwrap_or(""))
+        .collect();
+    for n in [
+        "load",
+        "show_get",
+        "pause",
+        "stop",
+        "locate",
+        "cue_go",
+        "transport_state",
+        "play_show",
+        "net",
+    ] {
+        assert!(nomes.contains(&n), "tool {} ausente: {:?}", n, nomes);
+    }
+    let play = tools["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["name"] == "play_show")
+        .unwrap();
+    assert_eq!(play["inputSchema"]["type"], json!("object"));
+    assert!(play["inputSchema"]["properties"]["loop"].is_object());
+    assert_eq!(play["inputSchema"]["required"], json!(["file"]));
+
+    // tools/call show_get no show de conformidade
+    let r = m.call(3, "tools/call", json!({"name": "show_get", "arguments": {"file": SHOW}}));
+    assert_eq!(r["isError"], json!(false));
+    let d: Value = serde_json::from_str(&texto(&r)).expect("show_get devolve JSON");
+    assert_eq!(d["aberto"], json!(true));
+    assert_eq!(d["fps"], json!(30));
+    assert!(!d["tracks"].as_array().unwrap().is_empty());
+    assert!(d["outputs"].as_array().unwrap().iter().any(|o| o == "sacn"));
+
+    // erro do comando volta como erro de TOOL (o cliente le o texto), nao como erro JSON-RPC
+    let r = m.call(4, "tools/call", json!({"name": "pause", "arguments": {}}));
+    assert_eq!(r["isError"], json!(true));
+    assert_eq!(texto(&r), "sem player em execucao");
+
+    // resources: spell://commands e' o registry inteiro; spell://show, o show que acabou de abrir
+    let rs = m.call(5, "resources/list", json!({}));
+    let uris: Vec<&str> = rs["resources"]
+        .as_array()
+        .expect("resources")
+        .iter()
+        .map(|r| r["uri"].as_str().unwrap_or(""))
+        .collect();
+    assert_eq!(uris, vec!["spell://show", "spell://commands"]);
+
+    let c = m.call(6, "resources/read", json!({"uri": "spell://commands"}));
+    let txt = c["contents"][0]["text"].as_str().expect("texto");
+    let cmds: Value = serde_json::from_str(txt).expect("commands devolve JSON");
+    let nomes: Vec<&str> = cmds
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["name"].as_str().unwrap_or(""))
+        .collect();
+    assert!(nomes.contains(&"play_show") && nomes.contains(&"show_get"));
+    assert!(cmds[0]["params"].is_object(), "cada comando leva o schema");
+
+    let s = m.call(7, "resources/read", json!({"uri": "spell://show"}));
+    let d: Value = serde_json::from_str(s["contents"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(d["aberto"], json!(true), "o show aberto pelo show_get continua aberto");
+    assert_eq!(d["transport"], Value::Null, "nenhum player rodando");
+}
+
+/// `play_show` bloqueia ate o fim do show: pelo MCP ele roda em thread e a tool volta na hora.
+/// E, sobretudo, a linha de status do `play` NAO pode sair no stdout — la' passa o JSON-RPC.
+#[test]
+fn play_show_em_background_nao_suja_o_stdout() {
+    let p = std::env::temp_dir().join("spellcore_mcp_play.spell");
+    std::fs::write(
+        &p,
+        r#"{"name":"curto","fps":30,"duration":0.4,"version":1,"outputs":[],
+            "tracks":[{"type":"dmx","universe":1,"address":1,"keys":[[0,10],[0.4,200]]}]}"#,
+    )
+    .expect("escrever o show");
+    let mut m = Mcp::start();
+    m.call(
+        1,
+        "initialize",
+        json!({"protocolVersion": "2025-06-18", "capabilities": {},
+               "clientInfo": {"name": "teste", "version": "0"}}),
+    );
+    m.send(json!({"jsonrpc": "2.0", "method": "notifications/initialized"}));
+
+    let f = p.to_string_lossy().to_string();
+    let r = m.call(2, "tools/call", json!({"name": "play_show", "arguments": {"file": f}}));
+    assert_eq!(r["isError"], json!(false));
+    assert!(texto(&r).starts_with("play_show iniciado em background"), "{}", texto(&r));
+
+    // o show tem 0,4 s; ate ele acabar, `transport_state` responde — e cada resposta que chega
+    // inteira aqui prova que a linha de status do play foi para o stderr.
+    let mut viu_play = false;
+    for id in 3..12 {
+        let r = m.call(id, "tools/call", json!({"name": "transport_state", "arguments": {}}));
+        if r["isError"] == json!(false) && texto(&r).contains("\"state\": \"play\"") {
+            viu_play = true;
+            break;
+        }
+    }
+    assert!(viu_play, "o player nao chegou a tocar");
+    m.call(20, "tools/call", json!({"name": "stop", "arguments": {}}));
+    std::fs::remove_file(&p).ok();
+}

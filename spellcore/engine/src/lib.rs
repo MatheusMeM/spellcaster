@@ -10,6 +10,10 @@ pub mod show;
 pub mod timeline;
 pub mod universe;
 
+/// Reexportado: quem registra comando no `Registry` deriva `JsonSchema`, e a versao do schemars
+/// e' contrato do engine — `cli` e `mcp` nao pinam a sua.
+pub use schemars;
+
 pub use clock::{Clock, State, Stats};
 pub use cues::{Cue, CueList};
 pub use hook::{Ev, EventSink, FrameHook, NullSink};
