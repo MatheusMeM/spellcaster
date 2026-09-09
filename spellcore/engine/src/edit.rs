@@ -64,6 +64,14 @@ pub fn rev() -> u64 {
     REV.load(Ordering::Relaxed)
 }
 
+/// Troca o show aberto por inteiro (`load`, `show_get {file}`, `show_new`): grava `OPEN` e sobe
+/// `rev`. Sem isso a `rev` que o cliente segurava continuaria valendo em OUTRO show, e o
+/// `show_patch` dele entraria sem erro no arquivo errado.
+pub(crate) fn abre(path: String, sh: Show) {
+    *lock(&OPEN) = Some((path, sh));
+    REV.fetch_add(1, Ordering::Relaxed);
+}
+
 fn json(sh: &Show) -> Result<Value, String> {
     serde_json::to_value(sh).map_err(|e| e.to_string())
 }
@@ -331,12 +339,13 @@ fn operar(doc: &mut Value, o: &PatchOp) -> Result<Option<Value>, String> {
 /// Aplica a lista inteira a uma COPIA do show; so' comita se todas passarem e se o resultado
 /// ainda for um Show valido (mesma via do `show_set`: deserializa e checa a versao).
 fn patch(a: &ShowPatchArgs) -> Result<Value, String> {
-    if let Some(r) = a.rev {
-        if r != rev() {
-            return Err(format!("rev {} != {}", r, rev()));
+    com_ro(|_, sh| {
+        // dentro do lock de `OPEN`: entre a checagem e a gravacao ninguem troca o show.
+        if let Some(r) = a.rev {
+            if r != rev() {
+                return Err(format!("rev {} != {}", r, rev()));
+            }
         }
-    }
-    let undo = com_ro(|_, sh| {
         let mut doc = json(sh)?;
         let mut undo: Vec<Value> = Vec::with_capacity(a.ops.len());
         for o in &a.ops {
@@ -349,9 +358,8 @@ fn patch(a: &ShowPatchArgs) -> Result<Value, String> {
         novo.extra.retain(|k, _| !k.starts_with('_'));
         *sh = novo;
         undo.reverse(); // ja' na ordem de aplicacao: o cliente manda de volta como veio
-        Ok(undo)
-    })?;
-    Ok(json!({"rev": REV.fetch_add(1, Ordering::Relaxed) + 1, "undo": undo}))
+        Ok(json!({"rev": REV.fetch_add(1, Ordering::Relaxed) + 1, "undo": undo}))
+    })
 }
 
 // ------------------------------------------------------------------ graph e face
@@ -523,8 +531,7 @@ pub fn register(r: &mut Registry) {
         |_| {
             let sh = novo();
             let v = json(&sh)?;
-            *lock(&OPEN) = Some((String::new(), sh));
-            REV.fetch_add(1, Ordering::Relaxed);
+            abre(String::new(), sh);
             Ok(v)
         },
     );

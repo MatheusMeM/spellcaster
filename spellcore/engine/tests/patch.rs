@@ -8,6 +8,7 @@ use engine::Registry;
 use serde_json::{json, Value};
 
 const SPELL: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../shows/medgrupo.spell");
+const OUTRO: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../shows/medgrupo_r0.spell");
 
 /// `show_patch` com uma lista de ops, sem checagem de revisao.
 fn ops(r: &Registry, o: Value) -> Result<Value, String> {
@@ -24,6 +25,7 @@ fn patch_graph_e_face() {
     tudo_ou_nada(&r);
     show_continua_show(&r);
     rev_velha_e_recusada(&r);
+    trocar_de_show_sobe_rev(&r);
     graph_e_face(&r);
 }
 
@@ -172,6 +174,24 @@ fn rev_velha_e_recusada(r: &Registry) {
         .unwrap_err();
     assert_eq!(e, format!("rev {} != {}", v, v + 1));
     assert_eq!(full(r)["fps"], json!(24), "a edicao recusada nao entrou");
+}
+
+/// `load` e `show_get {file}` trocam o show inteiro: a revisao que o cliente segurava nao pode
+/// valer no show novo, senao o patch dele entra no arquivo errado.
+fn trocar_de_show_sobe_rev(r: &Registry) {
+    for (cmd, arg) in [("load", "path"), ("show_get", "file")] {
+        r.call("show_get", json!({ "file": SPELL })).unwrap();
+        let v = rev();
+        r.call(cmd, json!({ arg: OUTRO })).unwrap();
+        assert_ne!(rev(), v, "{} deixou a rev parada", cmd);
+        let e = r
+            .call(
+                "show_patch",
+                json!({"rev": v, "ops": [{"op": "replace", "path": "/fps", "value": 12}]}),
+            )
+            .unwrap_err();
+        assert!(e.contains("rev"), "{}: {:?}", cmd, e);
+    }
 }
 
 fn graph_e_face(r: &Registry) {
