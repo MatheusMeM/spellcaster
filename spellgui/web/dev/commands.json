@@ -1,17 +1,17 @@
 [
   {
-    "doc": "Carrega um .spell e devolve nome, fps, duracao e tracks.",
+    "doc": "Abre um .spell E VALIDA a timeline (o que show_get{file} nao faz): devolve nome, fps, duracao, quantos tracks e quais foram ignorados. O argumento `path` e' o nome velho de `file` (deprecated, sai na proxima rodada).",
     "name": "load",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
-        "path": {
-          "description": "Caminho do arquivo .spell.",
+        "file": {
+          "description": "Caminho do arquivo .spell (o mesmo `file` de show_get, show_save e play_show).",
           "type": "string"
         }
       },
       "required": [
-        "path"
+        "file"
       ],
       "title": "LoadArgs",
       "type": "object"
@@ -186,7 +186,7 @@
     }
   },
   {
-    "doc": "Acrescenta um track vazio ao show aberto. Devolve o indice do track.",
+    "doc": "Acrescenta um track vazio ao show aberto. Devolve o indice do track. O argumento `label` e' o nome velho de `name` (deprecated, sai na proxima rodada).",
     "name": "track_add",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -198,9 +198,9 @@
           "minimum": 0.0,
           "type": "integer"
         },
-        "label": {
+        "name": {
           "default": "",
-          "description": "Nome do track (campo `name` do .spell).",
+          "description": "Nome do track (campo `name` do .spell). O argumento `label` e' o nome velho deste (deprecated, sai na proxima rodada).",
           "type": "string"
         },
         "type": {
@@ -210,6 +210,7 @@
         },
         "universe": {
           "default": 1,
+          "description": "Universo de saida, a partir de 1.",
           "format": "uint16",
           "minimum": 0.0,
           "type": "integer"
@@ -286,6 +287,7 @@
           "type": "number"
         },
         "track": {
+          "description": "Indice do track em `tracks`.",
           "format": "uint",
           "minimum": 0.0,
           "type": "integer"
@@ -328,6 +330,7 @@
         },
         "name": {
           "default": "",
+          "description": "Nome da cue, como aparece na lista.",
           "type": "string"
         },
         "values": {
@@ -354,6 +357,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "index": {
+          "description": "Indice da cue em `cues`.",
           "format": "uint",
           "minimum": 0.0,
           "type": "integer"
@@ -389,6 +393,7 @@
         },
         "universe": {
           "default": 1,
+          "description": "Universo de saida, a partir de 1.",
           "format": "uint16",
           "minimum": 0.0,
           "type": "integer"
@@ -409,6 +414,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "name": {
+          "description": "Nome da fixture no patch.",
           "type": "string"
         }
       },
@@ -545,6 +551,7 @@
         },
         "universe": {
           "default": 1,
+          "description": "Universo de saida, a partir de 1.",
           "format": "uint16",
           "minimum": 0.0,
           "type": "integer"
@@ -616,19 +623,23 @@
       "properties": {
         "fade": {
           "default": 0.0,
+          "description": "Segundos de fade linear ate os valores.",
           "format": "double",
           "type": "number"
         },
         "follow": {
           "default": false,
+          "description": "Ao terminar, dispara a proxima.",
           "type": "boolean"
         },
         "name": {
           "default": "",
+          "description": "Nome da cue nova.",
           "type": "string"
         },
         "wait": {
           "default": 0.0,
+          "description": "Segundos entre o GO e o inicio do fade.",
           "format": "double",
           "type": "number"
         }
@@ -940,6 +951,7 @@
           "type": "string"
         },
         "value": {
+          "description": "Valor na faixa do `path` (a tabela de faixas esta no spellcore/README.md).",
           "format": "double",
           "type": "number"
         }

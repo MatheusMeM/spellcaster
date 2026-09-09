@@ -546,6 +546,100 @@ pub fn current() -> Option<Handle>;
 `locate`/`stop` chamam `reset()` em todo hook e `CueList::reset()`. `looping` sem `duration`
 não repete (não há fim). O transporte remoto por OSC nunca toca nos Universes direto.
 
+## Registry — os 46 comandos numa tabela
+
+Auditoria de setembro/2026. Uma linha por comando: os argumentos com tipo e default (o schema que
+o `schemars` gera do struct de `Args`, o mesmo que sai em `GET /commands`, nas tools MCP e em
+`spellcore commands <nome>`), o que faz, o que devolve e o que dispara o comando na GUI. As
+seções abaixo continuam sendo a explicação; esta tabela é o índice.
+
+Regras de leitura: `arg:tipo` é obrigatório, `arg:tipo?` é opcional sem default, `arg:tipo=v` tem
+default `v`. "Dispara na GUI" cita a página (`index.html` = TIMELINE, `teatro.html` = TEATRO,
+`patchbay.html` = PATCHBAY, `laser.html` = LASER, `face.html` = FACE) e a tecla de
+`design/SHORTCUTS.md` quando existe; `—` é comando que hoje só a IA (MCP), o OSC e a
+`help.html` chamam.
+
+| Comando | Argumentos | Faz | Devolve | Dispara na GUI |
+|---|---|---|---|---|
+| `load` | `file:string` | abre o `.spell` **e valida a timeline** | `{name, fps, duration, tracks, ignored}` | PATCHBAY: campo do caminho + `Abrir`; `serve --show` |
+| `show_get` | `file:string=""`, `full:boolean=false` | abre (ou reusa) e resume; `full` devolve o `.spell` inteiro | resumo ou o show | TIMELINE, PATCHBAY e TEATRO no boot; `GET /show` |
+| `resume` | — | solta o player pausado | estado do transporte | TIMELINE: `Play`, `Space`, `L` |
+| `pause` | — | pausa o player | estado do transporte | TIMELINE: `Pause`, `Space`, `K` |
+| `stop` | — | para o player | estado do transporte | TIMELINE: `Stop` |
+| `locate` | `t:number` | salta para `t` segundos | estado do transporte | TIMELINE: régua, `←`/`→`, `Home`/`End` |
+| `cue_go` | `index:integer?` | dispara a próxima cue, ou a de índice dado | estado do transporte | TEATRO: `GO` (`Enter`) |
+| `transport_state` | — | lê o transporte sem tocar em nada | `{t, state, cue, frames, fps, duration, universes}` | — (a GUI recebe o evento `transport`) |
+| `input` | `key:string`, `value:number=0` | entrega um evento aos ganchos do player (o Graph) | `{key, value}` | FACE: todo widget |
+| `show_new` | — | zera o show aberto (sACN no universo 1, 60 s) | o show inteiro | — |
+| `show_set` | `data:any` | **importa** um show inteiro (objeto ou texto JSON) | o show inteiro | — |
+| `show_save` | `file:string=""` | grava; sem `file`, no caminho do último aberto | o caminho | TIMELINE: `Salvar`, `Ctrl+S` |
+| `track_add` | `type:string="dmx"`, `universe:integer=1`, `address:integer=1`, `name:string=""` | acrescenta um track vazio | o índice | TIMELINE: `+Track` |
+| `track_del` | `index:integer` | remove o track | o track removido | TIMELINE: `-Track` |
+| `key_set` | `track:integer`, `t:number`, `value:any=null`, `curve:string="linear"` | cria ou substitui o keyframe em `t` | os keys do track | TIMELINE: `Ctrl+K`, arrastar, `Ctrl+V` |
+| `key_del` | `track:integer`, `t:number` | apaga o keyframe em `t` (tolerância 1 ms) | quantos saíram | TIMELINE: `Delete`, `Ctrl+X` |
+| `cue_set` | `index:integer?`, `name:string=""`, `fade:number=0`, `wait:number=0`, `follow:boolean=false`, `values:object={}` | cria (sem `index`) ou substitui uma cue | o índice | TEATRO: lista de cenas |
+| `cue_del` | `index:integer` | remove a cue | a cue removida | TEATRO: apagar cena |
+| `patch_add` | `name:string`, `profile:string`, `universe:integer=1`, `address:integer=1` | patcheia e revalida o patch inteiro | a grade do patch | TEATRO: `Adicionar` |
+| `patch_del` | `name:string` | tira a fixture do patch | a entrada removida | TEATRO: apagar fixture |
+| `patch_check` | — | grade do patch + o primeiro erro | `{rows, error}` | TEATRO: a grade |
+| `profiles` | — | nomes dos `.json` em `profiles/` | lista de nomes | TEATRO: select de perfil |
+| `show_patch` | `ops:array`, `rev:integer?` | JSON Patch (RFC 6902) no show aberto; tudo ou nada | `{rev, undo}` | TIMELINE, PATCHBAY e TEATRO: **toda** edição |
+| `graph_get` | — | o `graph` do show | `{nodes, edges}` | — (o PATCHBAY lê o graph pelo `show_get full`) |
+| `face_get` | — | a face inline, ou `faces/<nome>.face.json` | a face ou `null` | — (a FACE hoje busca o `.face.json` direto) |
+| `profile_get` | `name:string` | o perfil inteiro (canais, `ranges`, `wheel`) | o JSON do perfil | TEATRO: widgets da fixture |
+| `level_set` | `universe:integer=1`, `address:integer`, `values:array=[]` | escreve no override do programmer (HTP) | quantos canais | — (o TEATRO escreve por `fixture_set`) |
+| `level_clear` | `universe:integer?` | solta o override de um universo, ou de todos | quantos canais saíram | TEATRO: `Solta` |
+| `level_get` | `universe:integer?` | o override atual | `{"u/end": v}` | — |
+| `cue_capture` | `name:string=""`, `fade:number=0`, `wait:number=0`, `follow:boolean=false` | o override vira cue nova e o override é solto | o índice | TEATRO: `Capturar` |
+| `fixture_set` | `name:string`, `channel:string`, `value:number` | resolve fixture + canal do perfil e chama `level_set` | `{universe, address, value}` | TEATRO: sliders da fixture |
+| `module_add` | `file:string=""`, `data:any=null` | valida um `module.json` e põe na tabela de módulos vivos | `{name, version}` | — |
+| `module_del` | `name:string` | tira o módulo da tabela | o manifesto removido | — |
+| `module_list` | — | módulos vivos | `[{name, type, version}]` | PATCHBAY: catálogo do nó `module` |
+| `module_get` | `name:string` | o manifesto inteiro | `{name, type, version, parameters, values, commands}` | PATCHBAY: o nó `module` |
+| `play_show` | `file:string`, `loop:boolean=false`, `osc_port:integer?` | **sobe** um player e toca até o fim ou Ctrl+C | `{name, frames, jitter_p99_ms, jitter_max_ms, drift}` | TIMELINE: `Play` sem player vivo; CLI `spellcore play` |
+| `net` | `timeout:number=2`, `json:boolean=false` | varre a rede (interfaces, Art-Net, sACN, Ether Dream) | relatório de texto, ou o scan cru | CLI `spellcore net` |
+| `graph_check` | — | compila o graph do show aberto sem rodar | `{nodes, error}` | PATCHBAY: a cada edição do graph |
+| `laser_dacs` | `timeout:number=2` | procura DACs (Ether Dream por beacon, IDN por scan) | `[{type, id, host}]` | LASER: `Procurar` |
+| `laser_open` | `dac:string`, `host:string=""`, `kpps:number=30`, `safety:any=null` | abre o DAC e sobe o feed (a safety nunca desliga) | `{feed, dac, pps}` | LASER: `Abrir` |
+| `laser_play` | `feed:integer`, `file:string`, `fps:number=30`, `loop:boolean=false` | empurra os frames do `.ild` ao DAC | `{feed, file, frames, fps, loop}` | LASER: `Play` |
+| `laser_stop` | `feed:integer` | para o playback; o DAC continua aberto | `{feed, playing:false}` | LASER: `Stop` |
+| `laser_close` | `feed:integer` | para e fecha (apaga o DAC) | `{feed, dac, closed}` | LASER: `Fechar` |
+| `laser_param` | `feed:integer`, `path:string`, `value:number` | um parâmetro do feed (geo, limit, safe, shutter) | `{feed, path, value, shutter}` | LASER: sliders e `Shutter` |
+| `laser_stats` | `feed:integer` | estado do feed | `{playing, file, stat/*, jitter, cpu, safety}` | LASER: painel de stats (4 Hz) |
+| `laser_files` | `dir:string=""` | lista os `.ild` do diretório (vazio = `shows/`) | `{dir, files:[{name, path, bytes}]}` | LASER: `Listar` |
+
+### O que a auditoria corrigiu, e o que ficou de pé
+
+- **`load(path)` virou `load(file)`.** O mesmo caminho de `.spell` se chamava `path` em `load` e
+  `file` em `show_get`, `show_save`, `play_show` e `module_add`. `path` continua aceito por uma
+  rodada (`#[serde(alias = "path")]`) e o `doc` do comando avisa que é deprecated; clientes
+  atualizados: `spellgui/web/graph.js`, `serve::abre`, `cli/tests/serve.rs`,
+  `engine/tests/patch.rs`. O `spellcaster/` Python não muda (é referência) e continua entrando
+  pelo alias.
+- **`track_add(label)` virou `track_add(name)`.** O campo que ele escreve no `.spell` chama-se
+  `name`, e `patch_add` já usava `name` para a mesma ideia. `label` continua aceito por uma
+  rodada, pelo mesmo mecanismo; cliente atualizado: `spellgui/web/timeline.js`.
+- **Nada foi removido.** Os quatro pares suspeitos têm cliente e razão:
+  `load` × `show_get{file}` (um valida a timeline, o outro só resume — o `doc` agora diz isso),
+  `resume` × `play_show` (um solta o player vivo, o outro sobe um), `show_new` × `show_set`
+  (um zera, o outro importa), `laser_stop` × `laser_close` (um para o arquivo, o outro apaga o
+  DAC).
+- **Ficou de pé de propósito:** `track_del(index)`/`cue_del(index)` nomeiam o alvo do comando e
+  `key_set(track, t)` nomeia o container do keyframe — nomes diferentes para coisas diferentes.
+  `resume`/`pause`/`stop` continuam três verbos sem argumento, e não um `transport(state=…)`,
+  porque é assim que aparecem no mapa de atalhos, nas tools do MCP e nos endereços OSC.
+- **Descrição por argumento:** os doze argumentos que ainda não tinham `description`
+  (`track_add.universe`, `key_del.track`, `cue_set.name`, `cue_del.index`, `patch_add.universe`,
+  `patch_del.name`, `level_set.universe`, os quatro de `cue_capture` e `laser_param.value`)
+  ganharam a sua. `spellgui/web/test/help.test.js` falha se um comando ou argumento novo entrar
+  sem texto.
+- **Uma fonte para o texto:** `DOC_PLAY`, `DOC_NET` e `DOC_GRAPH_CHECK` em `cli/src/main.rs` são
+  ao mesmo tempo o `doc` do registry e o `about` do clap, então `spellcore play --help` e
+  `GET /commands` dizem a mesma frase (teste:
+  `about_do_clap_e_doc_do_registry_sao_o_mesmo_texto`). Para os comandos que **não** são
+  subcomando da CLI, `spellcore commands <nome>` imprime o `doc` e o schema de um só — é o
+  `spellcore <cmd> --help` deles.
+
 ## `engine::registry::base()`
 
 Assinatura muda para `pub fn base() -> Registry` (sem `Clock`: o transporte age no player vivo).
@@ -841,11 +935,14 @@ página usa quando abre sem engine.
 | Comando | Faz | Devolve |
 |---|---|---|
 | `commands` (subcomando da CLI) | imprime `Registry::schema()`; é a fonte do `spellgui/web/dev/commands.json` | a lista de comandos com doc e schema |
+| `commands <nome>` | só esse comando — é o `spellcore <cmd> --help` dos verbos que não viraram subcomando da CLI | `{name, doc, params}` |
 
 ```
 spellcore commands > spellgui/web/dev/commands.json
 ```
 
 `cli/tests/commands_json.rs` falha se algum comando sair do registry ou mudar de schema sem o
-JSON ser regerado. O resto (barramento, Face, como abrir) está em
-`spellgui/web/README.md`.
+JSON ser regerado, e `spellgui/web/test/help.test.js` falha se um comando ou argumento entrar sem
+texto de ajuda. A página que mostra tudo isso ao operador é `spellgui/web/help.html` (atalhos de
+`design/SHORTCUTS.md` + o registry vivo, cada comando com um formulário que executa). O resto
+(barramento, Face, como abrir) está em `spellgui/web/README.md`.

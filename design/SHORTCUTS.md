@@ -14,44 +14,69 @@ Referência para R5 (GUI) e R9 (editores). Fonte: Adobe Premiere Pro e DaVinci R
 
 ## Mapa padrão
 
-| Ação | Tecla | Origem |
-|---|---|---|
-| Play / pause | `Space` | ambos |
-| Shuttle recuar / parar / avançar | `J` / `K` / `L` | ambos |
-| Quadro anterior / próximo | `←` / `→` | ambos |
-| 5 quadros | `Shift+←` / `Shift+→` | Premiere |
-| Início / fim | `Home` / `End` | ambos |
-| Keyframe anterior / próximo (track focado) | `↑` / `↓` | Premiere (edit points) |
-| Marcar In / Out | `I` / `O` | ambos |
-| Limpar In / Out / ambos | `Alt+I` / `Alt+O` / `Alt+X` | Premiere |
-| Ir para In / Out | `Shift+I` / `Shift+O` | Premiere |
-| Loop no intervalo In–Out | `Ctrl+L` | Premiere |
-| Marcador no playhead / editar | `M` / `Shift+M` | ambos |
-| Marcador anterior / próximo | `Ctrl+Shift+←` / `Ctrl+Shift+→` | Resolve |
-| Monitor DMX do track focado (512 barras) | `Alt+M` | (nosso; `M` já é marcador, `Ctrl+M` já é exportar) |
-| Zoom in / out / ajustar | `=` / `-` / `Shift+Z` ou `\` | Premiere / Resolve |
-| Pan na timeline | roda com `Shift`, ou arrastar com botão do meio | ambos |
-| Keyframe no playhead (track focado) | `Ctrl+K` | Premiere (add edit) |
-| Adicionar / remover keyframe por parâmetro | `Ctrl+Click` no losango | Resolve |
-| Selecionar tudo / nada | `Ctrl+A` / `Ctrl+Shift+A` | ambos |
-| Copiar / colar / cortar / apagar | `Ctrl+C` / `Ctrl+V` / `Ctrl+X` / `Delete` | ambos |
-| Desfazer / refazer | `Ctrl+Z` / `Ctrl+Shift+Z` | ambos |
-| Easing do keyframe selecionado | `Ctrl+E` abre menu; `Ctrl+Shift+E` cicla linear→in→out→inout→hold | (nosso) |
-| Mute / solo do track focado | `Shift+D` / `Shift+S` | Premiere (disable) / (nosso) |
-| Snapping liga/desliga | `S` | Premiere |
-| Record arm do track focado | `R` | Resolve (Fairlight) |
-| Novo / abrir / salvar / salvar como | `Ctrl+N` / `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` | ambos |
-| Importar marcadores de vídeo/áudio | `Ctrl+I` | Premiere (import) |
-| Exportar (render do show) | `Ctrl+M` | Premiere |
-| Foco de painel: Patch, Timeline, Graph, Outputs, Network, Log, Inspector | `Shift+1` … `Shift+7` | Premiere (Shift+1..9) / Resolve (Shift+2..7 páginas) |
-| Maximizar painel focado | `` Ctrl+` `` | Premiere |
-| Workspace (Face `editor`) 1..9 | `Alt+Shift+1` … `Alt+Shift+9` | Premiere |
-| Alternar Face `editor` ↔ `performance` | `Tab` (segurar para espiar, toque para trocar) | (nosso, PRD §10) |
-| Tela cheia / kiosk | `Shift+F` | Resolve |
-| Cue GO / voltar / pular para cue | `Enter` / `Backspace` / `Ctrl+G` | (nosso; consoles de luz) |
-| Armar saídas reais / modo ensaio | `Ctrl+Shift+Enter` / `Ctrl+Shift+R` | (nosso, PRD §10) |
-| Blackout (segurar) | `Esc` segurado 0,5 s | (nosso) |
-| Fechar sem sair (volta ao editor) | `Esc` | ambos |
+A coluna **estado** é o que o código faz hoje (base `dac3e0a`, páginas de `spellgui/web`), não o
+que se pretende: `feito` = a tecla está ligada na página dona da ação; `falta` = a ação existe no
+produto e a tecla não; `n.a.` = a tela ou o modo que a tecla controla ainda não existe. Quem
+mantém a coluna é quem mexe na tecla — `spellgui/web/help.html` lê esta tabela e a mostra ao
+operador.
+
+| Ação | Tecla | Origem | Estado |
+|---|---|---|---|
+| Play / pause | `Space` | ambos | feito |
+| Shuttle recuar / parar / avançar | `J` / `K` / `L` | ambos | feito |
+| Quadro anterior / próximo | `←` / `→` | ambos | feito |
+| 5 quadros | `Shift+←` / `Shift+→` | Premiere | feito |
+| Início / fim | `Home` / `End` | ambos | feito |
+| Keyframe anterior / próximo (track focado) | `↑` / `↓` | Premiere (edit points) | feito |
+| Marcar In / Out | `I` / `O` | ambos | feito |
+| Limpar In / Out / ambos | `Alt+I` / `Alt+O` / `Alt+X` | Premiere | feito |
+| Ir para In / Out | `Shift+I` / `Shift+O` | Premiere | feito |
+| Loop no intervalo In–Out | `Ctrl+L` | Premiere | feito |
+| Marcador no playhead | `M` | ambos | feito |
+| Editar marcador | `Shift+M` | ambos | falta |
+| Marcador anterior / próximo | `Ctrl+Shift+←` / `Ctrl+Shift+→` | Resolve | feito |
+| Monitor DMX do track focado (512 barras) | `Alt+M` | (nosso; `M` já é marcador, `Ctrl+M` já é exportar) | feito |
+| Zoom in / out / ajustar | `=` / `-` / `Shift+Z` ou `\` | Premiere / Resolve | feito |
+| Pan na timeline, arrastando | botão do meio | ambos | feito |
+| Pan na timeline, com a roda | roda com `Shift` | ambos | falta |
+| Keyframe no playhead (track focado) | `Ctrl+K` | Premiere (add edit) | feito |
+| Adicionar / remover keyframe por parâmetro | `Ctrl+Click` no losango | Resolve | falta |
+| Selecionar tudo / nada | `Ctrl+A` / `Ctrl+Shift+A` | ambos | feito |
+| Copiar / colar / cortar / apagar | `Ctrl+C` / `Ctrl+V` / `Ctrl+X` / `Delete` | ambos | feito |
+| Desfazer / refazer | `Ctrl+Z` / `Ctrl+Shift+Z` | ambos | falta |
+| Easing do keyframe selecionado: menu | `Ctrl+E` | (nosso) | falta |
+| Easing do keyframe selecionado: ciclar linear→in→out→inout→hold | `Ctrl+Shift+E` | (nosso) | feito |
+| Mute / solo do track focado | `Shift+D` / `Shift+S` | Premiere (disable) / (nosso) | feito |
+| Snapping liga/desliga | `S` | Premiere | feito |
+| Record arm do track focado | `R` | Resolve (Fairlight) | feito |
+| Novo / abrir / salvar como | `Ctrl+N` / `Ctrl+O` / `Ctrl+Shift+S` | ambos | falta |
+| Salvar | `Ctrl+S` | ambos | feito |
+| Importar marcadores de vídeo/áudio | `Ctrl+I` | Premiere (import) | falta |
+| Exportar (render do show) | `Ctrl+M` | Premiere | n.a. |
+| Ajuda (esta tabela + os comandos do registry) | `?` | (nosso) | falta |
+| Foco de painel: Patch, Timeline, Graph, Outputs, Network, Log, Inspector | `Shift+1` … `Shift+7` | Premiere (Shift+1..9) / Resolve (Shift+2..7 páginas) | n.a. |
+| Maximizar painel focado | `` Ctrl+` `` | Premiere | n.a. |
+| Workspace (Face `editor`) 1..9 | `Alt+Shift+1` … `Alt+Shift+9` | Premiere | n.a. |
+| Alternar Face `editor` ↔ `performance` | `Tab` (segurar para espiar, toque para trocar) | (nosso, PRD §10) | n.a. |
+| Tela cheia / kiosk | `Shift+F` | Resolve | falta |
+| Cue GO | `Enter` | (nosso; consoles de luz) | feito |
+| Cue voltar / pular para cue | `Backspace` / `Ctrl+G` | (nosso; consoles de luz) | falta |
+| Armar saídas reais / modo ensaio | `Ctrl+Shift+Enter` / `Ctrl+Shift+R` | (nosso, PRD §10) | n.a. |
+| Blackout (segurar) | `Esc` segurado 0,5 s | (nosso) | falta |
+| Fechar sem sair (volta ao editor) | `Esc` | ambos | n.a. |
+
+Onde a leitura da coluna não é óbvia:
+
+- **Desfazer / refazer** está `falta` porque quem é dono da ação é a timeline (`timeline.js`), que
+  não liga `Ctrl+Z`; no PATCHBAY (`graph.js`) as duas teclas já funcionam sobre `show_patch`.
+- **Pan com a roda** está `falta` porque hoje `Shift`+roda rola na vertical (`canvaskit.js`), não
+  na horizontal; arrastar com o botão do meio já faz o pan.
+- **Ajuda `?`** está `falta` porque a página existe (`spellgui/web/help.html`, que liga a tecla em
+  `help.js`) mas as outras páginas ainda não carregam `help.js` — passa a `feito` quando o
+  `nav.js` entrar nelas.
+- **Exportar** está `n.a.` porque não há render de show no registry; `Ctrl+M` continua reservado.
+- **Blackout** está `falta`, e não `n.a.`, porque a ação existe: é o widget `blackout` da Face,
+  que manda `input {key:"widget:blackout"}` ao Graph. O que falta é a tecla.
 
 ## Interface (o que copiar de cada um)
 
