@@ -19,12 +19,13 @@
        text-transform: uppercase; color: var(--sc-fg); transition: none; }
   .w:focus-visible { border-color: var(--sc-accent); }
   .w-label { cursor: default; font-size: var(--sc-text-lg); color: var(--sc-fg-2); }
-  .w.hit, .w.on { background: var(--sc-panel-2); border-color: var(--sc-accent);
+  /* `prop` do out.widget e' o nome da classe (face.js): a pagina pinta as que conhece. */
+  .w.hit, .w.on, .w.glow { background: var(--sc-panel-2); border-color: var(--sc-accent);
                   color: var(--sc-accent); box-shadow: var(--sc-glow-accent); }
-  .w.alert { border-color: var(--sc-live); color: var(--sc-live); box-shadow: var(--sc-glow-live); }
+  .w.alert, .w.live { border-color: var(--sc-live); color: var(--sc-live); box-shadow: var(--sc-glow-live); }
   .w.off { color: var(--sc-fg-3); border-color: var(--sc-line); box-shadow: none; }
-  .tone-go.on, .tone-go.hit { border-color: var(--sc-go); color: var(--sc-go); box-shadow: var(--sc-glow-go); }
-  .tone-live.on, .tone-live.hit { border-color: var(--sc-live); color: var(--sc-live); box-shadow: var(--sc-glow-live); }
+  .tone-go.on, .tone-go.hit, .tone-go.glow { border-color: var(--sc-go); color: var(--sc-go); box-shadow: var(--sc-glow-go); }
+  .tone-live.on, .tone-live.hit, .tone-live.glow { border-color: var(--sc-live); color: var(--sc-live); box-shadow: var(--sc-glow-live); }
   .w-fader { width: 90%; }
   .bar { flex: 0 0 auto; display: flex; gap: var(--sc-gap); align-items: center;
          padding: 4px 8px; background: var(--sc-panel); border-top: 1px solid var(--sc-line);
@@ -40,7 +41,7 @@
 <div class="bar">
   <span>face <b id="nome">—</b></span>
   <span>view <b id="view">—</b></span>
-  <span>t <b id="t">00:00:00:00</b></span>
+  <span>t <b id="t">00:00:00</b></span>
   <span>cue <b id="cue">—</b></span>
   <span id="conn">offline</span>
   <span id="log"></span>
@@ -60,19 +61,13 @@ bus.on("close", () => { q("conn").textContent = "offline"; q("conn").className =
 bus.on("log", d => { q("log").textContent = (d && d.text) || ""; });
 bus.on("transport", d => {
   if (!d) return;
-  const f = d.fps || 30, t = d.t || 0, p2 = n => (n < 10 ? "0" : "") + n;
-  q("t").textContent = p2((t / 3600) | 0) + ":" + p2(((t / 60) | 0) % 60) + ":" +
-                       p2((t | 0) % 60) + ":" + p2(Math.floor((t % 1) * f));
+  q("t").textContent = new Date((d.t || 0) * 1000).toISOString().slice(11, 19);
   q("cue").textContent = d.cue === undefined || d.cue < 0 ? "—" : d.cue;
 });
 
 q("nome").textContent = nome;
-const rel = "faces/" + nome + ".face.json";
-const opt = { view: p.get("view") };
-// servindo a raiz do repo (o normal), a face esta' em ../../faces; servindo so' spellgui/web,
-// ao lado. ponytail: duas tentativas ; uma so' quando `serve --dir` estiver fixado.
-Face.mount(q("grid"), "../../" + rel, bus, opt)
-  .catch(() => Face.mount(q("grid"), rel, bus, opt))
+// a raiz servida e' a do repo (README de spellgui/web): a face esta' em ../../faces.
+Face.mount(q("grid"), "../../faces/" + nome + ".face.json", bus, { view: p.get("view") })
   .then(st => { q("view").textContent = st.view.name; })
   .catch(e => { q("log").textContent = e.message; });
 

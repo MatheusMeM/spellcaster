@@ -638,9 +638,8 @@ página usa quando abre sem engine.
 
 ```
 spellcore commands > spellgui/web/dev/commands.json
-SPELL_DUMP_COMMANDS=1 cargo test -p cli --test commands_json   # o mesmo, pelo teste
 ```
 
-Sem a variável, `cli/tests/commands_json.rs` falha se algum comando sair do registry ou mudar de
-schema sem o JSON ser regerado. O resto (barramento, Face, como abrir) está em
+`cli/tests/commands_json.rs` falha se algum comando sair do registry ou mudar de schema sem o
+JSON ser regerado. O resto (barramento, Face, como abrir) está em
 `spellgui/web/README.md`.

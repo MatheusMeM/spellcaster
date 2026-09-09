@@ -136,14 +136,7 @@ WG.widget = function (prop, schema, onChange) {
       if (onChange) onChange(WG.coerce(kind, inp.value));
     };
   }
-  const raw = () => (kind === "toggle" ? inp.checked : inp.value);
-  wrap.get = () => WG.coerce(kind, raw());
-  wrap.set = v => {
-    if (kind === "toggle") inp.checked = !!v;
-    else inp.value = kind === "json" ? JSON.stringify(v) : String(v);
-    if (num) num.value = inp.value;
-  };
-  wrap.kind = kind;
+  wrap.get = () => WG.coerce(kind, kind === "toggle" ? inp.checked : inp.value);
   inp.oninput = () => {
     if (num) num.value = inp.value;
     if (onChange) onChange(wrap.get());
@@ -159,15 +152,17 @@ WG.form = function (c, bus, onResult) {
   f.appendChild(el("div", "wg-doc", c.doc || ""));
   const props = (c.params && c.params.properties) || {};
   const campos = {};
+  const out = el("div", "wg-out", "");
   for (const name of Object.keys(props)) {
-    const w = WG.widget(name, props[name]);
+    // mexer num campo apaga o resultado da execucao anterior, que ja' nao vale para o que
+    // esta' na tela — e' o unico consumidor de `onChange`.
+    const w = WG.widget(name, props[name], () => (out.textContent = ""));
     campos[name] = w;
     f.appendChild(w);
   }
   const bt = el("button", "wg-go", c.name);
   bt.type = "submit";
   f.appendChild(bt);
-  const out = el("div", "wg-out", "");
   f.appendChild(out);
   f.onsubmit = e => {
     e.preventDefault();

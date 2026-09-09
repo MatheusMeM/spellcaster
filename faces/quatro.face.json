@@ -1,14 +1,12 @@
 {
   "name": "quatro",
-  "theme": "feiticaria",
-  "mode": "performance",
   "views": {
     "full": {
-      "grid": "4x2",
+      "grid": [4, 2],
       "widgets": ["go", "next", "stop", "blackout"]
     },
     "compact": {
-      "grid": "2x1",
+      "grid": [2, 1],
       "widgets": ["go", "blackout"],
       "at": {"go": [0, 0, 1, 1], "blackout": [1, 0, 1, 1]}
     }

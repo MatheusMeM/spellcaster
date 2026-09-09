@@ -33,12 +33,8 @@ python -m http.server 8000
 # http://127.0.0.1:8000/spellgui/web/face.html?face=quatro&offline=1
 ```
 
-`face.html` também aceita a face servida ao lado (`faces/<nome>.face.json`), para quem servir só
-`spellgui/web`.
-
-No modo offline o `bus.call` valida o nome do comando contra `dev/commands.json` e responde
-localmente; `show_get` devolve o `.spell` apontado em `opts.show`. A página monta, os botões
-respondem, nada sai pela rede.
+No modo offline não há engine: `bus.call` ecoa `{offline, cmd, args}` e escreve no log o que
+faria. A página monta, os botões respondem, nada sai pela rede.
 
 ## Face
 
@@ -54,9 +50,11 @@ comportamento mora no Graph, dentro do `.spell`:
 - `input` → comando `input {key, value}`; um nó `in.widget` com `"widget": "blackout"` no graph
   do show é quem decide o que isso faz. Sem esse nó, o `input` não tem efeito — é de propósito:
   a página não implementa comportamento.
-- Volta pelo evento `widget` (`out.widget` do Graph): `{"id","prop","value"}`. `prop` é numérico —
-  `glow`/`on`/`press`, `alert`/`live`, `enabled`, `level`; qualquer outro nome cai em `data-<prop>`.
-- `views` remanejam os mesmos widgets (`grid`, lista de `widgets`, `at` por id); `?view=compact`.
+- Volta pelo evento `widget` (`out.widget` do Graph): `{"id","prop","value"}`. `prop` vira classe
+  de mesmo nome no widget, ligada quando o valor não é zero; `face.html` pinta `glow`/`on`,
+  `alert`/`live` e `off`, e o resto fica para a página estilizar.
+- `views` remanejam os mesmos widgets (`grid` `[colunas, linhas]`, lista de `widgets`, `at` por
+  id); `?view=compact`. `views` é obrigatório.
 - Tipos hoje: `button`, `toggle`, `fader`, `label`. O resto do catálogo do PRD §10 entra com o
   editor de Face (R9).
 
@@ -69,8 +67,6 @@ Sai do registry, nunca escrito à mão:
 
 ```
 spellcore commands > spellgui/web/dev/commands.json
-# ou, do workspace:
-SPELL_DUMP_COMMANDS=1 cargo test -p cli --test commands_json
 ```
 
-O mesmo teste, sem a variável, falha quando um comando sai do registry ou muda de schema.
+`spellcore/cli/tests/commands_json.rs` falha quando um comando sai do registry ou muda de schema.

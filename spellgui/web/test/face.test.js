@@ -13,12 +13,11 @@ const QUATRO = JSON.parse(
   fs.readFileSync(path.join(__dirname, "..", "..", "..", "faces", "quatro.face.json"), "utf8")
 );
 
-test("pick: view pedida, primeira declarada, ou sintetica", () => {
+test("pick: view pedida ou a primeira declarada", () => {
   assert.strictEqual(Face.pick(QUATRO, "compact").name, "compact");
   assert.strictEqual(Face.pick(QUATRO, "nao_existe").name, "full");
   assert.strictEqual(Face.pick(QUATRO).name, "full");
-  const v = Face.pick({ widgets: [{ id: "a" }, { id: "b" }] });
-  assert.deepStrictEqual(v.widgets, ["a", "b"]);
+  assert.deepStrictEqual(Face.pick(QUATRO, "compact").grid, [2, 1]);
 });
 
 test("widgets: a view manda na ordem e no conjunto", () => {
@@ -50,18 +49,10 @@ test("action: cmd vai ao registry, input vai ao graph", () => {
   });
 });
 
-test("grid: 'CxL' e o default", () => {
-  assert.deepStrictEqual(Face.grid("4x2"), [4, 2]);
-  assert.deepStrictEqual(Face.grid("12 X 8"), [12, 8]);
-  assert.deepStrictEqual(Face.grid("torto"), [4, 2]);
-  assert.deepStrictEqual(Face.grid(undefined), [4, 2]);
-});
-
 test("quatro.face.json: os quatro botoes do show-alvo cabem na grade", () => {
-  const [cols, rows] = Face.grid(QUATRO.views.full.grid);
+  const [cols, rows] = QUATRO.views.full.grid;
   for (const w of QUATRO.widgets) {
     const [c, r, dc, dr] = w.at;
     assert.ok(c + dc <= cols && r + dr <= rows, w.id + " sai da grade");
   }
-  assert.strictEqual(QUATRO.mode, "performance");
 });

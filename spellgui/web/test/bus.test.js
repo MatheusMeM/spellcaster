@@ -73,17 +73,19 @@ test("recv: entrega resultado a promessa pendente e evento ao inscrito", async (
   assert.strictEqual(b.pend.size, 0, "pendencias limpas");
 });
 
-test("offline: comando fora do catalogo e' recusado, show_get devolve o show local", async () => {
+test("offline: a chamada vira eco e o log conta o que faria", async () => {
   const b = new Bus({ offline: true });
-  b._cmds = Promise.resolve([{ name: "cue_go" }, { name: "show_get" }]);
-  b.showGet = () => Promise.resolve({ name: "medgrupo" });
+  let log = null;
+  b.on("log", d => (log = d.text));
   assert.deepStrictEqual(await b.call("cue_go", {}), {
     offline: true,
     cmd: "cue_go",
     args: {},
   });
-  assert.deepStrictEqual(await b.call("show_get", {}), { name: "medgrupo" });
-  await assert.rejects(b.call("nao_existe", {}), /comando desconhecido: nao_existe/);
-  // `input` esta' no contrato do barramento mesmo sem estar no dev/commands.json de hoje
-  assert.strictEqual((await b.input("widget:blackout", 1)).cmd, "input");
+  assert.strictEqual(log, 'offline: cue_go {}');
+  assert.deepStrictEqual(await b.input("widget:blackout", 1), {
+    offline: true,
+    cmd: "input",
+    args: { key: "widget:blackout", value: 1 },
+  });
 });

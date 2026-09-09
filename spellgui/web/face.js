@@ -15,12 +15,11 @@
 
 const Face = {};
 
-/// View pedida, a primeira declarada, ou uma view sintetica com todos os widgets.
+/// View pedida ou a primeira declarada. `views` e' obrigatorio no .face.json.
 Face.pick = function (face, name) {
-  const vs = (face && face.views) || {};
+  const vs = face.views;
   const k = name && vs[name] ? name : Object.keys(vs)[0];
-  if (k) return Object.assign({ name: k }, vs[k]);
-  return { name: "full", grid: "4x2", widgets: (face.widgets || []).map(w => w.id) };
+  return Object.assign({ name: k }, vs[k]);
 };
 
 /// Widgets da view, na ordem declarada por ela.
@@ -39,12 +38,6 @@ Face.action = function (w, value) {
   return null;
 };
 
-/// "4x2" -> [4, 2]
-Face.grid = function (g) {
-  const m = /^(\d+)\s*[xX]\s*(\d+)$/.exec(String(g || ""));
-  return m ? [+m[1], +m[2]] : [4, 2];
-};
-
 // ---- DOM ----------------------------------------------------------------
 function el(tag, cls, txt) {
   const e = document.createElement(tag);
@@ -53,19 +46,14 @@ function el(tag, cls, txt) {
   return e;
 }
 
-/// Prop vinda do `out.widget`. O valor e' f64: prop de texto nao existe aqui de proposito.
+/// Prop vinda do `out.widget` e' o nome da classe; a pagina decide o que cada uma pinta.
 Face.applyProp = function (node, prop, value) {
-  const on = +value !== 0;
-  if (prop === "glow" || prop === "on" || prop === "press") node.classList.toggle("on", on);
-  else if (prop === "alert" || prop === "live") node.classList.toggle("alert", on);
-  else if (prop === "enabled") node.classList.toggle("off", !on);
-  else if (prop === "level") node.style.setProperty("--v", String(value));
-  else node.dataset[prop] = String(value);
+  node.classList.toggle(prop, +value !== 0);
 };
 
 /// Monta a view no host. Devolve {view, nodes} para o chamador trocar de view.
 Face.build = function (host, face, view, bus) {
-  const [cols, rows] = Face.grid(view.grid);
+  const [cols, rows] = view.grid;
   host.innerHTML = "";
   host.style.gridTemplateColumns = "repeat(" + cols + ", 1fr)";
   host.style.gridTemplateRows = "repeat(" + rows + ", 1fr)";
@@ -86,15 +74,15 @@ Face.build = function (host, face, view, bus) {
     node.appendChild(el("span", "w-lab", w.label || w.id));
     if (t === "fader") {
       const r = el("input", "w-fader");
-      r.type = "range";
-      r.min = w.min === undefined ? 0 : w.min;
-      r.max = w.max === undefined ? 1 : w.max;
-      r.step = "any";
-      r.value = w.value === undefined ? 0 : w.value;
+      Object.assign(r, {
+        type: "range",
+        step: "any",
+        min: w.min ?? 0,
+        max: w.max ?? 1,
+        value: w.value ?? 0,
+      });
       r.oninput = () => fire(w, r.value);
       node.appendChild(r);
-    } else if (t === "label") {
-      // so' mostra: valor chega por out.widget em data-*
     } else {
       node.tabIndex = 0;
       const press = ev => {
@@ -133,7 +121,6 @@ Face.mount = function (host, url, bus, opts) {
         const n = d && st.nodes[d.id];
         if (n) Face.applyProp(n, d.prop || "glow", d.value);
       });
-      st.face = face;
       return st;
     });
 };
