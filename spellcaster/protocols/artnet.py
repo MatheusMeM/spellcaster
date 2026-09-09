@@ -4,7 +4,7 @@ Universos no Spellcaster são 1-based (como sACN). Conversão para Art-Net:
     port_address = universe - 1   (15 bits: net[7] | subnet[4] | universe[4])
 Ex.: universe 1 -> port-address 0 (net 0, subnet 0, uni 0); universe 17 -> subnet 1, uni 0.
 """
-import socket, struct, threading, time
+import socket, struct, threading
 
 PORT = 6454
 HEADER = b"Art-Net\x00"
@@ -55,18 +55,20 @@ def parse(packet):
         return {"op": "ArtPoll", "flags": packet[12] if len(packet) > 12 else 0}
     if op == OP_SYNC:
         return {"op": "ArtSync"}
-    if op == OP_POLL_REPLY and len(packet) >= 207:
-        ip = ".".join(str(b) for b in packet[10:14])
+    if op == OP_POLL_REPLY and len(packet) >= 194:
         net, sub = packet[18], packet[19]
-        short_name = packet[26:44].split(b"\x00")[0].decode("latin-1")
-        long_name = packet[44:108].split(b"\x00")[0].decode("latin-1")
-        num_ports = struct.unpack_from(">H", packet, 172)[0]
-        swin, swout = packet[186:190], packet[190:194]
-        mac = ":".join(f"{b:02x}" for b in packet[201:207])
-        ports = [(net << 8) | (sub << 4) | (swout[i] & 0xF) for i in range(min(num_ports, 4))]
-        return {"op": "ArtPollReply", "ip": ip, "short_name": short_name, "long_name": long_name,
-                "num_ports": num_ports, "net": net, "subnet": sub, "sw_in": list(swin), "sw_out": list(swout),
-                "port_addresses": ports, "universes": [p + 1 for p in ports], "mac": mac}
+        types, swin, swout = packet[174:178], packet[186:190], packet[190:194]
+        ports = []                                       # port-address por porta, com a direcao do no
+        for i in range(min(struct.unpack_from(">H", packet, 172)[0], 4)):
+            if types[i] & 0x80:
+                ports.append({"dir": "out", "universe": net << 8 | sub << 4 | swout[i] & 0xF})
+            if types[i] & 0x40:
+                ports.append({"dir": "in", "universe": net << 8 | sub << 4 | swin[i] & 0xF})
+        return {"op": "ArtPollReply", "ip": ".".join(map(str, packet[10:14])),
+                "port": struct.unpack_from("<H", packet, 14)[0],
+                "short_name": packet[26:44].split(b"\x00")[0].decode("latin-1"),
+                "long_name": packet[44:108].split(b"\x00")[0].decode("latin-1"),
+                "mac": packet[201:207].hex(":") if len(packet) >= 207 else None, "ports": ports}
     return {"op": f"0x{op:04x}"}
 
 
@@ -92,9 +94,6 @@ class ArtNetOut:
         s = self.seq.get(universe, 0) % 255 + 1  # 1..255, 0 = sem sequência
         self.seq[universe] = s
         self._tx(artdmx(universe, data, s))
-
-    def sync(self):
-        self._tx(artsync())
 
     def close(self):
         self.sock.close()
@@ -129,33 +128,3 @@ class ArtNetIn(threading.Thread):
     def close(self):
         self._stop.set()
         self.sock.close()
-
-
-def poll(timeout=2.0, targets=BROADCASTS):
-    """Envia ArtPoll e coleta ArtPollReply (dicts) por `timeout` s."""
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    try:
-        s.bind(("", PORT))
-    except OSError:
-        s.bind(("", 0))  # ponytail: porta efêmera se 6454 ocupada, só respostas unicast chegam ; usar SO_REUSEADDR em 6454 quando precisar de broadcast
-    s.settimeout(0.2)
-    for t in targets:
-        try:
-            s.sendto(artpoll(), (t, PORT))
-        except OSError:
-            pass
-    out, seen, end = [], set(), time.monotonic() + timeout
-    while time.monotonic() < end:
-        try:
-            pkt, addr = s.recvfrom(1024)
-        except socket.timeout:
-            continue
-        p = parse(pkt)
-        if p and p["op"] == "ArtPollReply" and (p["ip"], p["mac"]) not in seen:
-            seen.add((p["ip"], p["mac"]))
-            p["from"] = addr[0]
-            out.append(p)
-    s.close()
-    return out

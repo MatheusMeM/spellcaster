@@ -1,6 +1,5 @@
 """Analise de rede: interfaces, nos Art-Net (ArtPoll), fontes sACN (discovery), Ether Dream (beacon), sugestoes.
-ArtPoll/ArtPollReply e o pacote E1.31 Universe Discovery sao decodificados aqui em poucos bytes;
-F0 pode unificar com protocols/artnet.py e sacn.py quando estiverem estaveis.
+Os pacotes sao decodificados por artnet.parse e sacn.parse: aqui so mora a varredura.
 Uso: python -m spellcaster.protocols.netscan [--json] [--timeout N]"""
 import argparse
 import json
@@ -13,11 +12,12 @@ import sys
 import threading
 import time
 
+from . import artnet, sacn
 from .ilda.etherdream import BEACON, BEACON_PORT, STATUS, parse_beacon
 
-ARTNET_PORT = 6454
-ARTPOLL = b"Art-Net\0" + struct.pack("<H", 0x2000) + bytes([0, 14, 0, 0])  # ProtVer 14, TalkToMe 0, prio 0
-SACN_PORT, SACN_DISCOVERY = 5568, "239.255.250.214"
+ARTNET_PORT = artnet.PORT
+ARTPOLL = artnet.artpoll(flags=0, priority=0)   # TalkToMe 0, prioridade 0: so quero o ArtPollReply
+SACN_PORT, SACN_DISCOVERY = sacn.PORT, sacn.DISCOVERY_IP
 IPV4 = r"(\d{1,3}(?:\.\d{1,3}){3})"
 WINDOWS = platform.system() == "Windows"
 
@@ -106,24 +106,6 @@ def interfaces():
 
 
 # ---------------------------------------------------------------- Art-Net
-def parse_artpollreply(data):
-    if len(data) < 194 or data[:8] != b"Art-Net\0" or struct.unpack_from("<H", data, 8)[0] != 0x2100:
-        return None
-    net, sub = data[18], data[19]
-    nports = min(struct.unpack_from(">H", data, 172)[0], 4)
-    types, swin, swout = data[174:178], data[186:190], data[190:194]
-    ports = []
-    for i in range(nports):
-        if types[i] & 0x80:
-            ports.append({"dir": "out", "universe": net << 8 | sub << 4 | swout[i] & 0xF})
-        if types[i] & 0x40:
-            ports.append({"dir": "in", "universe": net << 8 | sub << 4 | swin[i] & 0xF})
-    return {"ip": ".".join(map(str, data[10:14])), "port": struct.unpack_from("<H", data, 14)[0],
-            "short_name": data[26:44].split(b"\0")[0].decode("latin-1"),
-            "long_name": data[44:108].split(b"\0")[0].decode("latin-1"),
-            "mac": data[201:207].hex(":") if len(data) >= 207 else None, "ports": ports}
-
-
 def scan_artnet(timeout=2, ifaces=None):
     """ArtPoll em broadcast (global + 2.x + 10.x + subrede de cada interface) e coleta ArtPollReply."""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -147,7 +129,8 @@ def scan_artnet(timeout=2, ifaces=None):
             data, addr = s.recvfrom(1024)
         except (socket.timeout, OSError):
             break
-        if (r := parse_artpollreply(data)) and r["ip"] not in found:
+        r = artnet.parse(data)
+        if r and r["op"] == "ArtPollReply" and r["ip"] not in found:
             r["from"] = addr[0]
             found[r["ip"]] = r
     s.close()
@@ -155,18 +138,6 @@ def scan_artnet(timeout=2, ifaces=None):
 
 
 # ---------------------------------------------------------------- sACN
-def parse_sacn_discovery(data):
-    """E1.31 Universe Discovery -> {cid, source_name, universes, page, last_page} ou None."""
-    if len(data) < 120 or data[4:16] != b"ASC-E1.17\0\0\0":
-        return None
-    if struct.unpack_from(">I", data, 18)[0] != 8 or struct.unpack_from(">I", data, 40)[0] != 2:
-        return None  # root vector EXTENDED, framing vector DISCOVERY
-    n = ((struct.unpack_from(">H", data, 112)[0] & 0x0FFF) - 8) // 2
-    n = max(0, min(n, (len(data) - 120) // 2))
-    return {"cid": data[22:38].hex(), "source_name": data[44:108].split(b"\0")[0].decode("utf-8", "replace"),
-            "page": data[118], "last_page": data[119], "universes": list(struct.unpack_from(f">{n}H", data, 120))}
-
-
 def scan_sacn(timeout=3, ifaces=None):
     """Entra no multicast de discovery (239.255.250.214:5568) e lista fontes e universos anunciados."""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -184,8 +155,10 @@ def scan_sacn(timeout=3, ifaces=None):
             data, addr = s.recvfrom(2048)
         except (socket.timeout, OSError):
             break
-        if r := parse_sacn_discovery(data):
-            src = found.setdefault(r["cid"], {"cid": r["cid"], "ip": addr[0], "source_name": r["source_name"], "universes": []})
+        r = sacn.parse(data)
+        if r and r["kind"] == "discovery":
+            cid = r["cid"].hex()
+            src = found.setdefault(cid, {"cid": cid, "ip": addr[0], "source_name": r["name"], "universes": []})
             src["universes"] = sorted(set(src["universes"]) | set(r["universes"]))
     s.close()
     return list(found.values())
