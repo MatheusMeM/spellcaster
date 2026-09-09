@@ -1,0 +1,20 @@
+/* xp - Luna: barra azul-royal em degrade, painel bege/branco, botao verde de start, laranja de foco. */
+.chrome {
+  background: linear-gradient(#4b8ef7, #245edb 45%, #1c3fbf);
+  border-bottom: 2px solid #17399f; border-radius: 0 0 8px 8px;
+}
+.transport { background: linear-gradient(#f4f2e6, #ded9c3); border-top: 1px solid #a9a48f; }
+.logo { color: #ffffff; text-shadow: 1px 1px 0 #14309a; }
+.tabs a { color: #d7e4ff; }
+.tabs a:hover { color: #fff; }
+.tabs a.on { background: #ffffff; color: #14309a; border-radius: 6px 6px 0 0; border-bottom-color: var(--accent); }
+.status { color: #d7e4ff; }
+.status.on { color: #ffffff; }
+.skinmenu { color: #d7e4ff; }
+.transport button { background: linear-gradient(#ffffff, #e2ddc8); border-color: #a9a48f; color: #1d2a3a; }
+.transport button:hover { background: linear-gradient(#ffffff, #ffe6bf); border-color: var(--accent); }
+.transport button.on { background: radial-gradient(circle at 40% 25%, #8ddc6e, #3ba32b 65%, #1f6b18); color: #fff; border-color: #1f6b18; }
+.timecode { background: #ffffff; color: #14309a; border: 1px solid #a9a48f; }
+#vu { background: #1b2740; border: 1px solid #a9a48f; }
+#panels { background: #ffffff; }
+#log { color: #4a4a44; }

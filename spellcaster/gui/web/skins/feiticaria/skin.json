@@ -1,0 +1,18 @@
+{
+  "name": "feiticaria",
+  "author": "Feiticaria Industrial",
+  "chrome": { "transport": "square", "visualizer": "bars" },
+  "vars": {
+    "--bg": "#000000",
+    "--panel": "#101010",
+    "--chrome": "#181818",
+    "--accent": "#f2c300",
+    "--accent2": "#b4d435",
+    "--text": "#f2f2f2",
+    "--muted": "#7d7d7d",
+    "--font": "Bahnschrift, \"Segoe UI Semibold\", \"Arial Narrow\", sans-serif",
+    "--radius": "0px",
+    "--bevel": "none",
+    "--glow": "0 0 6px rgba(242,195,0,.55)"
+  }
+}

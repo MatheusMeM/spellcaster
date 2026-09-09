@@ -1,0 +1,11 @@
+/* corporate - cinza-prata de escritorio, azul corporativo, relevo discreto, tudo retangular. */
+.chrome, .transport { background: linear-gradient(#e9edf1, #cdd3d9); border-bottom: 1px solid #b3bac1; }
+.transport { border: 0; border-top: 1px solid #b3bac1; }
+.logo { color: #2b3a4a; letter-spacing: .12em; }
+.tabs a.on { background: #f4f6f8; border: 1px solid #b3bac1; border-bottom-color: var(--accent); }
+.transport button { background: linear-gradient(#fbfcfd, #dde2e7); border-color: #9aa3ac; }
+.transport button:hover { background: linear-gradient(#ffffff, #e6ecf3); }
+.transport button.on { background: linear-gradient(#4f86e8, #245edb); color: #fff; }
+.timecode { background: #ffffff; color: #1b3a6b; border: 1px solid #9aa3ac; font-weight: 400; }
+#vu { background: #ffffff; border: 1px solid #9aa3ac; }
+#log { color: #46505c; }

@@ -1,0 +1,9 @@
+{
+ "name": "PAR LED RGB 3ch",
+ "note": "Os Brisas BX-940 da vara sao 5 ch (R,G,B,W,A) mas estao patcheados de 3 em 3: o W/A de cada um cai no R/G/B do vizinho. Enquanto o rig estiver assim, o aparelho E de 3 ch. Perfil RGBW de 4 ch em espacamento 3 vira PatchError, e esse e o comportamento certo.",
+ "channels": [
+  {"name": "r", "offset": 0},
+  {"name": "g", "offset": 1},
+  {"name": "b", "offset": 2}
+ ]
+}

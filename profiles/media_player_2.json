@@ -1,0 +1,8 @@
+{
+ "name": "Reprodutor de midia 2ch",
+ "note": "ch1 controle: 8-15 play, 16-23 replay, 24-31 stop. ch2 numero do clipe.",
+ "channels": [
+  {"name": "ctrl", "offset": 0, "ranges": {"play": 10, "replay": 20, "stop": 28}},
+  {"name": "clip", "offset": 1}
+ ]
+}

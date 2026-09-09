@@ -1,0 +1,13 @@
+/* bluesky - ceu de meio-dia: azul claro em degrade, vidro branco, botoes redondos, scope fino. */
+.chrome { background: linear-gradient(#cfe9ff, #7db8e8); border-bottom: 1px solid #5f9bcd; }
+.transport { background: linear-gradient(#7db8e8, #cfe9ff); border-top: 1px solid #5f9bcd; }
+.logo { color: #ffffff; text-shadow: 0 1px 2px #2c6a9c; }
+.tabs a { color: #14456e; }
+.tabs a.on { background: #f2f9ff; border-radius: 10px 10px 0 0; border-bottom-color: var(--accent); }
+.status { color: #14456e; }
+.transport button { background: radial-gradient(circle at 35% 25%, #ffffff, #bcdcf6 60%, #7fb4dd); border-color: #5f9bcd; }
+.transport button:hover { background: radial-gradient(circle at 35% 25%, #ffffff, #d9edff 60%, #92c6ea); }
+.transport button.on { background: radial-gradient(circle at 35% 25%, #9fd8ff, #0f7fd4); color: #fff; }
+.timecode { background: rgba(255,255,255,.85); color: #0f4f86; border: 1px solid #5f9bcd; }
+#vu { background: rgba(255,255,255,.85); border: 1px solid #5f9bcd; }
+#panels { background: linear-gradient(#f2f9ff, #dcefff); }

@@ -1,0 +1,18 @@
+/* quicksilver - metal escovado: grafite com risco horizontal, botoes redondos cromados, LED ciano. */
+.chrome, .transport {
+  background:
+    repeating-linear-gradient(180deg, rgba(255,255,255,.05) 0 1px, rgba(0,0,0,.05) 1px 2px),
+    linear-gradient(#5a6469, #2b3134);
+  border-bottom: 1px solid #121618;
+}
+.transport { border: 0; border-top: 1px solid #121618; }
+.logo { color: #dfe7ea; text-shadow: 0 1px 0 #000; }
+.tabs a.on { background: #1e2225; border-radius: 6px 6px 0 0; }
+.transport button {
+  background: radial-gradient(circle at 40% 22%, #f2f6f8, #9fadb4 55%, #4c565b);
+  border-color: #121618; color: #1b2124;
+}
+.transport button:hover { background: radial-gradient(circle at 40% 22%, #ffffff, #cfe3ee 55%, #5d757f); color: #06222e; }
+.transport button.on { background: radial-gradient(circle at 40% 22%, #d6f3ff, #7fd7ff 55%, #1c7fa6); color: #06222e; }
+.timecode { background: #0c1013; color: var(--accent); border: 1px solid #121618; }
+#vu { background: #0c1013; border: 1px solid #121618; }

@@ -1,0 +1,9 @@
+{
+ "name": "Ribalta BX-402 Wash 4ch",
+ "channels": [
+  {"name": "r", "offset": 0},
+  {"name": "g", "offset": 1},
+  {"name": "b", "offset": 2},
+  {"name": "w", "offset": 3}
+ ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "xp",
+  "author": "inspirada no tema Luna do Windows XP / Media Player 9",
+  "chrome": { "transport": "round", "visualizer": "bars" },
+  "vars": {
+    "--bg": "#ece9d8",
+    "--panel": "#ffffff",
+    "--chrome": "#245edb",
+    "--accent": "#f08a00",
+    "--accent2": "#3ba32b",
+    "--text": "#101820",
+    "--muted": "#6d6c62",
+    "--font": "Tahoma, \"Segoe UI\", sans-serif",
+    "--radius": "6px",
+    "--bevel": "inset 0 1px 0 rgba(255,255,255,.6), 0 1px 3px rgba(0,0,0,.3)",
+    "--glow": "0 0 6px rgba(240,138,0,.55)"
+  }
+}

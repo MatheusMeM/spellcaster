@@ -1,0 +1,11 @@
+{
+ "name": "Ribalta WLED bar 6ch",
+ "channels": [
+  {"name": "r", "offset": 0},
+  {"name": "g", "offset": 1},
+  {"name": "b", "offset": 2},
+  {"name": "w", "offset": 3},
+  {"name": "uv", "offset": 4},
+  {"name": "a", "offset": 5}
+ ]
+}

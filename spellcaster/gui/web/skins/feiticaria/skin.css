@@ -1,0 +1,18 @@
+/* feiticaria - padrao da casa: preto industrial, amarelo de sinalizacao, verde-lima, tudo em angulo reto. */
+.chrome { border-bottom: 2px solid var(--accent); }
+.logo { font-stretch: condensed; }
+.logo::after { content: " //"; color: var(--accent2); }
+.tabs a { border: 1px solid transparent; }
+.tabs a.on { border-color: #2a2a2a; border-bottom-color: var(--accent); }
+.transport { border-top: 1px solid #2a2a2a; }
+.transport button { border-width: 2px; border-color: #333; }
+.transport button:hover { background: #1a1a1a; }
+.timecode { border: 1px solid #333; color: var(--accent); }
+#vu { border: 1px solid #333; }
+#scrub { accent-color: var(--accent2); }
+/* faixa de perigo, do design system */
+.transport { position: relative; padding-top: 12px; }
+.transport::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 4px;
+  background: repeating-linear-gradient(135deg, var(--accent) 0 10px, #000 10px 20px);
+}

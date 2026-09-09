@@ -1,0 +1,16 @@
+{
+ "name": "Flash Butrym Laser 10W RGB 10ch",
+ "note": "Este perfil nao tem canal de rotacao de figura.",
+ "channels": [
+  {"name": "on", "offset": 0, "ranges": {"off": 0, "on": 255}},
+  {"name": "strobe", "offset": 1, "ranges": {"aberto": 255}},
+  {"name": "size", "offset": 2},
+  {"name": "posh", "offset": 3},
+  {"name": "posv", "offset": 4},
+  {"name": "fig", "offset": 5},
+  {"name": "color", "offset": 6, "wheel": {"multi": 107, "branco": 255}},
+  {"name": "scan", "offset": 7},
+  {"name": "lib", "offset": 8},
+  {"name": "auto", "offset": 9}
+ ]
+}

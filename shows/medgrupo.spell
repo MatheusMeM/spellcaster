@@ -1,0 +1,62 @@
+{
+ "name": "MED GRUPO RJ - plenaria 09/2026",
+ "fps": 30,
+ "duration": 85.9,
+ "outputs": [
+  {
+   "type": "sacn",
+   "universes": [
+    1
+   ],
+   "priority": 100,
+   "source_name": "Spellcaster"
+  },
+  {
+   "type": "laser",
+   "dac": null,
+   "port": 7765,
+   "pps": 25000,
+   "safety": {
+    "min_size": 2000,
+    "max_intensity": 255
+   }
+  }
+ ],
+ "tracks": [
+  {
+   "type": "pyfx",
+   "file": "medgrupo.py",
+   "universe": 1
+  },
+  {
+   "type": "laser",
+   "clip": "medgrupo_laser.ild",
+   "fps": 30,
+   "scale": [
+    [
+     0,
+     1.0
+    ],
+    [
+     46.8,
+     1.0
+    ]
+   ],
+   "rot": [
+    [
+     0,
+     0.0
+    ],
+    [
+     46.8,
+     0.0
+    ]
+   ]
+  }
+ ],
+ "cues": [],
+ "transport": {
+  "osc_port": 9100
+ },
+ "version": 1
+}

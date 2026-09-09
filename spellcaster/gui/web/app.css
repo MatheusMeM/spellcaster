@@ -1,0 +1,79 @@
+/* Base da GUI. A skin so redefine as variaveis (skin.json) e decora o cromo (skin.css).
+   Variaveis do contrato: --bg --panel --chrome --accent --accent2 --text --muted --font --radius --bevel --glow */
+:root {
+  --bg: #0a0a0a; --panel: #141414; --chrome: #1c1c1c; --accent: #f2c300; --accent2: #b4d435;
+  --text: #f0f0f0; --muted: #8a8a8a; --font: Bahnschrift, "Segoe UI", sans-serif;
+  --radius: 0px; --bevel: none; --glow: none;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  display: grid; grid-template-rows: auto 1fr auto; height: 100vh; overflow: hidden;
+  background: var(--bg); color: var(--text); font: 13px/1.4 var(--font);
+}
+button, select, input { font: inherit; color: inherit; }
+
+/* ---- cromo superior ---- */
+.chrome {
+  display: flex; align-items: center; gap: 16px; padding: 6px 12px;
+  background: var(--chrome); box-shadow: var(--bevel);
+}
+.logo { font-weight: 700; letter-spacing: .18em; color: var(--accent); text-shadow: var(--glow); }
+.tabs { display: flex; gap: 2px; flex: 1; }
+.tabs a {
+  padding: 4px 12px; color: var(--muted); text-decoration: none; text-transform: uppercase;
+  font-size: 11px; letter-spacing: .08em; border-radius: var(--radius) var(--radius) 0 0;
+  border-bottom: 2px solid transparent;
+}
+.tabs a:hover { color: var(--text); }
+.tabs a.on { color: var(--text); border-bottom-color: var(--accent); background: var(--panel); }
+.status { font-size: 11px; color: var(--muted); padding-left: 14px; position: relative; }
+.status::before {
+  content: ""; position: absolute; left: 0; top: 4px; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--muted);
+}
+.status.on { color: var(--text); }
+.status.on::before { background: var(--accent2); box-shadow: var(--glow); }
+.skinmenu { font-size: 11px; color: var(--muted); }
+.skinmenu select {
+  margin-left: 4px; background: var(--panel); color: var(--text); padding: 2px 6px;
+  border: 1px solid var(--muted); border-radius: var(--radius);
+}
+
+/* ---- paineis (montados por App.panel; vazios aqui de proposito) ---- */
+#panels { position: relative; background: var(--panel); overflow: hidden; }
+#panels > section { display: none; position: absolute; inset: 0; padding: 12px; overflow: auto; }
+#panels > section.on { display: block; }
+#panels > section:empty::after {
+  content: attr(data-panel) " \2014 painel vazio (montagem por App.panel)"; color: var(--muted);
+  text-transform: uppercase; font-size: 11px; letter-spacing: .1em;
+}
+#log { margin: 0; font: 12px/1.5 Consolas, monospace; white-space: pre-wrap; color: var(--muted); }
+
+/* ---- transporte ---- */
+.transport {
+  display: flex; align-items: center; gap: 14px; padding: 8px 12px;
+  background: var(--chrome); box-shadow: var(--bevel);
+}
+.buttons { display: flex; gap: 6px; }
+.transport button {
+  width: 36px; height: 36px; padding: 0; display: grid; place-items: center; cursor: pointer;
+  background: var(--panel); color: var(--text); border: 1px solid var(--muted);
+  border-radius: var(--radius); box-shadow: var(--bevel);
+}
+.transport button svg { width: 16px; height: 16px; fill: currentColor; }
+.transport button:hover { color: var(--accent); border-color: var(--accent); }
+.transport button.on { color: var(--bg); background: var(--accent); border-color: var(--accent); box-shadow: var(--glow); }
+html[data-transport="round"] .transport button { border-radius: 50%; }
+html[data-transport="pill"] .transport button { border-radius: 999px; width: 48px; }
+.ic-pause { display: none; }
+#play.on .ic-play { display: none; }
+#play.on .ic-pause { display: block; }
+.timecode {
+  font: 700 18px/1 Consolas, "Courier New", monospace; letter-spacing: .06em; color: var(--accent);
+  text-shadow: var(--glow); min-width: 7.5em; text-align: center;
+  padding: 6px 8px; background: var(--bg); border-radius: var(--radius); box-shadow: var(--bevel);
+}
+#scrub { flex: 1; accent-color: var(--accent); height: 4px; }
+#vu { width: 240px; height: 40px; background: var(--bg); border-radius: var(--radius); box-shadow: var(--bevel); }
+html[data-visualizer="none"] #vu { display: none; }

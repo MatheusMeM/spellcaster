@@ -1,0 +1,18 @@
+{
+  "name": "bluesky",
+  "author": "inspirada nas skins Bluesky / Radio do Windows Media Player 9",
+  "chrome": { "transport": "round", "visualizer": "scope" },
+  "vars": {
+    "--bg": "#dcefff",
+    "--panel": "#f2f9ff",
+    "--chrome": "#8dc6f0",
+    "--accent": "#0f7fd4",
+    "--accent2": "#ffffff",
+    "--text": "#0d2a44",
+    "--muted": "#4d7fa3",
+    "--font": "\"Segoe UI\", Verdana, sans-serif",
+    "--radius": "10px",
+    "--bevel": "inset 0 1px 0 rgba(255,255,255,.85), 0 1px 3px rgba(13,42,68,.25)",
+    "--glow": "0 0 8px rgba(255,255,255,.9)"
+  }
+}

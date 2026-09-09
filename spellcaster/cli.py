@@ -4,6 +4,7 @@ import argparse, importlib.util, json, sys
 from . import __version__
 from .core.registry import command, schema, call
 from .core.engine import Engine
+from . import fixtures, player, gui  # noqa: F401  (registram seus comandos no registry)
 
 
 def load_show(path):

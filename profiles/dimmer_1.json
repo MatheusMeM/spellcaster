@@ -1,0 +1,7 @@
+{
+ "name": "Dimmer 1ch (Fresnel 165 / elipsoidal)",
+ "note": "Altman Fresnel 165 e elipsoidal em canal de dimmer: mesmo perfil, um canal so. Nao vale dois arquivos iguais.",
+ "channels": [
+  {"name": "dim", "offset": 0, "ranges": {"apagado": 0, "meio": 128, "cheio": 255}}
+ ]
+}

@@ -1,0 +1,21 @@
+/* headspace - forma organica Y2K: verde-agua sobre petroleo, LCD verde-limao, botoes em capsula. */
+.chrome {
+  background: radial-gradient(120% 200% at 12% -60%, #2f6d78 0%, #1b3d47 55%, #10262e 100%);
+  border-bottom: 1px solid #0a1b21; border-radius: 0 0 22px 22px;
+}
+.transport {
+  background: radial-gradient(120% 220% at 88% 180%, #2f6d78 0%, #1b3d47 55%, #10262e 100%);
+  border-radius: 22px 22px 0 0;
+}
+.logo { color: var(--accent2); text-transform: lowercase; font-style: italic; letter-spacing: .1em; }
+.tabs a { border-radius: 12px; border-bottom: 0; }
+.tabs a.on { background: #0b1a22; color: var(--accent2); box-shadow: inset 0 1px 4px #000; }
+.transport button { background: linear-gradient(#2e6a76, #14343d); border-color: #0a1b21; }
+.transport button:hover { background: linear-gradient(#3d8a99, #17414c); }
+.transport button.on { background: linear-gradient(#a6ff4d, #5fbf1f); color: #0b1a22; }
+.timecode {
+  color: var(--accent2); background: #071016; border: 1px solid #2f6d78; border-radius: 12px;
+  text-shadow: 0 0 8px rgba(166,255,77,.8);
+}
+#vu { background: #071016; border: 1px solid #2f6d78; border-radius: 12px; }
+#scrub { accent-color: var(--accent2); }

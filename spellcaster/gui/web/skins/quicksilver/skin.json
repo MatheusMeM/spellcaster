@@ -1,0 +1,18 @@
+{
+  "name": "quicksilver",
+  "author": "inspirada na skin QuickSilver (codinome Corona) do Windows Media Player 9",
+  "chrome": { "transport": "round", "visualizer": "bars" },
+  "vars": {
+    "--bg": "#141719",
+    "--panel": "#1e2225",
+    "--chrome": "#3a4145",
+    "--accent": "#7fd7ff",
+    "--accent2": "#c8d2d8",
+    "--text": "#e6ecef",
+    "--muted": "#8d9aa2",
+    "--font": "\"Segoe UI\", Tahoma, sans-serif",
+    "--radius": "6px",
+    "--bevel": "inset 0 1px 0 rgba(255,255,255,.28), inset 0 -1px 0 rgba(0,0,0,.5), 0 2px 6px rgba(0,0,0,.5)",
+    "--glow": "0 0 8px rgba(127,215,255,.6)"
+  }
+}

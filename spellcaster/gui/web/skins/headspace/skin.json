@@ -1,0 +1,18 @@
+{
+  "name": "headspace",
+  "author": "inspirada na skin Headspace do Windows Media Player 7 (2001)",
+  "chrome": { "transport": "pill", "visualizer": "scope" },
+  "vars": {
+    "--bg": "#0b1a22",
+    "--panel": "#122a33",
+    "--chrome": "#1b3d47",
+    "--accent": "#4fd6c8",
+    "--accent2": "#a6ff4d",
+    "--text": "#dff7f3",
+    "--muted": "#6f9aa0",
+    "--font": "\"Trebuchet MS\", Verdana, sans-serif",
+    "--radius": "14px",
+    "--bevel": "inset 0 1px 0 rgba(255,255,255,.14), 0 2px 10px rgba(0,0,0,.45)",
+    "--glow": "0 0 10px rgba(79,214,200,.7)"
+  }
+}
