@@ -8,8 +8,10 @@
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Stdio};
 use std::time::{Duration, Instant};
+
+mod common;
 
 const RAIZ: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 
@@ -20,7 +22,7 @@ struct Servidor {
 
 impl Servidor {
     fn start() -> Servidor {
-        let mut p = Command::new(env!("CARGO_BIN_EXE_spellcore"))
+        let mut p = common::bin()
             .args(["serve", "--port", "0", "--dir"])
             .arg(RAIZ)
             .arg("--show")

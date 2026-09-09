@@ -6,101 +6,15 @@
 //! pontos que chegaram ao "DAC" e confere a geometria que saiu.
 
 use laser::{ild, Emulator, Frame, Point};
-use serde_json::{json, Value};
-use std::io::{BufRead, BufReader, Write};
+use serde_json::json;
+
 use std::net::UdpSocket;
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-// -------------------------------------------------------- servidor MCP em stdio
-
-struct Mcp {
-    p: Child,
-    inp: ChildStdin,
-    out: BufReader<ChildStdout>,
-    id: u32,
-}
-
-impl Mcp {
-    fn start() -> Mcp {
-        let mut p = Command::new(env!("CARGO_BIN_EXE_spellcore"))
-            .arg("mcp")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn()
-            .expect("spellcore mcp");
-        let inp = p.stdin.take().expect("stdin");
-        let out = BufReader::new(p.stdout.take().expect("stdout"));
-        let mut m = Mcp { p, inp, out, id: 0 };
-        m.rpc(
-            "initialize",
-            json!({"protocolVersion": "2025-06-18", "capabilities": {},
-                   "clientInfo": {"name": "teste", "version": "0"}}),
-        );
-        writeln!(
-            m.inp,
-            "{}",
-            json!({"jsonrpc": "2.0", "method": "notifications/initialized"})
-        )
-        .expect("initialized");
-        m.inp.flush().expect("flush");
-        m
-    }
-
-    fn rpc(&mut self, method: &str, params: Value) -> Value {
-        self.id += 1;
-        let id = self.id;
-        writeln!(
-            self.inp,
-            "{}",
-            json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params})
-        )
-        .expect("escrever no servidor");
-        self.inp.flush().expect("flush");
-        loop {
-            let mut l = String::new();
-            let n = self.out.read_line(&mut l).expect("ler do servidor");
-            assert!(n > 0, "servidor fechou o stdout esperando {}", method);
-            let v: Value = serde_json::from_str(&l)
-                .unwrap_or_else(|e| panic!("stdout nao e' JSON-RPC ({}): {:?}", e, l));
-            if v["id"] == json!(id) {
-                assert!(v["error"].is_null(), "{}: {}", method, v["error"]);
-                return v["result"].clone();
-            }
-        }
-    }
-
-    /// Chama o comando e devolve o JSON que ele retornou. Falha se o comando errou.
-    fn cmd(&mut self, name: &str, args: Value) -> Value {
-        let r = self.rpc("tools/call", json!({"name": name, "arguments": args}));
-        let t = r["content"][0]["text"]
-            .as_str()
-            .unwrap_or_default()
-            .to_string();
-        assert_eq!(r["isError"], json!(false), "{}: {}", name, t);
-        serde_json::from_str(&t).unwrap_or(Value::String(t))
-    }
-
-    /// Chama o comando esperando erro; devolve o texto do erro.
-    fn erro(&mut self, name: &str, args: Value) -> String {
-        let r = self.rpc("tools/call", json!({"name": name, "arguments": args}));
-        assert_eq!(r["isError"], json!(true), "{} devia ter falhado", name);
-        r["content"][0]["text"]
-            .as_str()
-            .unwrap_or_default()
-            .to_string()
-    }
-}
-
-impl Drop for Mcp {
-    fn drop(&mut self) {
-        self.p.kill().ok();
-        self.p.wait().ok();
-    }
-}
+mod common;
+use common::Mcp;
 
 // ------------------------------------------------------------------- utilidades
 

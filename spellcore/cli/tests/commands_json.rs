@@ -5,7 +5,8 @@
 //! Regerar: `spellcore commands > spellgui/web/dev/commands.json`.
 
 use serde_json::Value;
-use std::process::Command;
+
+mod common;
 
 const DEV: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -14,7 +15,7 @@ const DEV: &str = concat!(
 
 #[test]
 fn dev_commands_json_em_dia() {
-    let out = Command::new(env!("CARGO_BIN_EXE_spellcore"))
+    let out = common::bin()
         .arg("commands")
         .output()
         .expect("spellcore commands");
