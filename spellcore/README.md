@@ -12,7 +12,10 @@ spellcore/
   pixelmap/         amostragem de frame -> bytes DMX por universo (rayon); bin `map_bench`
   mcp/              servidor MCP (rmcp, stdio) + `mcp install`
   serve/            barramento: HTTP + WebSocket JSON-RPC + monitor DMX + MCP em /mcp
-  cli/              binário `spellcore`: play, net, commands, mcp, serve
+  cli/              binário `spellcore` (play, net, commands, mcp, serve); a CLI e o `registry()`
+                    completo moram em `lib.rs`, para o `gui` usar o MESMO registry
+  gui/              binário `spellcaster`: a janela (tao + wry/WebView2) com o barramento em
+                    processo — `spellcaster [show.spell] [--dir RAIZ]`
   bench/            Criterion + binários `jitter` e `throughput`
 ```
 
@@ -83,6 +86,7 @@ C:\Python313\python.exe tests/conformance/capture_sacn.py --secs 3
 | `socket2` | protocols | `std::net::UdpSocket` não expõe `IP_MULTICAST_IF` nem `SO_REUSEADDR`, exigidos por sACN |
 | `criterion` | bench, laser, pixelmap (dev) | medida estatística de jitter/latência exigida pelo PRD |
 | `rayon` | pixelmap | 100 000 px por frame em ~590 universos independentes; pool de trabalho sem escrever um |
+| `tao` + `wry` | gui (só `cfg(windows)`) | a janela e o WebView2 que o Windows 11 já traz; é o Tauri sem o Tauri (uma janela, um webview, nenhum menu nativo, updater ou tray para justificar o framework inteiro) |
 | `axum` + `tokio` | serve | HTTP, WebSocket e o `tower::Service` do MCP streamable em um servidor só; o `rmcp` já exigia hyper/tower, e escrever handshake de WS na mão no servidor não paga |
 
 Nada mais entra sem justificativa e sem medir o tamanho do binário.

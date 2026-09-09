@@ -6,6 +6,7 @@ o `spellcore serve` (ou qualquer servidor estático) entrega. Cor e tipografia v
 
 | Arquivo | O que é |
 |---|---|
+| `nav.js` | a barra do topo das cinco páginas (uma linha `<script src="nav.js">` e um `<div id="nav">`): abas TIMELINE/PATCHBAY/TEATRO/FACE/LASER com `Shift+1`..`Shift+5`, indicador ENGINE/OFFLINE com `rev`, e o nome do show editável (grava no Enter ou no blur, nunca por tecla) |
 | `bus.js` | cliente do barramento: WS `{"id","cmd","args"}` com promessa por id, reconexão, eventos (`transport`, `show`, `log`, `widget`), frames binários `topic\|universe\|512` decodificados em `{universe, data}`. Modo offline embutido |
 | `widgets.js` | parâmetro tipado → widget (`WG.kindOf`), campos → `args` do request (`WG.args`), formulário de um comando do registry (`WG.form`). Classes para a página estilizar: `.wg`, `.wg-<tipo>`, `.wg-lab`, `.wg-num`, `.wg-form`, `.wg-doc`, `.wg-go`, `.wg-out` |
 | `face.js` + `face.html` | runtime da Face: `faces/<nome>.face.json` vira grade de widgets em modo kiosk |
@@ -70,3 +71,12 @@ spellcore commands > spellgui/web/dev/commands.json
 ```
 
 `spellcore/cli/tests/commands_json.rs` falha quando um comando sai do registry ou muda de schema.
+
+## Como abrir sem navegador
+
+`spellcaster.exe` (crate `spellcore/gui`) sobe o barramento em processo, numa porta livre, e abre
+estas mesmas páginas numa janela do programa. É o modo normal no Windows:
+
+```
+spellcaster shows/medgrupo.spell
+```

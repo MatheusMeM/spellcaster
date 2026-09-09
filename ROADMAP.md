@@ -150,7 +150,7 @@ O plano acima (F0–F7) foi o do protótipo Python e está concluído até F6. O
 | R2 mídia (GStreamer, NDI, RTSP, Spout) | 1080p60 no alvo de CPU | pendente | SDKs não instalados (GStreamer, NDI) |
 | R3 pixel mapping (rayon; wgpu depois) | 100 000 px a 60 Hz < 2 ms | concluída (0,105 ms p50 / 0,316 ms p99 por frame; bilinear 0,196 / 0,493) | crate autônomo: ligar a fonte de frame ao player espera a R2 |
 | R4 laser multi-feed | Ether Dream, IDN; safety no engine; 4 feeds | concluída (0,83 % cpu) | — |
-| R5 GUI Tauri | show de 3 min do zero; Face em modo performance | base pronta em `main` (`spellgui/web`: canvaskit + timeline); falta Tauri, painéis, Theme/Face | voto das rodadas 5 e 6 do design |
+| R5 GUI (janela própria) | show de 3 min do zero; Face em modo performance | janela nativa pronta: `spellcaster.exe` (crate `spellcore/gui`, `tao` + `wry`/WebView2, sem Tauri) sobe o barramento em processo e abre as páginas de `spellgui/web`, ligadas pela barra `nav.js`; falta painéis, Theme/Face | voto das rodadas 5 e 6 do design |
 | R6 previz Godot | 60 fps, 64 fixtures, 2 LED walls | pendente | Godot não instalado |
 | R7 MCP com rmcp | sessão de IA monta e toca um show sem GUI | concluída em stdio; edição de show (patch, track, key, cue) no registry (`engine::edit`) | `spell://face`/`spell://graph` pendentes; transporte HTTP streamable em `/mcp` entregue pela F1 (`serve`) |
 | R8 empacotamento | onedir, Linux, Pi estático; CI com bench como gate | concluída | — |
