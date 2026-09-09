@@ -237,6 +237,7 @@ pub fn base() -> Registry {
         estado(&vivo()?)
     });
     crate::edit::register(&mut r);
+    crate::module::register(&mut r);
     r
 }
 

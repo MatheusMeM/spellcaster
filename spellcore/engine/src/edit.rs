@@ -128,25 +128,30 @@ fn perfil(dir: &Path, p: &str) -> Result<Perfil, String> {
     })
 }
 
-/// Pasta `profiles/`: ao lado do .spell, um nivel acima (`shows/` e `profiles/` irmaos, como no
-/// repo e no pendrive), no cwd ou ao lado do executavel — a primeira que existir.
-pub fn profiles_dir(spell: &str) -> PathBuf {
+/// Pasta `<nome>/` do show: ao lado do .spell, um nivel acima (`shows/` e `profiles/` irmaos,
+/// como no repo e no pendrive), no cwd ou ao lado do executavel — a primeira que existir.
+/// `profiles/` e `modules/` (o `module::modules_dir`) resolvem pela mesma regra.
+pub fn dir_do_show(spell: &str, nome: &str) -> PathBuf {
     let mut c = Vec::new();
     if !spell.is_empty() {
         let d = Path::new(spell).parent().unwrap_or(Path::new("."));
-        c.push(d.join("profiles"));
-        c.push(d.join("..").join("profiles"));
+        c.push(d.join(nome));
+        c.push(d.join("..").join(nome));
     }
-    c.push(PathBuf::from("profiles"));
+    c.push(PathBuf::from(nome));
     if let Some(d) = std::env::current_exe()
         .ok()
         .and_then(|e| e.parent().map(Path::to_path_buf))
     {
-        c.push(d.join("profiles"));
+        c.push(d.join(nome));
     }
     c.into_iter()
         .find(|p| p.is_dir())
-        .unwrap_or_else(|| PathBuf::from("profiles"))
+        .unwrap_or_else(|| PathBuf::from(nome))
+}
+
+pub fn profiles_dir(spell: &str) -> PathBuf {
+    dir_do_show(spell, "profiles")
 }
 
 /// Uma linha da grade por fixture; para no primeiro erro (perfil ausente, fora de 512,

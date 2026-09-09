@@ -184,6 +184,7 @@ CI, sem tocar no que já está conforme):
 | Frente | Entrega | Aceite | Depende de |
 |---|---|---|---|
 | Design | rodada 7 (FÓSFORO, PATCHBAY) | voto do dono | voto das rodadas 5 e 6 |
+| F4 module | `module.json`: `engine::module` (Module/Param/Cmd, `load`, `check`), comandos `module_add/del/list/get/check` e `modules_dir`, `modules/laser.json` | `engine/tests/module.rs` verde | — |
 
 Bloqueadas até instalar SDK (decisão do dono, não de agente): R2 (GStreamer + NDI SDK),
 R6 (Godot 4). R9 espera R5.
