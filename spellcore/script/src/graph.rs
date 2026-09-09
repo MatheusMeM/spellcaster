@@ -53,17 +53,19 @@
 // que venha ANTES dele na ordem topologica ve o valor do frame anterior ; virar pre-passe so' dos
 // nos `state` se algum show real depender do frame exato.
 //!
-//! `module` e' o app declarado em `modules/<nome>.json` (formato do `module.json` do Chataigne):
-//! `parameters{path:{type,default,norm,min,max}}`, `values{path:{type}}`, `commands{nome:{context}}`.
-//! Cada `parameter` e' uma ENTRADA: valor mudou -> `Ev::Param{target:"<modulo>/<path>"}`, com
+//! `module` e' o app declarado em `modules/<nome>.json`, lido por `engine::module::load` (a mesma
+//! pasta e o mesmo `Module` tipado dos comandos `module_*`; o graph nao tem leitor proprio).
+//! Cada `parameter` NUMERICO e' uma ENTRADA: valor mudou -> `Ev::Param{target:"<modulo>/<path>"}`, com
 //! `norm` mapeando o sinal 0..1 para `[n0,n1]` antes do clamp em `min`..`max`. Cada `value` e' uma
 //! SAIDA de nivel alimentada por `FrameHook::input("module:<modulo>/<path>", v)`. Cada `command`
-//! e' uma entrada de trigger -> `Ev::Cmd{name:"<modulo>/<cmd>", args:{}}`.
+//! e' uma entrada de trigger -> `Ev::Cmd{name:"<modulo>/<cmd>", args:{}}`. Parametro `enum` ou
+//! `string` NAO vira pino: `Ev::Param` carrega `f64`.
 //!
 //! JSON: `{"nodes":[{"id","type",...}], "edges":[["no.pino","no.pino"], ...]}`.
 //! Compila para uma lista de nos em ordem topologica com os pinos indexados por INTEIRO
 //! (nenhum lookup por texto no caminho quente). Ciclo e' erro na compilacao.
 
+use engine::module::Module;
 use engine::hook::{Ev, EventSink, FrameHook};
 use engine::{Curve, Universes};
 use rhai::{Dynamic, Engine as Rhai, Scope, AST};
@@ -155,32 +157,32 @@ fn pinos(t: &str) -> Option<(&'static [&'static str], &'static [&'static str])> 
     })
 }
 
-/// `modules/<nome>.json` relativo ao diretorio do show.
-// ponytail: le e valida o minimo do module.json aqui ; trocar por `engine::module::load` quando
-// a frente F4 entrar em main (o formato e' o mesmo).
-fn carrega_modulo(base: &Path, nome: &str) -> Result<Value, String> {
-    let p = base.join("modules").join(format!("{nome}.json"));
-    let s = std::fs::read_to_string(&p)
-        .map_err(|e| format!("module {nome:?}: {}: {e}", p.display()))?;
-    serde_json::from_str(&s).map_err(|e| format!("module {nome:?}: {e}"))
+/// `modules/<nome>.json` do show, pela mesma regra de `profiles/` e `faces/`: o `engine` resolve
+/// a pasta e le o manifesto tipado; o graph nao tem leitor proprio de module.json.
+// ponytail: `base_dir` e' o diretorio do show, e `recurso_dir` quer o caminho do .spell ; o nome
+// sintetico so' existe para dar a ele o pai certo — some quando o Graph receber o .spell.
+fn carrega_modulo(base: &Path, nome: &str) -> Result<Module, String> {
+    let spell = base.join("show.spell");
+    let dir = engine::module::modules_dir(&spell.to_string_lossy());
+    engine::module::load(&dir.join(format!("{nome}.json"))).map_err(|e| format!("module {nome:?}: {e}"))
 }
 
-/// Chaves de um objeto do module.json, em ordem estavel (o layout dos pinos depende dela).
-/// `serde_json::Map` sem `preserve_order` e' um `BTreeMap`: `keys()` ja' sai ordenado.
-fn chaves(m: &Value, k: &str) -> Vec<String> {
-    match m.get(k).and_then(|x| x.as_object()) {
-        Some(o) => o.keys().cloned().collect(),
-        None => Vec::new(),
-    }
+/// Parametros que viram pino: so' os numericos.
+// ponytail: pino so' numerico ; enum/string entram quando `Ev::Param` carregar `Value`.
+fn params_num(m: &Module) -> impl Iterator<Item = (&String, &engine::module::Param)> {
+    m.parameters
+        .iter()
+        .filter(|(_, p)| p.r#type != "enum" && p.r#type != "string")
 }
 
-/// Pinos deste no. Iguais aos do tipo, menos `module`, que os tira do arquivo.
-fn pinos_no(tipo: &str, m: Option<&Value>) -> (Vec<String>, Vec<String>) {
+/// Pinos deste no. Iguais aos do tipo, menos `module`, que os tira do manifesto (`BTreeMap`:
+/// a ordem das chaves e' estavel, e o layout dos slots depende dela).
+fn pinos_no(tipo: &str, m: Option<&Module>) -> (Vec<String>, Vec<String>) {
     match m {
         Some(m) => {
-            let mut ins = chaves(m, "parameters");
-            ins.extend(chaves(m, "commands"));
-            (ins, chaves(m, "values"))
+            let mut ins: Vec<String> = params_num(m).map(|(k, _)| k.clone()).collect();
+            ins.extend(m.commands.keys().cloned());
+            (ins, m.values.keys().cloned().collect())
         }
         None => {
             let (i, o) = pinos(tipo).unwrap();
@@ -220,7 +222,7 @@ fn monta(
     tipo: &str,
     n: &Value,
     rhai: &mut Option<(Rhai, Scope<'static>)>,
-    m: Option<&Value>,
+    m: Option<&Module>,
     // se este no E' um `state`, o indice dele em `Graph::estados`
     meu: Option<usize>,
 ) -> Result<Kind, String> {
@@ -310,26 +312,18 @@ fn monta(
         "module" => {
             let m = m.unwrap();
             let nome = txt(n, "module", "");
-            let params = chaves(m, "parameters")
-                .iter()
-                .map(|k| {
-                    let p = &m["parameters"][k];
-                    Par {
-                        alvo: format!("{nome}/{k}"),
-                        norm: p
-                            .get("norm")
-                            .and_then(|v| v.as_array())
-                            .filter(|a| a.len() == 2)
-                            .map(|a| (a[0].as_f64().unwrap_or(0.0), a[1].as_f64().unwrap_or(1.0))),
-                        // ponytail: sem min/max declarados o clamp e' identidade ; parametro sem
-                        // faixa e' o caso do app que ainda nao mediu o proprio limite.
-                        min: f(p, "min", f64::NEG_INFINITY),
-                        max: f(p, "max", f64::INFINITY),
-                        ult: f64::NAN,
-                    }
+            let params = params_num(m)
+                .map(|(k, p)| Par {
+                    alvo: format!("{nome}/{k}"),
+                    norm: p.norm.map(|a| (a[0], a[1])),
+                    // ponytail: sem min/max declarados o clamp e' identidade ; parametro sem
+                    // faixa e' o caso do app que ainda nao mediu o proprio limite.
+                    min: p.min.unwrap_or(f64::NEG_INFINITY),
+                    max: p.max.unwrap_or(f64::INFINITY),
+                    ult: f64::NAN,
                 })
                 .collect();
-            let cmds = chaves(m, "commands").iter().map(|k| (format!("{nome}/{k}"), 0.0)).collect();
+            let cmds = m.commands.keys().map(|k| (format!("{nome}/{k}"), 0.0)).collect();
             Kind::Modulo { params, cmds }
         }
         _ => return Err(format!("tipo fora do catalogo: {tipo}")),
@@ -382,7 +376,7 @@ impl Graph {
         let mut declarados: Vec<bool> = Vec::new();
         let mut nomes_grupo: HashMap<String, usize> = HashMap::new();
         // module.json de cada no `module`, lido uma vez
-        let mut mods: HashMap<usize, Value> = HashMap::new();
+        let mut mods: HashMap<usize, Module> = HashMap::new();
         for (i, no) in brutos.iter().enumerate() {
             let id = no
                 .get("id")
@@ -1297,7 +1291,9 @@ mod tests {
             dir.join("modules").join("laser.json"),
             r#"{"name":"laser","type":"laser","version":"1.0.0",
                 "parameters":{"geo/scale":{"type":"float","default":1,"norm":[0,2],
-                                           "min":0,"max":1.5}},
+                                           "min":0,"max":1.5},
+                              "dev/type":{"type":"enum","options":["idn","etherdream"]},
+                              "dev/host":{"type":"string"}},
                 "values":{"stats/pps":{"type":"float"}},
                 "commands":{"blank":{"context":"action"}}}"#,
         )
@@ -1313,6 +1309,18 @@ mod tests {
         .unwrap();
         let mut g = Graph::new_in(&spec, Box::new(s.clone()), &dir).expect("compila");
         let mut u = Universes::new();
+
+        // parametro enum/string nao vira pino: aresta para ele nao compila
+        let ruim: Value = serde_json::from_str(
+            r#"{"nodes":[{"id":"k","type":"in.widget","widget":"k"},
+                         {"id":"m","type":"module","module":"laser"}],
+                "edges":[["k.press","m.dev/host"]]}"#,
+        )
+        .unwrap();
+        let Err(e) = Graph::new_in(&ruim, Box::new(Sink::default()), &dir) else {
+            panic!("enum/string nao tem pino: a aresta tinha que falhar");
+        };
+        assert!(e.contains("dev/host"), "{e}");
 
         g.frame(0.0, &mut u);
         assert_eq!(
