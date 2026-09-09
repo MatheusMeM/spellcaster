@@ -60,27 +60,22 @@ pub fn open_outputs(sh: &Show) -> Result<Vec<Box<dyn Output>>, String> {
     let mut outs: Vec<Box<dyn Output>> = Vec::new();
     for c in &sh.outputs {
         match c {
-            OutputCfg::Sacn {
-                universes,
-                priority,
-                source_name,
-                interfaces,
-            } => {
-                let ifaces = interfaces.as_ref().map(|v| {
+            OutputCfg::Sacn(c) => {
+                let ifaces = c.interfaces.as_ref().map(|v| {
                     v.iter()
                         .filter_map(|s| s.parse::<Ipv4Addr>().ok())
                         .collect::<Vec<_>>()
                 });
-                let o = SacnOut::with(universes, *priority, source_name, ifaces)
+                let o = SacnOut::with(&c.universes, c.priority, &c.source_name, ifaces)
                     .map_err(|e| format!("sacn: {}", e))?;
                 outs.push(Box::new(o));
             }
-            OutputCfg::ArtNet { targets, broadcast } => {
-                let o = ArtNetOut::new(targets.clone(), *broadcast)
+            OutputCfg::ArtNet(c) => {
+                let o = ArtNetOut::new(c.targets.clone(), c.broadcast)
                     .map_err(|e| format!("artnet: {}", e))?;
                 outs.push(Box::new(o));
             }
-            OutputCfg::Osc { .. } => {} // saida de mensagem, nao de universo: vai no `osc_out`
+            OutputCfg::Osc(_) => {} // saida de mensagem, nao de universo: vai no `osc_out`
             OutputCfg::Unknown { tipo } => eprintln!("aviso: saida \"{}\" ignorada", tipo),
         }
     }
@@ -90,12 +85,12 @@ pub fn open_outputs(sh: &Show) -> Result<Vec<Box<dyn Output>>, String> {
 /// Primeira saida `osc` do show (o Python tambem guarda so' uma).
 fn open_osc(sh: &Show) -> Result<Option<OscOut>, String> {
     for c in &sh.outputs {
-        if let OutputCfg::Osc { host, port } = c {
-            if *port == 0 {
+        if let OutputCfg::Osc(o) = c {
+            if o.port == 0 {
                 eprintln!("aviso: saida osc sem \"port\" ignorada");
                 continue;
             }
-            return OscOut::new(host, *port)
+            return OscOut::new(&o.host, o.port)
                 .map(Some)
                 .map_err(|e| format!("osc: {}", e));
         }

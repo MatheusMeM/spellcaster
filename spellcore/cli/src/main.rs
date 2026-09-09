@@ -145,7 +145,7 @@ impl EventSink for CliSink {
 /// Host/porta da saida `osc` do .spell — o destino do `out.osc` do Graph.
 fn osc_target(sh: &show::Show) -> Option<(String, u16)> {
     sh.outputs.iter().find_map(|o| match o {
-        show::OutputCfg::Osc { host, port } => Some((host.clone(), *port)),
+        show::OutputCfg::Osc(o) => Some((o.host.clone(), o.port)),
         _ => None,
     })
 }

@@ -19,12 +19,12 @@ pub fn novo() -> Show {
     Show {
         name: "novo show".into(),
         duration: Some(60.0),
-        outputs: vec![OutputCfg::Sacn {
+        outputs: vec![OutputCfg::Sacn(show::Sacn {
             universes: vec![1],
             priority: 100,
             source_name: "Spellcaster".into(),
             interfaces: None,
-        }],
+        })],
         extra: json!({"patch": [], "cues": [], "markers": [], "in": 0.0, "out": 60.0})
             .as_object()
             .cloned()

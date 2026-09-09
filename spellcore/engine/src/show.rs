@@ -1,47 +1,76 @@
 //! Arquivo de show `.spell` (JSON) v1 — mesmo arquivo do `spellcaster/show.py`.
 
-use serde::{Deserialize, Serialize};
+use serde::de::Error as _;
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 use std::path::Path;
 
 pub const VERSION: u32 = 1;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Sacn {
+    #[serde(default)]
+    pub universes: Vec<u16>,
+    #[serde(default = "cem")]
+    pub priority: u8,
+    #[serde(default = "spellcaster")]
+    pub source_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interfaces: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ArtNet {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub targets: Option<Vec<String>>,
+    #[serde(default = "sim")]
+    pub broadcast: bool,
+}
+
+/// Saida OSC do Player: tracks `osc` e `media` de reprodutor nao-Capture.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Osc {
+    #[serde(default = "local")]
+    pub host: String,
+    /// Sem "port" a saida fica em 0 e o Player a ignora (o Python levanta KeyError).
+    #[serde(default)]
+    pub port: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum OutputCfg {
-    Sacn {
-        #[serde(default)]
-        universes: Vec<u16>,
-        #[serde(default = "cem")]
-        priority: u8,
-        #[serde(default = "spellcaster")]
-        source_name: String,
-        #[serde(default)]
-        interfaces: Option<Vec<String>>,
-    },
-    ArtNet {
-        #[serde(default)]
-        targets: Option<Vec<String>>,
-        #[serde(default = "sim")]
-        broadcast: bool,
-    },
-    /// Saida OSC do Player: tracks `osc` e `media` de reprodutor nao-Capture.
-    Osc {
-        #[serde(default = "local")]
-        host: String,
-        /// Sem "port" a saida fica em 0 e o Player a ignora (o Python levanta KeyError).
-        #[serde(default)]
-        port: u16,
-    },
+    Sacn(Sacn),
+    ArtNet(ArtNet),
+    Osc(Osc),
     // ponytail: tipo desconhecido guarda so' o nome (o resto da config se perde ao regravar)
     // ; virar Unknown com Map quando laser/media entrarem no `outputs` do Rust.
-    // O `untagged` e' o ultimo braco: pega o "type" que nao e' nenhum dos de cima e tambem o
-    // output sem "type" nenhum (vira Unknown { tipo: "" } em vez de erro de parse).
     #[serde(untagged)]
     Unknown {
-        #[serde(default, rename = "type")]
+        #[serde(rename = "type")]
         tipo: String,
     },
+}
+
+/// Tipo conhecido com conteudo invalido e' erro (o `untagged` do derive o transformaria em
+/// `Unknown` e a saida sumiria do show sem aviso). Sem "type" vira `Unknown { tipo: "" }`,
+/// como no Python.
+impl<'de> Deserialize<'de> for OutputCfg {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<OutputCfg, D::Error> {
+        let v = Value::deserialize(d)?;
+        let tipo = v
+            .get("type")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        match tipo.as_str() {
+            "sacn" => serde_json::from_value(v).map(OutputCfg::Sacn),
+            "artnet" => serde_json::from_value(v).map(OutputCfg::ArtNet),
+            "osc" => serde_json::from_value(v).map(OutputCfg::Osc),
+            _ => return Ok(OutputCfg::Unknown { tipo }),
+        }
+        .map_err(|e| D::Error::custom(format!("output \"{}\": {}", tipo, e)))
+    }
 }
 
 fn cem() -> u8 {
@@ -149,24 +178,19 @@ mod tests {
         .unwrap();
         assert_eq!(sh.outputs.len(), 3);
         match &sh.outputs[0] {
-            OutputCfg::Sacn {
-                universes,
-                priority,
-                source_name,
-                ..
-            } => {
-                assert_eq!(universes, &vec![1u16, 2]);
-                assert_eq!(*priority, 100);
-                assert_eq!(source_name, "Spellcaster");
+            OutputCfg::Sacn(c) => {
+                assert_eq!(c.universes, vec![1u16, 2]);
+                assert_eq!(c.priority, 100);
+                assert_eq!(c.source_name, "Spellcaster");
             }
             o => panic!("esperava sacn, veio {:?}", o),
         }
         assert_eq!(
             sh.outputs[1],
-            OutputCfg::ArtNet {
+            OutputCfg::ArtNet(ArtNet {
                 targets: None,
                 broadcast: false
-            }
+            })
         );
         assert_eq!(
             sh.outputs[2],
@@ -174,6 +198,40 @@ mod tests {
                 tipo: "laser".into()
             }
         );
+    }
+
+    /// O `untagged` do derive engolia isso: o show carregava com a saida virada em `Unknown` e
+    /// nao saia universo nenhum.
+    #[test]
+    fn tipo_conhecido_com_conteudo_invalido_e_erro() {
+        for src in [
+            r#"{"outputs":[{"type":"sacn","universes":"1"}]}"#,
+            r#"{"outputs":[{"type":"sacn","universes":[1],"priority":"alto"}]}"#,
+        ] {
+            let e = serde_json::from_str::<Show>(src).unwrap_err().to_string();
+            assert!(e.contains("sacn"), "erro sem o tipo: {}", e);
+        }
+        let sh: Show =
+            serde_json::from_str(r#"{"outputs":[{"type":"laser","x":1},{"pps":25000}]}"#).unwrap();
+        assert_eq!(
+            sh.outputs,
+            vec![
+                OutputCfg::Unknown {
+                    tipo: "laser".into()
+                },
+                OutputCfg::Unknown { tipo: "".into() },
+            ]
+        );
+    }
+
+    #[test]
+    fn save_nao_escreve_null() {
+        let sh: Show = serde_json::from_str(
+            r#"{"outputs":[{"type":"sacn","universes":[1]},{"type":"artnet"}]}"#,
+        )
+        .unwrap();
+        let txt = serde_json::to_string(&sh).unwrap();
+        assert!(!txt.contains("null"), "{}", txt);
     }
 
     #[test]
