@@ -48,7 +48,7 @@
 <body>
 <div class="bar">
   <span class="over">patchbay</span>
-  <input type="text" id="path" value="../../shows/patchbay_demo.spell">
+  <input type="text" id="path" value="shows/patchbay_demo.spell" title="caminho como o engine ve, a partir da raiz do repo">
   <button id="open">Abrir</button>
   <span class="over" id="estado">offline</span>
   <span class="over" id="aviso"></span>
@@ -76,7 +76,7 @@ PB.init({ cv: q("cv"), cat: q("cat"), insp: q("insp"), log: q("log"),
 const arg = new URLSearchParams(location.search).get("show");
 if (arg) q("path").value = arg;
 q("open").onclick = () => PB.carrega(q("path").value);
-PB.carrega(q("path").value);
+PB.liga(q("path").value);
 </script>
 </body>
 </html>
