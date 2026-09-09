@@ -45,3 +45,18 @@ Consequências:
 - **Rodada 4 = `design/rodada4/projetor.html`**: three.js r128 (jsdelivr; o cdnjs não tem o build UMD), PBR com PMREM de estúdio procedural, ACES, sombras PCF, alumínio escovado (normal + roughness procedurais), chapas com chanfro (ExtrudeGeometry), dicroicos em MeshPhysicalMaterial. A parede é o canvas 2D da rodada 3 como textura aditiva; os feixes saem da abertura do modelo. Painel de parâmetros opaco e chanfrado (lição do voto). Sala com clip-path chanfrado e degrau (borda não quadrada).
 - **NDI → ILDA (FÓSFORO)** não morreu: vira o que aparece na porta ETHER (um monitor de rack ligado ali). Fica para a rodada 5 se o voto confirmar.
 - Rodada 3 (`ilda.html`) fica como registro; o ajuste do LASER foi absorvido pela 4.
+
+## 09/09/2026 · rodada 5 (protótipo publicado, aguardando voto)
+
+- Protótipo: https://claude.ai/code/artifact/8a913f8b-8ea7-4621-b57a-88d7738dbafd · design system: https://claude.ai/code/artifact/2bada8a5-b991-43b7-a086-1b72b0a42232. Fontes em `design/laser/` (módulos `ilda.js`, `cam.js`, `bind.js`, `mat.js`, `body.js`, `optics.js`, `beam.js`, `pino3d.js`, `app.js`, página `app.html`, `tokens.css`, `SISTEMA.md`, `sistema.html`). `design/build.py` inlina qualquer `<script src>` e `<link>` local para publicar como um arquivo só.
+- Pedidos do Matheus desta rodada ficam literais em `design/laser/PEDIDOS.md` (todos marcados como feitos; o voto decide o que ajusta).
+- Traseira inspirada no Kvant Clubmax, sem copiar: powerCON TRUE1, rocker, chave, LED EMISSION, um interlock só, sem fusível, ILDA IN/OUT DB25, DMX IN/OUT XLR-5, NET RJ45, USB, OLED com encoder e BACK, ventoinha axial de 60 mm modelada de verdade (aro, cubo, 7 pás, grade de arame), placa de série.
+- Dentro, "nada voando": mesa óptica de alumínio (bloco silver único, furação M4), três módulos em bases, dois dicroicos e o espelho de dobra em suportes cinemáticos, obturador de solenoide, bloco de galvos em cantoneira (X vertical, Y a 90°, espelhos que seguem o galvo), drivers de diodo e de galvo e a placa DAC nas paredes, escuros; fonte 48 V; nove cabos roteados de um ponto a outro.
+- Feixe em GLSL: cilindros instanciados (núcleo + halo), alfa por dot(N,V), poeira por ruído 1D, aditivo, bloom. Fora: abertura → pontos acesos da parede. Dentro: caminho óptico módulo → dicroico → dobra → obturador → galvo X → galvo Y → abertura, acende com a chave e o obturador corta.
+- Splash = a câmera mira o output: começa num ponto estático, o foco vai para a parede ignorando o laser, o galvo contorna SPELLCASTER LASER (marching squares sobre o texto em Michroma), cada letra fechada é revelada, tudo brilha, o laser apaga, a sala escurece e a câmera pousa na traseira. Sem ILDA na parede durante a splash.
+- Fluxo: a vista SHOW fica trancada até armar a chave (settings primeiro, show depois).
+- Câmera no padrão SolidWorks (`cam.js`): MMB gira em torno do ponto clicado, Ctrl+MMB pan, Shift+MMB zoom, roda no cursor (sentido SolidWorks com toggle), setas 15°/Shift 90°/Ctrl pan, F enquadra, Ctrl+1..7 vistas.
+- Bindings (`bind.js`): toda ação tem id; tecla ou MIDI (note/CC com canal) com LEARN, feedback de saída para o controlador, persistido em localStorage. Espelha o MadMapper/Resolume.
+- Pino 3D substitui o Pino 2D (`design/pino.js` fica como referência): cabo DMX plugado no DMX OUT, ponta macho em pé no case, cinco pinos como botões na cena, balão Win98 ancorado na projeção da cabeça.
+- Design system só desta ferramenta: `tokens.css` (cores LASER/âmbar/vermelho/OLED, Michroma + Share Tech Mono, escala, chanfros, glows) + `SISTEMA.md` + `sistema.html`.
+- Pendente: voto da rodada 5 (traseira, dentro, splash, câmera, bindings, Pino 3D) em `moodboard/round5`.

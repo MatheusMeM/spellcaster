@@ -38,3 +38,9 @@ Mesma sequência sempre, veste-se de tema: **Excitement** = ligar (o material ac
 - Leitor `.wmz`: descartado (voto). Fica em `rodada2/` como referência de formato.
 - Gels Lee/Rosco como filtro físico: guardado para TEATRO DE PAPEL (gelatina de verdade na frente do recorte).
 - Voto dentro do protótipo com `db`: padrão de todas as rodadas.
+
+## Rodada 5 · o tema LASER virou aparelho completo
+
+- O tema LASER agora tem design system próprio (`design/laser/tokens.css`, `SISTEMA.md`, `sistema.html`): a matéria é o alumínio escovado do case, a mesa óptica de alumínio natural, o feixe em névoa e o OLED verde-água. Tudo que é UI 2D (HUD, painéis, balão) é serigrafia sobre o objeto.
+- Pino 3D é o mascote-menu de todos os temas daqui em diante: um cabo de verdade plugado numa porta do aparelho de cada tema (no LASER, DMX OUT).
+- A câmera SolidWorks e os bindings tecla/MIDI são transversais: valem para FÓSFORO, PATCHBAY e TEATRO DE PAPEL sem mudar nada.
