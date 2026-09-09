@@ -30,3 +30,5 @@ Show-control portátil: timeline + sACN / Art-Net / OSC / ILDA, GUI web com skin
 
 - Branch `main`, remote `origin` = github.com/MatheusMeM/spellcaster. Commits em português, verbo no infinitivo ou substantivo, uma linha de assunto.
 - Não commitar `build/`, `dist/`, `*.log`, `__pycache__/`.
+
+- Commits e pushes só na conta do Matheus. Proibido `Co-Authored-By`, "Generated with Claude" ou qualquer crédito ao Claude no histórico git.
