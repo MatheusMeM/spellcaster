@@ -12,15 +12,15 @@
 #                                        (DMX = 512 bytes; ids dos topicos em TOPICS)
 import base64, hashlib, json, struct, threading, webbrowser
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
-from pathlib import Path
 
 from ..core import registry
 from ..core.registry import command
+from ..paths import WEB
 
-WEB = Path(__file__).parent / "web"
 GUID = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 TOPICS = {"dmx": 1}                                   # ids dos topicos binarios (espelhado em app.js)
 TEXT, BINARY, CLOSE, PING, PONG = 1, 2, 8, 9, 10
+SERVER = None                                         # ultimo GuiServer criado (api.py publica nele)
 
 
 def accept_key(key):
@@ -60,7 +60,9 @@ def read_frame(rf):
 
 class GuiServer:
     def __init__(self, host="0.0.0.0", port=8000):
+        global SERVER
         self.clients, self.lock = set(), threading.Lock()
+        SERVER = self
         srv = self
         mime = {**SimpleHTTPRequestHandler.extensions_map, ".js": "text/javascript", ".css": "text/css",
                 ".json": "application/json", ".svg": "image/svg+xml", ".html": "text/html"}
@@ -171,6 +173,8 @@ def serve(port: int = 8000, browser: bool = False):
         srv.stop()
     return srv
 
+
+from . import api  # noqa: E402,F401  (registra show_*/track_*/key_*/transport/patch_check/net_report)
 
 # Entradas: `python -m spellcaster.gui.window` (janela, ou navegador sem pywebview).
 # `spell serve` passa a existir quando cli.py importar o pacote gui (uma linha: `from . import gui`);

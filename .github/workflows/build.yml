@@ -1,0 +1,46 @@
+# Testes em loopback nas tres plataformas + artefatos: onedir do Windows e tarball Lite (x64 e aarch64).
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: testes
+        run: python -m unittest discover -s tests
+
+      - name: onedir (Windows)
+        if: runner.os == 'Windows'
+        run: pwsh -File packaging/build_win.ps1 -Out "${{ runner.temp }}/spellcaster_build"
+
+      - name: fumaca do exe congelado
+        if: runner.os == 'Windows'
+        run: |
+          & "${{ runner.temp }}/spellcaster_build/dist/Spellcaster/spell.exe" --version
+          & "${{ runner.temp }}/spellcaster_build/dist/Spellcaster/spell.exe" tui --seconds 2
+
+      - name: tarball Lite (Linux)
+        if: runner.os == 'Linux'
+        run: sh packaging/build_lite.sh "${{ runner.temp }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spellcaster-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/spellcaster_build/dist/Spellcaster
+            ${{ runner.temp }}/spellcaster-lite-*.tar.gz
+          if-no-files-found: error

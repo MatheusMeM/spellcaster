@@ -8,6 +8,7 @@ import threading
 import time
 
 from .. import fixtures  # noqa: F401  (registra o resolvedor do track fixture)
+from ..paths import SHOWS
 from .. import show as showfile
 from ..core.engine import Engine
 from ..core.registry import command
@@ -248,6 +249,7 @@ CURRENT = None                       # player em execucao neste processo (stop/p
 def play_show(file: str, loop: bool = False):
     """Toca um show .spell (timeline, cues, laser) ate o fim ou Ctrl+C."""
     global CURRENT
+    file = file if os.path.exists(file) else str(SHOWS / file)   # nome solto = shows/ ao lado do exe
     p = CURRENT = Player(showfile.load(file), loop=loop)
     outs = [c.get("type") for c in p.show.get("outputs", ())]
     print(f"{p.show.get('name', file)}: {len(p.tl.tracks)} tracks, {p.fps} fps, {p.duration}s, saidas {outs}", flush=True)

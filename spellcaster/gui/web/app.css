@@ -77,3 +77,69 @@ html[data-transport="pill"] .transport button { border-radius: 999px; width: 48p
 #scrub { flex: 1; accent-color: var(--accent); height: 4px; }
 #vu { width: 240px; height: 40px; background: var(--bg); border-radius: var(--radius); box-shadow: var(--bevel); }
 html[data-visualizer="none"] #vu { display: none; }
+
+/* ================= paineis (timeline, patch, outputs, network) =================
+   So variaveis da skin: --bg --panel --chrome --accent --accent2 --text --muted --font --radius --bevel --glow */
+#panels > section[data-panel="timeline"], #panels > section[data-panel="outputs"] { padding: 0; overflow: hidden; }
+#panels > section[data-panel="timeline"].on, #panels > section[data-panel="outputs"].on {
+  display: flex; flex-direction: column;
+}
+
+/* barra de ferramentas dos paineis */
+.tl-bar, .out-bar {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 6px 8px;
+  background: var(--chrome); box-shadow: var(--bevel); font-size: 11px; color: var(--muted);
+}
+.tl-bar button, .grid button {
+  padding: 3px 9px; cursor: pointer; background: var(--panel); color: var(--text);
+  border: 1px solid var(--muted); border-radius: var(--radius);
+}
+.tl-bar button:hover, .grid button:hover { color: var(--accent); border-color: var(--accent); }
+.tl-bar button.on { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+.tl-bar button:disabled { opacity: .5; cursor: default; }
+.tl-bar input, .tl-bar select, .grid input, .grid select, .insp-row input, .insp-row select {
+  background: var(--bg); color: var(--text); border: 1px solid var(--muted);
+  border-radius: var(--radius); padding: 2px 6px;
+}
+.tl-bar #tl-file { width: 15em; }
+.tl-bar #tl-video { width: 11em; }
+.tl-bar .sep { width: 1px; height: 18px; background: var(--muted); opacity: .4; }
+.tl-msg { margin-left: auto; color: var(--muted); }
+.pt-err { color: #ff5555; font-weight: 700; flex-basis: 100%; }
+
+/* timeline: canvas + inspector docado */
+.tl-body { flex: 1; display: flex; min-height: 0; }
+#tl-cv { flex: 1; min-width: 0; height: 100%; display: block; background: var(--panel); cursor: crosshair; outline: none; }
+.tl-insp { width: 210px; overflow: auto; background: var(--chrome); box-shadow: var(--bevel); padding: 8px; }
+.tl-insp h3 { margin: 0 0 6px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+.tl-insp h4 { margin: 10px 0 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; }
+.insp-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 3px 0; font-size: 11px; }
+.insp-row span { color: var(--muted); }
+.insp-row input, .insp-row select { width: 108px; }
+.insp-row input[type="checkbox"] { width: auto; }
+.insp-none { color: var(--muted); font-size: 11px; }
+.tl-menu {
+  display: none; position: fixed; z-index: 9; background: var(--panel); border: 1px solid var(--muted);
+  border-radius: var(--radius); box-shadow: var(--bevel); padding: 2px;
+}
+.tl-menu button {
+  display: block; width: 100%; text-align: left; padding: 3px 14px 3px 8px; cursor: pointer;
+  background: none; border: 0; color: var(--text); font-size: 11px;
+}
+.tl-menu button:hover { background: var(--accent); color: var(--bg); }
+
+/* patch */
+.grid { border-collapse: collapse; width: 100%; font-size: 12px; }
+.grid th { text-align: left; padding: 4px 8px; color: var(--muted); font-weight: 400;
+  text-transform: uppercase; font-size: 10px; letter-spacing: .08em; border-bottom: 1px solid var(--chrome); }
+.grid td { padding: 2px 8px; border-bottom: 1px solid var(--chrome); }
+.grid tr.bad td { color: #ff5555; }
+.grid tr.bad input { border-color: #ff5555; }
+
+/* outputs */
+#out-cv { flex: 1; min-height: 0; display: block; background: var(--panel); }
+
+/* network */
+.nt-sug { margin: 0 0 8px; padding-left: 18px; color: var(--accent2); font-size: 12px; }
+.nt-pre { margin: 0; font: 12px/1.5 Consolas, monospace; white-space: pre-wrap; color: var(--muted); }
+#panels h4 { margin: 8px 0 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }

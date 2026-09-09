@@ -7,7 +7,11 @@ name = "spellcaster"
 version = "0.0.1"
 description = "Show-control portátil da Feitiçaria Industrial: sACN / Art-Net / OSC / ILDA"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = []                    # runtime = stdlib do Python 3.13; pyinstaller e so de build (packaging/build_win.ps1)
+
+[project.optional-dependencies]
+gui = ["pywebview"]                  # janela nativa (WebView2); sem ela a GUI abre no navegador padrao
+lite = []                            # Raspberry Pi: nada a instalar, roda com o python3 do sistema
 
 [project.scripts]
 spell = "spellcaster.cli:main"

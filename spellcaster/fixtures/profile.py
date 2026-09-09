@@ -1,7 +1,7 @@
 # Perfil de aparelho: JSON com canais por nome, faixas nomeadas, rodas nomeadas e canal fine (16 bit).
 import json, pathlib
 
-DIR = pathlib.Path(__file__).resolve().parents[2] / "profiles"
+from ..paths import PROFILES as DIR
 
 
 class ProfileError(ValueError):

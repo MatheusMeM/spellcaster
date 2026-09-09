@@ -4,5 +4,11 @@ __pycache__/
 build/
 dist/
 *.spec
+# o spec do PyInstaller e versionado; o resto e lixo de build
+!packaging/*.spec
 *.log
 .claude/settings.local.json
+
+# spellcore (Rust): target/ nunca dentro do Google Drive
+target/
+spellcore/.cargo/config.toml
