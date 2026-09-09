@@ -125,7 +125,9 @@ impl Clock {
         let _boost = rt::Boost::on();
         let mut next = Instant::now();
         while self.state() != State::Stop {
-            let t = self.time();
+            // Tempo travado no quadro: n/fps exato, como o gerador do fixture (t = i/fps). Sem isso um fx
+            // continuo (sin) amostrado no tempo medido (i/fps + overshoot) diverge em +-1 na truncagem.
+            let t = (self.time() * self.i.fps as f64).round() / self.i.fps as f64;
             if let Some(d) = duration {
                 if t >= d {
                     break;

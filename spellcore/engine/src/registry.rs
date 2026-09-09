@@ -1,7 +1,7 @@
 //! Registro de comandos: todo verbo do produto passa por aqui. CLI, OSC-API, GUI e MCP sao
 //! clientes. Erro e' `String` — sem `anyhow` na R0.
 
-use crate::clock::Clock;
+use crate::player;
 use crate::show;
 use crate::timeline::Timeline;
 use schemars::JsonSchema;
@@ -100,9 +100,29 @@ pub struct LocateArgs {
     pub t: f64,
 }
 
-/// Comandos do engine que nao precisam de rede. `play` e `net` ficam na CLI (dependem de
-/// `protocols`) e sao acrescentados de fora com `Registry::add`.
-pub fn base(clock: Clock) -> Registry {
+#[derive(Deserialize, JsonSchema)]
+pub struct CueGoArgs {
+    /// Indice da cue; ausente = a proxima.
+    #[serde(default)]
+    pub index: Option<usize>,
+}
+
+/// Comando sem parametro.
+#[derive(Deserialize, JsonSchema)]
+pub struct NoArgs {}
+
+/// O player vivo neste processo, ou o erro que todo comando de transporte devolve sem ele.
+fn vivo() -> Result<player::Handle, String> {
+    player::current().ok_or_else(|| "sem player em execucao".to_string())
+}
+
+fn estado(h: &player::Handle) -> Result<Value, String> {
+    serde_json::to_value(h.state()).map_err(|e| e.to_string())
+}
+
+/// Comandos do engine. `play_show` e `net` ficam na CLI (dependem de `script` e de varredura de
+/// rede) e sao acrescentados de fora com `Registry::add`.
+pub fn base() -> Registry {
     let mut r = Registry::new();
     r.add::<LoadArgs>("load", "Carrega um .spell e devolve nome, fps, duracao e tracks.", |a| {
         let sh = show::load(Path::new(&a.path))?;
@@ -110,9 +130,28 @@ pub fn base(clock: Clock) -> Registry {
         Ok(json!({"name": sh.name, "fps": tl.fps, "duration": tl.duration,
                   "tracks": tl.tracks.len(), "ignored": tl.ignored()}))
     });
-    r.add::<LocateArgs>("locate", "Move o relogio para t segundos.", move |a| {
-        clock.locate(a.t);
-        Ok(json!({ "t": clock.time() }))
+    r.add::<NoArgs>("pause", "Pausa o player em execucao neste processo.", |_| {
+        let h = vivo()?;
+        h.pause();
+        estado(&h)
+    });
+    r.add::<NoArgs>("stop", "Para o player em execucao neste processo.", |_| {
+        let h = vivo()?;
+        h.stop();
+        estado(&h)
+    });
+    r.add::<LocateArgs>("locate", "Salta o player para o instante t (segundos).", |a| {
+        let h = vivo()?;
+        h.locate(a.t);
+        estado(&h)
+    });
+    r.add::<CueGoArgs>("cue_go", "Dispara a proxima cue (ou a de indice dado).", |a| {
+        let h = vivo()?;
+        h.cue_go(a.index);
+        estado(&h)
+    });
+    r.add::<NoArgs>("transport_state", "Estado do transporte do player em execucao.", |_| {
+        estado(&vivo()?)
     });
     r
 }
@@ -145,13 +184,29 @@ mod tests {
         assert_eq!(r.iter().count(), 1);
     }
 
+    /// Sem player vivo, todo comando de transporte devolve o mesmo erro; `load` continua livre.
     #[test]
-    fn base_tem_load_e_locate() {
-        let clk = Clock::new(30);
-        let r = base(clk.clone());
-        assert!(r.get("load").is_some() && r.get("locate").is_some());
-        r.call("locate", json!({"t": 3.5})).unwrap();
-        assert_eq!(clk.time(), 3.5);
+    fn base_tem_transporte_e_load() {
+        let r = base();
+        for c in ["load", "pause", "stop", "locate", "cue_go", "transport_state"] {
+            assert!(r.get(c).is_some(), "comando {} ausente", c);
+        }
+        // ponytail: o teste so' vale quando nao ha player neste processo — os testes do player
+        // sobem o seu em outro binario (tests/player.rs), entao aqui nunca ha CURRENT.
+        for (c, a) in [
+            ("pause", json!({})),
+            ("stop", json!({})),
+            ("locate", json!({"t": 3.5})),
+            ("cue_go", json!({})),
+            ("transport_state", json!({})),
+        ] {
+            assert_eq!(
+                r.call(c, a).unwrap_err(),
+                "sem player em execucao",
+                "comando {}",
+                c
+            );
+        }
         assert!(r.call("load", json!({"path": "nao_existe.spell"})).is_err());
     }
 }

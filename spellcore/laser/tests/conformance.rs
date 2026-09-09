@@ -1,0 +1,86 @@
+// Conformidade com o Python: `optimize`/`safety` ponto a ponto contra as fixtures de
+// tests/fixtures/ (geradas por gen_fixtures.py) e o .ild do show byte a byte.
+// Saida ASCII pura (console cp1252).
+
+use std::path::{Path, PathBuf};
+
+use laser::frame::{optimize, Frame, Safety};
+use laser::ild;
+
+fn dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("fixtures")
+}
+
+fn um(path: PathBuf) -> Frame {
+    let mut f = ild::read(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    assert_eq!(f.len(), 1, "fixture com mais de um frame: {}", path.display());
+    f.remove(0)
+}
+
+fn num(v: &serde_json::Value, k: &str) -> f64 {
+    v[k].as_f64().unwrap_or_else(|| panic!("parametro {k} ausente"))
+}
+
+fn zona(v: &serde_json::Value) -> Option<(f64, f64, f64, f64)> {
+    let z = v["zone"].as_array()?;
+    Some((
+        z[0].as_f64().unwrap(),
+        z[1].as_f64().unwrap(),
+        z[2].as_f64().unwrap(),
+        z[3].as_f64().unwrap(),
+    ))
+}
+
+#[test]
+fn optimize_e_safety_batem_com_o_python() {
+    let d = dir();
+    let txt = std::fs::read_to_string(d.join("cases.json"))
+        .expect("rode: C:\\Python313\\python.exe spellcore/laser/tests/gen_fixtures.py");
+    let casos: Vec<serde_json::Value> = serde_json::from_str(&txt).unwrap();
+    assert!(casos.len() >= 10, "poucas fixtures: {}", casos.len());
+    for c in &casos {
+        let name = c["name"].as_str().unwrap();
+        let op = c["op"].as_str().unwrap();
+        let p = &c["params"];
+        let entrada = um(d.join(format!("{name}_in.ild")));
+        let esperado = um(d.join(format!("{name}_out.ild")));
+        assert_eq!(entrada.len(), c["n_in"].as_u64().unwrap() as usize, "{name}: n_in");
+        let mut got = entrada;
+        if op.starts_with("optimize") {
+            got = optimize(
+                &got,
+                num(p, "dwell") as usize,
+                num(p, "blank_gap") as usize,
+                num(p, "max_step") as i32,
+                num(p, "angle"),
+            );
+        }
+        if op.ends_with("safety") {
+            let s = Safety {
+                min_size: num(p, "min_size") as i32,
+                max_intensity: num(p, "max_intensity") as u8,
+                zone: zona(p),
+            };
+            s.apply(&mut got.points);
+        }
+        assert_eq!(got.len(), esperado.len(), "{name}: numero de pontos");
+        for (i, (a, b)) in got.points.iter().zip(&esperado.points).enumerate() {
+            assert_eq!(a, b, "{name}: ponto {i}");
+        }
+    }
+    println!("{} casos de conformidade OK", casos.len());
+}
+
+#[test]
+fn ild_medgrupo_byte_a_byte() {
+    let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../shows/medgrupo_laser.ild");
+    let raw = std::fs::read(&src).unwrap_or_else(|e| panic!("{}: {e}", src.display()));
+    let frames = ild::read(&src).unwrap();
+    assert_eq!(frames.len(), 1404);
+    let back = ild::write_bytes(&frames, 5, "medgrupo", "feitic.", None).unwrap();
+    assert_eq!(back.len(), raw.len(), "tamanho diferente");
+    if back != raw {
+        let i = back.iter().zip(&raw).position(|(a, b)| a != b).unwrap();
+        panic!("primeiro byte diferente em {i}: {} != {}", back[i], raw[i]);
+    }
+}
