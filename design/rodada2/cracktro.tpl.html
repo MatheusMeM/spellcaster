@@ -1,0 +1,387 @@
+<title>Spellcaster Cracktro</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=JetBrains+Mono:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,800&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root { --bg:#0C0B0A; --sur:#141311; --line:#2A2723; --fg:#F7F5EB; --fg2:#B9B4A9; --mut:#8F8A80; --amb:#FFB000; --go:#A8E05E; --live:#FF2D1F; --reh:#B7AED9;
+    --mono:"JetBrains Mono",Consolas,monospace; --body:"IBM Plex Sans","Segoe UI",Arial,sans-serif; --px:"Press Start 2P","Courier New",monospace; --nfo:"VT323","Courier New",monospace; --disp:"Bricolage Grotesque","Arial Narrow",sans-serif; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font-family:var(--body); font-size:15px; line-height:1.55; }
+  a { color:var(--amb); }
+  .wrap { max-width:1180px; margin:0 auto; padding:28px 28px 96px; }
+  h1 { font-family:var(--disp); font-weight:800; font-size:clamp(34px,5vw,56px); line-height:.95; letter-spacing:-.02em; margin:0 0 8px; }
+  h2 { font-family:var(--disp); font-weight:800; font-size:26px; margin:0 0 8px; }
+  p { margin:0 0 12px; max-width:68ch; }
+  .eyebrow { font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.14em; color:var(--mut); }
+  .lead { color:var(--fg2); font-size:17px; max-width:62ch; }
+  code { font-family:var(--mono); font-size:12.5px; color:var(--amb); background:#1C1A17; padding:1px 5px; }
+  .keys { font-family:var(--mono); font-size:12px; color:var(--mut); display:flex; gap:18px; flex-wrap:wrap; margin:10px 0 14px; }
+  .keys b { color:var(--fg); font-weight:700; }
+
+  /* ---------- palco ---------- */
+  #stage { position:relative; height:720px; overflow:hidden; background:#101214; border:1px solid var(--line); user-select:none; }
+  /* desktop falso: Resolume à esquerda, TouchDesigner à direita */
+  #desk { position:absolute; inset:0; font-family:var(--mono); font-size:10px; color:#8A9098; }
+  .rz { position:absolute; left:0; top:0; width:62%; height:100%; background:#1E2126; border-right:1px solid #2C3037; }
+  .rz .bar { height:26px; background:#15181C; border-bottom:1px solid #2C3037; display:flex; align-items:center; padding:0 10px; gap:14px; color:#9AA3AD; }
+  .rz .layers { position:absolute; left:0; top:26px; right:0; bottom:120px; display:grid; grid-template-rows:repeat(4,1fr); gap:1px; padding:6px; }
+  .rz .layer { display:grid; grid-template-columns:70px repeat(8,1fr); gap:4px; }
+  .rz .lh { background:#262A30; display:flex; align-items:center; justify-content:center; color:#C9D0D8; }
+  .rz .clip { background:linear-gradient(135deg,var(--c1),var(--c2)); opacity:.8; }
+  .rz .clip.on { outline:2px solid #38E06E; opacity:1; }
+  .rz .tl { position:absolute; left:0; right:0; bottom:0; height:120px; background:#15181C; border-top:1px solid #2C3037; }
+  .rz .tl i { position:absolute; left:8%; right:8%; top:50px; height:2px; background:#3A4048; }
+  .rz .tl b { position:absolute; left:40%; top:36px; width:2px; height:30px; background:#38E06E; }
+  .td { position:absolute; left:62%; top:0; right:0; height:100%; background:#0F1013; }
+  .td svg { width:100%; height:100%; display:block; }
+  #out { position:absolute; right:12px; top:36px; width:220px; height:124px; border:1px solid #2C3037; }
+  .rz .rec { position:absolute; left:8px; bottom:130px; color:#38E06E; }
+
+  /* ---------- splash / cracktro ---------- */
+  #splash { position:absolute; inset:0; background:#000; z-index:20; display:flex; align-items:center; justify-content:center; }
+  #splash canvas { position:absolute; inset:0; width:100%; height:100%; }
+  #press { position:relative; text-align:center; font-family:var(--px); color:var(--go); font-size:14px; line-height:2.2; cursor:pointer; }
+  #press small { display:block; font-size:9px; color:#4E6A2B; }
+  #press .blink { animation:bl 1s steps(2,end) infinite; }
+  @keyframes bl { 50% { opacity:0; } }
+  #load { position:absolute; left:50%; bottom:64px; transform:translateX(-50%); width:420px; font-family:var(--px); font-size:9px; color:var(--go); display:none; }
+  #load .bar { height:12px; border:2px solid var(--go); margin-top:8px; padding:2px; }
+  #load .bar i { display:block; height:100%; width:0; background:var(--go); }
+  #skip { position:absolute; right:16px; top:12px; font-family:var(--px); font-size:8px; color:#4E6A2B; display:none; align-items:center; gap:14px; }
+  #skip label { display:flex; gap:6px; align-items:center; cursor:pointer; }
+  #skip input { accent-color:var(--go); }
+  @media (prefers-reduced-motion:reduce) { #press .blink { animation:none; } }
+
+  /* ---------- janela de vidro ---------- */
+  :root { --P: polygon(0 0, calc(100% - 34px) 0, 100% 34px, 100% 100%, 56px 100%, 0 calc(100% - 56px)); }
+  #winb { position:absolute; left:120px; top:70px; width:760px; height:470px; clip-path:var(--P); background:linear-gradient(135deg, rgba(255,255,255,.55), rgba(255,255,255,.10) 40%, rgba(255,255,255,.04) 70%, rgba(255,255,255,.30)); z-index:5; transition:opacity .3s; }
+  #winb.hide { opacity:0; pointer-events:none; }
+  #winb.drop { animation:drop .55s cubic-bezier(.2,1.4,.4,1); }
+  @keyframes drop { from { transform:translateY(-40px) scale(.96); opacity:0; } to { transform:none; opacity:1; } }
+  #win { position:absolute; inset:1.5px; clip-path:var(--P); background:rgba(var(--gel), var(--ga)); backdrop-filter:blur(var(--blur)) saturate(1.5); -webkit-backdrop-filter:blur(var(--blur)) saturate(1.5); display:grid; grid-template-rows:34px 1fr 44px; color:var(--fg); }
+  #win.frost { background:linear-gradient(rgba(255,255,255,.16), rgba(255,255,255,.10)), rgba(var(--gel), var(--ga)); }
+  .tstrip { display:flex; align-items:center; gap:12px; padding:0 40px 0 14px; font-family:var(--mono); font-size:11px; letter-spacing:.06em; color:rgba(255,255,255,.85); border-bottom:1px solid rgba(255,255,255,.18); cursor:grab; overflow:hidden; white-space:nowrap; }
+  .tstrip:active { cursor:grabbing; }
+  .tstrip .nm { font-family:var(--disp); font-weight:800; font-size:15px; letter-spacing:-.01em; }
+  .tstrip .sc { flex:1; overflow:hidden; position:relative; height:16px; }
+  .tstrip .sc span { position:absolute; left:0; top:0; animation:mq 22s linear infinite; padding-left:100%; }
+  @keyframes mq { to { transform:translateX(-100%); } }
+  @media (prefers-reduced-motion:reduce) { .tstrip .sc span { animation:none; padding-left:0; } }
+  .tstrip .x { font-size:12px; color:rgba(255,255,255,.7); cursor:pointer; }
+  .main { display:grid; grid-template-columns:220px 1fr 150px; gap:12px; padding:12px 14px 8px 14px; min-height:0; }
+  .gob { align-self:stretch; border-radius:16px; background:linear-gradient(180deg, rgba(255,255,255,.35), rgba(255,255,255,.08)); box-shadow:inset 0 1px 0 rgba(255,255,255,.6), inset 0 -8px 0 rgba(0,0,0,.35), 0 6px 0 rgba(0,0,0,.35); display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; font-family:var(--disp); font-weight:800; font-size:112px; line-height:.9; color:var(--go); text-shadow:0 0 18px rgba(168,224,94,.5); letter-spacing:-.03em; transition:transform .05s, box-shadow .05s; border:0; }
+  .gob small { font-family:var(--mono); font-size:11px; letter-spacing:.14em; color:rgba(255,255,255,.8); margin-top:6px; }
+  .gob:active, .gob.dn { transform:translateY(6px); box-shadow:inset 0 1px 0 rgba(255,255,255,.4), inset 0 -2px 0 rgba(0,0,0,.35); }
+  .gob:focus-visible { outline:2px solid var(--amb); outline-offset:3px; }
+  .mid { display:grid; grid-template-rows:auto 1fr; gap:10px; min-height:0; }
+  .lcd { background:rgba(0,0,0,.55); border-radius:10px; padding:10px 14px; font-family:var(--mono); box-shadow:inset 0 2px 10px rgba(0,0,0,.6), 0 1px 0 rgba(255,255,255,.2); display:grid; grid-template-columns:1fr auto; align-items:end; }
+  .lcd .tc { font-size:40px; font-weight:700; line-height:1; color:var(--amb); text-shadow:0 0 12px rgba(255,176,0,.55); font-variant-numeric:tabular-nums; }
+  .lcd .nx { font-size:11px; letter-spacing:.1em; color:rgba(255,255,255,.7); text-align:right; line-height:1.6; }
+  .lcd .nx b { color:var(--fg); font-weight:700; display:block; font-size:14px; }
+  .cues { background:rgba(0,0,0,.35); border-radius:10px; padding:6px 8px; font-family:var(--mono); font-size:12.5px; overflow:hidden; display:flex; flex-direction:column; }
+  .cue { display:grid; grid-template-columns:24px 1fr 86px; gap:8px; padding:4px 8px; color:rgba(255,255,255,.45); border-radius:6px; }
+  .cue.done { color:rgba(255,255,255,.3); text-decoration:line-through; }
+  .cue.now { background:rgba(255,176,0,.22); color:var(--fg); box-shadow:inset 3px 0 0 var(--amb); }
+  .cue.next { color:var(--fg); }
+  .cue .t { text-align:right; font-variant-numeric:tabular-nums; }
+  .side { display:grid; grid-template-rows:1fr auto; gap:10px; min-height:0; }
+  .vu { background:rgba(0,0,0,.45); border-radius:10px; padding:8px; display:flex; gap:3px; align-items:flex-end; }
+  .vu i { flex:1; background:var(--go); border-radius:2px 2px 0 0; height:10%; box-shadow:0 0 6px rgba(168,224,94,.5); transition:height .08s; }
+  .tr { display:grid; grid-template-columns:repeat(4,1fr); gap:4px; }
+  .tr button { height:34px; border:0; border-radius:8px; background:rgba(255,255,255,.18); box-shadow:inset 0 1px 0 rgba(255,255,255,.5), inset 0 -3px 0 rgba(0,0,0,.3); color:var(--fg); cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .tr button:active { transform:translateY(2px); box-shadow:inset 0 1px 0 rgba(255,255,255,.3); }
+  .tr button.on { background:rgba(168,224,94,.5); }
+  .tr svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.8; }
+  .foot { display:flex; align-items:center; gap:10px; padding:0 14px 0 70px; border-top:1px solid rgba(255,255,255,.18); font-family:var(--mono); font-size:11px; color:rgba(255,255,255,.8); }
+  .gels { display:flex; gap:6px; align-items:center; }
+  .gel { width:22px; height:22px; border-radius:4px; border:1px solid rgba(255,255,255,.5); cursor:pointer; position:relative; }
+  .gel.on { outline:2px solid var(--fg); outline-offset:2px; }
+  .gel[data-n="clear"] { background:linear-gradient(135deg, rgba(255,255,255,.6), rgba(255,255,255,.05)); }
+  .foot .sp { flex:1; }
+  .foot .tg { cursor:pointer; padding:3px 8px; border:1px solid rgba(255,255,255,.35); border-radius:6px; }
+  .foot .tg.on { background:rgba(255,255,255,.25); }
+  /* fita */
+  #strip { position:absolute; left:120px; top:20px; height:56px; width:620px; z-index:6; display:none; clip-path:polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px)); background:rgba(var(--gel), var(--ga)); backdrop-filter:blur(var(--blur)) saturate(1.5); -webkit-backdrop-filter:blur(var(--blur)) saturate(1.5); box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.35); align-items:center; gap:14px; padding:0 14px 0 20px; font-family:var(--mono); }
+  #strip.on { display:flex; }
+  #strip .tc { font-size:22px; font-weight:700; color:var(--amb); text-shadow:0 0 10px rgba(255,176,0,.5); font-variant-numeric:tabular-nums; }
+  #strip .nx { flex:1; font-size:11px; letter-spacing:.08em; color:rgba(255,255,255,.8); }
+  #strip .vu { height:28px; width:60px; padding:4px; }
+  #strip .go { font-family:var(--disp); font-weight:800; font-size:18px; padding:6px 14px; border-radius:8px; background:var(--go); color:#000; cursor:pointer; box-shadow:inset 0 -3px 0 rgba(0,0,0,.3); border:0; }
+  #strip .go:active { transform:translateY(2px); box-shadow:none; }
+  /* nfo */
+  #nfo { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:8; display:none; background:#000; color:#B7AED9; font-family:var(--nfo); font-size:17px; line-height:1.05; padding:18px 22px; border:2px solid #B7AED9; white-space:pre; box-shadow:0 0 0 6px #000, 0 0 40px rgba(183,174,217,.35); }
+  #nfo.on { display:block; }
+  #nfo b { color:var(--go); font-weight:400; }
+  #toast { position:absolute; left:50%; bottom:18px; transform:translateX(-50%); z-index:7; font-family:var(--mono); font-size:12px; background:rgba(0,0,0,.75); color:var(--fg); padding:8px 14px; border-radius:8px; opacity:0; transition:opacity .2s; pointer-events:none; }
+  #toast.on { opacity:1; }
+
+  /* ---------- documento ---------- */
+  section { display:grid; grid-template-columns:150px 1fr; gap:32px; padding:40px 0; border-bottom:1px solid var(--line); }
+  section > .eyebrow { padding-top:8px; }
+  @media (max-width:800px) { section { grid-template-columns:1fr; gap:12px; } }
+  table { border-collapse:collapse; width:100%; font-size:14px; }
+  th, td { text-align:left; vertical-align:top; padding:9px 12px 9px 0; border-bottom:1px solid var(--line); }
+  th { font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.12em; color:var(--mut); font-weight:500; }
+  td:first-child { font-family:var(--mono); color:var(--amb); white-space:nowrap; }
+  .tbl { overflow-x:auto; }
+  ul { margin:0; padding-left:18px; } li { margin-bottom:6px; max-width:70ch; }
+  .copy { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; }
+  .copy div { background:var(--sur); border:1px solid var(--line); padding:12px 14px; font-size:13.5px; }
+  .copy b { font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--mut); display:block; margin-bottom:6px; }
+  .copy q { quotes:none; color:var(--fg); }
+  .vote { background:var(--sur); border:1px solid var(--line); padding:20px; display:grid; grid-template-columns:1fr 1fr; gap:18px 28px; }
+  @media (max-width:800px) { .vote { grid-template-columns:1fr; } }
+  .q { display:flex; flex-direction:column; gap:6px; }
+  .q .eyebrow { margin-bottom:2px; }
+  .opts { display:flex; gap:6px; flex-wrap:wrap; }
+  .opts button { font-family:var(--mono); font-size:12px; letter-spacing:.04em; padding:8px 12px; background:#1C1A17; color:var(--fg2); border:1px solid #3A3630; cursor:pointer; }
+  .opts button.on { background:var(--amb); color:#000; border-color:var(--amb); }
+  .opts button:focus-visible, textarea:focus-visible, .save:focus-visible { outline:2px solid var(--amb); outline-offset:2px; }
+  textarea { width:100%; min-height:120px; background:var(--bg); color:var(--fg); border:1px solid #3A3630; font-family:var(--body); font-size:13.5px; padding:8px; resize:vertical; }
+  .savebar { grid-column:1/3; display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--line); padding-top:14px; }
+  @media (max-width:800px) { .savebar { grid-column:1; } }
+  .st { font-family:var(--mono); font-size:12px; color:var(--mut); }
+  .save { font-family:var(--mono); font-size:13px; letter-spacing:.08em; padding:12px 22px; background:var(--amb); color:#000; border:0; cursor:pointer; }
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">Spellcaster · departamento de design · rodada 2 · protótipo</div>
+  <h1>Vidro, gel e um jingle</h1>
+  <p class="lead">Rodada 1 reprovada, brief novo: como as skins do WMP, mesmo kitsch; vidro; keygen; jingle; humor; arco 5E. Em vez de mais artboards, um protótipo que funciona. O desktop atrás é falso (Resolume e TouchDesigner desenhados); o vidro, o gel, o GO, a fita, o NFO e o jingle são reais.</p>
+  <div class="keys"><span><b>qualquer tecla</b> começa</span><span><b>ESC</b> pula o splash</span><span><b>ESPAÇO</b> GO</span><span><b>TAB</b> fita</span><span><b>N</b> NFO</span><span><b>arraste</b> a barra de título</span><span><b>gels</b> no rodapé</span></div>
+
+  <div id="stage">
+    <div id="desk" aria-hidden="true">
+      <div class="rz">
+        <div class="bar"><span>Arena 7</span><span>Composition</span><span>Layer</span><span>Clip</span><span>Output</span><span style="margin-left:auto">1920×1080 · 60 fps</span></div>
+        <div class="layers" id="layers"></div>
+        <div class="rec">● OSC in 7000 · out 7001</div>
+        <div class="tl"><i></i><b></b></div>
+      </div>
+      <div class="td"><svg viewBox="0 0 460 720" preserveAspectRatio="none">
+        <g fill="none" stroke="#2C3037" stroke-width="1"><path d="M40 90 C 120 90 120 180 200 180 M40 300 C 120 300 120 180 200 180 M270 180 C 340 180 340 420 400 420 M40 520 C 140 520 140 420 400 420"/></g>
+        <g font-family="JetBrains Mono, monospace" font-size="9" fill="#9AA3AD">
+          <rect x="10" y="70" width="60" height="40" fill="#22262C" stroke="#5B6470"/><text x="16" y="94">oscin1</text>
+          <rect x="10" y="280" width="60" height="40" fill="#22262C" stroke="#5B6470"/><text x="16" y="304">artnet1</text>
+          <rect x="200" y="160" width="70" height="40" fill="#22262C" stroke="#8A6CC8"/><text x="206" y="184">math1</text>
+          <rect x="10" y="500" width="60" height="40" fill="#22262C" stroke="#5B6470"/><text x="16" y="524">noise1</text>
+          <rect x="400" y="400" width="50" height="40" fill="#22262C" stroke="#C86A2A"/><text x="404" y="424">out1</text>
+          <text x="14" y="30" fill="#5B6470">/project1</text>
+        </g></svg>
+        <canvas id="out" width="220" height="124"></canvas>
+      </div>
+    </div>
+
+    <div id="winb" class="hide"><div id="win" style="--gel:27,15,143; --ga:.34; --blur:14px">
+      <div class="tstrip" id="drag"><span class="nm">SPELLCASTER</span><span class="sc"><span id="scroll">MED GRUPO RJ · PLENÁRIA · sACN U1 U2 a 30 Hz · ETHER DREAM 20 kpps · GREETZ: CAPTURE, RESOLUME, TOUCHDESIGNER, ETC, MA · CRACKED BY FEITIÇARIA iNDUSTRIAL · NO SERIAL NEEDED</span></span><span class="x" id="mini" title="fita">▁</span><span class="x" id="close" title="fechar">✕</span></div>
+      <div class="main">
+        <button class="gob" id="go">GO<small>ESPAÇO · MIDI 36</small></button>
+        <div class="mid">
+          <div class="lcd"><div class="tc" id="tc">00:00:00:00</div><div class="nx">PRÓXIMA<b id="nx">4 · PICO</b><span id="eta">em 11.9 s</span></div></div>
+          <div class="cues" id="cues"></div>
+        </div>
+        <div class="side">
+          <div class="vu" id="vu"></div>
+          <div class="tr">
+            <button title="play" class="on"><svg viewBox="0 0 20 20"><path d="M5 3 L16 10 L5 17 Z"/></svg></button>
+            <button title="pausa"><svg viewBox="0 0 20 20"><path d="M6 3 V17 M14 3 V17"/></svg></button>
+            <button title="stop"><svg viewBox="0 0 20 20"><rect x="4" y="4" width="12" height="12"/></svg></button>
+            <button title="loop"><svg viewBox="0 0 20 20"><path d="M4 8 A6 6 0 0 1 16 8 M16 12 A6 6 0 0 1 4 12 M13 5 L16 8 L13 11 M7 15 L4 12 L7 9"/></svg></button>
+          </div>
+        </div>
+      </div>
+      <div class="foot">
+        <span>GEL</span>
+        <div class="gels" id="gels"></div>
+        <span id="gelname">Lee 181 Congo Blue</span>
+        <span class="sp"></span>
+        <span class="tg" id="frost">GEADA</span>
+        <span class="tg" id="nfobtn">NFO</span>
+      </div>
+    </div></div>
+
+    <div id="strip"><span class="tc" id="tc2">00:00:00:00</span><span class="nx" id="nx2">PRÓXIMA 4 · PICO</span><div class="vu" id="vu2"></div><button class="go" id="go2">GO</button></div>
+
+    <div id="nfo"><b>  ┌─────────────────────────────────────────────┐</b>
+<b>  │</b>  SPELLCASTER v1.0  ·  show-control portátil  <b>│</b>
+<b>  │</b>  cracked by FEITIÇARIA iNDUSTRIAL ·· 2026    <b>│</b>
+<b>  └─────────────────────────────────────────────┘</b>
+   serial ............ não precisa
+   protocolos ........ sACN · Art-Net · OSC · ILDA
+   engine ............ Rust · 30 Hz · jitter p99 0.4 ms
+   skins ............. gel + vidro · .spellskin
+   greetz ............ Capture · Resolume · TouchDesigner
+                       ETC · MA · Ether Dream · Winamp
+   nota .............. se travar, foi o DMX, não a gente
+   <b>[N]</b> fecha</div>
+    <div id="toast"></div>
+
+    <div id="splash">
+      <canvas id="fx"></canvas>
+      <div id="press"><span class="blink">PRESS ANY KEY</span><small>FEITIÇARIA iNDUSTRIAL apresenta</small></div>
+      <div id="load"><span id="lmsg">aquecendo lâmpadas</span><div class="bar"><i id="lbar"></i></div></div>
+      <div id="skip"><label><input type="checkbox" id="never"> nunca mais</label><span>ESC pula</span></div>
+    </div>
+  </div>
+
+  <section>
+    <div class="eyebrow">01 · real ou falso</div>
+    <div>
+      <h2>O que desta demo vira produto, e como</h2>
+      <ul>
+        <li><b>Vidro sobre o desktop.</b> Aqui o fundo é desenhado; o blur em CSS só enxerga a própria página. No produto: janela Tauri com <code>transparent: true</code>, <code>decorations: false</code> e acrílico do Windows 11 via <code>window-vibrancy</code>. O desfoque é feito pelo DWM, custa quase nada, e o Resolume de verdade aparece atrás.</li>
+        <li><b>Silhueta.</b> <code>clip-path</code> roda no WebView2. Risco conhecido: no Windows a área transparente da janela ainda captura clique; resolve-se com hit-test na forma ou com a janela do tamanho exato do objeto.</li>
+        <li><b>Jingle.</b> Sintetizado em Web Audio, zero bytes de mídia, toca igual dentro do WebView2. Se você quiser tracker de verdade (.xm de 20 KB), entra <code>libopenmpt</code>; só vale se a música for assinatura.</li>
+        <li><b>Gel.</b> O theme deixa de ser CSS solto e vira uma cor de gel sobre vidro mais uma escolha de silhueta. Um <code>.spellskin</code> cabe em 5 KB. Os nomes são gels reais (Lee, Rosco): a linguagem de quem monta luz.</li>
+        <li><b>Performance.</b> A UI é HTML sem framework; o engine Rust não sabe que a janela é de vidro. Nada aqui encosta no caminho do DMX.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">02 · arco 5E</div>
+    <div>
+      <h2>A experiência do software em cinco fases</h2>
+      <div class="tbl"><table>
+        <thead><tr><th>Fase</th><th>Momento</th><th>Eu sinto</th><th>Dispositivo</th></tr></thead>
+        <tbody>
+          <tr><td>Excitement</td><td>Ícone e instalador; o README é um NFO.</td><td>"isso não é software de empresa".</td><td>Convite-objeto: .nfo, ícone com o anel orbital.</td></tr>
+          <tr><td>Entry</td><td>Splash com jingle, 6 s, pulável, "nunca mais" honesto.</td><td>Entrei numa cena, não num app.</td><td>Umbral: PRESS ANY KEY; a janela cai no desktop.</td></tr>
+          <tr><td>Engagement</td><td>O show. GO físico, LCD, fita sobre o Resolume.</td><td>Presença. O pico é o primeiro GO ao vivo.</td><td>Restrição: um botão grande; cor só para estado.</td></tr>
+          <tr><td>Exit</td><td>Fechar = encerrar o show: contagem de cues, zero erros, um acorde.</td><td>Valeu.</td><td>Nota final alta e calma; sem popup de "tem certeza?".</td></tr>
+          <tr><td>Extension</td><td>Relatório do show exportado no mesmo estilo; o gel do show vira .spellskin compartilhável.</td><td>Levo algo.</td><td>Objeto-extensão: o arquivo .spell com o NFO do show dentro.</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">03 · humor</div>
+    <div>
+      <h2>Engraçado é copy, não animação</h2>
+      <p>O humor mora nos textos de estado e erro, onde ninguém espera, e nunca no caminho do GO.</p>
+      <div class="copy">
+        <div><b>cue list vazia</b><q>Nenhuma cue. O show é você.</q></div>
+        <div><b>universo sem receptor</b><q>U2 está falando sozinho há 40 s. Alguém liga o node.</q></div>
+        <div><b>última cue</b><q>Acabou. O público quer bis; o Spellcaster também.</q></div>
+        <div><b>patch sobreposto</b><q>bsw_frente_1 e bsw_frente_2 querem o canal 396. Só um leva.</q></div>
+        <div><b>laser sem safety</b><q>Não. Safety mínimo é 2000 pps. Isso não é humor.</q></div>
+        <div><b>splash pulado</b><q>Tá bom, sem música. Da próxima vez ESC de novo.</q></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">04 · voto</div>
+    <div>
+      <h2>Rodada 2</h2>
+      <div class="vote" id="vote">
+        <div class="q"><span class="eyebrow">gel padrão</span><span class="st" id="gelvote">Lee 181 Congo Blue (escolha no rodapé da janela)</span></div>
+        <div class="q"><span class="eyebrow">splash com jingle</span><div class="opts" data-q="splash"><button data-v="sempre">SEMPRE</button><button data-v="primeira">1ª VEZ DO DIA</button><button data-v="nunca">NUNCA</button></div></div>
+        <div class="q"><span class="eyebrow">silhueta</span><div class="opts" data-q="forma"><button data-v="cortes">CORTES 45°</button><button data-v="capsula">CÁPSULA</button><button data-v="organica">ORGÂNICA / ASSIMÉTRICA</button><button data-v="objeto">OBJETO (BOOMBOX, CONSOLE)</button></div></div>
+        <div class="q"><span class="eyebrow">quantidade de kitsch</span><div class="opts" data-q="kitsch"><button data-v="mais">MAIS</button><button data-v="assim">ASSIM</button><button data-v="menos">MENOS</button></div></div>
+        <div class="q"><span class="eyebrow">jingle</span><div class="opts" data-q="jingle"><button data-v="chip">CHIPTUNE ASSIM</button><button data-v="tracker">TRACKER DE VERDADE</button><button data-v="curto">SÓ UM ACORDE</button></div></div>
+        <div class="q"><span class="eyebrow">fita sobre o Resolume</span><div class="opts" data-q="fita"><button data-v="sim">SIM</button><button data-v="nao">NÃO</button></div></div>
+        <div class="q" style="grid-column:1/3"><span class="eyebrow">notas</span><textarea id="notas" placeholder="referências, skins específicas, o que tirar, o que falta"></textarea></div>
+        <div class="savebar"><span class="st" id="st">carregando…</span><button class="save" id="save">SALVAR RODADA 2</button></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  var $ = function (s) { return document.querySelector(s); };
+  var reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------- desktop falso ---------- */
+  var cols = [["#4A2BD6","#1B0F8F"],["#E8651A","#C8102E"],["#009A44","#0B4D2B"],["#FFB000","#8A5A00"],["#B7AED9","#4A3A8F"],["#38E06E","#0F6E3A"],["#C8102E","#5A0714"],["#6E8AA8","#2C3A4A"]];
+  var L = $("#layers"), h = "";
+  for (var r = 0; r < 4; r++) { h += '<div class="layer"><div class="lh">L' + (4 - r) + '</div>'; for (var c = 0; c < 8; c++) { var k = cols[(r * 3 + c) % 8]; h += '<div class="clip' + ((r === 1 && c === 2) ? " on" : "") + '" style="--c1:' + k[0] + ';--c2:' + k[1] + '"></div>'; } h += "</div>"; }
+  L.innerHTML = h;
+  var oc = $("#out").getContext("2d"), t0 = performance.now();
+  function drawOut(t) { var w = 220, hh = 124; var g = oc.createLinearGradient(0, 0, w, hh); var a = (t / 4000) % 1; g.addColorStop(0, "hsl(" + (a * 360) + ",70%,45%)"); g.addColorStop(1, "hsl(" + ((a * 360 + 120) % 360) + ",70%,25%)"); oc.fillStyle = g; oc.fillRect(0, 0, w, hh); oc.fillStyle = "rgba(255,255,255,.85)"; oc.font = "bold 28px 'JetBrains Mono'"; oc.fillText("CIDADES", 30, 74); }
+
+  /* ---------- áudio ---------- */
+  var AC = null, master = null, playing = false;
+  function ac() { if (!AC) { AC = new (window.AudioContext || window.webkitAudioContext)(); master = AC.createGain(); master.gain.value = 0.16; master.connect(AC.destination); } if (AC.state === "suspended") AC.resume(); return AC; }
+  function f(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+  function tone(type, m, t, d, g) { var o = AC.createOscillator(), e = AC.createGain(); o.type = type; o.frequency.value = f(m); e.gain.setValueAtTime(0, t); e.gain.linearRampToValueAtTime(g, t + 0.005); e.gain.exponentialRampToValueAtTime(0.001, t + d); o.connect(e); e.connect(master); o.start(t); o.stop(t + d + 0.02); }
+  function hat(t) { var b = AC.createBuffer(1, 2205, AC.sampleRate), d = b.getChannelData(0); for (var i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 4); var s = AC.createBufferSource(), e = AC.createGain(); s.buffer = b; e.gain.value = 0.25; s.connect(e); e.connect(master); s.start(t); }
+  var lead = [72,75,79,84, 72,75,79,84, 70,74,77,82, 70,74,77,82, 68,72,75,80, 68,72,75,80, 67,70,74,79, 67,71,74,79];
+  var bass = [48,0,48,0, 48,0,48,55, 46,0,46,0, 46,0,46,53, 44,0,44,0, 44,0,44,51, 43,0,43,0, 43,0,43,50];
+  var step = 60 / 150 / 4, cur = 0, next = 0, timer = null;
+  function sched() { while (next < AC.currentTime + 0.12) { var i = cur % 32; tone("square", lead[i], next, step * 0.9, 0.5); if (i % 8 < 4) tone("square", lead[i] + 12, next + step / 2, step * 0.4, 0.15); if (bass[i]) tone("triangle", bass[i], next, step * 1.6, 0.9); if (i % 2 === 0) hat(next); next += step; cur++; } timer = setTimeout(sched, 40); }
+  function startJingle() { ac(); if (playing) return; playing = true; cur = 0; next = AC.currentTime + 0.05; master.gain.setValueAtTime(0.16, AC.currentTime); sched(); }
+  function stopJingle() { if (!playing) return; playing = false; clearTimeout(timer); master.gain.linearRampToValueAtTime(0.0001, AC.currentTime + 0.35); setTimeout(function () { master.gain.value = 0.16; }, 400); }
+  function blip(up) { try { ac(); var t = AC.currentTime; var o = AC.createOscillator(), e = AC.createGain(); o.type = "square"; o.frequency.setValueAtTime(up ? 660 : 440, t); o.frequency.exponentialRampToValueAtTime(up ? 1320 : 220, t + 0.09); e.gain.setValueAtTime(0.3, t); e.gain.exponentialRampToValueAtTime(0.001, t + 0.12); o.connect(e); e.connect(master); o.start(t); o.stop(t + 0.13); } catch (e) {} }
+  function chord() { try { ac(); var t = AC.currentTime; [60, 63, 67, 72].forEach(function (m, i) { tone("triangle", m, t + i * 0.04, 1.4, 0.5); }); } catch (e) {} }
+
+  /* ---------- cracktro ---------- */
+  var fx = $("#fx"), fc = fx.getContext("2d"), stars = [], W, H, active = false, tStart = 0, raf;
+  function size() { W = fx.width = fx.clientWidth; H = fx.height = fx.clientHeight; }
+  for (var i = 0; i < 220; i++) stars.push([Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random()]);
+  var scrollTxt = "SPELLCASTER v1 ··· FEITIÇARIA iNDUSTRIAL APRESENTA ··· SHOW-CONTROL PORTÁTIL ··· sACN · ART-NET · OSC · ILDA ··· GREETZ TO CAPTURE · RESOLUME · TOUCHDESIGNER · ETC · MA · ETHER DREAM ··· NO SERIAL NEEDED ··· PRESS ESC TO SKIP ··· ";
+  function torus(t) { var R = 70, r = 24, N = 28, M = 10, cx = W / 2, cy = H / 2 - 40, ax = t * 0.7, ay = t * 1.1, pts = []; for (var i = 0; i < N; i++) { pts.push([]); for (var j = 0; j < M; j++) { var u = i / N * Math.PI * 2, v = j / M * Math.PI * 2; var x = (R + r * Math.cos(v)) * Math.cos(u), y = (R + r * Math.cos(v)) * Math.sin(u), z = r * Math.sin(v); var y1 = y * Math.cos(ax) - z * Math.sin(ax), z1 = y * Math.sin(ax) + z * Math.cos(ax); var x2 = x * Math.cos(ay) + z1 * Math.sin(ay), z2 = -x * Math.sin(ay) + z1 * Math.cos(ay); var p = 320 / (320 + z2); pts[i].push([cx + x2 * p, cy + y1 * p]); } } fc.strokeStyle = "#A8E05E"; fc.lineWidth = 1; fc.beginPath(); for (i = 0; i < N; i++) for (var j = 0; j < M; j++) { var a = pts[i][j], b = pts[(i + 1) % N][j], c = pts[i][(j + 1) % M]; fc.moveTo(a[0], a[1]); fc.lineTo(b[0], b[1]); fc.moveTo(a[0], a[1]); fc.lineTo(c[0], c[1]); } fc.stroke(); fc.fillStyle = "#F7F5EB"; fc.beginPath(); fc.arc(cx, cy, 5, 0, 7); fc.fill(); }
+  function frame(now) { if (!active) return; var t = (now - tStart) / 1000; fc.fillStyle = "#000"; fc.fillRect(0, 0, W, H);
+    for (var k = 0; k < 3; k++) { var y = H / 2 + Math.sin(t * 1.3 + k * 2.1) * (H * 0.36); var g = fc.createLinearGradient(0, y - 22, 0, y + 22); var hue = [40, 280, 100][k]; g.addColorStop(0, "hsla(" + hue + ",90%,50%,0)"); g.addColorStop(0.5, "hsla(" + hue + ",90%,55%,.55)"); g.addColorStop(1, "hsla(" + hue + ",90%,50%,0)"); fc.fillStyle = g; fc.fillRect(0, y - 22, W, 44); }
+    fc.fillStyle = "#F7F5EB"; for (var i = 0; i < stars.length; i++) { var s = stars[i]; s[2] -= 0.006; if (s[2] <= 0.02) { s[0] = Math.random() * 2 - 1; s[1] = Math.random() * 2 - 1; s[2] = 1; } var sx = W / 2 + s[0] / s[2] * W / 2, sy = H / 2 + s[1] / s[2] * H / 2; if (sx >= 0 && sx < W && sy >= 0 && sy < H) { var sz = (1 - s[2]) * 2.2; fc.fillRect(sx, sy, sz, sz); } }
+    torus(t);
+    fc.font = "18px 'Press Start 2P'"; fc.fillStyle = "#FFB000"; var x = W - ((t * 140) % (scrollTxt.length * 22 + W)); for (i = 0; i < scrollTxt.length; i++) { var cxx = x + i * 22; if (cxx > -30 && cxx < W) fc.fillText(scrollTxt[i], cxx, H - 150 + Math.sin(cxx / 48 + t * 3) * 16); }
+    fc.font = "22px 'Press Start 2P'"; fc.fillStyle = "#F7F5EB"; fc.textAlign = "center"; fc.fillText("SPELLCASTER", W / 2, 70); fc.font = "9px 'Press Start 2P'"; fc.fillStyle = "#B7AED9"; fc.fillText("FEITIÇARIA iNDUSTRIAL · 2026", W / 2, 96); fc.textAlign = "left";
+    raf = requestAnimationFrame(frame); }
+  var msgs = ["aquecendo lâmpadas", "pedindo licença ao DMX", "contando universos: 2", "negociando com o Ether Dream", "calibrando o kitsch", "pronto"];
+  var splashDone = false;
+  function endSplash(skipped) { if (splashDone) return; splashDone = true; active = false; cancelAnimationFrame(raf); stopJingle(); $("#splash").style.transition = "opacity .5s"; $("#splash").style.opacity = 0; setTimeout(function () { $("#splash").style.display = "none"; }, 500); showWin(); if (skipped) toast("Tá bom, sem música. Da próxima vez ESC de novo."); }
+  function runSplash() { $("#press").style.display = "none"; $("#load").style.display = "block"; $("#skip").style.display = "flex"; size(); active = true; tStart = performance.now(); if (!reduced) requestAnimationFrame(frame); else { fc.fillStyle = "#000"; fc.fillRect(0, 0, W, H); torus(1); } startJingle(); var i = 0; var iv = setInterval(function () { i++; if (i >= msgs.length) { clearInterval(iv); setTimeout(function () { endSplash(false); }, 500); return; } $("#lmsg").textContent = msgs[i]; $("#lbar").style.width = (i / (msgs.length - 1) * 100) + "%"; }, 1100); }
+  var started = false;
+  function start() { if (started) return; started = true; try { if (localStorage.getItem("sc-never-splash") === "1") { $("#splash").style.display = "none"; showWin(); splashDone = true; return; } } catch (e) {} runSplash(); }
+  $("#press").addEventListener("click", start);
+  $("#never").addEventListener("change", function (e) { try { localStorage.setItem("sc-never-splash", e.target.checked ? "1" : "0"); } catch (x) {} });
+
+  /* ---------- janela ---------- */
+  var cues = [["0", "Countdown · pré-rolo", "00:00:00:00"], ["1", "Dígitos · vara amarela", "00:00:02:00"], ["2", "Flash · strobe branco", "00:00:10:15"], ["3", "Cidades · movings por corte", "00:00:13:03"], ["4", "Pico · logo, zoom 13→36°", "00:00:33:04"], ["5", "Epílogo · cada aparelho sozinho", "00:00:46:24"]];
+  var cueI = 3, winT0 = null, shown = false;
+  function renderCues() { var s = ""; for (var i = 0; i < cues.length; i++) { var c = cues[i]; var cls = i < cueI ? "done" : i === cueI ? "now" : i === cueI + 1 ? "next" : ""; s += '<div class="cue ' + cls + '"><span>' + c[0] + '</span><span>' + c[1] + '</span><span class="t">' + c[2] + '</span></div>'; } $("#cues").innerHTML = s; var n = cues[cueI + 1]; var nx = n ? n[0] + " · " + n[1].split(" ·")[0].toUpperCase() : "FIM"; $("#nx").textContent = nx; $("#nx2").textContent = "PRÓXIMA " + nx; }
+  function showWin() { if (shown) return; shown = true; winT0 = performance.now(); $("#winb").classList.remove("hide"); if (!reduced) $("#winb").classList.add("drop"); renderCues(); }
+  function tcs(ms) { var s = Math.floor(ms / 1000), fr = Math.floor((ms % 1000) / 1000 * 30); var p = function (n) { return (n < 10 ? "0" : "") + n; }; return p(Math.floor(s / 3600)) + ":" + p(Math.floor(s / 60) % 60) + ":" + p(s % 60) + ":" + p(fr); }
+  var vuEls = [], vuEls2 = [], vuv = [], burst = 0;
+  for (var i = 0; i < 12; i++) { var e = document.createElement("i"); $("#vu").appendChild(e); vuEls.push(e); vuv.push(0.2); if (i < 6) { var e2 = document.createElement("i"); $("#vu2").appendChild(e2); vuEls2.push(e2); } }
+  function tick(now) { drawOut(now - t0); if (winT0 !== null) { var ms = now - winT0 + 21090; var s = tcs(ms); $("#tc").textContent = s; $("#tc2").textContent = s; var n = cues[cueI + 1]; if (n) { var p = n[2].split(":"); var target = ((+p[0] * 3600 + +p[1] * 60 + +p[2]) * 1000 + +p[3] / 30 * 1000); var eta = (target - ms) / 1000; $("#eta").textContent = eta > 0 ? "em " + eta.toFixed(1) + " s" : "agora"; } else $("#eta").textContent = "o público quer bis"; }
+    if (!reduced || Math.random() < 0.1) { for (i = 0; i < 12; i++) { var tgt = Math.random() * 0.5 + (i % 4 === 0 ? 0.35 : 0.1) + burst; vuv[i] += (tgt - vuv[i]) * 0.25; vuEls[i].style.height = Math.min(100, vuv[i] * 100) + "%"; if (i < 6) vuEls2[i].style.height = Math.min(100, vuv[i] * 100) + "%"; } burst *= 0.85; }
+    requestAnimationFrame(tick); }
+  requestAnimationFrame(tick);
+  function toast(m) { var t = $("#toast"); t.textContent = m; t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(function () { t.classList.remove("on"); }, 2600); }
+  function doGo() { if (!shown) { start(); return; } blip(true); burst = 0.6; $("#go").classList.add("dn"); setTimeout(function () { $("#go").classList.remove("dn"); }, 120); if (cueI < cues.length - 1) { cueI++; renderCues(); $("#scroll").textContent = "GO · CUE " + cues[cueI][0] + " " + cues[cueI][1].toUpperCase() + " · VAI!"; } else { toast("Acabou. O público quer bis; o Spellcaster também."); cueI = 0; renderCues(); } }
+  $("#go").addEventListener("click", doGo); $("#go2").addEventListener("click", doGo);
+  $("#mini").addEventListener("click", toggleStrip); $("#close").addEventListener("click", function () { chord(); toast("Show encerrado · 6 cues · 0 erros. Valeu."); $("#winb").classList.add("hide"); setTimeout(function () { $("#winb").classList.remove("hide"); }, 2600); });
+  function toggleStrip() { var on = !$("#strip").classList.contains("on"); $("#strip").classList.toggle("on", on); $("#winb").classList.toggle("hide", on); }
+  $("#frost").addEventListener("click", function () { var on = $("#win").classList.toggle("frost"); this.classList.toggle("on", on); $("#win").style.setProperty("--blur", on ? "26px" : "14px"); $("#strip").style.setProperty("--blur", on ? "26px" : "14px"); });
+  $("#nfobtn").addEventListener("click", function () { $("#nfo").classList.toggle("on"); });
+  /* gels reais */
+  var gels = [["clear", "Sem gel", "255,255,255", 0.10], ["lee181", "Lee 181 Congo Blue", "27,15,143", 0.34], ["rosco27", "Rosco 27 Medium Red", "200,16,46", 0.30], ["lee139", "Lee 139 Primary Green", "0,154,68", 0.28], ["lee158", "Lee 158 Deep Orange", "232,101,26", 0.30], ["lee117", "Lee 117 Steel Blue", "74,110,138", 0.34], ["lee210", "Lee 210 ND 0.6", "40,40,40", 0.45]];
+  var gelCur = "lee181";
+  gels.forEach(function (g) { var d = document.createElement("span"); d.className = "gel" + (g[0] === gelCur ? " on" : ""); d.dataset.n = g[0]; d.title = g[1]; if (g[0] !== "clear") d.style.background = "rgb(" + g[2] + ")"; d.addEventListener("click", function () { setGel(g); }); $("#gels").appendChild(d); });
+  function setGel(g) { gelCur = g[0]; document.querySelectorAll(".gel").forEach(function (x) { x.classList.toggle("on", x.dataset.n === g[0]); }); ["#win", "#strip"].forEach(function (s) { $(s).style.setProperty("--gel", g[2]); $(s).style.setProperty("--ga", g[3]); }); $("#gelname").textContent = g[1]; $("#gelvote").textContent = g[1]; state.gel = g[1]; mark(); }
+  /* arrastar */
+  var drag = null; $("#drag").addEventListener("pointerdown", function (e) { if (e.target.classList.contains("x")) return; var b = $("#winb"); drag = [e.clientX - b.offsetLeft, e.clientY - b.offsetTop]; $("#drag").setPointerCapture(e.pointerId); });
+  $("#drag").addEventListener("pointermove", function (e) { if (!drag) return; var b = $("#winb"); b.style.left = (e.clientX - drag[0]) + "px"; b.style.top = (e.clientY - drag[1]) + "px"; });
+  $("#drag").addEventListener("pointerup", function () { drag = null; });
+  /* teclado */
+  document.addEventListener("keydown", function (e) { if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") return; if (!started) { start(); e.preventDefault(); return; } if (e.key === "Escape") { if (!splashDone) endSplash(true); else $("#nfo").classList.remove("on"); } else if (e.key === " ") { e.preventDefault(); doGo(); } else if (e.key === "Tab") { e.preventDefault(); toggleStrip(); } else if (e.key.toLowerCase() === "n") { $("#nfo").classList.toggle("on"); } });
+  $("#splash").addEventListener("click", function () { if (!started) start(); });
+  size(); window.addEventListener("resize", size);
+
+  /* ---------- voto ---------- */
+  var state = { gel: "Lee 181 Congo Blue", splash: null, forma: null, kitsch: null, jingle: null, fita: null, notas: "", savedAt: null }, ref = null, dirty = false;
+  var st = $("#st"); function status(t) { st.textContent = t; }
+  function paint() { document.querySelectorAll(".opts").forEach(function (o) { var q = o.dataset.q; o.querySelectorAll("button").forEach(function (b) { b.classList.toggle("on", state[q] === b.dataset.v); }); }); var n = $("#notas"); if (document.activeElement !== n) n.value = state.notas || ""; $("#gelvote").textContent = state.gel; }
+  function localSave() { try { localStorage.setItem("sc-moodboard-r2", JSON.stringify(state)); } catch (e) {} }
+  function mark() { dirty = true; localSave(); status(ref ? "alterações não salvas" : "guardado neste navegador"); }
+  document.querySelectorAll(".opts button").forEach(function (b) { b.addEventListener("click", function () { state[b.parentNode.dataset.q] = b.dataset.v; paint(); mark(); }); });
+  $("#notas").addEventListener("input", function (e) { state.notas = e.target.value; mark(); });
+  $("#save").addEventListener("click", function () { state.savedAt = new Date().toISOString(); localSave(); if (!ref) { status("guardado neste navegador (sem salvamento remoto)"); return; } status("salvando…"); ref.set(state).then(function () { dirty = false; status("salvo · " + new Date().toLocaleTimeString()); }).catch(function (e) { status("não salvou (" + (e && e.code || "erro") + "); guardado neste navegador"); }); });
+  try { var s = localStorage.getItem("sc-moodboard-r2"); if (s) state = JSON.parse(s); } catch (e) {}
+  paint();
+  if (!window.claude || typeof window.claude.use !== "function") { status("guardado neste navegador"); return; }
+  window.claude.use("db").then(function (db) { if (!db) { status("guardado neste navegador (sem salvamento remoto)"); return; } ref = db.doc("moodboard/round2"); ref.onSnapshot(function (s) { if (s.exists && !dirty) { var d = s.data(); if (d) { state = d; paint(); } } status(state.savedAt ? "salvo · " + new Date(state.savedAt).toLocaleString() : "pronto para votar"); }, function () { status("sem conexão; guardado neste navegador"); }); }).catch(function () { status("guardado neste navegador"); });
+})();
+</script>
