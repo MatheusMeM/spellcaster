@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["engine", "protocols", "laser", "script", "pixelmap", "mcp", "cli", "bench"]
+members = ["engine", "protocols", "laser", "script", "pixelmap", "mcp", "serve", "cli", "bench"]
 
 [workspace.package]
 version = "0.1.0"
@@ -15,12 +15,14 @@ schemars = "0.8"
 clap = { version = "4", features = ["derive"] }
 rmcp = { version = "3", default-features = false, features = ["server", "transport-io"] }
 tokio = { version = "1", default-features = false, features = ["rt", "time"] }
+axum = { version = "0.8", features = ["ws"] }
 socket2 = { version = "0.5", features = ["all"] }
 criterion = { version = "0.5", default-features = false, features = ["cargo_bench_support"] }
 engine = { path = "engine" }
 protocols = { path = "protocols" }
 script = { path = "script" }
 mcp = { path = "mcp" }
+serve = { path = "serve" }
 
 [profile.release]
 lto = "thin"

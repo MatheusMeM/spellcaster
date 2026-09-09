@@ -1,0 +1,16 @@
+[package]
+name = "serve"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+engine = { workspace = true }
+mcp = { workspace = true }
+serde_json = { workspace = true }
+axum = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "net", "sync", "time", "fs"] }
+# `transport-streamable-http-server` = `server-side-http` + o gerente de sessao local
+rmcp = { workspace = true, features = ["transport-streamable-http-server"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }

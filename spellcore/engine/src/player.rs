@@ -31,6 +31,18 @@ use std::time::Duration;
 /// Player vivo neste processo (o `CURRENT` do Python): quem os comandos do registry operam.
 static CURRENT: Mutex<Option<Handle>> = Mutex::new(None);
 
+/// Ganchos instalados em TODO player que subir neste processo, DEPOIS dos ganchos do show: e'
+/// assim que o monitor do `serve` ve o frame que realmente sai, sem o engine conhecer GUI.
+type Global = Box<dyn Fn() -> Box<dyn FrameHook> + Send + Sync>;
+static GLOBAL: Mutex<Vec<Global>> = Mutex::new(Vec::new());
+
+/// Cadastra uma fabrica de gancho global; vale para os proximos `start()`, nao para o player que
+/// ja esta rodando.
+// ponytail: so' cadastra, nao remove ; o unico cliente e' o `serve`, que vive o processo inteiro.
+pub fn hook_global(f: impl Fn() -> Box<dyn FrameHook> + Send + Sync + 'static) {
+    lock(&GLOBAL).push(Box::new(f));
+}
+
 fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
 }
@@ -104,6 +116,8 @@ enum Ctl {
     Go(Option<usize>),
     /// locate/stop: zera cues e ganchos e reancora o `prev` do disparo por borda.
     Reset(f64),
+    /// Evento de entrada para os ganchos ("widget:go", "key:Space", "module:laser/geo/scale").
+    Input(String, f64),
 }
 
 struct Shared {
@@ -163,6 +177,12 @@ impl Handle {
         self.s.push(Ctl::Go(index));
     }
 
+    /// Entrega `FrameHook::input` a todos os ganchos no proximo frame: e' o comando `input` do
+    /// registry, por onde a GUI e o barramento alimentam o Graph.
+    pub fn input(&self, key: &str, value: f64) {
+        self.s.push(Ctl::Input(key.to_string(), value));
+    }
+
     pub fn state(&self) -> TransportState {
         TransportState {
             t: self.s.clock.time(),
@@ -216,6 +236,11 @@ impl Rt {
                         h.reset(x);
                     }
                     self.prev = x;
+                }
+                Ctl::Input(k, v) => {
+                    for h in self.hooks.iter_mut() {
+                        h.input(&k, v);
+                    }
                 }
             }
         }
@@ -442,7 +467,10 @@ impl Player {
         if self.th.is_some() {
             return Ok(());
         }
-        let rt = self.rt.take().ok_or("player ja encerrado")?;
+        let mut rt = self.rt.take().ok_or("player ja encerrado")?;
+        for f in lock(&GLOBAL).iter() {
+            rt.hooks.push(f());
+        }
         let s = self.s.clone();
         s.run.store(true, Ordering::Relaxed);
         let th = std::thread::Builder::new()

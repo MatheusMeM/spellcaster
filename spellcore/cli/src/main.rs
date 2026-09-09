@@ -1,9 +1,10 @@
-//! `spellcore` — CLI da R1/R7. Quatro subcomandos, escritos com `clap::Parser`:
+//! `spellcore` — CLI da R1/R7/R5. Cinco subcomandos, escritos com `clap::Parser`:
 //!
 //!   spellcore play <show.spell> [--loop] [--osc-port N]
 //!   spellcore net [--json] [--timeout N]
 //!   spellcore commands
 //!   spellcore mcp [install --target desktop|code [--path P] [--yes]]
+//!   spellcore serve [--port N] [--dir D] [--show x.spell]
 //!
 //! Quem tem logica e' o registry; a CLI so' chama e imprime. Os subcomandos NAO sao mais
 //! gerados em runtime a partir do `Registry::schema()`: `load`, `pause`, `stop`, `locate`,
@@ -264,6 +265,19 @@ struct Cli {
     cmd: Cmd,
 }
 
+#[derive(Args)]
+struct ServeArgs {
+    /// Porta HTTP; 0 = uma livre (a linha `serve http://...` no stderr diz qual).
+    #[arg(long, default_value_t = 8000)]
+    port: u16,
+    /// Raiz dos arquivos da GUI.
+    #[arg(long, default_value = "spellgui/web")]
+    dir: String,
+    /// .spell aberto no boot, com o player parado em t=0.
+    #[arg(long, default_value = "")]
+    show: String,
+}
+
 #[derive(Subcommand)]
 enum Cmd {
     /// Toca um show .spell ate o fim ou Ctrl+C.
@@ -274,6 +288,8 @@ enum Cmd {
     Commands,
     /// Servidor MCP em stdio; `spellcore mcp install` registra o servidor no Claude.
     Mcp(McpArgs),
+    /// Barramento: HTTP + WebSocket + MCP em /mcp. E' o processo que toca o hardware.
+    Serve(ServeArgs),
 }
 
 #[derive(Args)]
@@ -303,6 +319,16 @@ fn main() {
         Cmd::Play(a) => play(a),
         Cmd::Net(a) => net(a),
         Cmd::Commands => Ok(registry().schema()),
+        Cmd::Serve(a) => {
+            // o stdout de um servidor nao e' canal de dado: status e log vao para o stderr
+            STDOUT_LIVRE.store(false, Ordering::SeqCst);
+            let o = serve::Opts {
+                port: a.port,
+                dir: a.dir.into(),
+                show: Some(a.show).filter(|s| !s.is_empty()),
+            };
+            serve::serve(registry(), o).map(|_| Value::Null)
+        }
         Cmd::Mcp(m) => match m.cmd {
             Some(McpCmd::Install { target, path, yes }) => mcp::install::install(&target, &path, yes),
             None => {
@@ -382,6 +408,17 @@ mod tests {
                 assert!(yes);
             }
             _ => panic!("esperava mcp install"),
+        }
+        match Cli::try_parse_from(["spellcore", "serve", "--port", "0", "--show", "x.spell"])
+            .expect("serve aceita --port, --dir e --show")
+            .cmd
+        {
+            Cmd::Serve(a) => {
+                assert_eq!(a.port, 0);
+                assert_eq!(a.dir, "spellgui/web", "default do --dir");
+                assert_eq!(a.show, "x.spell");
+            }
+            _ => panic!("esperava serve"),
         }
         assert!(Cli::try_parse_from(["spellcore"]).is_err(), "sem subcomando = ajuda");
     }

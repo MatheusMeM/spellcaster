@@ -1,10 +1,8 @@
 //! Servidor MCP do Spellcaster sobre o SDK oficial `rmcp`. Porte do
 //! `spellcaster/mcp/server.py`: as tools SAEM DO REGISTRY — nada de logica de produto aqui.
 //!
-//! Transporte: stdio (`spellcore mcp`).
-// ponytail: so' stdio ; o HTTP streamable do rmcp e' `StreamableHttpService`, um `tower::Service`
-// que ainda exige axum/hyper para virar servidor (feature `server-side-http`, +11 crates) —
-// entra quando alguem pedir MCP remoto no Pi, junto com o `serve` da GUI.
+//! Transporte: stdio (`spellcore mcp`) e HTTP streamable em `/mcp`, montado pelo crate `serve`
+//! (`StreamableHttpService` do rmcp e' um `tower::Service`; quem tem o axum e' o `serve`).
 //
 //! Resources: `spell://show` (o .spell aberto) e `spell://commands` (o registry inteiro em JSON).
 //! Quem monta o `Registry` e' a CLI: e' ela que conhece `play_show` e `net`.
@@ -35,7 +33,7 @@ const INSTRUCTIONS: &str = concat!(
 
 /// Comandos que bloqueiam ate o fim do show ou ate Ctrl+C: rodam em thread e a tool volta na hora
 /// (o `BACKGROUND` do `spellcaster/mcp/server.py`).
-const BACKGROUND: [&str; 1] = ["play_show"];
+pub const BACKGROUND: [&str; 1] = ["play_show"];
 
 const SHOW: &str = "spell://show";
 const COMMANDS: &str = "spell://commands";
@@ -45,8 +43,10 @@ pub struct Spell {
 }
 
 impl Spell {
-    pub fn new(reg: Registry) -> Spell {
-        Spell { reg: Arc::new(reg) }
+    /// Aceita `Registry` (stdio: um servidor por processo) ou `Arc<Registry>` (o `serve`: um
+    /// `Spell` por sessao HTTP, todos sobre o mesmo registry).
+    pub fn new(reg: impl Into<Arc<Registry>>) -> Spell {
+        Spell { reg: reg.into() }
     }
 
     /// Uma tool por comando do registry: nome, doc e o schema JSON que o `schemars` gerou.

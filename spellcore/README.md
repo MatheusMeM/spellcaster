@@ -11,7 +11,8 @@ spellcore/
   protocols/        trait Output, sacn, artnet, osc, netscan
   pixelmap/         amostragem de frame -> bytes DMX por universo (rayon); bin `map_bench`
   mcp/              servidor MCP (rmcp, stdio) + `mcp install`
-  cli/              binário `spellcore`: play, net, commands, mcp
+  serve/            barramento: HTTP + WebSocket JSON-RPC + monitor DMX + MCP em /mcp
+  cli/              binário `spellcore`: play, net, commands, mcp, serve
   bench/            Criterion + binários `jitter` e `throughput`
 ```
 
@@ -82,6 +83,7 @@ C:\Python313\python.exe tests/conformance/capture_sacn.py --secs 3
 | `socket2` | protocols | `std::net::UdpSocket` não expõe `IP_MULTICAST_IF` nem `SO_REUSEADDR`, exigidos por sACN |
 | `criterion` | bench, laser, pixelmap (dev) | medida estatística de jitter/latência exigida pelo PRD |
 | `rayon` | pixelmap | 100 000 px por frame em ~590 universos independentes; pool de trabalho sem escrever um |
+| `axum` + `tokio` | serve | HTTP, WebSocket e o `tower::Service` do MCP streamable em um servidor só; o `rmcp` já exigia hyper/tower, e escrever handshake de WS na mão no servidor não paga |
 
 Nada mais entra sem justificativa e sem medir o tamanho do binário.
 Windows API (`timeBeginPeriod`, `SetThreadPriority`, `GetProcessTimes`) é declarada com
@@ -296,6 +298,46 @@ pub fn report(s: &Scan) -> String;
 Cada saída de rede roda em thread própria com fila de 2 frames por universo; quando a fila
 enche, o frame velho é descartado (`send` nunca bloqueia o engine).
 
+### `serve` — barramento
+
+```
+spellcore serve [--port 8000] [--dir spellgui/web] [--show x.spell]
+```
+
+Um processo toca o hardware; toda página e toda IA falam com ele. Porta `0` = uma livre; ao
+subir, o servidor imprime **no stderr** a linha `serve http://127.0.0.1:<porta>`.
+
+Contrato (as outras frentes leem daqui, palavra por palavra):
+
+```
+HTTP  GET /commands -> Registry::schema()   GET /show -> show_get full   GET /<arquivo> -> spellgui/web/<arquivo>
+WS    /ws  request  {"id":7,"cmd":"locate","args":{"t":12.5}}
+           resposta {"id":7,"result":...} | {"id":7,"error":"texto"}
+           evento   {"event":"transport","data":<TransportState>} | {"event":"show","data":{"rev":n}} | {"event":"log","data":{"text":...}}
+           binário  topic:u8 | universe:u16 LE | 512 bytes   (topic 1 = dmx de saída)
+Comando `input {key, value}` no registry alimenta FrameHook::input do player vivo (chaves "widget:go", "key:Space", "module:laser/geo/scale").
+```
+
+| Detalhe | Regra |
+|---|---|
+| cabeçalho | toda resposta HTTP leva `Cache-Control: no-store` |
+| estático | só segmentos simples relativos: `..`, segmento vazio, `\` e `:` são recusados com 403 antes de tocar o disco; o caminho não é percent-decodificado. `/` = `index.html` |
+| comando | cada request do WS chama `Registry::call`; erro do comando volta como `{"id","error"}` e **não** derruba a conexão |
+| `play_show` | está no `BACKGROUND` do crate `mcp`: roda em thread e a resposta volta na hora, com `"<cmd> iniciado em background"`; erro vira evento `log` |
+| `rev` | contador do processo. Todo comando bem-sucedido cujo nome **não** esteja em `LEITURA = [show_get, transport_state, profiles, patch_check, net, load]` incrementa `rev` e faz broadcast `{"event":"show","data":{"rev":n}}` |
+| `transport` | a cada mudança de estado e a 10 Hz enquanto o player anda (sondagem de `player::current()`) |
+| monitor | um `FrameHook` global copia os universos que mudaram desde o último envio, no máximo a 40 Hz e só quando há cliente WS; sai como frame binário de 515 bytes |
+| `/mcp` | `StreamableHttpService` do `rmcp` (feature `transport-streamable-http-server`) sobre o mesmo `Spell` do stdio, sem sessão e com resposta JSON: `POST /mcp` de um `initialize` devolve o JSON-RPC direto |
+| `--show` | `load` (é o que `GET /show` lê) e o player parado em `t=0`; solta-se com o comando `resume` |
+
+`serve` é subcomando da CLI, não comando do registry: é ele que monta o `Registry` (com
+`play_show` e `net`) e o passa para `serve::serve`. O crate `serve` não tem lógica de produto —
+só transporte.
+
+**Fora de escopo, e por quê:** autenticação e TLS (por isso o socket abre **só em 127.0.0.1**:
+sem token, abrir a LAN entregaria o hardware a quem estiver no wifi — `--host` entra junto com o
+token); mDNS; mais de um show por processo (um `OPEN`, um `CURRENT`).
+
 ### Fixtures de conformidade (`tests/conformance/`, gerados por `gen.py`)
 
 | Arquivo | Conteúdo |
@@ -315,6 +357,7 @@ spellcore net [--json] [--timeout N]                  varredura de rede + sugest
 spellcore commands                                    lista o registry (nome, doc, schema)
 spellcore mcp                                         servidor MCP em stdio
 spellcore mcp install --target desktop|code [--yes]   registra o servidor no Claude
+spellcore serve [--port N] [--dir D] [--show S]       barramento HTTP + WebSocket + MCP
 ```
 
 Os quatro subcomandos são structs `clap::Args` fixas. `PlayArgs` e `NetArgs` servem as duas
@@ -499,6 +542,11 @@ em `base()` por `edit::register`. Todo comando age no `OPEN`; sem show aberto, a
 | `patch_del(name)` | tira pelo nome | a entrada |
 | `patch_check()` | grade (`name`, `profile`, `universe`, `address`, `channels`) + `error` da primeira fixture que não entra | `{rows, error}` |
 | `profiles()` | nomes dos `.json` em `profiles/` | lista |
+
+Transporte, além dos da R0/R7: `resume()` continua o player pausado (a metade que faltava do
+`pause`; chama-se `resume` porque `play` é o subcomando da CLI e o registry já tem `play_show`)
+e `input(key, value)` entrega o evento a `FrameHook::input` do player vivo — é por ele que
+widget, tecla e módulo alimentam o Graph.
 
 `profiles/` é a primeira que existir entre: ao lado do `.spell`, um nível acima dele (`shows/` e
 `profiles/` irmãos, como no repo e no pendrive), o cwd e a pasta do executável. O perfil só é
