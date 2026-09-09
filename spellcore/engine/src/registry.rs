@@ -101,6 +101,9 @@ pub struct ShowGetArgs {
     /// Caminho do .spell a abrir; vazio = o ultimo aberto neste processo.
     #[serde(default)]
     pub file: String,
+    /// true = o .spell inteiro (o que a GUI desenha) em vez do resumo.
+    #[serde(default)]
+    pub full: bool,
 }
 
 /// Comando sem parametro.
@@ -108,12 +111,12 @@ pub struct ShowGetArgs {
 pub struct NoArgs {}
 
 /// Ultimo .spell aberto neste processo (o `OPEN` do `spellcaster/mcp/tools.py`): (caminho, show).
-// ponytail: um show aberto por processo, gravado por `load` e `show_get` ; virar id de sessao
-// quando a GUI abrir dois shows ao mesmo tempo. `play_show` NAO grava aqui (mora na CLI, que
-// nao ve este estado): depois de um play, `show_get` continua pedindo `file`.
-static OPEN: Mutex<Option<(String, show::Show)>> = Mutex::new(None);
+// ponytail: um show aberto por processo, gravado por `load`, `show_get` e os comandos de `edit`
+// ; virar id de sessao quando a GUI abrir dois shows ao mesmo tempo. `play_show` NAO grava aqui
+// (mora na CLI, que nao ve este estado): depois de um play, `show_get` continua pedindo `file`.
+pub(crate) static OPEN: Mutex<Option<(String, show::Show)>> = Mutex::new(None);
 
-fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+pub(crate) fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
@@ -159,11 +162,18 @@ fn resumo(file: &str, sh: &show::Show) -> Value {
                 .collect()
         })
         .unwrap_or_default();
+    let patch: Vec<Value> = sh
+        .extra
+        .get("patch")
+        .and_then(|p| p.as_array())
+        .map(|a| a.iter().map(|f| f["name"].clone()).collect())
+        .unwrap_or_default();
     let transport = player::current()
         .and_then(|h| serde_json::to_value(h.state()).ok())
         .unwrap_or(Value::Null);
     json!({"aberto": true, "name": sh.name, "file": file, "fps": sh.fps, "duration": sh.duration,
-           "outputs": outputs, "tracks": tracks, "cues": cues, "transport": transport})
+           "outputs": outputs, "patch": patch, "tracks": tracks, "cues": cues,
+           "transport": transport})
 }
 
 /// O player vivo neste processo, ou o erro que todo comando de transporte devolve sem ele.
@@ -189,13 +199,14 @@ pub fn base() -> Registry {
     });
     r.add::<ShowGetArgs>(
         "show_get",
-        "Resumo do .spell aberto (ou do arquivo dado): nome, fps, duracao, saidas, tracks, cues.",
+        "Resumo do .spell aberto (ou do arquivo dado): nome, fps, duracao, saidas, patch, tracks, cues. full=true devolve o .spell inteiro.",
         |a| {
             if !a.file.is_empty() {
                 let sh = show::load(Path::new(&a.file))?;
                 *lock(&OPEN) = Some((a.file.clone(), sh));
             }
             match &*lock(&OPEN) {
+                Some((_, sh)) if a.full => serde_json::to_value(sh).map_err(|e| e.to_string()),
                 Some((f, sh)) => Ok(resumo(f, sh)),
                 None => Ok(json!({"aberto": false,
                                   "dica": "chame show_get com file=<caminho.spell>"})),
@@ -225,6 +236,7 @@ pub fn base() -> Registry {
     r.add::<NoArgs>("transport_state", "Estado do transporte do player em execucao.", |_| {
         estado(&vivo()?)
     });
+    crate::edit::register(&mut r);
     r
 }
 

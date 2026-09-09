@@ -7,7 +7,7 @@ que reproduzir byte a byte a saída dele (fixtures em `tests/conformance/`).
 ```
 spellcore/
   Cargo.toml        workspace (edition 2021, release: lto thin, codegen-units 1, panic abort)
-  engine/           clock, universe, timeline (keys/curvas), show (.spell v1), registry
+  engine/           clock, universe, timeline (keys/curvas), show (.spell v1), registry, edit (edicao do show aberto)
   protocols/        trait Output, sacn, artnet, osc, netscan
   pixelmap/         amostragem de frame -> bytes DMX por universo (rayon); bin `map_bench`
   mcp/              servidor MCP (rmcp, stdio) + `mcp install`
@@ -471,11 +471,40 @@ não repete (não há fim). O transporte remoto por OSC nunca toca nos Universes
 Assinatura muda para `pub fn base() -> Registry` (sem `Clock`: o transporte age no player vivo).
 Comandos: `load` (R0), `pause`, `stop`, `locate`, `cue_go`, `transport_state` e, desde a R7,
 `show_get`. Os de transporte usam `player::current()`; sem player vivo devolvem
-`Err("sem player em execucao")`. `show_get(file="")` abre o `.spell` (ou reusa o último aberto
-neste processo, o `OPEN` do `spellcaster/mcp/tools.py`) e resume nome, fps, duração, saídas,
-tracks, cues e o transporte vivo; é ele que alimenta o resource `spell://show`.
+`Err("sem player em execucao")`. `show_get(file="", full=false)` abre o `.spell` (ou reusa o
+último aberto neste processo, o `OPEN` do `spellcaster/mcp/tools.py`) e resume nome, fps,
+duração, saídas, patch, tracks, cues e o transporte vivo; é ele que alimenta o resource
+`spell://show`. `full=true` devolve o `.spell` inteiro (o que a GUI desenha).
 `play_show` **não** entra aqui: ele monta os hooks de `script` e é registrado pela CLI, como
 `play` e `net` na R0.
+
+### `engine::edit` — edição do show aberto
+
+Porte de `spellcaster/gui/api.py` (mais a checagem de footprint de `fixtures/patch.py`), ligado
+em `base()` por `edit::register`. Todo comando age no `OPEN`; sem show aberto, abre um novo
+(o `SHOW = NEW` do Python), então a IA pode chamar `track_add` antes de qualquer arquivo.
+
+| Comando | Faz | Devolve |
+|---|---|---|
+| `show_new` | zera: "novo show", sACN no universo 1, 60 s, `patch`/`cues`/`markers` vazios | o show inteiro |
+| `show_set(data)` | substitui pelo JSON dado (objeto ou texto JSON); `migrate`; chaves `_x` caem | o show inteiro |
+| `show_save(file="")` | grava (sem `file`, no caminho do último `load`/`show_get`/`show_save`) | o caminho |
+| `track_add(type="dmx", universe=1, address=1, label="")` | track vazio no fim | índice |
+| `track_del(index)` | remove | o track |
+| `key_set(track, t, value=0, curve="linear")` | cria ou substitui o keyframe em `t` (`\|Δt\| < 1 µs`); `value` texto que é JSON vira JSON; lista ordenada | keys do track |
+| `key_del(track, t)` | apaga em `t` (tolerância 1 ms) | quantos saíram |
+| `cue_set(index?, name, fade, wait, follow, values)` | cria (sem `index`) ou substitui; `values` = `{"u/end": v \| [v...]}`, chave validada por `cues::key` | índice |
+| `cue_del(index)` | remove | a cue |
+| `patch_add(name, profile, universe=1, address=1)` | acrescenta e valida o patch inteiro; sobreposição ou estouro de 512 recusa e desfaz | a grade |
+| `patch_del(name)` | tira pelo nome | a entrada |
+| `patch_check()` | grade (`name`, `profile`, `universe`, `address`, `channels`) + `error` da primeira fixture que não entra | `{rows, error}` |
+| `profiles()` | nomes dos `.json` em `profiles/` | lista |
+
+`profiles/` é a primeira que existir entre: ao lado do `.spell`, um nível acima dele (`shows/` e
+`profiles/` irmãos, como no repo e no pendrive), o cwd e a pasta do executável. O perfil só é
+lido para nome e footprint (`max(offset, fine) + 1`); nomes de canal, faixas e roda continuam no
+Python até o track `fixture` entrar no Rust. Teste: `engine/tests/edit.rs`, binário próprio
+porque `OPEN` é um por processo.
 
 ## `script` (crate novo)
 
@@ -574,8 +603,8 @@ spellcore mcp install --target code [--path P]      # .mcp.json do diretório co
 
 | Superfície | Conteúdo |
 |---|---|
-| tools | uma por comando de `Registry::iter()`: `load`, `show_get`, `pause`, `stop`, `locate`, `cue_go`, `transport_state`, `play_show`, `net`. `inputSchema` = o schema que o `schemars` gerou do struct de argumentos |
-| resources | `spell://show` (o `.spell` aberto: fps, duração, saídas, tracks, cues, transporte vivo) e `spell://commands` (o registry inteiro em JSON) |
+| tools | uma por comando de `Registry::iter()`: `load`, `show_get`, `pause`, `stop`, `locate`, `cue_go`, `transport_state`, os de edição de `engine::edit` (`show_new`, `show_set`, `show_save`, `track_add`, `track_del`, `key_set`, `key_del`, `cue_set`, `cue_del`, `patch_add`, `patch_del`, `patch_check`, `profiles`), `play_show`, `net`. `inputSchema` = o schema que o `schemars` gerou do struct de argumentos |
+| resources | `spell://show` (o `.spell` aberto: fps, duração, saídas, patch, tracks, cues, transporte vivo) e `spell://commands` (o registry inteiro em JSON) |
 | erro | erro de comando volta como `isError: true` com o texto (o cliente lê); só rota inexistente vira erro JSON-RPC |
 | `play_show` | bloqueia até o fim do show, então roda em thread e a tool volta na hora (o `BACKGROUND` do Python). Enquanto o MCP roda, a linha de status do `play` vai para o **stderr**: no stdio o stdout é o canal JSON-RPC |
 

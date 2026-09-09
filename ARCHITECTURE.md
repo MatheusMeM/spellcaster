@@ -210,6 +210,10 @@ u, v}]}`; a ligação com o player espera a R2 (mídia), então o crate ainda ro
   `registry::base()` sem `Clock`: `load`, `show_get`, `pause`, `stop`, `locate`, `cue_go`,
   `transport_state`; os de transporte agem em `player::current()`. `play_show` e `net` são
   registrados pela CLI, que é quem conhece `script` e `protocols`.
+- `engine::edit` (ligado em `base()`): edição do show aberto (`OPEN`, um por processo) —
+  `show_new`/`show_set`/`show_save`, `track_add`/`track_del`, `key_set`/`key_del`,
+  `cue_set`/`cue_del`, `patch_add`/`patch_del`/`patch_check`/`profiles`. Porte de
+  `gui/api.py` + footprint de `fixtures/patch.py`; é por aqui que a GUI Tauri e o MCP editam.
 - `mcp::Spell` (crate `mcp`) implementa `rmcp::ServerHandler` sobre um `Registry`: uma tool por
   comando, com o `inputSchema` que o `schemars` gerou; resources `spell://show` (o `show_get`) e
   `spell://commands` (o `Registry::schema()`). Erro de comando volta como `isError`, não como erro

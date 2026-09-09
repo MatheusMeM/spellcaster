@@ -152,7 +152,7 @@ O plano acima (F0–F7) foi o do protótipo Python e está concluído até F6. O
 | R4 laser multi-feed | Ether Dream, Helios, IDN; safety no engine; 4 feeds | concluída (0,83 % cpu) | — |
 | R5 GUI Tauri | show de 3 min do zero; Face em modo performance | base pronta em `main` (`spellgui/web`: canvaskit + timeline); falta Tauri, painéis, Theme/Face | voto das rodadas 5 e 6 do design |
 | R6 previz Godot | 60 fps, 64 fixtures, 2 LED walls | pendente | Godot não instalado |
-| R7 MCP com rmcp | sessão de IA monta e toca um show sem GUI | concluída em stdio | edição de show (patch/timeline) não existe no core Rust |
+| R7 MCP com rmcp | sessão de IA monta e toca um show sem GUI | concluída em stdio; edição de show (patch, track, key, cue) no registry (`engine::edit`) | `spell://face`/`spell://graph` e transporte HTTP pendentes |
 | R8 empacotamento | onedir, Linux, Pi estático; CI com bench como gate | concluída | — |
 | R9 editores de Face/Graph + painel Agent | operador monta uma Face em 10 min | pendente | depende de R5 |
 
@@ -193,9 +193,10 @@ ponytail (−2 900 linhas), CI com release por tag, docs (README, INSTALL, LICEN
 
 R7 entregou o crate `mcp` (rmcp 3.2, stdio), uma tool por comando do registry, os resources
 `spell://show` e `spell://commands` e `spellcore mcp install`. Do aceite do PRD §6 — "escanear
-rede, patchear, criar timeline e dar play" — o core Rust hoje tem **escanear** (`net`) e **play**
-(`play_show` + transporte); **patchear** e **editar timeline** não existem em nenhum comando do
-registry Rust (o patch de fixtures é da F2 do Python), e Theme/Face/Graph não têm estrutura
-serializada no `engine::show` para `face_patch`/`graph_patch` operarem. Faltam, nesta ordem:
-comandos de edição de show no registry, `spell://face`/`spell://graph` e o transporte HTTP
+rede, patchear, criar timeline e dar play" — o core Rust tem **escanear** (`net`), **play**
+(`play_show` + transporte) e, desde `engine::edit`, **patchear** (`patch_add`/`patch_del`/
+`patch_check`/`profiles`) e **editar timeline** (`show_new`/`show_set`/`show_save`, `track_add`/
+`track_del`, `key_set`/`key_del`, `cue_set`/`cue_del`); o Python deixa de ser o único editor.
+Theme/Face/Graph ainda não têm estrutura serializada no `engine::show` para `face_patch`/
+`graph_patch` operarem. Faltam, nesta ordem: `spell://face`/`spell://graph` e o transporte HTTP
 streamable.

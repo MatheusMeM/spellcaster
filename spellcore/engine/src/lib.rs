@@ -3,6 +3,7 @@
 
 pub mod clock;
 pub mod cues;
+pub mod edit;
 pub mod hook;
 pub mod player;
 pub mod registry;

@@ -96,6 +96,13 @@ fn handshake_tools_e_resources() {
         "locate",
         "cue_go",
         "transport_state",
+        "show_new",
+        "show_save",
+        "track_add",
+        "key_set",
+        "cue_set",
+        "patch_add",
+        "patch_check",
         "play_show",
         "net",
     ] {

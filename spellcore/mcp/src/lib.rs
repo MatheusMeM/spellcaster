@@ -27,8 +27,10 @@ pub mod install;
 const INSTRUCTIONS: &str = concat!(
     "Spellcaster: show control (sACN, Art-Net, OSC, laser ILDA). Ordem util: `net` para achar os ",
     "nos da rede, `show_get` para ler o show, `play_show` para tocar, `transport_state`/`pause`/",
-    "`stop`/`locate`/`cue_go` para o transporte. Os resources spell://show e spell://commands dao ",
-    "o show aberto e o registry inteiro sem gastar uma chamada de tool."
+    "`stop`/`locate`/`cue_go` para o transporte. Para montar um show: `show_new` ou `show_get` ",
+    "com file, `profiles` + `patch_add`, `track_add` + `key_set`, `cue_set`, `show_save`. Os ",
+    "resources spell://show e spell://commands dao o show aberto e o registry inteiro sem gastar ",
+    "uma chamada de tool."
 );
 
 /// Comandos que bloqueiam ate o fim do show ou ate Ctrl+C: rodam em thread e a tool volta na hora
