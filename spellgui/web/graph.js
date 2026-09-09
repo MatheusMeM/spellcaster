@@ -857,7 +857,7 @@ PB.init = function (opts) {
 // pagina editando um documento e o engine outro.
 PB.carrega = function (path) {
   if (PB.vivo()) {
-    return PB.bus.call("load", { path })
+    return PB.bus.call("load", { file: path })
       .then(() => PB.recarrega(true))
       .catch(e => PB.log(`load ${path}: ${e.message}`));
   }

@@ -292,6 +292,7 @@ struct ParamArgs {
     /// geo/x, geo/y, geo/scale, geo/rot, limit/r, limit/g, limit/b, safe/min_size,
     /// safe/max_intensity, shutter.
     path: String,
+    /// Valor na faixa do `path` (a tabela de faixas esta no spellcore/README.md).
     value: f64,
 }
 

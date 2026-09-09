@@ -2,7 +2,7 @@
 //!
 //!   spellcore play <show.spell> [--loop] [--osc-port N]
 //!   spellcore net [--json] [--timeout N]
-//!   spellcore commands
+//!   spellcore commands [nome]
 //!   spellcore mcp [install --target desktop|code [--path P] [--yes]]
 //!   spellcore serve [--port N] [--dir D] [--show x.spell]
 //!
@@ -28,6 +28,13 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 // ------------------------------------------------------------------ comandos
+
+/// Uma fonte para o `doc` do registry (`/commands`, tools MCP) e para o `about` do clap
+/// (`spellcore --help`, `spellcore play --help`): os dois lados leem estas constantes.
+const DOC_PLAY: &str = "Toca um show .spell ate o fim ou Ctrl+C.";
+const DOC_NET: &str =
+    "Varre a rede: interfaces, nos Art-Net, fontes sACN, Ether Dream e sugestoes.";
+const DOC_GRAPH_CHECK: &str = "Compila o graph do show aberto sem rodar. Devolve {nodes, error}.";
 
 #[derive(Args, Deserialize, JsonSchema)]
 #[schemars(crate = "engine::schemars")]
@@ -288,21 +295,9 @@ fn graph_check(_: NoArgs) -> Result<Value, String> {
 /// E' este registry que o MCP expoe como tools.
 pub fn registry() -> Registry {
     let mut r = engine::registry::base();
-    r.add::<PlayArgs>(
-        "play_show",
-        "Toca um show .spell ate o fim ou Ctrl+C.",
-        play,
-    );
-    r.add::<NetArgs>(
-        "net",
-        "Varre a rede: interfaces, nos Art-Net, fontes sACN, Ether Dream e sugestoes.",
-        net,
-    );
-    r.add::<NoArgs>(
-        "graph_check",
-        "Compila o graph do show aberto sem rodar. Devolve {nodes, error}.",
-        graph_check,
-    );
+    r.add::<PlayArgs>("play_show", DOC_PLAY, play);
+    r.add::<NetArgs>("net", DOC_NET, net);
+    r.add::<NoArgs>("graph_check", DOC_GRAPH_CHECK, graph_check);
     laser_cmd::register(&mut r);
     r
 }
@@ -338,12 +333,16 @@ struct ServeArgs {
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// Toca um show .spell ate o fim ou Ctrl+C.
+    #[command(about = DOC_PLAY)]
     Play(PlayArgs),
-    /// Varre a rede: interfaces, nos Art-Net, fontes sACN, Ether Dream e sugestoes.
+    #[command(about = DOC_NET)]
     Net(NetArgs),
-    /// Lista o registry em JSON: nome, doc e schema de cada comando.
-    Commands,
+    /// Lista o registry em JSON: nome, doc e schema de cada comando. Com um nome, so' esse
+    /// comando - e' o `spellcore <cmd> --help` dos verbos que nao viraram subcomando.
+    Commands {
+        /// Nome do comando do registry; vazio = todos.
+        name: Option<String>,
+    },
     /// Servidor MCP em stdio; `spellcore mcp install` registra o servidor no Claude.
     Mcp(McpArgs),
     /// Barramento: HTTP + WebSocket + MCP em /mcp. E' o processo que toca o hardware.
@@ -376,7 +375,14 @@ pub fn main() {
     let r = match Cli::parse().cmd {
         Cmd::Play(a) => play(a),
         Cmd::Net(a) => net(a),
-        Cmd::Commands => Ok(registry().schema()),
+        Cmd::Commands { name } => match name {
+            None => Ok(registry().schema()),
+            Some(n) => registry()
+                .schema()
+                .as_array()
+                .and_then(|a| a.iter().find(|c| c["name"] == n.as_str()).cloned())
+                .ok_or_else(|| format!("comando desconhecido: {}", n)),
+        },
         Cmd::Serve(a) => {
             // o stdout de um servidor nao e' canal de dado: status e log vao para o stderr
             STDOUT_LIVRE.store(false, Ordering::SeqCst);
@@ -450,10 +456,17 @@ mod tests {
             _ => panic!("esperava net"),
         }
 
-        assert!(matches!(
-            Cli::try_parse_from(["spellcore", "commands"]).unwrap().cmd,
-            Cmd::Commands
-        ));
+        match Cli::try_parse_from(["spellcore", "commands"]).unwrap().cmd {
+            Cmd::Commands { name } => assert!(name.is_none(), "`commands` sozinho = todos"),
+            _ => panic!("esperava commands"),
+        }
+        match Cli::try_parse_from(["spellcore", "commands", "cue_go"])
+            .unwrap()
+            .cmd
+        {
+            Cmd::Commands { name } => assert_eq!(name.as_deref(), Some("cue_go")),
+            _ => panic!("esperava commands"),
+        }
         match Cli::try_parse_from(["spellcore", "mcp"]).unwrap().cmd {
             Cmd::Mcp(m) => assert!(m.cmd.is_none(), "`mcp` sozinho = servidor stdio"),
             _ => panic!("esperava mcp"),
@@ -515,6 +528,25 @@ mod tests {
             e["params"]["required"].as_array().unwrap(),
             &vec![json!("file")]
         );
+    }
+
+    /// Uma fonte: o `about` do subcomando e o `doc` do registry sao a mesma constante.
+    #[test]
+    fn about_do_clap_e_doc_do_registry_sao_o_mesmo_texto() {
+        let c = Cli::command();
+        let about = |n: &str| {
+            c.find_subcommand(n)
+                .unwrap_or_else(|| panic!("subcomando {}", n))
+                .get_about()
+                .expect("about")
+                .to_string()
+        };
+        assert_eq!(about("play"), DOC_PLAY);
+        assert_eq!(about("net"), DOC_NET);
+        let reg = registry();
+        assert_eq!(reg.get("play_show").unwrap().doc, DOC_PLAY);
+        assert_eq!(reg.get("net").unwrap().doc, DOC_NET);
+        assert_eq!(reg.get("graph_check").unwrap().doc, DOC_GRAPH_CHECK);
     }
 
     #[test]

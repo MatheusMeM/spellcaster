@@ -485,14 +485,18 @@ pub struct TrackAddArgs {
     #[serde(default = "dmx", rename = "type")]
     #[schemars(rename = "type")]
     pub kind: String,
+    /// Universo de saida, a partir de 1.
     #[serde(default = "um")]
     pub universe: u16,
     /// Endereco DMX 1..512 (tracks osc usam texto: passe pelo show_set).
     #[serde(default = "um")]
     pub address: u16,
-    /// Nome do track (campo `name` do .spell).
-    #[serde(default)]
-    pub label: String,
+    /// Nome do track (campo `name` do .spell). O argumento `label` e' o nome velho deste
+    /// (deprecated, sai na proxima rodada).
+    // ponytail: alias `label` por uma rodada, por script e sessao MCP ja' escritos (no repo nao
+    // sobrou chamador) ; tirar na rodada 3.
+    #[serde(default, alias = "label")]
+    pub name: String,
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -517,6 +521,7 @@ pub struct KeySetArgs {
 
 #[derive(Deserialize, JsonSchema)]
 pub struct KeyDelArgs {
+    /// Indice do track em `tracks`.
     pub track: usize,
     /// Instante do keyframe (tolerancia 1 ms).
     pub t: f64,
@@ -527,6 +532,7 @@ pub struct CueSetArgs {
     /// Indice da cue a substituir; ausente = acrescenta no fim.
     #[serde(default)]
     pub index: Option<usize>,
+    /// Nome da cue, como aparece na lista.
     #[serde(default)]
     pub name: String,
     /// Segundos de fade linear ate os valores.
@@ -545,6 +551,7 @@ pub struct CueSetArgs {
 
 #[derive(Deserialize, JsonSchema)]
 pub struct CueDelArgs {
+    /// Indice da cue em `cues`.
     pub index: usize,
 }
 
@@ -554,6 +561,7 @@ pub struct PatchAddArgs {
     pub name: String,
     /// Perfil em profiles/ (sem .json) ou caminho de um .json.
     pub profile: String,
+    /// Universo de saida, a partir de 1.
     #[serde(default = "um")]
     pub universe: u16,
     /// Primeiro canal DMX (1..512).
@@ -563,6 +571,7 @@ pub struct PatchAddArgs {
 
 #[derive(Deserialize, JsonSchema)]
 pub struct PatchDelArgs {
+    /// Nome da fixture no patch.
     pub name: String,
 }
 
@@ -595,6 +604,7 @@ pub struct ProfileGetArgs {
 
 #[derive(Deserialize, JsonSchema)]
 pub struct LevelSetArgs {
+    /// Universo de saida, a partir de 1.
     #[serde(default = "um")]
     pub universe: u16,
     /// Primeiro canal DMX (1..512).
@@ -613,12 +623,16 @@ pub struct LevelArgs {
 
 #[derive(Deserialize, JsonSchema)]
 pub struct CueCaptureArgs {
+    /// Nome da cue nova.
     #[serde(default)]
     pub name: String,
+    /// Segundos de fade linear ate os valores.
     #[serde(default)]
     pub fade: f64,
+    /// Segundos entre o GO e o inicio do fade.
     #[serde(default)]
     pub wait: f64,
+    /// Ao terminar, dispara a proxima.
     #[serde(default)]
     pub follow: bool,
 }
@@ -684,13 +698,13 @@ pub fn register(r: &mut Registry) {
     );
     r.add::<TrackAddArgs>(
         "track_add",
-        "Acrescenta um track vazio ao show aberto. Devolve o indice do track.",
+        "Acrescenta um track vazio ao show aberto. Devolve o indice do track. O argumento `label` e' o nome velho de `name` (deprecated, sai na proxima rodada).",
         |a| {
             com(|_, sh| {
                 let mut tr = json!({"type": a.kind, "universe": a.universe,
                                     "address": a.address, "keys": []});
-                if !a.label.is_empty() {
-                    tr["name"] = json!(a.label);
+                if !a.name.is_empty() {
+                    tr["name"] = json!(a.name);
                 }
                 sh.tracks.push(tr);
                 Ok(json!(sh.tracks.len() - 1))

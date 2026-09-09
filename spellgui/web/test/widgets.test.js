@@ -41,7 +41,7 @@ test("kindOfCommand: comando sem parametro e' trigger", () => {
 test("kindOf sobre os comandos reais do registry", () => {
   const p = n => cmd(n).params.properties;
   assert.strictEqual(WG.kindOf(p("locate").t), "num");
-  assert.strictEqual(WG.kindOf(p("load").path), "text");
+  assert.strictEqual(WG.kindOf(p("load").file), "text");
   assert.strictEqual(WG.kindOf(p("cue_go").index), "spin", "Option<usize>");
   assert.strictEqual(WG.kindOf(p("show_get").full), "toggle");
   assert.strictEqual(WG.kindOf(p("play_show").loop), "toggle");
@@ -68,7 +68,7 @@ test("args: monta o request do comando a partir dos campos", () => {
   assert.deepStrictEqual(WG.args(cmd("cue_go"), { index: "2" }), { index: 2 });
   assert.deepStrictEqual(WG.args(cmd("show_get"), { file: "", full: true }), { full: true });
   // obrigatorio em branco vai como default do tipo (o engine reclama, nao a pagina)
-  assert.deepStrictEqual(WG.args(cmd("load"), {}), { path: "" });
+  assert.deepStrictEqual(WG.args(cmd("load"), {}), { file: "" });
   const ks = WG.args(cmd("key_set"), { track: "1", t: "2.5", value: "255", curve: "hold" });
   assert.deepStrictEqual(ks, { track: 1, t: 2.5, value: 255, curve: "hold" });
   // campo que o schema nao declara nao entra no request

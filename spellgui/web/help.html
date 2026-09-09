@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Spellcaster — ajuda</title>
+<link rel="stylesheet" href="../../design/tokens/spellcaster.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: var(--sc-bg); color: var(--sc-fg);
+               font: var(--sc-text-sm)/1.5 var(--sc-mono); }
+  body { display: flex; flex-direction: column; }
+  .bar { display: flex; align-items: center; gap: var(--sc-gap); padding: 6px 8px;
+         background: var(--sc-panel); border-bottom: 1px solid var(--sc-line); flex: 0 0 auto; }
+  .over { color: var(--sc-fg-3); font-size: var(--sc-text-xs); letter-spacing: var(--sc-tracking);
+          text-transform: uppercase; font-family: var(--sc-label); }
+  .bar .grow { flex: 1 1 auto; }
+  input { background: var(--sc-panel-2); color: var(--sc-fg); border: 1px solid var(--sc-line);
+          border-radius: var(--sc-radius); font: 12px var(--sc-mono); padding: 5px 9px; }
+  main { flex: 1 1 auto; display: flex; min-height: 0; }
+  section { flex: 1 1 50%; padding: 10px 14px; overflow: auto; min-width: 0; }
+  section + section { border-left: 1px solid var(--sc-line); }
+  h2 { font: var(--sc-text-xs)/1 var(--sc-label); letter-spacing: var(--sc-tracking);
+       text-transform: uppercase; color: var(--sc-fg-3); margin: 0 0 10px; }
+  h2 small { color: var(--sc-fg-3); margin-left: 8px; }
+
+  /* ---- atalhos ---- */
+  table.grade { border-collapse: collapse; width: 100%; }
+  table.grade th { text-align: left; color: var(--sc-fg-3); font: var(--sc-text-xs) var(--sc-label);
+                   letter-spacing: var(--sc-tracking); text-transform: uppercase;
+                   border-bottom: 1px solid var(--sc-line); padding: 4px 10px 4px 0; }
+  table.grade td { padding: 3px 10px 3px 0; border-bottom: 1px solid var(--sc-hair);
+                   vertical-align: top; }
+  table.grade td:nth-child(2) { color: var(--sc-accent); white-space: nowrap; }
+  td.st-feito { color: var(--sc-go); }
+  td.st-falta { color: var(--sc-live); }
+  td.st-na    { color: var(--sc-fg-3); }
+  .vazio { color: var(--sc-fg-3); }
+
+  /* ---- comandos ---- */
+  details.cmd { border-bottom: 1px solid var(--sc-hair); padding: 3px 0; }
+  details.cmd summary { cursor: pointer; display: flex; gap: 8px; align-items: baseline;
+                        flex-wrap: wrap; }
+  details.cmd summary::marker { color: var(--sc-fg-3); }
+  details.cmd b { color: var(--sc-fg); }
+  details.cmd .args { color: var(--sc-accent); }
+  details.cmd .doc { color: var(--sc-fg-2); flex: 1 1 240px; min-width: 0; }
+  details.cmd[open] { background: var(--sc-panel); }
+
+  /* ---- WG.form (classes de widgets.js) ---- */
+  .wg-form { padding: 8px 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+  .wg-doc { color: var(--sc-fg-3); }
+  .wg { display: grid; grid-template-columns: 130px 1fr 60px; gap: 6px; align-items: center; }
+  .wg-lab { color: var(--sc-fg-2); }
+  .wg input, .wg select, .wg textarea { background: var(--sc-panel-2); color: var(--sc-fg);
+    border: 1px solid var(--sc-line); border-radius: var(--sc-radius);
+    font: 12px var(--sc-mono); padding: 4px 6px; width: 100%; }
+  .wg-slider input[type=range] { accent-color: var(--sc-accent); padding: 0; border: 0;
+                                 background: none; }
+  .wg-toggle input { width: auto; }
+  .wg-json textarea { grid-column: 2 / span 2; }
+  .wg-go { align-self: flex-start; background: var(--sc-panel-2); color: var(--sc-fg);
+           border: 1px solid var(--sc-line); border-radius: var(--sc-radius);
+           font: 12px var(--sc-mono); padding: 5px 12px; cursor: pointer; }
+  .wg-go:hover { border-color: var(--sc-accent); color: var(--sc-accent); }
+  .wg-out { color: var(--sc-go); word-break: break-all; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <span class="over">ajuda</span>
+  <span class="over">tecla ?</span>
+  <span class="grow"></span>
+  <input type="search" id="busca" placeholder="filtrar comandos" size="24">
+  <span class="over" id="n"></span>
+  <span class="over" id="conn">offline</span>
+</div>
+<main>
+  <section>
+    <h2>Atalhos <small>design/SHORTCUTS.md</small></h2>
+    <div id="atalhos" class="vazio">lendo...</div>
+  </section>
+  <section>
+    <h2>Comandos <small>GET /commands — o registry</small></h2>
+    <div id="comandos" class="vazio">lendo...</div>
+  </section>
+</main>
+<script src="bus.js"></script>
+<script src="widgets.js"></script>
+<script src="help.js"></script>
+<script>HELP.mount(document);</script>
+</body>
+</html>

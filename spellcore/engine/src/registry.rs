@@ -79,8 +79,11 @@ impl Registry {
 
 #[derive(Deserialize, JsonSchema)]
 pub struct LoadArgs {
-    /// Caminho do arquivo .spell.
-    pub path: String,
+    /// Caminho do arquivo .spell (o mesmo `file` de show_get, show_save e play_show).
+    // ponytail: `path` era o nome deste argumento e continua aceito por uma rodada, por script e
+    // sessao MCP ja' escritos (no repo nao sobrou chamador) ; tirar o alias na rodada 3.
+    #[serde(alias = "path")]
+    pub file: String,
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -200,13 +203,13 @@ pub fn base() -> Registry {
     let mut r = Registry::new();
     r.add::<LoadArgs>(
         "load",
-        "Carrega um .spell e devolve nome, fps, duracao e tracks.",
+        "Abre um .spell E VALIDA a timeline (o que show_get{file} nao faz): devolve nome, fps, duracao, quantos tracks e quais foram ignorados. O argumento `path` e' o nome velho de `file` (deprecated, sai na proxima rodada).",
         |a| {
-            let sh = show::load(Path::new(&a.path))?;
+            let sh = show::load(Path::new(&a.file))?;
             let tl = Timeline::new(&sh)?;
             let out = json!({"name": sh.name, "fps": tl.fps, "duration": tl.duration,
                          "tracks": tl.tracks.len(), "ignored": tl.ignored()});
-            crate::edit::abre(a.path.clone(), sh);
+            crate::edit::abre(a.file.clone(), sh);
             Ok(out)
         },
     );
@@ -356,7 +359,16 @@ mod tests {
                 c
             );
         }
-        assert!(r.call("load", json!({"path": "nao_existe.spell"})).is_err());
+        assert!(r.call("load", json!({"file": "nao_existe.spell"})).is_err());
+        // o alias deprecated ainda entra: erro de arquivo, nao de argumento faltando
+        assert!(r
+            .call("load", json!({"path": "nao_existe.spell"}))
+            .unwrap_err()
+            .contains("nao_existe.spell"));
+        assert!(
+            r.call("load", json!({})).is_err(),
+            "sem file nem path: erro de deserializacao"
+        );
     }
 
     /// `show_get` sem show aberto avisa; com `file` abre, resume e fica aberto para a proxima

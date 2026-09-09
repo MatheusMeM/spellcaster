@@ -90,6 +90,7 @@ fn mime(p: &str) -> &'static str {
         "js" => "text/javascript; charset=utf-8",
         "css" => "text/css; charset=utf-8",
         "json" | "spell" => "application/json",
+        "md" => "text/markdown; charset=utf-8", // design/SHORTCUTS.md, que a help.html le
         _ => "application/octet-stream",
     }
 }
@@ -278,7 +279,7 @@ impl FrameHook for Monitor {
 /// `--show`: abre o arquivo no registry (e' o que `GET /show` le) e sobe o player parado em
 /// t=0, para monitor e transporte ja' terem o que mostrar.
 fn abre(reg: Arc<Registry>, file: String) {
-    if let Err(e) = reg.call("load", json!({ "path": file })) {
+    if let Err(e) = reg.call("load", json!({ "file": file })) {
         return eprintln!("--show {}: {}", file, e);
     }
     let (r, f) = (reg.clone(), file.clone());
@@ -437,6 +438,7 @@ mod tests {
     fn mime_por_extensao() {
         assert_eq!(mime("index.html"), "text/html; charset=utf-8");
         assert_eq!(mime("a/b/quatro.face.json"), "application/json");
+        assert_eq!(mime("design/SHORTCUTS.md"), "text/markdown; charset=utf-8");
         assert_eq!(mime("sem_extensao"), "application/octet-stream");
     }
 }
