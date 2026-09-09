@@ -32,3 +32,7 @@ Show-control portátil: timeline + sACN / Art-Net / OSC / ILDA, GUI web com skin
 - Não commitar `build/`, `dist/`, `*.log`, `__pycache__/`.
 
 - Commits e pushes só na conta do Matheus. Proibido `Co-Authored-By`, "Generated with Claude" ou qualquer crédito ao Claude no histórico git.
+
+## Spellcaster v1 (Rust)
+
+Especificação em `PRD.md`. Core Rust em `spellcore/`, GUI Tauri em `spellgui/`, previz Godot em `spellviz/`, benches em `bench/`. O pacote Python `spellcaster/` é referência e gerador de fixtures de conformidade; não recebe funcionalidade nova. Toolchain: `cargo` (rustup, instalado por usuário, sem UAC).
