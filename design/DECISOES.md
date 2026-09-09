@@ -92,3 +92,13 @@ Consequências:
 - **Paths declarados sem implementação.** `modules/laser.json` declara `dev/type`, `dev/host`, `dev/pps`, `ilda/fps`, `curve/r|g|b`, `safe/zone`, `safe/armed` e `test/pattern`; `laser_param` não aceita nenhum deles (`dev/*` e `ilda/*` são argumento de `laser_open`/`laser_play`, o resto espera LUT de cor e `optimize` paramétrico). O manifesto é a declaração do app, não do comando: o voto decide se ele só declara o que já roda, ou se declara o alvo e o comando cresce até ele.
 - **`shutter` está dos dois lados.** É `command` no `modules/laser.json` e `path` no `laser_param`. Uma das duas some.
 - Motivo: a convenção está no código (seis linhas no sink da CLI, com comentário `ponytail:`) e funciona para um laser; registrar aqui evita que ela vire contrato por omissão.
+
+## 09/09/2026 · x/y de fixture no patch — aguarda voto
+
+- O previz da timeline (`spellgui/web/viewer.js`) desenha a planta do patch, e o patch não tem
+  onde a fixture está: `patch_add` grava `{name, profile, universe, address}` e nada mais. Enquanto
+  isso, a planta é uma grade em ordem de endereço — lê o rig, não a sala.
+- **O que o voto decide:** se a entrada do patch ganha `x`/`y` (planta em metros, com o palco na
+  origem) e se eles entram no `.spell` ou num arquivo de planta ao lado dele.
+- Não implementado e não removido até o voto: a grade por endereço fica, e vira posição real no dia
+  em que o patch souber dizer onde a fixture está.
