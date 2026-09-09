@@ -184,6 +184,7 @@ CI, sem tocar no que já está conforme):
 | Frente | Entrega | Aceite | Depende de |
 |---|---|---|---|
 | Design | rodada 7 (FÓSFORO, PATCHBAY) | voto do dono | voto das rodadas 5 e 6 |
+| F8 TEATRO DE PAPEL | programmer no engine (`level_set`, `level_clear`, `level_get`, `cue_capture`, `fixture_set`, `profile_get`) e a página `spellgui/web/teatro.*`: patch, cues com GO e cenário clicável | `engine/tests/programmer.rs` e `node --test spellgui/web/test/teatro.test.js` verdes | a página espera o barramento da F1 e o `show_patch` da F2 |
 
 Bloqueadas até instalar SDK (decisão do dono, não de agente): R2 (GStreamer + NDI SDK),
 R6 (Godot 4). R9 espera R5.

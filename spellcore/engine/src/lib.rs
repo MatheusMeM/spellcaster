@@ -18,7 +18,7 @@ pub use schemars;
 pub use clock::{Clock, State, Stats};
 pub use cues::{Cue, CueList};
 pub use hook::{Ev, EventSink, FrameHook, NullSink};
-pub use player::{Handle, Player, TransportState};
+pub use player::{Handle, Player, Prog, TransportState};
 pub use registry::{Command, Registry};
 pub use show::{OutputCfg, Show};
 pub use timeline::{Curve, Keyframe, Keys, Timeline, Track, Value, BEZ};

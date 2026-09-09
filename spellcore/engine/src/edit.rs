@@ -3,7 +3,7 @@
 //! GUI e MCP editam por aqui; nenhuma logica de edicao vive fora do registry.
 
 use crate::cues;
-use crate::registry::{lock, NoArgs, Registry, OPEN};
+use crate::registry::{lock, vivo, NoArgs, Registry, OPEN};
 use crate::show::{self, OutputCfg, Show};
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -95,11 +95,15 @@ fn lista<'a>(sh: &'a mut Show, k: &str) -> &'a mut Vec<Value> {
 struct Perfil {
     name: String,
     size: u16,
+    /// (nome do canal, offset). Canal sem `name` ou sem `offset` fica de fora, mas continua
+    /// contando no footprint (`size` sai do maior offset/fine).
+    chans: Vec<(String, u16)>,
+    json: Value,
 }
 
-/// Perfil por nome em `dir` (sem .json) ou por caminho. So' nome e footprint.
-// ponytail: nomes de canal, faixas e roda ficam no Python ; entram aqui quando o track
-// `fixture` for resolvido no Rust.
+/// Perfil por nome em `dir` (sem .json) ou por caminho.
+// ponytail: faixas (`ranges`) e roda (`wheel`) so' viajam no `json` cru, para o cliente
+// desenhar ; viram tipo aqui quando o fade por tipo de canal existir.
 fn perfil(dir: &Path, p: &str) -> Result<Perfil, String> {
     let f = if Path::new(p).extension().is_some() {
         PathBuf::from(p)
@@ -122,9 +126,22 @@ fn perfil(dir: &Path, p: &str) -> Result<Perfil, String> {
     if m > 511 {
         return Err(format!("{}: offset {} fora de 0..511", name, m));
     }
+    let chans = v["channels"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|c| {
+            Some((
+                c["name"].as_str()?.to_string(),
+                c["offset"].as_u64()? as u16,
+            ))
+        })
+        .collect();
     Ok(Perfil {
         name,
         size: m as u16 + 1,
+        chans,
+        json: v,
     })
 }
 
@@ -216,6 +233,62 @@ fn linha(
     let i = rows.len();
     busy.extend((a..a + p.size).map(|ch| ((u, ch), i)));
     Ok(json!({"name": name, "profile": p.name, "universe": u, "address": a, "channels": p.size}))
+}
+
+// ------------------------------------------------- cues e programmer (mesa)
+
+/// Objeto cue do .spell, com as chaves validadas. Uma so' via para `cue_set` e `cue_capture`.
+fn cue(
+    name: &str,
+    fade: f64,
+    wait: f64,
+    follow: bool,
+    values: &Map<String, Value>,
+) -> Result<Value, String> {
+    if let Some(k) = values.keys().find(|k| cues::key(k).is_none()) {
+        return Err(format!("cue: chave {:?} nao e' \"universo/endereco\"", k));
+    }
+    Ok(json!({"name": name, "fade": fade, "wait": wait, "follow": follow, "values": values}))
+}
+
+/// Poe a cue no show aberto: `index` substitui, sem `index` acrescenta. Devolve o indice.
+fn cue_put(index: Option<usize>, c: Value) -> Result<Value, String> {
+    com(|_, sh| {
+        let cs = lista(sh, "cues");
+        let i = match index {
+            Some(i) if i < cs.len() => {
+                cs[i] = c;
+                i
+            }
+            Some(i) => return Err(format!("cue {}: o show tem {}", i, cs.len())),
+            None => {
+                cs.push(c);
+                cs.len() - 1
+            }
+        };
+        Ok(json!(i))
+    })
+}
+
+/// Fixture do patch pelo nome, com o perfil ja carregado.
+fn fixture(nome: &str) -> Result<(u16, u16, Perfil), String> {
+    com(|p, sh| {
+        let dir = profiles_dir(p);
+        let f = sh
+            .extra
+            .get("patch")
+            .and_then(|v| v.as_array())
+            .into_iter()
+            .flatten()
+            .find(|f| f["name"] == nome)
+            .ok_or_else(|| format!("fixture {:?} nao esta no patch", nome))?;
+        let pr = perfil(&dir, f["profile"].as_str().unwrap_or_default())?;
+        let u = f["universe"].as_u64().unwrap_or(1) as u16;
+        let a = f["address"]
+            .as_u64()
+            .ok_or_else(|| format!("{}: sem address", nome))? as u16;
+        Ok((u, a, pr))
+    })
 }
 
 // ------------------------------------------------------------------ args
@@ -330,6 +403,55 @@ pub struct PatchDelArgs {
     pub name: String,
 }
 
+#[derive(Deserialize, JsonSchema)]
+pub struct ProfileGetArgs {
+    /// Perfil em profiles/ (sem .json) ou caminho de um .json.
+    pub name: String,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct LevelSetArgs {
+    #[serde(default = "um")]
+    pub universe: u16,
+    /// Primeiro canal DMX (1..512).
+    pub address: u16,
+    /// Um valor 0..255; use `values` para escrever varios canais seguidos.
+    #[serde(default)]
+    pub value: Option<f64>,
+    /// Valores a partir de `address`.
+    #[serde(default)]
+    pub values: Option<Vec<f64>>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct LevelArgs {
+    /// Universo; ausente = todos.
+    #[serde(default)]
+    pub universe: Option<u16>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct CueCaptureArgs {
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub fade: f64,
+    #[serde(default)]
+    pub wait: f64,
+    #[serde(default)]
+    pub follow: bool,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct FixtureSetArgs {
+    /// Nome da fixture no patch.
+    pub name: String,
+    /// Nome do canal no perfil ("dim", "r") ou o offset como numero ("0").
+    pub channel: String,
+    /// 0..255.
+    pub value: f64,
+}
+
 // ------------------------------------------------------------------ comandos
 
 pub fn register(r: &mut Registry) {
@@ -442,28 +564,7 @@ pub fn register(r: &mut Registry) {
     r.add::<CueSetArgs>(
         "cue_set",
         "Cria (sem index) ou substitui uma cue: nome, fade, wait, follow e valores DMX. Devolve o indice.",
-        |a| {
-            if let Some(k) = a.values.keys().find(|k| cues::key(k).is_none()) {
-                return Err(format!("cue: chave {:?} nao e' \"universo/endereco\"", k));
-            }
-            let c = json!({"name": a.name, "fade": a.fade, "wait": a.wait,
-                           "follow": a.follow, "values": a.values});
-            com(|_, sh| {
-                let cs = lista(sh, "cues");
-                let i = match a.index {
-                    Some(i) if i < cs.len() => {
-                        cs[i] = c;
-                        i
-                    }
-                    Some(i) => return Err(format!("cue {}: o show tem {}", i, cs.len())),
-                    None => {
-                        cs.push(c);
-                        cs.len() - 1
-                    }
-                };
-                Ok(json!(i))
-            })
-        },
+        |a| cue_put(a.index, cue(&a.name, a.fade, a.wait, a.follow, &a.values)?),
     );
     r.add::<CueDelArgs>(
         "cue_del",
@@ -535,4 +636,91 @@ pub fn register(r: &mut Registry) {
         v.sort();
         Ok(json!(v))
     });
+    r.add::<ProfileGetArgs>(
+        "profile_get",
+        "O perfil inteiro (nome, canais com offset, ranges e wheel) para o cliente montar os widgets.",
+        |a| {
+            let dir = com(|p, _| Ok(profiles_dir(p)))?;
+            Ok(perfil(&dir, &a.name)?.json)
+        },
+    );
+    r.add::<LevelSetArgs>(
+        "level_set",
+        "Programmer: escreve valores no override manual, por cima da timeline (HTP). Exige player em execucao.",
+        |a| {
+            let v = match (a.value, a.values) {
+                (_, Some(v)) => v,
+                (Some(x), None) => vec![x],
+                (None, None) => return Err("level_set: passe value ou values".into()),
+            };
+            let h = vivo()?;
+            h.level_set(a.universe, a.address, &v);
+            Ok(json!(v.len()))
+        },
+    );
+    r.add::<LevelArgs>(
+        "level_clear",
+        "Solta o override do programmer (um universo, ou todos sem universe). Devolve quantos canais sairam.",
+        |a| {
+            let h = vivo()?;
+            let n = h.levels(a.universe).len();
+            h.level_clear(a.universe);
+            Ok(json!(n))
+        },
+    );
+    r.add::<LevelArgs>(
+        "level_get",
+        "Override do programmer como {\"universo/endereco\": valor}.",
+        |a| Ok(Value::Object(niveis(&vivo()?, a.universe))),
+    );
+    r.add::<CueCaptureArgs>(
+        "cue_capture",
+        "Grava o override do programmer como uma cue nova no fim da lista e solta o override. Devolve o indice.",
+        |a| {
+            let h = vivo()?;
+            let vals = niveis(&h, None);
+            if vals.is_empty() {
+                return Err("cue_capture: o programmer esta vazio".into());
+            }
+            let i = cue_put(None, cue(&a.name, a.fade, a.wait, a.follow, &vals)?)?;
+            h.level_clear(None);
+            Ok(i)
+        },
+    );
+    r.add::<FixtureSetArgs>(
+        "fixture_set",
+        "Escreve num canal de uma fixture do patch pelo nome do canal no perfil (via level_set).",
+        |a| {
+            let (u, base, pr) = fixture(&a.name)?;
+            let off = match pr.chans.iter().find(|(n, _)| *n == a.channel) {
+                Some((_, o)) => *o,
+                None => a.channel.parse::<u16>().map_err(|_| {
+                    format!(
+                        "{}: o perfil {:?} nao tem canal {:?}; tem {:?}",
+                        a.name,
+                        pr.name,
+                        a.channel,
+                        pr.chans.iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>()
+                    )
+                })?,
+            };
+            if off >= pr.size {
+                return Err(format!(
+                    "{}: offset {} passa dos {} ch do perfil",
+                    a.name, off, pr.size
+                ));
+            }
+            let h = vivo()?;
+            h.level_set(u, base + off, &[a.value]);
+            Ok(json!({"universe": u, "address": base + off, "value": a.value}))
+        },
+    );
+}
+
+/// Override do programmer no formato de `values` de cue: {"universo/endereco": valor}.
+fn niveis(h: &crate::player::Handle, u: Option<u16>) -> Map<String, Value> {
+    h.levels(u)
+        .into_iter()
+        .map(|(u, a, v)| (format!("{}/{}", u, a), json!(v)))
+        .collect()
 }

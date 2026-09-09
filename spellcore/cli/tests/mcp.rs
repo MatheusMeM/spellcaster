@@ -103,6 +103,10 @@ fn handshake_tools_e_resources() {
         "cue_set",
         "patch_add",
         "patch_check",
+        "profile_get",
+        "level_set",
+        "cue_capture",
+        "fixture_set",
         "play_show",
         "net",
     ] {
