@@ -36,6 +36,7 @@ Referência para R5 (GUI) e R9 (editores). Fonte: Adobe Premiere Pro e DaVinci R
 | Monitor DMX do track focado (512 barras) | `Alt+M` | (nosso; `M` já é marcador, `Ctrl+M` já é exportar) |
 | Zoom in / out / ajustar | `=` / `-` / `Shift+Z` ou `\` | Premiere / Resolve |
 | Voltar ao zoom anterior | `Shift+Z` de novo | Resolve (manual p.647) |
+| Enquadrar tudo na faixa de visão geral | duplo-clique na faixa | Ableton §6.1 |
 | Pan na timeline | roda com `Shift`, ou arrastar com botão do meio | ambos |
 | Altura das faixas | `Alt`+roda, ou `Alt++` / `Alt+-` | Resolve p.648 (lá é `Shift`) / Ableton |
 | Dobrar / desdobrar as lanes do track focado | `U` | Ableton (Fold/Unfold) |
