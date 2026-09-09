@@ -86,7 +86,7 @@ C:\Python313\python.exe tests/conformance/capture_sacn.py --secs 3
 | `socket2` | protocols | `std::net::UdpSocket` não expõe `IP_MULTICAST_IF` nem `SO_REUSEADDR`, exigidos por sACN |
 | `criterion` | bench, laser, pixelmap (dev) | medida estatística de jitter/latência exigida pelo PRD |
 | `rayon` | pixelmap | 100 000 px por frame em ~590 universos independentes; pool de trabalho sem escrever um |
-| `tao` + `wry` | gui (só `cfg(windows)`) | a janela e o WebView2 que o Windows 11 já traz; é o Tauri sem o Tauri (uma janela, um webview, nenhum menu nativo, updater ou tray para justificar o framework inteiro) |
+| `tao` + `wry` | gui (só `cfg(windows)`) | a janela e o WebView2 que o Windows 11 já traz; é o Tauri sem o Tauri (uma janela, um webview, nenhum menu nativo, updater ou tray para justificar o framework inteiro). Custo medido: ~200 crates novos no `Cargo.lock`, todos atrás do `cfg(windows)`. Licenças: `wry` Apache-2.0 OR MIT, `tao` **Apache-2.0 só** — o repositório é MIT, e Apache-2.0 é compatível, mas pede o aviso de atribuição no pacote (`packaging/`) |
 | `axum` + `tokio` | serve | HTTP, WebSocket e o `tower::Service` do MCP streamable em um servidor só; o `rmcp` já exigia hyper/tower, e escrever handshake de WS na mão no servidor não paga |
 
 Nada mais entra sem justificativa e sem medir o tamanho do binário.
