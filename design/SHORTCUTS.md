@@ -1,6 +1,6 @@
 # Atalhos e gramática de interface
 
-Referência para R5 (GUI) e R9 (editores). Fonte: Adobe Premiere Pro e DaVinci Resolve. Regra: quem edita vídeo opera o Spellcaster sem aprender nada novo; o que não existe lá (cues, saídas, laser) segue a mesma lógica de modificadores. Atalhos remapeáveis em `config.json` (`"keys": {...}`), mas o mapa abaixo é o padrão e o que a documentação ensina.
+Referência para R5 (GUI) e R9 (editores). Fonte: Adobe Premiere Pro e DaVinci Resolve; desde `design/FUNCOES/timeline-daw.md`, **Ableton Live** também é origem válida, para o que uma DAW resolve melhor que um NLE (automação, follow, loop na seleção). Regra: quem edita vídeo opera o Spellcaster sem aprender nada novo; o que não existe lá (cues, saídas, laser) segue a mesma lógica de modificadores. Atalhos remapeáveis em `config.json` (`"keys": {...}`), mas o mapa abaixo é o padrão e o que a documentação ensina.
 
 ## Gramática (herdada dos dois)
 
@@ -11,6 +11,8 @@ Referência para R5 (GUI) e R9 (editores). Fonte: Adobe Premiere Pro e DaVinci R
 - Painéis têm foco; o atalho age no painel focado (Premiere). Painel com foco tem borda de 1 px no accent (design/PRINCIPIOS.md §2).
 - Zoom com `=` / `-`, ajustar tudo com `Shift+Z` (Premiere) ou `\` (Resolve: ambos valem).
 - Marcadores: `M` cria no playhead, `Shift+M` edita, `Ctrl+Shift+←/→` navega (Resolve). Marcadores importados de corte de vídeo são marcadores comuns, cor cinza.
+- Roda anda nos tracks, `Ctrl`+roda dá zoom, `Shift`+roda anda de lado, `Alt`+roda muda a altura das faixas (Ableton; o Resolve usa `Option` para zoom e `Command` para andar, e isso brigaria com `Ctrl` = comando). Nunca há scroll de página.
+- Durante um arrasto, `Alt` solta o snap e `Shift` afina o valor (Ableton). O snap volta sozinho ao soltar o botão (Resolve).
 
 ## Mapa padrão
 
@@ -32,16 +34,30 @@ operador.
 | Limpar In / Out / ambos | `Alt+I` / `Alt+O` / `Alt+X` | Premiere | feito |
 | Ir para In / Out | `Shift+I` / `Shift+O` | Premiere | feito |
 | Loop no intervalo In–Out | `Ctrl+L` | Premiere | feito |
+| Loop na seleção de tempo (In/Out viram a seleção) | `Ctrl+L` com seleção ativa | Ableton (Loop Selection) | falta |
+| Follow: a vista acompanha o playhead | `Alt+Shift+F` | Ableton | falta |
 | Marcador no playhead | `M` | ambos | feito |
 | Editar marcador | `Shift+M` | ambos | falta |
+| Editar o marcador sob o playhead | `M` de novo | Resolve (manual p.548, p.781) | falta |
 | Marcador anterior / próximo | `Ctrl+Shift+←` / `Ctrl+Shift+→` | Resolve | feito |
 | Monitor DMX do track focado (512 barras) | `Alt+M` | (nosso; `M` já é marcador, `Ctrl+M` já é exportar) | feito |
 | Zoom in / out / ajustar | `=` / `-` / `Shift+Z` ou `\` | Premiere / Resolve | feito |
+| Voltar ao zoom anterior | `Shift+Z` de novo | Resolve (manual p.647) | falta |
+| Enquadrar tudo na faixa de visão geral | duplo-clique na faixa | Ableton §6.1 | falta |
 | Rolar as tracks (vertical) | roda | (nosso; a página não rola — quem rola são as tracks) | feito |
 | Pan na timeline (horizontal) | `Shift`+roda, ou arrastar com botão do meio | ambos | feito |
 | Zoom no cursor | `Ctrl`+roda | ambos | feito |
+| Altura das faixas | `Alt`+roda, ou `Alt++` / `Alt+-` | Resolve p.648 (lá é `Shift`) / Ableton | falta |
+| Dobrar / desdobrar as lanes do track focado | `U` | Ableton (Fold/Unfold) | falta |
+| Travar / destravar o track focado | `Shift+L` | (nosso; par de `Shift+D` e `Shift+S`) | falta |
 | Keyframe no playhead (track focado) | `Ctrl+K` | Premiere (add edit) | feito |
+| Keyframe na curva, no tempo do clique | duplo-clique na lane | Ableton (Automação) | falta |
 | Adicionar / remover keyframe por parâmetro | `Ctrl+Click` no losango | Resolve | falta |
+| Empurrar a seleção 1 quadro / 5 quadros | `,` / `.` e `Shift+,` / `Shift+.` | Resolve (manual p.533, p.625) | falta |
+| Duplicar a seleção | `Alt` + arrastar | Resolve / MadMapper | falta |
+| Soltar o snap no meio do arrasto | segurar `Alt` | Ableton (Automação) | falta |
+| Ajuste fino do valor ao arrastar | segurar `Shift` | Ableton (Automação) | falta |
+| Desenhar automação (draw mode) | segurar `B` | Ableton | falta |
 | Selecionar tudo / nada | `Ctrl+A` / `Ctrl+Shift+A` | ambos | feito |
 | Copiar / colar / cortar / apagar | `Ctrl+C` / `Ctrl+V` / `Ctrl+X` / `Delete` | ambos | feito |
 | Desfazer / refazer | `Ctrl+Z` / `Ctrl+Shift+Z` | ambos | feito |
