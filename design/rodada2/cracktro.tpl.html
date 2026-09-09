@@ -17,7 +17,7 @@
   .keys b { color:var(--fg); font-weight:700; }
 
   /* ---------- palco ---------- */
-  #stage { position:relative; height:720px; overflow:hidden; background:#101214; border:1px solid var(--line); user-select:none; }
+  #stage { position:relative; height:720px; overflow:hidden; perspective:1600px; perspective-origin:50% 50%; background:#101214; border:1px solid var(--line); user-select:none; }
   /* desktop falso: Resolume à esquerda, TouchDesigner à direita */
   #desk { position:absolute; inset:0; font-family:var(--mono); font-size:10px; color:#8A9098; }
   .rz { position:absolute; left:0; top:0; width:62%; height:100%; background:#1E2126; border-right:1px solid #2C3037; }
@@ -51,13 +51,13 @@
   @media (prefers-reduced-motion:reduce) { #press .blink { animation:none; } }
 
   /* ---------- janela de vidro (o vidro em si é o shader em #glass; aqui só o conteúdo) ---------- */
-  :root { --P: path("M 200,18 L 620,18 C 700,18 742,56 742,130 L 742,352 C 742,420 700,452 620,452 L 200,452 C 140,452 90,420 90,360 A 125,125 0 1 1 90,140 C 90,70 130,18 200,18 Z"); }
-  #glass { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:4; }
-  #winb { position:absolute; left:120px; top:70px; width:760px; height:470px; z-index:5; transition:opacity .3s; }
+  #glass, #glare { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:4; }
+  #glare { z-index:6; }
+  #winb { position:absolute; left:calc(50% - 380px); top:calc(50% - 235px); width:760px; height:470px; z-index:5; transition:opacity .3s; transform-style:preserve-3d; will-change:transform; }
   #winb.hide { opacity:0; pointer-events:none; }
   #winb.drop { animation:drop .45s cubic-bezier(.2,1.4,.4,1); }
-  @keyframes drop { from { transform:translateY(-40px); opacity:0; } to { transform:none; opacity:1; } }
-  #win { position:absolute; inset:0; clip-path:var(--P); color:var(--fg); }
+  @keyframes drop { from { opacity:0; } to { opacity:1; } }
+  #win { position:absolute; inset:0; clip-path:inset(0 round 36px); color:var(--fg); }
   #win.nogl { background:linear-gradient(160deg, rgba(255,255,255,.3), rgba(255,255,255,.05) 40%, rgba(255,255,255,.14)), rgba(var(--gel), var(--ga)); backdrop-filter:blur(8px) saturate(1.5); -webkit-backdrop-filter:blur(8px) saturate(1.5); }
   .tstrip { position:absolute; left:206px; right:72px; top:20px; height:38px; display:flex; align-items:center; gap:12px; font-family:var(--mono); font-size:11px; letter-spacing:.06em; color:rgba(255,255,255,.92); cursor:grab; overflow:hidden; white-space:nowrap; text-shadow:0 1px 0 rgba(0,0,0,.4); }
   .tstrip:active { cursor:grabbing; }
@@ -68,11 +68,9 @@
   @media (prefers-reduced-motion:reduce) { .tstrip .sc span { animation:none; padding-left:0; } }
   .tstrip .x { font-size:12px; color:rgba(255,255,255,.75); cursor:pointer; }
   .main { position:absolute; left:284px; top:68px; right:28px; bottom:70px; display:grid; grid-template-columns:minmax(0,1fr) 150px; gap:12px; min-height:0; }
-  .gob { position:absolute; left:46px; top:146px; width:208px; height:208px; border-radius:50%; border:0; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:var(--disp); font-weight:800; font-size:92px; line-height:.9; letter-spacing:-.03em; color:var(--go); text-shadow:0 0 22px rgba(168,224,94,.6), 0 2px 0 rgba(0,0,0,.45); transition:transform .05s, box-shadow .05s;
-    background:radial-gradient(circle at 34% 28%, rgba(255,255,255,.78), rgba(255,255,255,.2) 36%, rgba(255,255,255,.02) 58%, rgba(0,0,0,.3) 100%), radial-gradient(circle at 50% 88%, rgba(168,224,94,.5), rgba(168,224,94,0) 60%), rgba(var(--gel), .28);
-    box-shadow:inset 0 -14px 26px rgba(0,0,0,.38), inset 0 10px 16px rgba(255,255,255,.28), inset 0 0 0 1.5px rgba(255,255,255,.5), 0 14px 28px rgba(0,0,0,.45); }
+  .gob { position:absolute; left:46px; top:146px; width:208px; height:208px; border-radius:50%; border:0; cursor:pointer; background:none; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:var(--disp); font-weight:800; font-size:96px; line-height:.9; letter-spacing:-.03em; color:var(--go); text-shadow:0 0 26px rgba(168,224,94,.7), 0 0 4px rgba(168,224,94,.9), 0 2px 0 rgba(0,0,0,.5); transition:transform .05s; }
   .gob small { font-family:var(--mono); font-size:10px; letter-spacing:.14em; color:rgba(255,255,255,.85); margin-top:8px; text-shadow:0 1px 0 rgba(0,0,0,.4); }
-  .gob:active, .gob.dn { transform:translateY(4px) scale(.985); box-shadow:inset 0 -6px 14px rgba(0,0,0,.38), inset 0 4px 8px rgba(255,255,255,.2), inset 0 0 0 1.5px rgba(255,255,255,.4), 0 6px 14px rgba(0,0,0,.45); }
+  .gob:active, .gob.dn { transform:scale(.96); }
   .gob:focus-visible { outline:2px solid var(--amb); outline-offset:4px; }
   .mid { display:grid; grid-template-rows:auto 1fr; gap:10px; min-height:0; min-width:0; }
   .lcd { background:rgba(0,0,0,.52); border-radius:18px; padding:10px 16px; font-family:var(--mono); box-shadow:inset 0 3px 12px rgba(0,0,0,.7), inset 0 -1px 0 rgba(255,255,255,.12), 0 1px 0 rgba(255,255,255,.35); display:grid; gap:4px; }
@@ -174,7 +172,7 @@
       </div>
     </div>
 
-    <canvas id="glass" aria-hidden="true"></canvas>
+    <canvas id="glass" aria-hidden="true"></canvas><canvas id="glare" aria-hidden="true"></canvas>
     <div id="winb" class="hide" style="--gel:27,15,143; --ga:.34"><div id="win">
       <div class="tstrip" id="drag"><span class="nm">SPELLCASTER</span><span class="sc"><span id="scroll">MED GRUPO RJ · PLENÁRIA · sACN U1 U2 a 30 Hz · ETHER DREAM 20 kpps · GREETZ: CAPTURE, RESOLUME, TOUCHDESIGNER, ETC, MA · CRACKED BY FEITIÇARIA iNDUSTRIAL · NO SERIAL NEEDED</span></span><span class="x" id="mini" title="fita">▁</span><span class="x" id="close" title="fechar">✕</span></div>
       <button class="gob" id="go">GO<small>ESPAÇO · MIDI 36</small></button>
@@ -233,7 +231,7 @@
       <h2>O que desta demo vira produto, e como</h2>
       <ul>
         <li><b>Vidro sobre o desktop.</b> Aqui o fundo é desenhado; o blur em CSS só enxerga a própria página. No produto: janela Tauri com <code>transparent: true</code>, <code>decorations: false</code> e acrílico do Windows 11 via <code>window-vibrancy</code>. O desfoque é feito pelo DWM, custa quase nada, e o Resolume de verdade aparece atrás.</li>
-        <li><b>O vidro é um shader.</b> Fragment shader WebGL sobre o desktop (que aqui vira textura): a forma é um SDF (corpo + cúpula do GO), a borda refrata com dispersão R/G/B, o fresnel dá a espessura, o specular segue o mouse, uma varredura de luz passa a cada 15 s, e a sombra e a cáustica do gel caem no desktop. No produto o mesmo shader roda no WebView2 sobre o acrílico do DWM; sem captura de tela não há textura do desktop de verdade, então lá o refrator trabalha sobre o blur do sistema, e fresnel, cáustica e specular continuam. Clique fora da forma ainda pega a janela no Windows: hit-test no SDF resolve.</li>
+        <li><b>A janela é um cubo de vidro flutuando.</b> Raymarching em WebGL no estilo Shadertoy: um bloco 760×470×220 de borda redonda com a cúpula do GO, boiando e girando devagar na frente do desktop (que aqui vira textura). O raio entra, atravessa e sai do vidro; índice diferente por canal dá a dispersão; o gel é absorção pela espessura, não tinta por cima; dentro do cubo, no GO, sobe fogo volumétrico (gyroid fBm). Por cima da UI, um segundo passe do mesmo shader pinta só a face da frente: fresnel, reflexo de um estúdio com três softboxes, specular que segue o mouse. A UI em HTML é a face da frente, com a mesma matriz 3D do shader. Sombra e cáustica caem no desktop. No produto o mesmo shader roda no WebView2 sobre o acrílico do DWM; sem captura de tela não há textura do desktop de verdade, então lá o refrator trabalha sobre o blur do sistema, e fresnel, cáustica e specular continuam. Clique fora da forma ainda pega a janela no Windows: hit-test no SDF resolve.</li>
         <li><b>Jingle.</b> Sintetizado em Web Audio, zero bytes de mídia, toca igual dentro do WebView2. Se você quiser tracker de verdade (.xm de 20 KB), entra <code>libopenmpt</code>; só vale se a música for assinatura.</li>
         <li><b>Gel.</b> O theme deixa de ser CSS solto e vira uma cor de gel sobre vidro mais uma escolha de silhueta. Um <code>.spellskin</code> cabe em 5 KB. Os nomes são gels reais (Lee, Rosco): a linguagem de quem monta luz.</li>
         <li><b>Performance.</b> A UI é HTML sem framework; o engine Rust não sabe que a janela é de vidro. Nada aqui encosta no caminho do DMX.</li>
@@ -342,9 +340,9 @@
   $("#press").addEventListener("click", start);
   $("#never").addEventListener("change", function (e) { try { localStorage.setItem("sc-never-splash", e.target.checked ? "1" : "0"); } catch (x) {} });
 
-  /* ---------- vidro em GLSL: o desktop vira textura; SDF da forma (corpo + cúpula); refração com dispersão R/G/B, fresnel, specular no mouse, varredura, sombra e cáustica do gel ---------- */
-  var gc = $("#glass"), gl = gc.getContext("webgl", { alpha: true, premultipliedAlpha: true, antialias: false });
-  var deskc = document.createElement("canvas"), dk = deskc.getContext("2d"), tdImg = null, GW = 0, GH = 0, glassOn = 0, frostOn = false, mouse = [-9999, -9999], stageEl = $("#stage");
+  /* ---------- a janela é um cubo de vidro flutuando (ref: Enscape Cube, Empty Glass, Refraction blobs, Dispersion, Volumetric fire). Dois passes do mesmo shader: #glass (abaixo do HTML) marca o corpo: refração de duas faces com dispersão por canal, absorção do gel pela espessura, fogo volumétrico (gyroid fBm) dentro do cubo no GO, sombra e cáustica na parede (o desktop vira textura); #glare (acima do HTML) só a face da frente: fresnel × reflexo de estúdio + specular. O HTML da UI é a face da frente via CSS 3D com a mesma matriz do shader. ---------- */
+  var gc = $("#glass"), gl = null;
+  var deskc = document.createElement("canvas"), dk = deskc.getContext("2d"), tdImg = null, GW = 0, GH = 0, glassOn = 0, frostOn = false, fireV = 0, dragX = 0, dragY = 0, mouse = [-9999, -9999], stageEl = $("#stage");
   (function () { var svg = document.querySelector(".td svg"), im = new Image(); im.onload = function () { tdImg = im; }; im.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(new XMLSerializer().serializeToString(svg)); })();
   function drawDesk() {
     var W = GW, H = GH, rw = Math.round(W * 0.62);
@@ -357,54 +355,80 @@
   }
   var FS = [
     "precision highp float;",
-    "uniform vec2 u_res,u_pos,u_mouse;uniform sampler2D u_tex;uniform float u_t,u_ga,u_frost,u_on;uniform vec3 u_gel;",
-    "float sdBox(vec2 p,vec2 b,float r){vec2 q=abs(p)-b+r;return length(max(q,0.))+min(max(q.x,q.y),0.)-r;}",
-    "float sdf(vec2 p){return min(sdBox(p-vec2(416.,235.),vec2(326.,217.),100.),length(p-vec2(150.,250.))-125.);}",
-    "vec3 tex(vec2 px){return texture2D(u_tex,vec2(px.x/u_res.x,1.-px.y/u_res.y)).rgb;}",
-    "vec3 blur(vec2 px,float r){vec3 c=vec3(0.);for(int i=-2;i<=2;i++)for(int j=-2;j<=2;j++)c+=tex(px+vec2(float(i),float(j))*r);return c/25.;}",
+    "uniform vec2 u_res,u_ctr,u_mouse;uniform sampler2D u_tex;uniform float u_t,u_ga,u_frost,u_on,u_go,u_layer;uniform vec3 u_gel,u_T;uniform mat3 u_R;",
+    "const float CAM=1600.,ZW=320.;const vec3 HB=vec3(380.,235.,110.);const vec3 DC=vec3(-230.,15.,110.);",
+    "float smin(float a,float b,float k){float h=clamp(.5+.5*(b-a)/k,0.,1.);return mix(b,a,h)-k*h*(1.-h);}",
+    "float sdRB(vec3 p,vec3 b,float r){vec3 q=abs(p)-b+r;return length(max(q,0.))+min(max(q.x,max(q.y,q.z)),0.)-r;}",
+    "float sdRB2(vec2 p,vec2 b,float r){vec2 q=abs(p)-b+r;return length(max(q,0.))+min(max(q.x,q.y),0.)-r;}",
+    "float sdEll(vec3 p,vec3 r){float k0=length(p/r);float k1=length(p/(r*r));return k0*(k0-1.)/k1;}",
+    "vec3 toBox(vec3 p){return (p-u_T)*u_R;}",
+    "float map(vec3 p){vec3 b=toBox(p);return smin(sdRB(b,HB,36.),sdEll(b-DC,vec3(125.,125.,50.)),18.);}",
+    "vec3 nrm(vec3 p){vec2 e=vec2(.6,0.);return normalize(vec3(map(p+e.xyy)-map(p-e.xyy),map(p+e.yxy)-map(p-e.yxy),map(p+e.yyx)-map(p-e.yyx)));}",
+    "vec3 tex(vec2 px){return texture2D(u_tex,vec2(px.x/u_res.x,px.y/u_res.y)).rgb;}",
+    "float sb(vec2 d,vec2 c,vec2 s){vec2 q=abs(d-c)-s;return 1.-smoothstep(-.03,.03,max(q.x,q.y));}",
+    "vec3 env(vec3 d){vec3 c=mix(vec3(.16,.15,.14),vec3(.05,.05,.06),smoothstep(-.8,.8,d.y));vec2 u=d.xy/max(.25,d.z);float sw=sin(u_t*.25)*.15;c+=vec3(.55,.56,.6)*smoothstep(1.1,0.,length(u-vec2(-.25,-.35)))+vec3(.35)*smoothstep(.9,0.,length(u-vec2(.5,.4)));",
+    " c+=vec3(1.,.97,.92)*1.8*sb(u,vec2(-.55+sw,-.55),vec2(.42,.22));c+=vec3(.95,.97,1.)*1.2*sb(u,vec2(.75,.1),vec2(.07,.55));c+=vec3(1.)*.8*sb(u,vec2(.1,.75),vec2(.7,.04));return c;}",
+    "vec3 wall(vec3 p,vec3 d,float r){float t=(-ZW-p.z)/min(d.z,-1e-3);vec3 w=p+d*t;vec2 q=u_ctr+w.xy*(CAM/(CAM+ZW));vec3 c=tex(q);if(r>0.){c=(c+tex(q+vec2(r,0.))+tex(q-vec2(r,0.))+tex(q+vec2(0.,r))+tex(q-vec2(0.,r)))/5.;}",
+    " vec3 b=(w-u_T-vec3(50.,70.,0.))*u_R;float sd=min(sdRB2(b.xy,HB.xy,36.),length(b.xy-DC.xy)-125.);c*=1.-.55*(1.-smoothstep(-20.,110.,sd));",
+    " float ca=1.-smoothstep(-60.,150.,sd);c+=u_gel*u_ga*ca*.9;c*=mix(.5,1.,smoothstep(1.6,.5,length((q-u_ctr)/u_res*2.)));return c;}",
+    "float gy(vec3 p){float d=0.,z=1.;for(int i=0;i<4;i++){d-=abs(dot(cos(p),sin(p.zxy)))*z;z*=.6;p=p*1.9+vec3(1.7,9.2,3.1);}return d;}",
+    "vec3 fire(vec3 b){float go=.2+1.6*u_go;vec3 pp=b*.016;pp.y+=u_t*1.7;pp.x+=sin(u_t*.7)*.3;float g=gy(pp+vec3(0.,0.,u_t*.2));float base=smoothstep(HB.y-(60.+460.*u_go),HB.y+30.,b.y);float den=clamp(1.15+g*.8,0.,1.)*base*go;den*=smoothstep(HB.x+20.,HB.x-80.,abs(b.x));return mix(vec3(1.,.18,0.),vec3(1.,.7,.2),den)*den*den*2.6;}",
+    "float spec(vec3 n,vec3 v,vec3 l,float k){vec3 h=normalize(l+v);return pow(max(dot(n,h),0.),k);}",
     "void main(){",
-    " vec2 fp=vec2(gl_FragCoord.x,u_res.y-gl_FragCoord.y);",
-    " vec2 p=fp-u_pos;p.y+=40.*(1.-u_on);",
-    " float d=sdf(p);",
-    " float sh=(1.-smoothstep(-10.,44.,sdf(p-vec2(8.,28.))))*.55;",
-    " float ca=(1.-smoothstep(-40.,170.,sdf(p-vec2(60.,90.))))*u_ga*1.3;",
-    " vec3 rgb=u_gel*ca;float a=clamp(sh+ca*.25,0.,1.);",
-    " if(d<2.){",
-    "  vec2 g=vec2(sdf(p+vec2(1.,0.))-sdf(p-vec2(1.,0.)),sdf(p+vec2(0.,1.))-sdf(p-vec2(0.,1.)))*.5;",
-    "  float m=pow(clamp(1.+d/70.,0.,1.),2.);",
-    "  vec2 off=g*m*46.;",
-    "  float r=mix(1.6,5.,u_frost);",
-    "  vec3 c=vec3(blur(fp+off*.84,r).r,blur(fp+off,r).g,blur(fp+off*1.2,r).b);",
-    "  float l=dot(c,vec3(.299,.587,.114));c=mix(vec3(l),c,1.5);",
-    "  c=mix(c,u_gel,u_ga);c=mix(c,vec3(1.),u_frost*.28);",
-    "  float lum=clamp(1.-(p.x/760.+p.y/470.)*.5,0.,1.);",
-    "  c+=mix(vec3(1.),u_gel,.4)*pow(m,2.5)*.6;",
-    "  c+=vec3(.16)*pow(lum,2.);",
-    "  c+=vec3(.32)*exp(-pow((p.y-38.)/34.,2.))*exp(-pow((p.x-330.)/300.,2.));",
-    "  c+=vec3(.22)*exp(-pow((p.y-440.)/26.,2.))*exp(-pow((p.x-600.)/200.,2.));",
-    "  vec2 mp=u_mouse-u_pos;float md=dot(p-mp,p-mp);c+=vec3(.30)*exp(-md/12800.);",
-    "  float sx=mod(u_t*140.,2200.)-600.;c+=vec3(.26)*exp(-pow((p.x-p.y*.35-sx)/55.,2.));",
-    "  float e=1.-smoothstep(0.,2.4,abs(d+1.3));c+=vec3(1.)*e*(.3+.6*lum);",
-    "  float aa=1.-smoothstep(-1.,1.,d);",
-    "  rgb=mix(rgb,c,aa);a=mix(a,1.,aa);",
+    " vec2 fp=vec2(gl_FragCoord.x,u_res.y-gl_FragCoord.y);vec2 p=fp-u_ctr;",
+    " vec3 ro=vec3(0.,0.,CAM);vec3 rd=normalize(vec3(p,-CAM));",
+    " float t=CAM-620.;float h=1e3;vec3 q=ro;",
+    " for(int i=0;i<64;i++){q=ro+rd*t;h=map(q);if(h<.08)break;t+=h;if(t>CAM+ZW)break;}",
+    " vec3 rgb=vec3(0.);float a=0.;",
+    " if(u_layer<.5){rgb=wall(ro,rd,0.);a=1.;}",
+    " if(h<1.5){",
+    "  vec3 n=nrm(q);vec3 v=-rd;float F=.09+.91*pow(1.-max(dot(n,v),0.),3.);float aa=(1.-smoothstep(.3,1.5,h))*u_on;",
+    "  if(u_layer>.5){",
+    "   vec3 rr=reflect(rd,n);vec3 refl=rr.z>.02?env(rr):wall(q,rr,0.)*.7;",
+    "   vec3 l1=normalize(vec3(-.45,-.65,.6)),l2=normalize(vec3(.6,.25,.75));vec3 lm=normalize(vec3(u_mouse-u_ctr,500.)-q);",
+    "   vec3 c=refl*F+vec3(1.)*(spec(n,v,l1,90.)*.35+spec(n,v,l1,900.)*1.1+spec(n,v,l2,300.)*.5+spec(n,v,lm,200.)*.6);",
+    "   rgb=c*aa;a=F*aa;",
+    "  }else{",
+    "   vec3 r1=refract(rd,n,1./1.47);vec3 qi=q+r1;float ti=0.;float hi=1.;",
+    "   for(int i=0;i<40;i++){hi=-map(qi+r1*ti);if(hi<.08)break;ti+=hi;if(ti>900.)break;}",
+    "   vec3 qe=qi+r1*ti;vec3 ne=-nrm(qe);float L=ti+1.;float fr=u_frost*7.;",
+    "   vec3 r2r=refract(refract(rd,n,1./1.44),ne,1.44);vec3 r2g=refract(refract(rd,n,1./1.47),ne,1.47);vec3 r2b=refract(refract(rd,n,1./1.50),ne,1.50);",
+    "   if(dot(r2g,r2g)<.5)r2g=reflect(r1,ne);if(dot(r2r,r2r)<.5)r2r=r2g;if(dot(r2b,r2b)<.5)r2b=r2g;",
+    "   vec3 refr=vec3(r2r.z<0.?wall(qe,r2r,fr).r:env(r2r).r,r2g.z<0.?wall(qe,r2g,fr).g:env(r2g).g,r2b.z<0.?wall(qe,r2b,fr).b:env(r2b).b);",
+    "   vec3 gel=u_gel/max(max(u_gel.r,u_gel.g),max(u_gel.b,.001));refr*=pow(mix(vec3(1.),gel,u_ga*1.4),vec3(L/110.));",
+    "   refr=mix(refr,vec3(.85),u_frost*.35);refr*=exp(-L*.0014);",
+    "   vec3 fc=vec3(0.);for(int i=0;i<7;i++){fc+=fire(toBox(qi+r1*ti*(float(i)+.5)/7.));}refr+=fc/7.*min(L/120.,1.5);",
+    "   vec3 b=toBox(q);float dm=length(b.xy-DC.xy);refr+=vec3(.25,.9,.35)*(.10+.5*u_go)*(1.-smoothstep(60.,125.,dm));",
+    "   rgb=mix(rgb,refr,aa);",
+    "  }",
     " }",
-    " gl_FragColor=vec4(rgb,a)*u_on;",
+    " rgb+=(fract(sin(dot(fp,vec2(12.9898,78.233)))*43758.5453)-.5)/128.;",
+    " gl_FragColor=vec4(rgb,a);",
     "}"].join("\n");
-  function shader(t, s) { var h = gl.createShader(t); gl.shaderSource(h, s); gl.compileShader(h); if (!gl.getShaderParameter(h, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(h)); return h; }
-  var prog = null, U = {}, tex = null;
-  try { if (!gl) throw new Error("sem webgl"); prog = gl.createProgram(); gl.attachShader(prog, shader(gl.VERTEX_SHADER, "attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}")); gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog); if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog)); gl.useProgram(prog);
-    var buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW); var loc = gl.getAttribLocation(prog, "a"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-    ["u_res", "u_tex", "u_pos", "u_t", "u_gel", "u_ga", "u_frost", "u_on", "u_mouse"].forEach(function (n) { U[n] = gl.getUniformLocation(prog, n); });
-    tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.clearColor(0, 0, 0, 0);
-  } catch (e) { prog = null; gc.style.display = "none"; $("#win").classList.add("nogl"); }
+  function mk(c) { var g = c.getContext("webgl", { alpha: true, premultipliedAlpha: true, antialias: false }); if (!g) throw new Error("sem webgl");
+    function sh(t, s) { var h = g.createShader(t); g.shaderSource(h, s); g.compileShader(h); if (!g.getShaderParameter(h, g.COMPILE_STATUS)) throw new Error(g.getShaderInfoLog(h)); return h; }
+    var pr = g.createProgram(); g.attachShader(pr, sh(g.VERTEX_SHADER, "attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}")); g.attachShader(pr, sh(g.FRAGMENT_SHADER, FS)); g.linkProgram(pr); if (!g.getProgramParameter(pr, g.LINK_STATUS)) throw new Error(g.getProgramInfoLog(pr)); g.useProgram(pr);
+    var buf = g.createBuffer(); g.bindBuffer(g.ARRAY_BUFFER, buf); g.bufferData(g.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), g.STATIC_DRAW); var loc = g.getAttribLocation(pr, "a"); g.enableVertexAttribArray(loc); g.vertexAttribPointer(loc, 2, g.FLOAT, false, 0, 0);
+    var U = {}; ["u_res", "u_tex", "u_ctr", "u_t", "u_gel", "u_ga", "u_frost", "u_on", "u_mouse", "u_go", "u_layer", "u_T", "u_R"].forEach(function (n) { U[n] = g.getUniformLocation(pr, n); });
+    var tx = g.createTexture(); g.bindTexture(g.TEXTURE_2D, tx); g.texParameteri(g.TEXTURE_2D, g.TEXTURE_MIN_FILTER, g.LINEAR); g.texParameteri(g.TEXTURE_2D, g.TEXTURE_MAG_FILTER, g.LINEAR); g.texParameteri(g.TEXTURE_2D, g.TEXTURE_WRAP_S, g.CLAMP_TO_EDGE); g.texParameteri(g.TEXTURE_2D, g.TEXTURE_WRAP_T, g.CLAMP_TO_EDGE);
+    g.enable(g.BLEND); g.blendFunc(g.ONE, g.ONE_MINUS_SRC_ALPHA); g.clearColor(0, 0, 0, 0); return { gl: g, U: U, c: c }; }
+  var L = null;
+  try { L = [mk(gc), mk($("#glare"))]; gl = L[0].gl; } catch (e) { L = null; gc.style.display = $("#glare").style.display = "none"; $("#win").classList.add("nogl"); }
   stageEl.addEventListener("pointermove", function (e) { var r = stageEl.getBoundingClientRect(); mouse = [e.clientX - r.left, e.clientY - r.top]; });
-  function drawGlass(now) { if (!prog) return; var W = stageEl.clientWidth, H = stageEl.clientHeight; if (W !== GW || H !== GH) { GW = W; GH = H; gc.width = deskc.width = W; gc.height = deskc.height = H; gl.viewport(0, 0, W, H); }
-    var vis = shown && !$("#winb").classList.contains("hide"); glassOn += ((vis ? 1 : 0) - glassOn) * 0.16; if (!vis && glassOn < 0.01) { glassOn = 0; gl.clear(gl.COLOR_BUFFER_BIT); return; }
-    drawDesk(); gl.bindTexture(gl.TEXTURE_2D, tex); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, deskc);
-    var b = $("#winb"), g = gelRGB.split(",").map(Number);
-    gl.uniform2f(U.u_res, W, H); gl.uniform1i(U.u_tex, 0); gl.uniform2f(U.u_pos, b.offsetLeft, b.offsetTop); gl.uniform1f(U.u_t, now / 1000); gl.uniform3f(U.u_gel, g[0] / 255, g[1] / 255, g[2] / 255); gl.uniform1f(U.u_ga, gelA); gl.uniform1f(U.u_frost, frostOn ? 1 : 0); gl.uniform1f(U.u_on, glassOn); gl.uniform2f(U.u_mouse, mouse[0], mouse[1]);
-    gl.clear(gl.COLOR_BUFFER_BIT); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); }
+  function rot(ax, ay, az) { var cx = Math.cos(ax), sx = Math.sin(ax), cy = Math.cos(ay), sy = Math.sin(ay), cz = Math.cos(az), sz = Math.sin(az);
+    var X = [[1, 0, 0], [0, cx, -sx], [0, sx, cx]], Y = [[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]], Z = [[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]];
+    function mul(A, B) { var M = []; for (var r = 0; r < 3; r++) { M[r] = []; for (var c = 0; c < 3; c++) M[r][c] = A[r][0] * B[0][c] + A[r][1] * B[1][c] + A[r][2] * B[2][c]; } return M; }
+    return mul(mul(X, Y), Z); }
+  function drawGlass(now) { if (!L) return; var W = stageEl.clientWidth, H = stageEl.clientHeight; if (W !== GW || H !== GH) { GW = W; GH = H; deskc.width = W; deskc.height = H; L.forEach(function (o) { o.c.width = W; o.c.height = H; o.gl.viewport(0, 0, W, H); }); }
+    var b = $("#winb"), vis = shown && !b.classList.contains("hide"); glassOn += ((vis ? 1 : 0) - glassOn) * 0.12; if (!vis && glassOn < 0.01) { glassOn = 0; L.forEach(function (o) { o.gl.clear(o.gl.COLOR_BUFFER_BIT); }); b.style.transform = ""; return; }
+    fireV *= reduced ? 0.9 : 0.975;
+    var t = now / 1000, s = reduced ? 0 : 1, ax = -0.12 + 0.06 * s * Math.sin(t * 0.37), ay = 0.14 + 0.22 * s * Math.sin(t * 0.29), az = 0.025 * s * Math.sin(t * 0.53), tx = dragX, ty = dragY + (1 - glassOn) * -120 + 8 * s * Math.sin(t * 0.8);
+    var R = rot(ax, ay, az), Rc = new Float32Array([R[0][0], R[1][0], R[2][0], R[0][1], R[1][1], R[2][1], R[0][2], R[1][2], R[2][2]]);
+    b.style.transform = "translate3d(" + tx.toFixed(1) + "px," + ty.toFixed(1) + "px,0) rotateX(" + ax.toFixed(4) + "rad) rotateY(" + ay.toFixed(4) + "rad) rotateZ(" + az.toFixed(4) + "rad) translateZ(110px)";
+    drawDesk(); var g = gelRGB.split(",").map(Number);
+    L.forEach(function (o, i) { var gl = o.gl, U = o.U; gl.bindTexture(gl.TEXTURE_2D, gl.getParameter(gl.TEXTURE_BINDING_2D)); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, deskc);
+      gl.uniform2f(U.u_res, W, H); gl.uniform1i(U.u_tex, 0); gl.uniform2f(U.u_ctr, W / 2, H / 2); gl.uniform1f(U.u_t, t); gl.uniform3f(U.u_gel, g[0] / 255, g[1] / 255, g[2] / 255); gl.uniform1f(U.u_ga, gelA); gl.uniform1f(U.u_frost, frostOn ? 1 : 0); gl.uniform1f(U.u_on, glassOn); gl.uniform2f(U.u_mouse, mouse[0], mouse[1]); gl.uniform1f(U.u_go, fireV); gl.uniform1f(U.u_layer, i); gl.uniform3f(U.u_T, tx, ty, 0); gl.uniformMatrix3fv(U.u_R, false, Rc);
+      gl.clear(gl.COLOR_BUFFER_BIT); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); }); }
 
   /* ---------- janela ---------- */
   var cues = [["0", "Countdown · pré-rolo", "00:00:00:00"], ["1", "Dígitos · vara amarela", "00:00:02:00"], ["2", "Flash · strobe branco", "00:00:10:15"], ["3", "Cidades · movings por corte", "00:00:13:03"], ["4", "Pico · logo, zoom 13→36°", "00:00:33:04"], ["5", "Epílogo · cada aparelho sozinho", "00:00:46:24"]];
@@ -419,7 +443,7 @@
     requestAnimationFrame(tick); }
   requestAnimationFrame(tick);
   function toast(m) { var t = $("#toast"); t.textContent = m; t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(function () { t.classList.remove("on"); }, 2600); }
-  function doGo() { if (!shown) { start(); return; } blip(true); burst = 0.6; $("#go").classList.add("dn"); setTimeout(function () { $("#go").classList.remove("dn"); }, 120); if (cueI < cues.length - 1) { cueI++; renderCues(); $("#scroll").textContent = "GO · CUE " + cues[cueI][0] + " " + cues[cueI][1].toUpperCase() + " · VAI!"; } else { toast("Acabou. O público quer bis; o Spellcaster também."); cueI = 0; renderCues(); } }
+  function doGo() { if (!shown) { start(); return; } blip(true); burst = 0.6; fireV = 1; $("#go").classList.add("dn"); setTimeout(function () { $("#go").classList.remove("dn"); }, 120); if (cueI < cues.length - 1) { cueI++; renderCues(); $("#scroll").textContent = "GO · CUE " + cues[cueI][0] + " " + cues[cueI][1].toUpperCase() + " · VAI!"; } else { toast("Acabou. O público quer bis; o Spellcaster também."); cueI = 0; renderCues(); } }
   $("#go").addEventListener("click", doGo); $("#go2").addEventListener("click", doGo);
   $("#mini").addEventListener("click", toggleStrip); $("#close").addEventListener("click", function () { chord(); toast("Show encerrado · 6 cues · 0 erros. Valeu."); $("#winb").classList.add("hide"); setTimeout(function () { $("#winb").classList.remove("hide"); }, 2600); });
   function toggleStrip() { var on = !$("#strip").classList.contains("on"); $("#strip").classList.toggle("on", on); $("#winb").classList.toggle("hide", on); }
@@ -431,8 +455,8 @@
   gels.forEach(function (g) { var d = document.createElement("span"); d.className = "gel" + (g[0] === gelCur ? " on" : ""); d.dataset.n = g[0]; d.title = g[1]; if (g[0] !== "clear") d.style.background = "rgb(" + g[2] + ")"; d.addEventListener("click", function () { setGel(g); }); $("#gels").appendChild(d); });
   function setGel(g) { gelCur = g[0]; document.querySelectorAll(".gel").forEach(function (x) { x.classList.toggle("on", x.dataset.n === g[0]); }); ["#winb", "#strip"].forEach(function (s) { $(s).style.setProperty("--gel", g[2]); $(s).style.setProperty("--ga", g[3]); }); $("#gelname").textContent = g[1]; $("#gelvote").textContent = g[1]; state.gel = g[1]; mark(); }
   /* arrastar */
-  var drag = null; $("#drag").addEventListener("pointerdown", function (e) { if (e.target.classList.contains("x")) return; var b = $("#winb"); drag = [e.clientX - b.offsetLeft, e.clientY - b.offsetTop]; $("#drag").setPointerCapture(e.pointerId); });
-  $("#drag").addEventListener("pointermove", function (e) { if (!drag) return; var b = $("#winb"); b.style.left = (e.clientX - drag[0]) + "px"; b.style.top = (e.clientY - drag[1]) + "px"; });
+  var drag = null; $("#drag").addEventListener("pointerdown", function (e) { if (e.target.classList.contains("x")) return; drag = [e.clientX - dragX, e.clientY - dragY]; $("#drag").setPointerCapture(e.pointerId); });
+  $("#drag").addEventListener("pointermove", function (e) { if (!drag) return; dragX = e.clientX - drag[0]; dragY = e.clientY - drag[1]; });
   $("#drag").addEventListener("pointerup", function () { drag = null; });
   /* teclado */
   document.addEventListener("keydown", function (e) { if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") return; if (!started) { start(); e.preventDefault(); return; } if (e.key === "Escape") { if (!splashDone) endSplash(true); else $("#nfo").classList.remove("on"); } else if (e.key === " ") { e.preventDefault(); doGo(); } else if (e.key === "Tab") { e.preventDefault(); toggleStrip(); } else if (e.key.toLowerCase() === "n") { $("#nfo").classList.toggle("on"); } });
