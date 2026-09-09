@@ -150,7 +150,7 @@ O plano acima (F0–F7) foi o do protótipo Python e está concluído até F6. O
 | R2 mídia (GStreamer, NDI, RTSP, Spout) | 1080p60 no alvo de CPU | pendente | SDKs não instalados (GStreamer, NDI) |
 | R3 pixel mapping (rayon; wgpu depois) | 100 000 px a 60 Hz < 2 ms | concluída (0,105 ms p50 / 0,316 ms p99 por frame; bilinear 0,196 / 0,493) | crate autônomo: ligar a fonte de frame ao player espera a R2 |
 | R4 laser multi-feed | Ether Dream, Helios, IDN; safety no engine; 4 feeds | concluída (0,83 % cpu) | — |
-| R5 GUI Tauri | show de 3 min do zero; Face em modo performance | base pronta: canvaskit + timeline; falta Tauri, painéis, Theme/Face | voto das rodadas 5 e 6 do design |
+| R5 GUI Tauri | show de 3 min do zero; Face em modo performance | base pronta em `main` (`spellgui/web`: canvaskit + timeline); falta Tauri, painéis, Theme/Face | voto das rodadas 5 e 6 do design |
 | R6 previz Godot | 60 fps, 64 fixtures, 2 LED walls | pendente | Godot não instalado |
 | R7 MCP com rmcp | sessão de IA monta e toca um show sem GUI | concluída em stdio | edição de show (patch/timeline) não existe no core Rust |
 | R8 empacotamento | onedir, Linux, Pi estático; CI com bench como gate | concluída | — |
@@ -171,10 +171,10 @@ o programa é o modelo 3D fotorrealista do aparelho que ele controla.
 | 5 | traseira real, mesa óptica e feixe em GLSL, splash na parede, câmera SolidWorks, bindings tecla + MIDI, Pino 3D, design system do laser (`design/laser/SISTEMA.md`) | `design/0.1.2` | publicada, aguardando voto |
 | 6 | o laser como módulo `laser/1` do orquestrador: endereços, `module.json`, `graph.json`, painel ORQUESTRADOR, teste em `tests/test_laser_graph.py` | `design/0.1.3` | publicada, aguardando voto |
 | FUNCOES | funções por referência (Blender, TouchDesigner, Resolume, MadMapper, Capture, Chataigne): `ilda-player`, `ndi-ilda`, `orquestrador`, `cenas-cues-dmx`, `cenario-interativo`, `aprendiz-menu` | `design/funcoes-referencia` | em uso pelas rodadas |
+| 0.1.4 | base única: merge de `funcoes-referencia` + `0.1.3`, `INTEGRACAO` virou `design/FUNCOES/integracao-laser.md`, rodadas 2–4 e o Pino 2D fora da árvore | `design/0.1.4`, em `main` | feita |
 
-Pendências de design: merge de `design/funcoes-referencia` e `design/0.1.3` numa base única;
-mover `design/laser/INTEGRACAO.md` para `design/FUNCOES/integracao-laser.md`; rodada 7 = FÓSFORO
-(conversor NDI/Spout → ILDA na porta NET) e PATCHBAY (UI do orquestrador), após o voto.
+Pendência de design: rodada 7 = FÓSFORO (conversor NDI/Spout → ILDA na porta NET) e PATCHBAY
+(UI do orquestrador), após o voto das rodadas 5 e 6.
 
 ## 9. O que falta, e o que roda em paralelo agora
 
@@ -183,15 +183,13 @@ CI, sem tocar no que já está conforme):
 
 | Frente | Entrega | Aceite | Depende de |
 |---|---|---|---|
-
-| R5 base | `canvaskit.js` (pan, zoom, seleção, hit-test por bisect, dirty-flag, DPR) + timeline canvas portada do Python | testes headless no Chrome; timeline abre `medgrupo.spell` | nada (design só define o cromo) |
-| Design | merge das branches de design; rodada 7 | voto do dono | voto das rodadas 5 e 6 |
+| Design | rodada 7 (FÓSFORO, PATCHBAY) | voto do dono | voto das rodadas 5 e 6 |
 
 Bloqueadas até instalar SDK (decisão do dono, não de agente): R2 (GStreamer + NDI SDK),
 R6 (Godot 4). R9 espera R5.
 
-Já feito: F0–F6, R0, R1, R3, R4, R7 (stdio), R8, CI com release por tag, docs (README, INSTALL,
-LICENSE, ARCHITECTURE, PRD).
+Já feito: F0–F6, R0, R1, R3, R4, R5 base, R7 (stdio), R8, merge de design em `0.1.4`, auditoria
+ponytail (−2 900 linhas), CI com release por tag, docs (README, INSTALL, LICENSE, ARCHITECTURE, PRD).
 
 R7 entregou o crate `mcp` (rmcp 3.2, stdio), uma tool por comando do registry, os resources
 `spell://show` e `spell://commands` e `spellcore mcp install`. Do aceite do PRD §6 — "escanear

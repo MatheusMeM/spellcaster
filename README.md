@@ -11,8 +11,9 @@ O repo tem duas camadas:
   Hoje é a implementação de referência e o gerador dos fixtures de conformidade; não recebe
   funcionalidade nova.
 - `spellcore/` — o core do produto em Rust (PRD v1.1 em `PRD.md`). Fases R0 (engine, protocolos,
-  bench), R1 (cues, `.spell` completo, `fx` em Rhai, Graph runtime, player com transporte OSC) e
-  R4 (laser multi-feed com safety) concluídas e conformes byte a byte com o Python.
+  bench), R1 (cues, `.spell` completo, `fx` em Rhai, Graph runtime, player com transporte OSC),
+  R3 (pixel mapping), R4 (laser multi-feed com safety), R7 (MCP em stdio) e R8 (empacotamento)
+  concluídas e conformes byte a byte com o Python. `spellgui/web/` tem a base da GUI (R5).
 
 Arquivo de show: `.spell` (JSON, versão 1), o mesmo para os dois lados.
 
@@ -22,11 +23,15 @@ Instalação (pendrive Windows, Lite no Pi, código-fonte): `INSTALL.md`. Licen�
 
 | Fase | O que é | Estado |
 |---|---|---|
-| F0–F6 (Python) | protocolos, netscan, perfis/patch, timeline, GUI + skins, MCP, portátil/Lite | concluídas, 98 testes |
+| F0–F6 (Python) | protocolos, netscan, perfis/patch, timeline, GUI + skins, MCP, portátil/Lite | concluídas, 102 testes |
 | R0 (Rust) | `engine`, `protocols`, `cli net/play`, `bench` jitter/throughput | concluída, dentro do alvo |
 | R1 (Rust) | cues, `.spell` completo, `fx` Rhai, Graph, player + OSC, CLI headless | concluída, conformidade ao vivo 89/89 |
+| R3 (Rust) | `pixelmap`: amostragem nearest/bilinear com rayon, 100 000 px | concluída, 0,316 ms p99 por frame |
 | R4 (Rust) | `laser`: optimize/safety, `.ild`, Ether Dream/Helios/IDN, 4 feeds | concluída, 0,83 % de cpu |
-| R2 mídia, R3 pixelmap, R5 GUI Tauri, R6 previz Godot, R7 MCP rmcp, R8 empacotamento, R9 editores | ver `PRD.md` §6 | pendentes |
+| R5 base | `spellgui/web`: `canvaskit.js` (pan, zoom, seleção, hit-test) e timeline em canvas | base pronta; falta Tauri, painéis, Theme/Face |
+| R7 (Rust) | `mcp`: rmcp em stdio, uma tool por comando do registry, `spellcore mcp install` | concluída em stdio |
+| R8 | onedir Windows, Linux, `spellcore` estático para Pi (musl), CI com bench como gate | concluída |
+| R2 mídia, R6 previz Godot, R9 editores | ver `PRD.md` §6 | pendentes (SDKs, Godot, R5) |
 
 Design em `design/` (tokens, princípios, atalhos de Premiere/Resolve) e nas branches `design/*`:
 seis rodadas de protótipo do departamento de design, em que o programa é o modelo 3D do próprio
@@ -60,7 +65,8 @@ Com o pacote instalado (`pip install -e .`), `spell` substitui `C:\Python313\pyt
 C:\Python313\python.exe -m unittest discover -s tests -v
 ```
 
-98 testes Python e 106 Rust (`cargo test --workspace`). Loopback UDP em 127.0.0.1 faz o papel de mock. Os testes não imprimem caracteres fora de ASCII.
+102 testes Python e 120 Rust (`cargo test --workspace`). Não rodar os dois ao mesmo tempo: ambos
+usam sACN em loopback na porta 5568 e um rouba os pacotes do outro. Loopback UDP em 127.0.0.1 faz o papel de mock. Os testes não imprimem caracteres fora de ASCII.
 
 ## Contratos fixos
 
