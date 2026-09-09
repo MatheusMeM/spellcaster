@@ -9,8 +9,8 @@ o `spellcore serve` (ou qualquer servidor estático) entrega. Cor e tipografia v
 | `bus.js` | cliente do barramento: WS `{"id","cmd","args"}` com promessa por id, reconexão, eventos (`transport`, `show`, `log`, `widget`), frames binários `topic\|universe\|512` decodificados em `{universe, data}`. Modo offline embutido |
 | `widgets.js` | parâmetro tipado → widget (`WG.kindOf`), campos → `args` do request (`WG.args`), formulário de um comando do registry (`WG.form`). Classes para a página estilizar: `.wg`, `.wg-<tipo>`, `.wg-lab`, `.wg-num`, `.wg-form`, `.wg-doc`, `.wg-go`, `.wg-out` |
 | `face.js` + `face.html` | runtime da Face: `faces/<nome>.face.json` vira grade de widgets em modo kiosk |
-| `canvaskit.js` | pan, zoom, hit-test, marquee, DPR, dirty-flag; compartilhado por timeline e graph |
-| `timeline.js` + `index.html` | timeline em canvas |
+| `canvaskit.js` | pan, zoom, hit-test, marquee, DPR, dirty-flag; compartilhado por timeline, graph e laser. Roda do mouse igual nas três: **roda** rola o conteúdo, **Shift+roda** anda no eixo do tempo, **Ctrl+roda** dá zoom no cursor, botão do meio arrasta. Todo evento leva `preventDefault` (`passive:false`): a página nunca rola e o Ctrl+roda não dá zoom no navegador. O limite de baixo de `view.y` é 0; o de cima é `k.ymax`, escrito por quem sabe a altura do conteúdo |
+| `timeline.js` + `index.html` | timeline em canvas. Layout de três faixas fixas na altura da janela (toolbar, canvas, barra de status) com `overflow:hidden`: a página não rola. Loop é estado do engine (`loop_set`), não do cliente; desfazer/refazer é pilha local de 20 cópias do show (`show_set`). Atalhos: `design/SHORTCUTS.md` |
 | `dev/commands.json` | `Registry::schema()` congelado, usado no modo offline |
 | `test/*.test.js` | `node --test spellgui/web/test/*.test.js` |
 

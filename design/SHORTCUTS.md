@@ -30,7 +30,9 @@ Referência para R5 (GUI) e R9 (editores). Fonte: Adobe Premiere Pro e DaVinci R
 | Marcador anterior / próximo | `Ctrl+Shift+←` / `Ctrl+Shift+→` | Resolve |
 | Monitor DMX do track focado (512 barras) | `Alt+M` | (nosso; `M` já é marcador, `Ctrl+M` já é exportar) |
 | Zoom in / out / ajustar | `=` / `-` / `Shift+Z` ou `\` | Premiere / Resolve |
-| Pan na timeline | roda com `Shift`, ou arrastar com botão do meio | ambos |
+| Rolar as tracks (vertical) | roda | (nosso; a página não rola — quem rola são as tracks) |
+| Pan na timeline (horizontal) | `Shift`+roda, ou arrastar com botão do meio | ambos |
+| Zoom no cursor | `Ctrl`+roda | ambos |
 | Keyframe no playhead (track focado) | `Ctrl+K` | Premiere (add edit) |
 | Adicionar / remover keyframe por parâmetro | `Ctrl+Click` no losango | Resolve |
 | Selecionar tudo / nada | `Ctrl+A` / `Ctrl+Shift+A` | ambos |

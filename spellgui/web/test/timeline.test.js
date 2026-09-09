@@ -142,3 +142,77 @@ test("depois do reset da reconexao, o primeiro evento do engine novo recarrega",
 test("sem o reset, o engine reiniciado seria engolido", () => {
   assert.deepStrictEqual(TL.revEvento(1, 37), { rev: 37, reload: false });
 });
+
+// ---- transporte: loop e intervalo In-Out --------------------------------
+// `TL.k` falso: as funcoes abaixo so' marcam `dirty` e nao desenham nada.
+function mockShow() {
+  TL.k = { dirty: false, view: { x: 0, y: 0, zoom: 40 } };
+  TL.show = { name: "t", fps: 30, duration: 60, tracks: [], markers: [], in: 0, out: 60 };
+  TL.lanes = [];
+  TL.loop = false;
+}
+
+// O botao acende na hora, mas quem decide e' o engine: o evento `transport` traz o loop de volta.
+// Antes, `TL.loop` era so' local e o player seguia tocando enquanto a pagina fingia repetir.
+test("o loop do evento transport manda no estado da pagina", () => {
+  mockShow();
+  TL.setLoop(true);
+  assert.strictEqual(TL.loop, true, "reflexo otimista do botao");
+  TL.onTransport({ state: "play", t: 1, loop: false });
+  assert.strictEqual(TL.loop, false, "o engine desmente o botao");
+  TL.onTransport({ state: "pause", t: 1, loop: true });
+  assert.strictEqual(TL.loop, true);
+  TL.onTransport({ state: "pause", t: 1 });
+  assert.strictEqual(TL.loop, true, "transporte sem loop nao mexe no que ja' vale");
+});
+
+// O relato: In e Out terminaram a 10 ms um do outro (31.42 / 31.43) depois de mexer na regua.
+// Agora o limite que cruza o outro joga o outro para a ponta, e o intervalo nunca colapsa.
+test("In e Out nao colapsam: quem foi cruzado vai para a ponta", () => {
+  mockShow();
+  assert.deepStrictEqual(TL.setInOut(10, null), [10, 60]);
+  assert.deepStrictEqual(TL.setInOut(null, 20), [10, 20]);
+  assert.deepStrictEqual(TL.setInOut(null, 5), [0, 5], "Out antes do In: In volta para zero");
+  assert.deepStrictEqual(TL.setInOut(30, null), [30, 60], "In depois do Out: Out vai para o fim");
+  TL.setInOut(31.42, null);
+  assert.deepStrictEqual(TL.setInOut(null, 31.42), [0, 31.42], "I e O no mesmo instante");
+  assert.deepStrictEqual(TL.setInOut(-5, null), [0, 31.42], "fora do show, clampa na borda");
+  assert.deepStrictEqual(TL.setInOut(null, 999), [0, 60]);
+});
+
+// A alca da regua imantava na outra e o `clamp` de entao deixava as duas a 10 ms: arrastando uma,
+// In e Out ficam fora da lista de imantacao.
+test("arrastando a alca da regua, In e Out saem da imantacao", () => {
+  mockShow();
+  TL.show.in = 2;
+  TL.show.out = 4;
+  TL.t = 1;
+  TL.k.w = 800;
+  TL.k.toWorld = x => x / 10;
+  TL.k.sel = { m: new Map() };
+  TL.k.drag = null;
+  const livre = TL.buildSnaps();
+  assert.ok(livre.includes(2) && livre.includes(4), "sem arrasto, In e Out imantam");
+  TL.k.drag = { mode: "in" };
+  const alca = TL.buildSnaps();
+  assert.ok(!alca.includes(2) && !alca.includes(4), "com a alca na mao: " + alca);
+  assert.ok(alca.includes(TL.t), "o playhead continua imantando");
+});
+
+// Desfazer: pilha local de copias do show, tirada em cada commit (o engine ainda nao empilha).
+test("desfazer e refazer devolvem o show de antes do commit", () => {
+  mockShow();
+  TL.k.sel = { clear() {}, m: new Map() };
+  TL.k.fit = () => {};
+  TL.k.resize = () => {};
+  TL.load({ name: "a", fps: 30, duration: 60, tracks: [], markers: [] });
+  TL.show.name = "b";
+  TL.commit([]);
+  assert.strictEqual(TL.show.name, "b");
+  TL.undo(-1);
+  assert.strictEqual(TL.show.name, "a", "desfazer volta ao show do load");
+  TL.undo(1);
+  assert.strictEqual(TL.show.name, "b", "refazer devolve o commit");
+  TL.undo(1);
+  assert.strictEqual(TL.show.name, "b", "sem nada para refazer, nada muda");
+});
