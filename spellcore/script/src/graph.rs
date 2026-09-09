@@ -65,8 +65,8 @@
 //! Compila para uma lista de nos em ordem topologica com os pinos indexados por INTEIRO
 //! (nenhum lookup por texto no caminho quente). Ciclo e' erro na compilacao.
 
-use engine::module::Module;
 use engine::hook::{Ev, EventSink, FrameHook};
+use engine::module::Module;
 use engine::{Curve, Universes};
 use rhai::{Dynamic, Engine as Rhai, Scope, AST};
 use serde_json::Value;
@@ -85,31 +85,101 @@ const DELAY_N: usize = 8;
 enum Kind {
     /// in.widget / in.key / in.osc / in.midi / in.marker: o valor chega pela fila.
     Evento,
-    Timer { every: f64, prox: f64 },
+    Timer {
+        every: f64,
+        prox: f64,
+    },
     EstadoT,
-    EstadoDmx { uni: u16, addr: u16 },
+    EstadoDmx {
+        uni: u16,
+        addr: u16,
+    },
     And,
     Or,
     Not,
-    Latch { q: f64 },
-    Toggle { q: f64, p: f64 },
-    Debounce { win: f64, ult: f64, p: f64 },
-    Counter { passo: f64, n: f64, p: f64, pr: f64 },
+    Latch {
+        q: f64,
+    },
+    Toggle {
+        q: f64,
+        p: f64,
+    },
+    Debounce {
+        win: f64,
+        ult: f64,
+        p: f64,
+    },
+    Counter {
+        passo: f64,
+        n: f64,
+        p: f64,
+        pr: f64,
+    },
     Select,
-    Map { i0: f64, i1: f64, o0: f64, o1: f64, clamp: bool },
-    Curva { c: Curve, cc: (f64, f64) },
-    Expr { ast: AST, avisou: bool },
-    Delay { d: f64, fila: [(f64, f64); DELAY_N], n: usize, ult: f64, p: f64 },
-    Hold { d: f64, ate: f64, p: f64 },
-    Cmd { nome: String, args: Value, p: f64 },
-    SaiWidget { id: String, prop: String, hold: f64, ate: f64, aceso: bool, p: f64, ult: f64 },
-    SaiOsc { addr: String, ult: f64 },
-    SaiParam { alvo: String, ult: f64 },
-    SaiNotify { txt: String, p: f64 },
+    Map {
+        i0: f64,
+        i1: f64,
+        o0: f64,
+        o1: f64,
+        clamp: bool,
+    },
+    Curva {
+        c: Curve,
+        cc: (f64, f64),
+    },
+    Expr {
+        ast: AST,
+        avisou: bool,
+    },
+    Delay {
+        d: f64,
+        fila: [(f64, f64); DELAY_N],
+        n: usize,
+        ult: f64,
+        p: f64,
+    },
+    Hold {
+        d: f64,
+        ate: f64,
+        p: f64,
+    },
+    Cmd {
+        nome: String,
+        args: Value,
+        p: f64,
+    },
+    SaiWidget {
+        id: String,
+        prop: String,
+        hold: f64,
+        ate: f64,
+        aceso: bool,
+        p: f64,
+        ult: f64,
+    },
+    SaiOsc {
+        addr: String,
+        ult: f64,
+    },
+    SaiParam {
+        alvo: String,
+        ult: f64,
+    },
+    SaiNotify {
+        txt: String,
+        p: f64,
+    },
     /// Maquina de estados: `i` e' o indice deste estado em `Graph::estados`.
-    Estado { i: usize, pe: f64, px: f64 },
+    Estado {
+        i: usize,
+        pe: f64,
+        px: f64,
+    },
     /// App declarado: uma entrada por parameter, depois uma por command; uma saida por value.
-    Modulo { params: Vec<Par>, cmds: Vec<(String, f64)> },
+    Modulo {
+        params: Vec<Par>,
+        cmds: Vec<(String, f64)>,
+    },
 }
 
 /// Um `parameter` de um no `module`, ja' resolvido para o caminho quente.
@@ -164,7 +234,8 @@ fn pinos(t: &str) -> Option<(&'static [&'static str], &'static [&'static str])> 
 fn carrega_modulo(base: &Path, nome: &str) -> Result<Module, String> {
     let spell = base.join("show.spell");
     let dir = engine::module::modules_dir(&spell.to_string_lossy());
-    engine::module::load(&dir.join(format!("{nome}.json"))).map_err(|e| format!("module {nome:?}: {e}"))
+    engine::module::load(&dir.join(format!("{nome}.json")))
+        .map_err(|e| format!("module {nome:?}: {e}"))
 }
 
 /// Parametros que viram pino: so' os numericos.
@@ -228,7 +299,10 @@ fn monta(
 ) -> Result<Kind, String> {
     Ok(match tipo {
         "in.widget" | "in.key" | "in.osc" | "in.midi" | "in.marker" => Kind::Evento,
-        "in.timer" => Kind::Timer { every: f(n, "every", 1.0).max(1e-6), prox: 0.0 },
+        "in.timer" => Kind::Timer {
+            every: f(n, "every", 1.0).max(1e-6),
+            prox: 0.0,
+        },
         "in.state" => match txt(n, "what", "t").as_str() {
             "t" => Kind::EstadoT,
             "dmx" => Kind::EstadoDmx {
@@ -237,7 +311,11 @@ fn monta(
             },
             // ponytail: in.state so' le "t" e um canal DMX dos Universes do frame ; cue,
             // fixture e o resto entram quando o FrameHook receber o Handle do player.
-            o => return Err(format!("in.state: \"what\" desconhecido: {o} (use \"t\" ou \"dmx\")")),
+            o => {
+                return Err(format!(
+                    "in.state: \"what\" desconhecido: {o} (use \"t\" ou \"dmx\")"
+                ))
+            }
         },
         "logic.and" => Kind::And,
         "logic.or" => Kind::Or,
@@ -249,7 +327,12 @@ fn monta(
             ult: f64::NEG_INFINITY,
             p: 0.0,
         },
-        "logic.counter" => Kind::Counter { passo: f(n, "step", 1.0), n: 0.0, p: 0.0, pr: 0.0 },
+        "logic.counter" => Kind::Counter {
+            passo: f(n, "step", 1.0),
+            n: 0.0,
+            p: 0.0,
+            pr: 0.0,
+        },
         "logic.select" => Kind::Select,
         "math.map" => Kind::Map {
             i0: f(n, "in_min", 0.0),
@@ -265,7 +348,10 @@ fn monta(
                 .filter(|a| a.len() == 2)
                 .map(|a| (a[0].as_f64().unwrap_or(0.42), a[1].as_f64().unwrap_or(0.58)))
                 .unwrap_or(engine::BEZ);
-            Kind::Curva { c: Curve::from_str(&txt(n, "curve", "linear")), cc: c }
+            Kind::Curva {
+                c: Curve::from_str(&txt(n, "curve", "linear")),
+                cc: c,
+            }
         }
         "math.expr" => {
             let src = txt(n, "expr", "a");
@@ -290,10 +376,17 @@ fn monta(
             ult: 0.0,
             p: 0.0,
         },
-        "time.hold" => Kind::Hold { d: f(n, "ms", 300.0) / 1000.0, ate: f64::NEG_INFINITY, p: 0.0 },
+        "time.hold" => Kind::Hold {
+            d: f(n, "ms", 300.0) / 1000.0,
+            ate: f64::NEG_INFINITY,
+            p: 0.0,
+        },
         "cmd" => Kind::Cmd {
             nome: txt(n, "cmd", ""),
-            args: n.get("args").cloned().unwrap_or(Value::Object(Default::default())),
+            args: n
+                .get("args")
+                .cloned()
+                .unwrap_or(Value::Object(Default::default())),
             p: 0.0,
         },
         "out.widget" => Kind::SaiWidget {
@@ -305,10 +398,23 @@ fn monta(
             p: 0.0,
             ult: f64::NAN,
         },
-        "out.osc" => Kind::SaiOsc { addr: txt(n, "address", ""), ult: f64::NAN },
-        "out.param" => Kind::SaiParam { alvo: txt(n, "target", ""), ult: f64::NAN },
-        "out.notify" => Kind::SaiNotify { txt: txt(n, "text", ""), p: 0.0 },
-        "state" => Kind::Estado { i: meu.unwrap(), pe: 0.0, px: 0.0 },
+        "out.osc" => Kind::SaiOsc {
+            addr: txt(n, "address", ""),
+            ult: f64::NAN,
+        },
+        "out.param" => Kind::SaiParam {
+            alvo: txt(n, "target", ""),
+            ult: f64::NAN,
+        },
+        "out.notify" => Kind::SaiNotify {
+            txt: txt(n, "text", ""),
+            p: 0.0,
+        },
+        "state" => Kind::Estado {
+            i: meu.unwrap(),
+            pe: 0.0,
+            px: 0.0,
+        },
         "module" => {
             let m = m.unwrap();
             let nome = txt(n, "module", "");
@@ -323,7 +429,11 @@ fn monta(
                     ult: f64::NAN,
                 })
                 .collect();
-            let cmds = m.commands.keys().map(|k| (format!("{nome}/{k}"), 0.0)).collect();
+            let cmds = m
+                .commands
+                .keys()
+                .map(|k| (format!("{nome}/{k}"), 0.0))
+                .collect();
             Kind::Modulo { params, cmds }
         }
         _ => return Err(format!("tipo fora do catalogo: {tipo}")),
@@ -437,7 +547,9 @@ impl Graph {
         let vazio = Vec::new();
         let brutas = match spec.get("edges") {
             None => &vazio,
-            Some(v) => v.as_array().ok_or_else(|| "\"edges\" nao e' lista".to_string())?,
+            Some(v) => v
+                .as_array()
+                .ok_or_else(|| "\"edges\" nao e' lista".to_string())?,
         };
         let mut arestas: Vec<(usize, usize, usize, usize)> = Vec::with_capacity(brutas.len());
         for a in brutas {
@@ -446,11 +558,15 @@ impl Graph {
                 .filter(|p| p.len() == 2)
                 .ok_or_else(|| format!("aresta {a} nao e' [\"no.pino\", \"no.pino\"]"))?;
             let lado = |s: &Value, saida: bool| -> Result<(usize, usize), String> {
-                let s = s.as_str().ok_or_else(|| format!("aresta {a}: pino nao e' texto"))?;
+                let s = s
+                    .as_str()
+                    .ok_or_else(|| format!("aresta {a}: pino nao e' texto"))?;
                 let (no, pino) = s
                     .rsplit_once('.')
                     .ok_or_else(|| format!("pino {s:?} sem ponto (use \"no.pino\")"))?;
-                let i = *idx.get(no).ok_or_else(|| format!("aresta {a}: no {no:?} nao existe"))?;
+                let i = *idx
+                    .get(no)
+                    .ok_or_else(|| format!("aresta {a}: no {no:?} nao existe"))?;
                 let (ins, outs) = &pinos_de[i];
                 let lista = if saida { outs } else { ins };
                 let p = lista.iter().position(|x| *x == pino).ok_or_else(|| {
@@ -490,7 +606,10 @@ impl Graph {
                 .filter(|i| grau[*i] > 0)
                 .map(|i| brutos[i]["id"].as_str().unwrap_or("?"))
                 .collect();
-            return Err(format!("ciclo no graph, entre os nos: {}", presos.join(", ")));
+            return Err(format!(
+                "ciclo no graph, entre os nos: {}",
+                presos.join(", ")
+            ));
         }
         let mut topo = vec![0usize; n]; // indice de arquivo -> indice topologico
         for (k, &i) in ordem.iter().enumerate() {
@@ -610,7 +729,16 @@ impl FrameHook for Graph {
 
         // 2. nos em ordem topologica; nenhuma alocacao aqui (so' Ev, e evento e' raro)
         for k in 0..self.nos.len() {
-            let No { id, kind, base, nin, nout, mute, estado, ins } = &mut self.nos[k];
+            let No {
+                id,
+                kind,
+                base,
+                nin,
+                nout,
+                mute,
+                estado,
+                ins,
+            } = &mut self.nos[k];
             for &(s, d) in ins.iter() {
                 self.vals[d] = self.vals[s];
             }
@@ -682,9 +810,19 @@ impl FrameHook for Graph {
                         self.vals[b]
                     };
                 }
-                Kind::Map { i0, i1, o0, o1, clamp } => {
+                Kind::Map {
+                    i0,
+                    i1,
+                    o0,
+                    o1,
+                    clamp,
+                } => {
                     let d = *i1 - *i0;
-                    let mut u = if d == 0.0 { 0.0 } else { (self.vals[b] - *i0) / d };
+                    let mut u = if d == 0.0 {
+                        0.0
+                    } else {
+                        (self.vals[b] - *i0) / d
+                    };
                     if *clamp {
                         u = u.clamp(0.0, 1.0);
                     }
@@ -750,11 +888,22 @@ impl FrameHook for Graph {
                     let s = subiu(self.vals[b], p);
                     self.vals[o] = b2f(s);
                     if s {
-                        let e = Ev::Cmd { name: nome.clone(), args: args.clone() };
+                        let e = Ev::Cmd {
+                            name: nome.clone(),
+                            args: args.clone(),
+                        };
                         emite(&mut self.outq, &mut self.perdidos, e);
                     }
                 }
-                Kind::SaiWidget { id, prop, hold, ate, aceso, p, ult } => {
+                Kind::SaiWidget {
+                    id,
+                    prop,
+                    hold,
+                    ate,
+                    aceso,
+                    p,
+                    ult,
+                } => {
                     let v = self.vals[b];
                     let mut manda = None;
                     if *hold > 0.0 {
@@ -783,7 +932,10 @@ impl FrameHook for Graph {
                     let v = self.vals[b];
                     if v != *ult {
                         *ult = v;
-                        let e = Ev::Osc { address: addr.clone(), args: vec![v] };
+                        let e = Ev::Osc {
+                            address: addr.clone(),
+                            args: vec![v],
+                        };
                         emite(&mut self.outq, &mut self.perdidos, e);
                     }
                 }
@@ -791,7 +943,10 @@ impl FrameHook for Graph {
                     let v = self.vals[b];
                     if v != *ult {
                         *ult = v;
-                        let e = Ev::Param { target: alvo.clone(), value: v };
+                        let e = Ev::Param {
+                            target: alvo.clone(),
+                            value: v,
+                        };
                         emite(&mut self.outq, &mut self.perdidos, e);
                     }
                 }
@@ -959,8 +1114,11 @@ mod tests {
 
     fn monta_graph(j: &str) -> (Graph, Sink) {
         let s = Sink::default();
-        let g = Graph::new(&serde_json::from_str::<Value>(j).unwrap(), Box::new(s.clone()))
-            .expect("compila");
+        let g = Graph::new(
+            &serde_json::from_str::<Value>(j).unwrap(),
+            Box::new(s.clone()),
+        )
+        .expect("compila");
         (g, s)
     }
 
@@ -1069,18 +1227,28 @@ mod tests {
             name: "cue_go".into(),
             args: serde_json::json!({"index": 3})
         }));
-        assert!(evs.contains(&Ev::Widget { id: "go".into(), prop: "glow".into(), value: 1.0 }));
-        assert!(evs.contains(&Ev::Osc { address: "/spell/go".into(), args: vec![1.0] }));
+        assert!(evs.contains(&Ev::Widget {
+            id: "go".into(),
+            prop: "glow".into(),
+            value: 1.0
+        }));
+        assert!(evs.contains(&Ev::Osc {
+            address: "/spell/go".into(),
+            args: vec![1.0]
+        }));
         assert!(evs.contains(&Ev::Notify { text: "GO".into() }));
-        assert!(evs.contains(&Ev::Param { target: "par1.dim".into(), value: 1.0 }));
+        assert!(evs.contains(&Ev::Param {
+            target: "par1.dim".into(),
+            value: 1.0
+        }));
         // o glow do out.widget apaga sozinho depois do hold_ms
         s.0.lock().unwrap().clear();
         g.frame(0.5, &mut u);
-        assert!(s
-            .0
-            .lock()
-            .unwrap()
-            .contains(&Ev::Widget { id: "go".into(), prop: "glow".into(), value: 0.0 }));
+        assert!(s.0.lock().unwrap().contains(&Ev::Widget {
+            id: "go".into(),
+            prop: "glow".into(),
+            value: 0.0
+        }));
     }
 
     #[test]
@@ -1114,15 +1282,20 @@ mod tests {
             Err(e) => e,
             Ok(_) => panic!("ciclo tinha que ser erro"),
         };
-        assert!(e.contains("ciclo") && e.contains('a') && e.contains('b'), "{e}");
+        assert!(
+            e.contains("ciclo") && e.contains('a') && e.contains('b'),
+            "{e}"
+        );
         assert!(!e.contains("solto"), "{e}");
     }
 
     #[test]
     fn pino_e_tipo_desconhecidos_sao_erro_util() {
         let bad = |j: &str| -> String {
-            match Graph::new(&serde_json::from_str::<Value>(j).unwrap(), Box::new(engine::NullSink))
-            {
+            match Graph::new(
+                &serde_json::from_str::<Value>(j).unwrap(),
+                Box::new(engine::NullSink),
+            ) {
                 Err(e) => e,
                 Ok(_) => panic!("tinha que falhar: {j}"),
             }
@@ -1253,7 +1426,11 @@ mod tests {
         s.0.lock().unwrap().clear();
         g.input("widget:go", 1.0);
         g.frame(0.2, &mut u);
-        assert_eq!(s.0.lock().unwrap().len(), 1, "o gate por sm continua valendo");
+        assert_eq!(
+            s.0.lock().unwrap().len(),
+            1,
+            "o gate por sm continua valendo"
+        );
         g.reset(0.0);
         assert_eq!(saida(&g, "sm"), 0.0, "e o reset nao acende o pino calado");
     }

@@ -48,11 +48,12 @@ fn show_de_dois_tracks_em_loopback_sacn() {
     p.start(None).expect("start");
     let h = p.handle();
     h.play();
-    assert!(p.wait(Some(Duration::from_secs(5))), "o show de 0,5 s nao terminou");
+    assert!(
+        p.wait(Some(Duration::from_secs(5))),
+        "o show de 0,5 s nao terminou"
+    );
 
-    let ok = espera(2.0, || {
-        rx.get(1).is_some_and(|d| d[0] == 200 && d[9] == 11)
-    });
+    let ok = espera(2.0, || rx.get(1).is_some_and(|d| d[0] == 200 && d[9] == 11));
     let got = rx.get(1);
     let st = h.state();
     p.close();
@@ -63,7 +64,11 @@ fn show_de_dois_tracks_em_loopback_sacn() {
             assert!(ok, "frame recebido nao bate: {:?}", &d[..12]);
             assert_eq!(&d[..1], &[200], "track 1: canal 1");
             assert_eq!(&d[9..12], &[11, 22, 33], "track 2: canais 10..12");
-            assert_eq!(&d[19..21], &[10, 5], "media Capture: ch1 play = 10, ch2 clipe = 5");
+            assert_eq!(
+                &d[19..21],
+                &[10, 5],
+                "media Capture: ch1 play = 10, ch2 clipe = 5"
+            );
             assert_eq!(d[1], 0, "canal nao escrito continua zero");
         }
     }
@@ -105,7 +110,10 @@ fn transporte_remoto_por_osc() {
     );
     tx.send("/spellcaster/stop", &[]);
     assert!(espera(2.0, || h.state().state == "stop"), "stop remoto");
-    assert!(p.wait(Some(Duration::from_secs(2))), "stop remoto acorda o wait");
+    assert!(
+        p.wait(Some(Duration::from_secs(2))),
+        "stop remoto acorda o wait"
+    );
     p.close();
 }
 
@@ -141,21 +149,36 @@ fn tracks_de_efeito_colateral_saem_por_osc() {
     };
     p.start(None).expect("start");
     p.handle().play();
-    assert!(p.wait(Some(Duration::from_secs(5))), "o show de 0,4 s nao terminou");
+    assert!(
+        p.wait(Some(Duration::from_secs(5))),
+        "o show de 0,4 s nao terminou"
+    );
     let ok = espera(2.0, || vistos.lock().unwrap().len() >= 2);
     let msgs = vistos.lock().unwrap().clone();
     p.close();
     rx.close();
     if !ok {
-        return println!("pulado: OSC em loopback nao entregou (firewall?): {:?}", msgs);
+        return println!(
+            "pulado: OSC em loopback nao entregou (firewall?): {:?}",
+            msgs
+        );
     }
-    assert!(msgs.contains(&"/spell/dim".to_string()), "track osc: {:?}", msgs);
+    assert!(
+        msgs.contains(&"/spell/dim".to_string()),
+        "track osc: {:?}",
+        msgs
+    );
     assert!(
         msgs.contains(&"/spell/clip/play".to_string()),
         "media nao-Capture vira endereco/valor: {:?}",
         msgs
     );
-    assert_eq!(msgs.len(), 2, "valor constante manda uma vez so': {:?}", msgs);
+    assert_eq!(
+        msgs.len(),
+        2,
+        "valor constante manda uma vez so': {:?}",
+        msgs
+    );
 }
 
 /// Gancho de teste: conta frames e resets, e escreve um canal para provar que roda no frame.
@@ -192,17 +215,29 @@ fn locate_zera_cues_e_ganchos() {
     p.start(None).expect("start");
     let h = p.handle();
     h.play();
-    assert!(espera(2.0, || frames.load(Ordering::Relaxed) > 2), "o gancho nao rodou");
+    assert!(
+        espera(2.0, || frames.load(Ordering::Relaxed) > 2),
+        "o gancho nao rodou"
+    );
     assert_eq!(h.state().cue, -1);
 
     h.cue_go(None);
-    assert!(espera(2.0, || h.state().cue == 0), "GO nao disparou a cue 0");
+    assert!(
+        espera(2.0, || h.state().cue == 0),
+        "GO nao disparou a cue 0"
+    );
     h.cue_go(None);
-    assert!(espera(2.0, || h.state().cue == 1), "GO nao andou para a cue 1");
+    assert!(
+        espera(2.0, || h.state().cue == 1),
+        "GO nao andou para a cue 1"
+    );
 
     let antes = resets.load(Ordering::Relaxed);
     h.locate(3.0);
-    assert!(espera(2.0, || h.state().cue == -1), "locate nao zerou as cues");
+    assert!(
+        espera(2.0, || h.state().cue == -1),
+        "locate nao zerou as cues"
+    );
     assert!(
         espera(2.0, || resets.load(Ordering::Relaxed) > antes),
         "locate nao chamou reset() no gancho"
@@ -215,8 +250,14 @@ fn locate_zera_cues_e_ganchos() {
     assert!(espera(2.0, || h.state().cue == 1));
     let antes = resets.load(Ordering::Relaxed);
     h.stop();
-    assert!(espera(2.0, || h.state().cue == -1), "stop nao zerou as cues");
-    assert!(espera(2.0, || resets.load(Ordering::Relaxed) > antes), "stop nao resetou o gancho");
+    assert!(
+        espera(2.0, || h.state().cue == -1),
+        "stop nao zerou as cues"
+    );
+    assert!(
+        espera(2.0, || resets.load(Ordering::Relaxed) > antes),
+        "stop nao resetou o gancho"
+    );
     assert!(p.wait(Some(Duration::from_secs(2))), "stop acorda o wait");
     p.close();
 }

@@ -199,7 +199,6 @@ impl ArtNetOut {
             })?;
         Ok(ArtNetOut { q, th: Some(th) })
     }
-
 }
 
 impl Output for ArtNetOut {
@@ -252,8 +251,8 @@ mod tests {
         assert_eq!(
             &p[..18],
             &[
-                0x41, 0x72, 0x74, 0x2d, 0x4e, 0x65, 0x74, 0x00, 0x00, 0x50, 0x00, 0x0e, 0xc8,
-                0x00, 0x10, 0x00, 0x02, 0x00
+                0x41, 0x72, 0x74, 0x2d, 0x4e, 0x65, 0x74, 0x00, 0x00, 0x50, 0x00, 0x0e, 0xc8, 0x00,
+                0x10, 0x00, 0x02, 0x00
             ]
         );
     }
@@ -278,7 +277,10 @@ mod tests {
             _ => panic!("esperava ArtDmx"),
         }
         assert_eq!(parse(&artsync()), Some(Packet::Sync));
-        assert_eq!(parse(&artpoll(0x06, 0x10)), Some(Packet::Poll { flags: 0x06 }));
+        assert_eq!(
+            parse(&artpoll(0x06, 0x10)),
+            Some(Packet::Poll { flags: 0x06 })
+        );
         assert!(parse(b"nao e art-net").is_none());
     }
 

@@ -17,7 +17,9 @@ pub fn config_path(target: &str) -> Result<PathBuf, String> {
             let base = std::env::var("APPDATA")
                 .or_else(|_| std::env::var("HOME"))
                 .map_err(|_| "sem APPDATA nem HOME: passe --path".to_string())?;
-            Ok(Path::new(&base).join("Claude").join("claude_desktop_config.json"))
+            Ok(Path::new(&base)
+                .join("Claude")
+                .join("claude_desktop_config.json"))
         }
         "code" => Ok(std::env::current_dir()
             .map_err(|e| e.to_string())?
@@ -48,7 +50,9 @@ fn merge(old: &Value, e: Value) -> (Value, bool) {
         *srv = Value::Object(Map::new());
     }
     let igual = srv.get("spellcaster") == Some(&e);
-    srv.as_object_mut().expect("objeto").insert("spellcaster".into(), e);
+    srv.as_object_mut()
+        .expect("objeto")
+        .insert("spellcaster".into(), e);
     (new, igual)
 }
 
@@ -67,7 +71,11 @@ pub fn install(target: &str, path: &str, yes: bool) -> Result<Value, String> {
     let (new, igual) = merge(&old, entry()?);
     // ponytail: sem diff unificado (a stdlib nao tem difflib) ; imprime o caminho e a entrada,
     // que e' a unica chave que este comando toca. O `.bak` cobre o resto.
-    println!("{}\n\"spellcaster\": {}", p.display(), serde_json::to_string_pretty(&new["mcpServers"]["spellcaster"]).unwrap_or_default());
+    println!(
+        "{}\n\"spellcaster\": {}",
+        p.display(),
+        serde_json::to_string_pretty(&new["mcpServers"]["spellcaster"]).unwrap_or_default()
+    );
     if igual {
         println!("(sem mudanca)");
         return Ok(json!(p.to_string_lossy()));

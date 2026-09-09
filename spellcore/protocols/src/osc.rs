@@ -497,7 +497,10 @@ mod tests {
         };
         tx.send("/spell/play", &[Arg::Int(1), Arg::Str("go".into())]);
         tx.send_bundle(
-            &[message("/spell/a", &[Arg::Int(7)]), message("/spell/b", &[])],
+            &[
+                message("/spell/a", &[Arg::Int(7)]),
+                message("/spell/b", &[]),
+            ],
             IMMEDIATE,
         );
         for _ in 0..60 {

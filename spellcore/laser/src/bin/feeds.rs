@@ -126,7 +126,10 @@ fn main() {
         next += dt;
         let rot = wall0.elapsed().as_secs_f64() * 45.0;
         for (i, f) in feeds.iter().enumerate() {
-            f.set_transform(Transform { rot: rot + i as f64 * 90.0, ..Transform::default() });
+            f.set_transform(Transform {
+                rot: rot + i as f64 * 90.0,
+                ..Transform::default()
+            });
             f.push(&pts);
         }
         pushed += 1;
@@ -146,7 +149,10 @@ fn main() {
     for f in feeds.iter_mut() {
         f.stop();
     }
-    let stats: Vec<_> = feeds.iter().map(|f| (f.name().to_string(), f.stats())).collect();
+    let stats: Vec<_> = feeds
+        .iter()
+        .map(|f| (f.name().to_string(), f.stats()))
+        .collect();
     let recebidos: u64 = emus.iter().map(|e| e.count()).sum();
     // idas e voltas por comando: e o que custa CPU (cada uma e um ping-pong de contexto)
     let mut hist = std::collections::BTreeMap::new();
@@ -188,13 +194,20 @@ fn main() {
         "push={} frames/feed  pontos entregues={} (emuladores receberam {})",
         pushed, pontos, recebidos
     );
-    let cmds: Vec<String> = hist.iter().map(|(c, n)| format!("{}={}", *c as char, n)).collect();
+    let cmds: Vec<String> = hist
+        .iter()
+        .map(|(c, n)| format!("{}={}", *c as char, n))
+        .collect();
     println!(
         "comandos ao DAC: {}  total={} ({:.0}/s), {:.1} us de cpu de feed por ida e volta",
         cmds.join(" "),
         idas,
         idas as f64 / wall,
-        if idas > 0 { cpu_feeds * 1e6 / idas as f64 } else { 0.0 }
+        if idas > 0 {
+            cpu_feeds * 1e6 / idas as f64
+        } else {
+            0.0
+        }
     );
 
     let pct_feeds = 100.0 * cpu_feeds / wall;

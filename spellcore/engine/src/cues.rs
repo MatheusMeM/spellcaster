@@ -44,7 +44,9 @@ impl Cue {
                     Some(kk) => values.push((
                         kk,
                         match v {
-                            Value::Array(a) => a.iter().map(|x| x.as_f64().unwrap_or(0.0)).collect(),
+                            Value::Array(a) => {
+                                a.iter().map(|x| x.as_f64().unwrap_or(0.0)).collect()
+                            }
                             other => vec![other.as_f64().unwrap_or(0.0)],
                         },
                     )),

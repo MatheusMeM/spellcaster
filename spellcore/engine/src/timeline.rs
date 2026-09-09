@@ -187,10 +187,10 @@ pub struct Track {
     pub capture: bool,
     /// `osc`: valor padrao quando o track nao tem keys (o `args` do Python).
     pub args: Vec<f64>,
-    buf: Vec<f64>,      // saida reaproveitada: zero alocacao por frame
-    last: Vec<f64>,     // ultimo valor numerico enviado (tracks osc/media)
-    text: String,       // ultimo valor de texto enviado
-    sent: bool,         // false = nunca enviado (o sentinela MISS do Python)
+    buf: Vec<f64>,  // saida reaproveitada: zero alocacao por frame
+    last: Vec<f64>, // ultimo valor numerico enviado (tracks osc/media)
+    text: String,   // ultimo valor de texto enviado
+    sent: bool,     // false = nunca enviado (o sentinela MISS do Python)
 }
 
 /// O que `Track::changed` achou de novo neste frame.
@@ -215,7 +215,7 @@ impl Track {
             clip: 0,
             capture: true,
             args: Vec::new(),
-            buf: Vec::new(),      // o clear()+push do primeiro frame aloca uma vez
+            buf: Vec::new(), // o clear()+push do primeiro frame aloca uma vez
             last: Vec::new(),
             text: String::new(),
             sent: false,
@@ -240,7 +240,11 @@ impl Track {
         let mut tr = Track::new(kind, universe, address, Keys::new(ks));
         tr.text_address = adr.and_then(|v| v.as_str()).unwrap_or("").to_string();
         tr.clip = spec.get("clip").and_then(|v| v.as_f64()).unwrap_or(0.0) as u16;
-        tr.capture = spec.get("player").and_then(|v| v.as_str()).unwrap_or("capture") == "capture";
+        tr.capture = spec
+            .get("player")
+            .and_then(|v| v.as_str())
+            .unwrap_or("capture")
+            == "capture";
         tr.args = match spec.get("args") {
             Some(serde_json::Value::Array(a)) => a.iter().filter_map(|x| x.as_f64()).collect(),
             Some(serde_json::Value::Number(n)) => vec![n.as_f64().unwrap_or(0.0)],
@@ -314,7 +318,9 @@ impl Track {
 // ponytail: keyframe so' na forma de lista [t, valor, curva?, [c0, c1]?], que e' a unica que o
 // .spell v1 grava ; aceitar objeto {"t":..,"v":..} quando a GUI passar a escrever assim.
 fn parse_key(k: &serde_json::Value) -> Result<Keyframe, String> {
-    let a = k.as_array().ok_or_else(|| format!("keyframe nao e' lista: {}", k))?;
+    let a = k
+        .as_array()
+        .ok_or_else(|| format!("keyframe nao e' lista: {}", k))?;
     let t = a
         .first()
         .and_then(|v| v.as_f64())
@@ -395,7 +401,9 @@ impl Timeline {
         for &i in dmx.iter() {
             let tr = &mut tracks[i];
             if tr.keys.eval(t, &mut tr.buf) {
-                universes.get_or_create(tr.universe).set(tr.address, &tr.buf);
+                universes
+                    .get_or_create(tr.universe)
+                    .set(tr.address, &tr.buf);
             }
         }
     }
@@ -510,7 +518,11 @@ mod tests {
         assert_eq!(k.value(9.0), Some(&Value::Num(20.0)));
 
         // duplicado (dt <= 0): vale o keyframe seguinte
-        let d = Keys::new(vec![kf(1.0, 10.0, "linear"), kf(1.0, 200.0, "linear"), kf(3.0, 0.0, "linear")]);
+        let d = Keys::new(vec![
+            kf(1.0, 10.0, "linear"),
+            kf(1.0, 200.0, "linear"),
+            kf(3.0, 0.0, "linear"),
+        ]);
         assert!(d.eval(0.5, &mut out));
         assert_eq!(out, vec![10.0]);
         assert_eq!(d.value(1.0), Some(&Value::Num(200.0)));
@@ -520,15 +532,35 @@ mod tests {
     fn listas_e_texto() {
         let mut out = Vec::new();
         let k = Keys::new(vec![
-            Keyframe { t: 0.0, value: Value::List(vec![0.0, 100.0]), curve: Curve::Linear, c: BEZ },
-            Keyframe { t: 1.0, value: Value::List(vec![100.0, 0.0]), curve: Curve::Linear, c: BEZ },
+            Keyframe {
+                t: 0.0,
+                value: Value::List(vec![0.0, 100.0]),
+                curve: Curve::Linear,
+                c: BEZ,
+            },
+            Keyframe {
+                t: 1.0,
+                value: Value::List(vec![100.0, 0.0]),
+                curve: Curve::Linear,
+                c: BEZ,
+            },
         ]);
         assert!(k.eval(0.5, &mut out));
         assert_eq!(out, vec![50.0, 50.0]);
 
         let txt = Keys::new(vec![
-            Keyframe { t: 0.0, value: Value::Text("a".into()), curve: Curve::Linear, c: BEZ },
-            Keyframe { t: 1.0, value: Value::Text("b".into()), curve: Curve::Linear, c: BEZ },
+            Keyframe {
+                t: 0.0,
+                value: Value::Text("a".into()),
+                curve: Curve::Linear,
+                c: BEZ,
+            },
+            Keyframe {
+                t: 1.0,
+                value: Value::Text("b".into()),
+                curve: Curve::Linear,
+                c: BEZ,
+            },
         ]);
         assert!(!txt.eval(0.5, &mut out), "texto nao vira DMX");
         assert_eq!(txt.value(0.5), Some(&Value::Text("a".into())));
@@ -557,7 +589,11 @@ mod tests {
         assert_eq!(tl.osc, vec![2]);
         assert_eq!(tl.media, vec![3, 4]);
         assert_eq!(tl.cue, vec![5]);
-        assert_eq!(tl.ignored(), vec!["fixture", "pyfx"], "reservado e Python: aviso");
+        assert_eq!(
+            tl.ignored(),
+            vec!["fixture", "pyfx"],
+            "reservado e Python: aviso"
+        );
         assert_eq!(tl.tracks[6].universe, 3);
         assert_eq!(tl.tracks[2].text_address, "/spell/dim");
         assert!(tl.tracks[3].capture && !tl.tracks[4].capture);
@@ -583,21 +619,43 @@ mod tests {
             0,
             Keys::new(vec![kf(0.0, 0.0, "linear"), kf(1.0, 100.0, "linear")]),
         );
-        assert_eq!(tr.changed(0.0), Side::Nums, "primeira avaliacao sempre envia");
+        assert_eq!(
+            tr.changed(0.0),
+            Side::Nums,
+            "primeira avaliacao sempre envia"
+        );
         assert_eq!(tr.nums(), &[0.0]);
         assert_eq!(tr.changed(0.0), Side::Same);
         assert_eq!(tr.changed(0.5), Side::Nums);
-        assert_eq!(tr.nums(), &[50.0], "valor interpolado, como o value() do Python");
+        assert_eq!(
+            tr.nums(),
+            &[50.0],
+            "valor interpolado, como o value() do Python"
+        );
         assert_eq!(tr.changed(2.0), Side::Nums);
-        assert_eq!(tr.changed(3.0), Side::Same, "depois do ultimo keyframe segura o valor");
+        assert_eq!(
+            tr.changed(3.0),
+            Side::Same,
+            "depois do ultimo keyframe segura o valor"
+        );
 
         let mut txt = Track::new(
             "media".into(),
             1,
             0,
             Keys::new(vec![
-                Keyframe { t: 0.0, value: Value::Text("play".into()), curve: Curve::Linear, c: BEZ },
-                Keyframe { t: 1.0, value: Value::Text("stop".into()), curve: Curve::Linear, c: BEZ },
+                Keyframe {
+                    t: 0.0,
+                    value: Value::Text("play".into()),
+                    curve: Curve::Linear,
+                    c: BEZ,
+                },
+                Keyframe {
+                    t: 1.0,
+                    value: Value::Text("stop".into()),
+                    curve: Curve::Linear,
+                    c: BEZ,
+                },
             ]),
         );
         assert_eq!(txt.changed(0.0), Side::Text);
@@ -616,7 +674,11 @@ mod tests {
 
     #[test]
     fn crossed_por_borda() {
-        let k = Keys::new(vec![kf(0.0, 0.0, "linear"), kf(1.0, 1.0, "linear"), kf(2.0, 2.0, "linear")]);
+        let k = Keys::new(vec![
+            kf(0.0, 0.0, "linear"),
+            kf(1.0, 1.0, "linear"),
+            kf(2.0, 2.0, "linear"),
+        ]);
         assert_eq!(k.crossed(0.0, 1.0).len(), 1);
         assert_eq!(k.crossed(0.0, 2.0).len(), 2);
         assert_eq!(k.crossed(1.0, 1.0).len(), 0);

@@ -20,12 +20,16 @@ fn tela(w: usize, h: usize, dentro: impl Fn(usize, usize) -> bool) -> Vec<u8> {
 
 /// Quadrado cheio de 32x32 centrado em 64x64: cantos em (16,16) e (47,47).
 fn quadrado() -> Vec<u8> {
-    tela(64, 64, |x, y| (16..=47).contains(&x) && (16..=47).contains(&y))
+    tela(64, 64, |x, y| {
+        (16..=47).contains(&x) && (16..=47).contains(&y)
+    })
 }
 
 /// Disco cheio de raio 20 centrado em 64x64.
 fn circulo() -> Vec<u8> {
-    tela(64, 64, |x, y| (x as f64 - 31.5).powi(2) + (y as f64 - 31.5).powi(2) <= 400.0)
+    tela(64, 64, |x, y| {
+        (x as f64 - 31.5).powi(2) + (y as f64 - 31.5).powi(2) <= 400.0
+    })
 }
 
 /// Corridas de pontos acesos (um caminho desenhado = uma corrida).
@@ -42,11 +46,16 @@ fn quadrado_da_um_caminho_de_quatro_vertices() {
     let n = ps[0].len();
     assert!((4..=6).contains(&n), "vertices depois do RDP: {n}");
     assert_eq!(ps[0][0], ps[0][n - 1], "caminho tem que sair fechado");
-    assert!(ps[0].iter().all(|p| p.x.abs() as i32 <= LIM && p.y.abs() as i32 <= LIM));
+    assert!(ps[0]
+        .iter()
+        .all(|p| p.x.abs() as i32 <= LIM && p.y.abs() as i32 <= LIM));
     // o quadrado cheio ocupa metade da imagem: a bbox tem que ficar perto de metade da faixa
     let xs: Vec<i32> = ps[0].iter().map(|p| p.x as i32).collect();
     let larg = xs.iter().max().unwrap() - xs.iter().min().unwrap();
-    assert!((30000..=35000).contains(&larg), "largura em unidades ILDA: {larg}");
+    assert!(
+        (30000..=35000).contains(&larg),
+        "largura em unidades ILDA: {larg}"
+    );
 }
 
 #[test]
@@ -56,7 +65,9 @@ fn circulo_da_um_caminho_com_pontos_de_sobra() {
     let n = ps[0].len();
     assert!((8..=80).contains(&n), "pontos do circulo: {n}");
     // circulo nao pode virar poligono de 4 lados nem guardar o contorno cru (129 pixels)
-    assert!(ps[0].iter().all(|p| p.x.abs() as i32 <= LIM && p.y.abs() as i32 <= LIM));
+    assert!(ps[0]
+        .iter()
+        .all(|p| p.x.abs() as i32 <= LIM && p.y.abs() as i32 <= LIM));
 }
 
 #[test]
@@ -69,7 +80,10 @@ fn dois_objetos_dois_caminhos_com_blanking() {
     assert_eq!(ps.len(), 2, "dois objetos separados = dois caminhos");
     let pts = trace(&img, 64, 64, &Opts::default());
     assert_eq!(corridas(&pts), 2, "duas corridas acesas");
-    assert!(pts.iter().any(|p| p.blank), "sem ponto apagado entre os caminhos");
+    assert!(
+        pts.iter().any(|p| p.blank),
+        "sem ponto apagado entre os caminhos"
+    );
 }
 
 /// Sem flood fill da componente, o raster ainda encontra candidatos DENTRO de um objeto
@@ -93,16 +107,28 @@ fn buraco_nao_duplica_o_contorno() {
 #[test]
 fn max_points_respeitado() {
     let img = circulo();
-    let o = Opts { max_points: 16, epsilon: 0.2, ..Opts::default() };
+    let o = Opts {
+        max_points: 16,
+        epsilon: 0.2,
+        ..Opts::default()
+    };
     let ps = paths(&img, 64, 64, &o);
     let n: usize = ps.iter().map(|p| p.len()).sum();
     assert!(n <= 16, "pontos depois do corte: {n}");
     assert!(n >= 8, "corte comeu o circulo inteiro: {n}");
     // sem o corte o mesmo epsilon da bem mais
-    let solto: usize = paths(&img, 64, 64, &Opts { epsilon: 0.2, ..Opts::default() })
-        .iter()
-        .map(|p| p.len())
-        .sum();
+    let solto: usize = paths(
+        &img,
+        64,
+        64,
+        &Opts {
+            epsilon: 0.2,
+            ..Opts::default()
+        },
+    )
+    .iter()
+    .map(|p| p.len())
+    .sum();
     assert!(solto > n);
 }
 
@@ -118,10 +144,23 @@ fn imagem_vazia_nao_da_ponto() {
 #[test]
 fn invert_e_cor() {
     let img = quadrado();
-    let o = Opts { color: Some((10, 20, 30)), ..Opts::default() };
-    assert!(paths(&img, 64, 64, &o)[0].iter().all(|p| (p.r, p.g, p.b) == (10, 20, 30)));
+    let o = Opts {
+        color: Some((10, 20, 30)),
+        ..Opts::default()
+    };
+    assert!(paths(&img, 64, 64, &o)[0]
+        .iter()
+        .all(|p| (p.r, p.g, p.b) == (10, 20, 30)));
     // invertido, a figura e a moldura preta: contorno da borda da imagem
-    let inv = paths(&img, 64, 64, &Opts { invert: true, ..Opts::default() });
+    let inv = paths(
+        &img,
+        64,
+        64,
+        &Opts {
+            invert: true,
+            ..Opts::default()
+        },
+    );
     assert_eq!(inv.len(), 1);
     let xs: Vec<i32> = inv[0].iter().map(|p| p.x as i32).collect();
     assert!(xs.iter().min().unwrap() < &-32000 && xs.iter().max().unwrap() > &32000);
@@ -155,6 +194,9 @@ fn tempo_de_um_quadro_1080p() {
     println!("1920x1080, 20 discos: {melhor:.2} ms, {n} pontos");
     assert_eq!(paths(&img, w, h, &o).len(), 20);
     if !cfg!(debug_assertions) {
-        assert!(melhor < 8.0, "meta do PRD: < 8 ms por quadro em release; deu {melhor:.2} ms");
+        assert!(
+            melhor < 8.0,
+            "meta do PRD: < 8 ms por quadro em release; deu {melhor:.2} ms"
+        );
     }
 }

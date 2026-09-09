@@ -8,17 +8,25 @@ use laser::frame::{optimize, Frame, Safety};
 use laser::ild;
 
 fn dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("fixtures")
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixtures")
 }
 
 fn um(path: PathBuf) -> Frame {
     let mut f = ild::read(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-    assert_eq!(f.len(), 1, "fixture com mais de um frame: {}", path.display());
+    assert_eq!(
+        f.len(),
+        1,
+        "fixture com mais de um frame: {}",
+        path.display()
+    );
     f.remove(0)
 }
 
 fn num(v: &serde_json::Value, k: &str) -> f64 {
-    v[k].as_f64().unwrap_or_else(|| panic!("parametro {k} ausente"))
+    v[k].as_f64()
+        .unwrap_or_else(|| panic!("parametro {k} ausente"))
 }
 
 fn zona(v: &serde_json::Value) -> Option<(f64, f64, f64, f64)> {
@@ -44,7 +52,11 @@ fn optimize_e_safety_batem_com_o_python() {
         let p = &c["params"];
         let entrada = um(d.join(format!("{name}_in.ild")));
         let esperado = um(d.join(format!("{name}_out.ild")));
-        assert_eq!(entrada.len(), c["n_in"].as_u64().unwrap() as usize, "{name}: n_in");
+        assert_eq!(
+            entrada.len(),
+            c["n_in"].as_u64().unwrap() as usize,
+            "{name}: n_in"
+        );
         let mut got = entrada;
         if op.starts_with("optimize") {
             got = optimize(

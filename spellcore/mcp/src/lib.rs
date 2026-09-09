@@ -151,7 +151,9 @@ impl ServerHandler for Spell {
                 .with_mime_type("application/json"),
             Resource::new(COMMANDS, "commands")
                 .with_title("Registry")
-                .with_description("Todo comando do produto: nome, doc e schema JSON dos parametros.")
+                .with_description(
+                    "Todo comando do produto: nome, doc e schema JSON dos parametros.",
+                )
                 .with_mime_type("application/json"),
             Resource::new(GRAPH, "graph")
                 .with_title("Graph do show")
@@ -159,7 +161,9 @@ impl ServerHandler for Spell {
                 .with_mime_type("application/json"),
             Resource::new(FACE, "face")
                 .with_title("Face do show")
-                .with_description("Superficie de operacao: faces/<nome>.face.json ou o objeto inline.")
+                .with_description(
+                    "Superficie de operacao: faces/<nome>.face.json ou o objeto inline.",
+                )
                 .with_mime_type("application/json"),
         ]))
     }
@@ -170,16 +174,25 @@ impl ServerHandler for Spell {
         _c: RequestContext<RoleServer>,
     ) -> Result<ReadResourceResponse, McpError> {
         let txt = match r.uri.as_str() {
-            SHOW => texto(&self.reg.call("show_get", Value::Object(Map::new())).map_err(
-                |e| McpError::internal_error(format!("show_get: {}", e), None),
-            )?),
+            SHOW => texto(
+                &self
+                    .reg
+                    .call("show_get", Value::Object(Map::new()))
+                    .map_err(|e| McpError::internal_error(format!("show_get: {}", e), None))?,
+            ),
             COMMANDS => texto(&self.reg.schema()),
             GRAPH => self.leia("graph_get")?,
             FACE => self.leia("face_get")?,
-            u => return Err(McpError::resource_not_found(format!("resource {}", u), None)),
+            u => {
+                return Err(McpError::resource_not_found(
+                    format!("resource {}", u),
+                    None,
+                ))
+            }
         };
-        Ok(ReadResourceResult::new(vec![ResourceContents::text(txt, &r.uri)
-            .with_mime_type("application/json")])
+        Ok(ReadResourceResult::new(vec![
+            ResourceContents::text(txt, &r.uri).with_mime_type("application/json")
+        ])
         .into())
     }
 }
@@ -213,13 +226,24 @@ mod tests {
     fn tools_saem_do_registry() {
         let s = Spell::new(engine::registry::base());
         let t = s.tools();
-        for n in ["load", "show_get", "pause", "stop", "locate", "transport_state"] {
+        for n in [
+            "load",
+            "show_get",
+            "pause",
+            "stop",
+            "locate",
+            "transport_state",
+        ] {
             assert!(t.iter().any(|x| x.name == n), "tool {} ausente", n);
         }
         let locate = t.iter().find(|x| x.name == "locate").unwrap();
         assert_eq!(locate.input_schema["type"], json!("object"));
         assert!(locate.input_schema["properties"]["t"].is_object());
-        assert!(locate.description.as_deref().unwrap_or("").contains("instante"));
+        assert!(locate
+            .description
+            .as_deref()
+            .unwrap_or("")
+            .contains("instante"));
     }
 
     #[test]

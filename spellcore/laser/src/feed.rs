@@ -30,7 +30,13 @@ pub struct Transform {
 
 impl Default for Transform {
     fn default() -> Transform {
-        Transform { x: 0.0, y: 0.0, scale: 1.0, rot: 0.0, color: (1.0, 1.0, 1.0) }
+        Transform {
+            x: 0.0,
+            y: 0.0,
+            scale: 1.0,
+            rot: 0.0,
+            color: (1.0, 1.0, 1.0),
+        }
     }
 }
 
@@ -110,7 +116,12 @@ impl Feed {
     /// Sobe a thread do DAC. `ring` = frames em voo; 2 ou 3 basta (frame velho nao serve
     /// para nada num laser). `safety` e obrigatoria e pode ser trocada em runtime, nunca
     /// desligada.
-    pub fn start(mut dac: Box<dyn Dac>, pps: u32, ring: usize, safety: Safety) -> std::io::Result<Feed> {
+    pub fn start(
+        mut dac: Box<dyn Dac>,
+        pps: u32,
+        ring: usize,
+        safety: Safety,
+    ) -> std::io::Result<Feed> {
         let name = dac.name();
         dac.begin(pps)?;
         let n = ring.max(1) + 1;
@@ -128,7 +139,11 @@ impl Feed {
         });
         let s = shared.clone();
         let handle = std::thread::spawn(move || run(dac, s));
-        Ok(Feed { shared, handle: Some(handle), name })
+        Ok(Feed {
+            shared,
+            handle: Some(handle),
+            name,
+        })
     }
 
     pub fn name(&self) -> &str {
@@ -156,22 +171,40 @@ impl Feed {
         drop(r);
         self.shared.cv.notify_one();
         if dropped {
-            self.shared.stats.lock().unwrap_or_else(|e| e.into_inner()).1 += 1;
+            self.shared
+                .stats
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .1 += 1;
         }
     }
 
     pub fn set_transform(&self, t: Transform) {
-        self.shared.params.lock().unwrap_or_else(|e| e.into_inner()).0 = t;
+        self.shared
+            .params
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .0 = t;
     }
 
     pub fn set_safety(&self, s: Safety) {
-        self.shared.params.lock().unwrap_or_else(|e| e.into_inner()).1 = s;
+        self.shared
+            .params
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .1 = s;
     }
 
     pub fn stats(&self) -> FeedStats {
         let g = self.shared.stats.lock().unwrap_or_else(|e| e.into_inner());
         let (sent, dropped, errors, cpu, iv) = (g.0, g.1, g.2, g.3, &g.4);
-        let mut st = FeedStats { sent, dropped, errors, cpu, ..FeedStats::default() };
+        let mut st = FeedStats {
+            sent,
+            dropped,
+            errors,
+            cpu,
+            ..FeedStats::default()
+        };
         if iv.len() > 1 {
             let mean = iv.iter().sum::<f64>() / iv.len() as f64;
             let mut d: Vec<f64> = iv.iter().map(|x| (x - mean).abs()).collect();
@@ -304,14 +337,20 @@ fn thread_cpu() -> Option<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dac::etherdream::{EtherDream, Emulator};
+    use crate::dac::etherdream::{Emulator, EtherDream};
 
     #[test]
     fn transform_gira_escala_e_translada() {
         let src = [Point::new(1000.0, 0.0, 200, 100, 50, false)];
         let mut out = Vec::new();
-        Transform { x: 5.0, y: 0.0, scale: 2.0, rot: 90.0, color: (1.0, 0.5, 0.0) }
-            .apply(&src, &mut out);
+        Transform {
+            x: 5.0,
+            y: 0.0,
+            scale: 2.0,
+            rot: 90.0,
+            color: (1.0, 0.5, 0.0),
+        }
+        .apply(&src, &mut out);
         assert_eq!((out[0].x, out[0].y), (5, 2000));
         assert_eq!((out[0].r, out[0].g, out[0].b), (200, 50, 0));
         // identidade copia sem mexer
@@ -335,7 +374,10 @@ mod tests {
         feed.stop();
         let st = feed.stats();
         assert!(st.sent > 0, "nada foi enviado");
-        assert!(st.dropped > 0, "o ring nao descartou nada com 200 frames de uma vez");
+        assert!(
+            st.dropped > 0,
+            "o ring nao descartou nada com 200 frames de uma vez"
+        );
         assert_eq!(st.errors, 0);
         // todo frame ou saiu ou foi descartado; no maximo os 2 do ring ficam para tras
         let contados = st.sent + st.dropped;
@@ -350,7 +392,11 @@ mod tests {
             Box::new(dac),
             20_000,
             2,
-            Safety { min_size: 2000, max_intensity: 255, zone: None },
+            Safety {
+                min_size: 2000,
+                max_intensity: 255,
+                zone: None,
+            },
         )
         .unwrap();
         // figura de 100 unidades: ganho 100/2000 -> 255 vira 12
@@ -362,6 +408,10 @@ mod tests {
         feed.stop();
         let got = emu.points();
         assert_eq!(got.len(), 50);
-        assert!(got.iter().all(|p| p.r == 12 * 257), "safety nao escureceu: {:?}", got[0]);
+        assert!(
+            got.iter().all(|p| p.r == 12 * 257),
+            "safety nao escureceu: {:?}",
+            got[0]
+        );
     }
 }

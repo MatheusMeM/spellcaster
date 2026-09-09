@@ -119,8 +119,8 @@ pub fn save(path: &Path, show: &Show) -> Result<(), String> {
     let mut out = show.clone();
     out.version = VERSION;
     out.extra.retain(|k, _| !k.starts_with('_')); // "_dir" e afins nao vao para o arquivo
-    // ponytail: indent 2 do serde em vez do indent 1 do json.dump ; o Python le igual e nenhum
-    // teste compara o texto ; casar byte a byte so' se o .spell entrar em diff de git.
+                                                  // ponytail: indent 2 do serde em vez do indent 1 do json.dump ; o Python le igual e nenhum
+                                                  // teste compara o texto ; casar byte a byte so' se o .spell entrar em diff de git.
     let txt = serde_json::to_string_pretty(&out).map_err(|e| e.to_string())?;
     std::fs::write(path, format!("{}\n", txt)).map_err(|e| format!("{}: {}", path.display(), e))
 }
@@ -149,15 +149,31 @@ mod tests {
         .unwrap();
         assert_eq!(sh.outputs.len(), 3);
         match &sh.outputs[0] {
-            OutputCfg::Sacn { universes, priority, source_name, .. } => {
+            OutputCfg::Sacn {
+                universes,
+                priority,
+                source_name,
+                ..
+            } => {
                 assert_eq!(universes, &vec![1u16, 2]);
                 assert_eq!(*priority, 100);
                 assert_eq!(source_name, "Spellcaster");
             }
             o => panic!("esperava sacn, veio {:?}", o),
         }
-        assert_eq!(sh.outputs[1], OutputCfg::ArtNet { targets: None, broadcast: false });
-        assert_eq!(sh.outputs[2], OutputCfg::Unknown { tipo: "laser".into() });
+        assert_eq!(
+            sh.outputs[1],
+            OutputCfg::ArtNet {
+                targets: None,
+                broadcast: false
+            }
+        );
+        assert_eq!(
+            sh.outputs[2],
+            OutputCfg::Unknown {
+                tipo: "laser".into()
+            }
+        );
     }
 
     #[test]

@@ -18,7 +18,10 @@ fn abrir_editar_gravar_e_reabrir() {
     assert_eq!(sh["outputs"][0]["type"], json!("sacn"));
     assert_eq!(sh["tracks"], json!([]));
     assert_eq!(sh["patch"], json!([]));
-    assert_eq!(c("show_get", json!({"full": true})).unwrap()["cues"], json!([]));
+    assert_eq!(
+        c("show_get", json!({"full": true})).unwrap()["cues"],
+        json!([])
+    );
 
     // medgrupo + track novo com keyframes fora de ordem
     c("show_get", json!({ "file": SPELL })).unwrap();
@@ -34,7 +37,11 @@ fn abrir_editar_gravar_e_reabrir() {
         json!({"track": 3, "t": 2.5, "value": "[255, 128, 0]", "curve": "inout"}),
     )
     .unwrap();
-    let ks = c("key_set", json!({"track": 3, "t": 1, "value": [10, 10, 10]})).unwrap();
+    let ks = c(
+        "key_set",
+        json!({"track": 3, "t": 1, "value": [10, 10, 10]}),
+    )
+    .unwrap();
     let ts: Vec<f64> = ks
         .as_array()
         .unwrap()
@@ -42,10 +49,18 @@ fn abrir_editar_gravar_e_reabrir() {
         .map(|k| k[0].as_f64().unwrap())
         .collect();
     assert_eq!(ts, vec![0.0, 1.0, 2.5], "ordenado por tempo");
-    assert_eq!(ks[2], json!([2.5, [255, 128, 0], "inout"]), "texto JSON vira lista");
+    assert_eq!(
+        ks[2],
+        json!([2.5, [255, 128, 0], "inout"]),
+        "texto JSON vira lista"
+    );
 
     // mesmo t substitui; key_del conta; curva e track invalidos sao erro
-    let ks = c("key_set", json!({"track": 3, "t": 1, "value": 10, "curve": "hold"})).unwrap();
+    let ks = c(
+        "key_set",
+        json!({"track": 3, "t": 1, "value": 10, "curve": "hold"}),
+    )
+    .unwrap();
     assert_eq!(ks[1], json!([1.0, 10, "hold"]));
     assert_eq!(ks.as_array().unwrap().len(), 3);
     assert_eq!(c("key_del", json!({"track": 3, "t": 1})).unwrap(), json!(1));
@@ -71,7 +86,10 @@ fn abrir_editar_gravar_e_reabrir() {
         .unwrap(),
         json!(0)
     );
-    assert_eq!(c("cue_set", json!({"name": "b", "follow": true})).unwrap(), json!(1));
+    assert_eq!(
+        c("cue_set", json!({"name": "b", "follow": true})).unwrap(),
+        json!(1)
+    );
     assert_eq!(
         c("cue_set", json!({"index": 0, "name": "a2", "fade": 3})).unwrap(),
         json!(0)
@@ -85,7 +103,10 @@ fn abrir_editar_gravar_e_reabrir() {
     assert_eq!(full["cues"][1]["follow"], json!(true));
     let resumo = c("show_get", json!({})).unwrap();
     assert_eq!(resumo["cues"][0]["fade"], json!(3.0));
-    assert_eq!(c("cue_del", json!({"index": 0})).unwrap()["name"], json!("a2"));
+    assert_eq!(
+        c("cue_del", json!({"index": 0})).unwrap()["name"],
+        json!("a2")
+    );
     assert!(c("cue_del", json!({"index": 1})).is_err());
 
     // patch: 17 ch em 300 e 316 sobrepoe; em 317 nao
@@ -95,14 +116,26 @@ fn abrir_editar_gravar_e_reabrir() {
     let e = c("patch_add", bsw("bsw_2", 316)).unwrap_err();
     assert!(e.contains("sobreposicao") && e.contains("316"), "{}", e);
     let rows = c("patch_add", bsw("bsw_2", 317)).unwrap();
-    assert_eq!(rows.as_array().unwrap().len(), 2, "a recusada nao ficou no patch");
-    assert!(c("patch_add", bsw("bsw_2", 400)).unwrap_err().contains("ja esta"));
-    assert!(c("patch_add", json!({"name": "x", "profile": "dimmer_1", "address": 513}))
+    assert_eq!(
+        rows.as_array().unwrap().len(),
+        2,
+        "a recusada nao ficou no patch"
+    );
+    assert!(c("patch_add", bsw("bsw_2", 400))
         .unwrap_err()
-        .contains("512"));
-    assert!(c("patch_add", json!({"name": "x", "profile": "nao_existe", "address": 1}))
-        .unwrap_err()
-        .contains("nao encontrado"));
+        .contains("ja esta"));
+    assert!(c(
+        "patch_add",
+        json!({"name": "x", "profile": "dimmer_1", "address": 513})
+    )
+    .unwrap_err()
+    .contains("512"));
+    assert!(c(
+        "patch_add",
+        json!({"name": "x", "profile": "nao_existe", "address": 1})
+    )
+    .unwrap_err()
+    .contains("nao encontrado"));
     let ck = c("patch_check", json!({})).unwrap();
     assert_eq!(ck["error"], Value::Null);
     assert_eq!(ck["rows"].as_array().unwrap().len(), 2);
@@ -132,7 +165,9 @@ fn abrir_editar_gravar_e_reabrir() {
     );
     c("show_new", json!({})).unwrap();
     assert!(
-        c("show_save", json!({})).unwrap_err().contains("sem caminho"),
+        c("show_save", json!({}))
+            .unwrap_err()
+            .contains("sem caminho"),
         "show novo nao tem caminho"
     );
     let depois = c("show_get", json!({"file": f, "full": true})).unwrap();

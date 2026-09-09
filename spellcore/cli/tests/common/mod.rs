@@ -112,6 +112,10 @@ impl Drop for Mcp {
 
 /// Texto da primeira parte de um `tools/call` (ou de um `resources/read`).
 pub fn texto(r: &Value) -> String {
-    let v = if r["content"].is_array() { &r["content"] } else { &r["contents"] };
+    let v = if r["content"].is_array() {
+        &r["content"]
+    } else {
+        &r["contents"]
+    };
     v[0]["text"].as_str().unwrap_or_default().to_string()
 }

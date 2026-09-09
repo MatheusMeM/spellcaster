@@ -54,7 +54,16 @@ impl Default for Opts {
 }
 
 /// Vizinhanca de Moore em sentido horario (imagem tem Y para baixo).
-const D: [(i32, i32); 8] = [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)];
+const D: [(i32, i32); 8] = [
+    (1, 0),
+    (1, 1),
+    (0, 1),
+    (-1, 1),
+    (-1, 0),
+    (-1, -1),
+    (0, -1),
+    (1, -1),
+];
 
 struct Grid<'a> {
     m: &'a [bool],
@@ -164,7 +173,11 @@ fn rdp(pts: &[(i32, i32)], eps: f32) -> Vec<(i32, i32)> {
             stack.push((best, b));
         }
     }
-    pts.iter().zip(keep).filter(|(_, k)| *k).map(|(p, _)| *p).collect()
+    pts.iter()
+        .zip(keep)
+        .filter(|(_, k)| *k)
+        .map(|(p, _)| *p)
+        .collect()
 }
 
 /// Corte proporcional: cada caminho fica com `len * max / total` pontos, por amostragem
@@ -222,7 +235,11 @@ pub fn paths(rgba: &[u8], w: usize, h: usize, o: &Opts) -> Vec<Vec<Point>> {
         return Vec::new();
     }
     let m = mask(rgba, w, h, o);
-    let g = Grid { m: &m, w: w as i32, h: h as i32 };
+    let g = Grid {
+        m: &m,
+        w: w as i32,
+        h: h as i32,
+    };
     let mut seen = vec![false; w * h];
     let mut raw: Vec<Vec<(i32, i32)>> = Vec::new();
     'fora: for y in 0..g.h {
@@ -287,7 +304,10 @@ pub fn trace(rgba: &[u8], w: usize, h: usize, o: &Opts) -> Vec<Point> {
         if i > 0 {
             // ponto apagado no inicio do proximo caminho: o `optimize` abre o gap e
             // interpola o salto sozinho
-            src.push(Point { blank: true, ..p[0] });
+            src.push(Point {
+                blank: true,
+                ..p[0]
+            });
         }
         src.extend_from_slice(p);
     }

@@ -11,9 +11,10 @@ const SHOW: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../shows/medgrupo.sp
 
 #[test]
 fn handshake_tools_e_resources() {
-    let mut m = Mcp::cru();                 // sem o handshake do harness: e' ele que se confere aqui
+    let mut m = Mcp::cru(); // sem o handshake do harness: e' ele que se confere aqui
 
-    let init = m.rpc("initialize",
+    let init = m.rpc(
+        "initialize",
         json!({"protocolVersion": "2025-06-18", "capabilities": {},
                "clientInfo": {"name": "teste", "version": "0"}}),
     );
@@ -95,7 +96,12 @@ fn handshake_tools_e_resources() {
         .collect();
     assert_eq!(
         uris,
-        vec!["spell://show", "spell://commands", "spell://graph", "spell://face"]
+        vec![
+            "spell://show",
+            "spell://commands",
+            "spell://graph",
+            "spell://face"
+        ]
     );
 
     let c = m.rpc("resources/read", json!({"uri": "spell://commands"}));
@@ -112,7 +118,11 @@ fn handshake_tools_e_resources() {
 
     let s = m.rpc("resources/read", json!({"uri": "spell://show"}));
     let d: Value = serde_json::from_str(s["contents"][0]["text"].as_str().unwrap()).unwrap();
-    assert_eq!(d["aberto"], json!(true), "o show aberto pelo show_get continua aberto");
+    assert_eq!(
+        d["aberto"],
+        json!(true),
+        "o show aberto pelo show_get continua aberto"
+    );
     assert_eq!(d["transport"], Value::Null, "nenhum player rodando");
 
     // graph: o resource le o graph_get do registry; o medgrupo nao tem graph, entao vem vazio
@@ -125,7 +135,10 @@ fn handshake_tools_e_resources() {
                              {"id": "t", "type": "logic.toggle"},
                              {"id": "c", "type": "cmd", "cmd": "cue_go"}],
                    "edges": [["k.down", "t.in"], ["t.out", "c.trigger"]]});
-    let r = m.tool("show_patch", json!({"ops": [{"op": "add", "path": "/graph", "value": g}]}));
+    let r = m.tool(
+        "show_patch",
+        json!({"ops": [{"op": "add", "path": "/graph", "value": g}]}),
+    );
     assert_eq!(r["isError"], json!(false));
     let lido = m.rpc("resources/read", json!({"uri": "spell://graph"}));
     let lido: Value = serde_json::from_str(lido["contents"][0]["text"].as_str().unwrap()).unwrap();
@@ -141,17 +154,30 @@ fn handshake_tools_e_resources() {
     let ciclo = json!({"nodes": [{"id": "a", "type": "logic.not"},
                                  {"id": "b", "type": "logic.not"}],
                        "edges": [["a.out", "b.in"], ["b.out", "a.in"]]});
-    m.tool("show_patch", json!({"ops": [{"op": "replace", "path": "/graph", "value": ciclo}]}));
+    m.tool(
+        "show_patch",
+        json!({"ops": [{"op": "replace", "path": "/graph", "value": ciclo}]}),
+    );
     let r = m.tool("graph_check", json!({}));
     let c: Value = serde_json::from_str(&texto(&r)).expect("graph_check devolve JSON");
     let e = c["error"].as_str().unwrap_or("");
-    assert!(e.contains("ciclo") && e.contains('a') && e.contains('b'), "{}", e);
+    assert!(
+        e.contains("ciclo") && e.contains('a') && e.contains('b'),
+        "{}",
+        e
+    );
 
     // show_patch: edita e devolve as ops de undo
-    let r = m.tool("show_patch", json!({"ops": [{"op": "replace", "path": "/fps", "value": 25}]}));
+    let r = m.tool(
+        "show_patch",
+        json!({"ops": [{"op": "replace", "path": "/fps", "value": 25}]}),
+    );
     let d: Value = serde_json::from_str(&texto(&r)).expect("show_patch devolve JSON");
     assert!(d["rev"].as_u64().unwrap_or(0) > 0);
-    assert_eq!(d["undo"], json!([{"op": "replace", "path": "/fps", "value": 30}]));
+    assert_eq!(
+        d["undo"],
+        json!([{"op": "replace", "path": "/fps", "value": 30}])
+    );
 }
 
 /// `play_show` bloqueia ate o fim do show: pelo MCP ele roda em thread e a tool volta na hora.
@@ -170,7 +196,11 @@ fn play_show_em_background_nao_suja_o_stdout() {
     let f = p.to_string_lossy().to_string();
     let r = m.tool("play_show", json!({"file": f}));
     assert_eq!(r["isError"], json!(false));
-    assert!(texto(&r).starts_with("play_show iniciado em background"), "{}", texto(&r));
+    assert!(
+        texto(&r).starts_with("play_show iniciado em background"),
+        "{}",
+        texto(&r)
+    );
 
     // o show tem 0,4 s; ate ele acabar, `transport_state` responde — e cada resposta que chega
     // inteira aqui prova que a linha de status do play foi para o stderr.

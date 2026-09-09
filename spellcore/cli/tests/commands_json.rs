@@ -27,9 +27,10 @@ fn dev_commands_json_em_dia() {
     let vivos = vivo.as_array().expect("lista de comandos");
     for c in disco.as_array().expect("lista de comandos") {
         let n = &c["name"];
-        let v = vivos.iter().find(|x| x["name"] == *n).unwrap_or_else(|| {
-            panic!("{} saiu do registry; regere com `spellcore commands`", n)
-        });
+        let v = vivos
+            .iter()
+            .find(|x| x["name"] == *n)
+            .unwrap_or_else(|| panic!("{} saiu do registry; regere com `spellcore commands`", n));
         assert_eq!(
             v, c,
             "schema de {} mudou; regere com `spellcore commands`",

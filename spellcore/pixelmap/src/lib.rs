@@ -277,7 +277,8 @@ impl Mapper {
         self.unis.par_iter_mut().for_each(|u| {
             for f in &u.fixtures {
                 let (r, g, b) = frame.sample(f.u, f.v, s);
-                f.order.write(r, g, b, &mut u.data[f.channel as usize - 1..]);
+                f.order
+                    .write(r, g, b, &mut u.data[f.channel as usize - 1..]);
             }
         });
     }

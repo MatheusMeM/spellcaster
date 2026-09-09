@@ -14,7 +14,11 @@ fn medgrupo_universo_1_byte_a_byte() {
     let bin = std::fs::read(root().join("tests/conformance/medgrupo_u1.bin"))
         .expect("tests/conformance/medgrupo_u1.bin ausente: rode gen.py");
     let n = u32::from_le_bytes(bin[0..4].try_into().unwrap()) as usize;
-    assert_eq!(bin.len(), 4 + n * 512, "tamanho do .bin nao bate com nframes");
+    assert_eq!(
+        bin.len(),
+        4 + n * 512,
+        "tamanho do .bin nao bate com nframes"
+    );
 
     let sh = show::load(&root().join("shows/medgrupo_r0.spell")).unwrap();
     let fps = sh.fps as f64;

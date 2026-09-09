@@ -125,17 +125,25 @@ fn register(e: &mut Engine, pend: &Arc<Mutex<Pend>>, uni: u16) {
         p.lock().unwrap().write(un, a, &[v as f64])
     });
     let p = pend.clone();
-    e.register_fn("set", move |a: i64, v: Array| p.lock().unwrap().write_arr(u, a, &v));
+    e.register_fn("set", move |a: i64, v: Array| {
+        p.lock().unwrap().write_arr(u, a, &v)
+    });
     let p = pend.clone();
-    e.register_fn("set", move |a: i64, v: f64| p.lock().unwrap().write(u, a, &[v]));
+    e.register_fn("set", move |a: i64, v: f64| {
+        p.lock().unwrap().write(u, a, &[v])
+    });
     let p = pend.clone();
-    e.register_fn("set", move |a: i64, v: i64| p.lock().unwrap().write(u, a, &[v as f64]));
+    e.register_fn("set", move |a: i64, v: i64| {
+        p.lock().unwrap().write(u, a, &[v as f64])
+    });
     let p = pend.clone();
     e.register_fn("st", move |i: i64| p.lock().unwrap().st(i));
     let p = pend.clone();
     e.register_fn("st", move |i: i64, v: f64| p.lock().unwrap().st_set(i, v));
     let p = pend.clone();
-    e.register_fn("st", move |i: i64, v: i64| p.lock().unwrap().st_set(i, v as f64));
+    e.register_fn("st", move |i: i64, v: i64| {
+        p.lock().unwrap().st_set(i, v as f64)
+    });
 }
 
 /// Track `{"type":"fx","script":"...rhai","universe":N}`: compila o `.rhai` uma vez e roda
@@ -302,8 +310,16 @@ mod tests {
     #[test]
     fn hooks_le_os_tracks_fx_na_ordem() {
         let dir = std::env::temp_dir();
-        std::fs::write(dir.join("spellcore_h1.rhai"), "fn look(t) { set(1, 1, 11); }").unwrap();
-        std::fs::write(dir.join("spellcore_h2.rhai"), "fn look(t) { set(1, 2, 22); }").unwrap();
+        std::fs::write(
+            dir.join("spellcore_h1.rhai"),
+            "fn look(t) { set(1, 1, 11); }",
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("spellcore_h2.rhai"),
+            "fn look(t) { set(1, 2, 22); }",
+        )
+        .unwrap();
         let sh: Show = serde_json::from_str(
             r#"{"version":1,"tracks":[{"type":"fx","script":"spellcore_h1.rhai","universe":1},
                                       {"type":"dmx","universe":1,"address":1,"keys":[]},

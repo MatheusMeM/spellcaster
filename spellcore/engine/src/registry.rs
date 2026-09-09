@@ -198,14 +198,18 @@ fn estado(h: &player::Handle) -> Result<Value, String> {
 /// rede) e sao acrescentados de fora com `Registry::add`.
 pub fn base() -> Registry {
     let mut r = Registry::new();
-    r.add::<LoadArgs>("load", "Carrega um .spell e devolve nome, fps, duracao e tracks.", |a| {
-        let sh = show::load(Path::new(&a.path))?;
-        let tl = Timeline::new(&sh)?;
-        let out = json!({"name": sh.name, "fps": tl.fps, "duration": tl.duration,
+    r.add::<LoadArgs>(
+        "load",
+        "Carrega um .spell e devolve nome, fps, duracao e tracks.",
+        |a| {
+            let sh = show::load(Path::new(&a.path))?;
+            let tl = Timeline::new(&sh)?;
+            let out = json!({"name": sh.name, "fps": tl.fps, "duration": tl.duration,
                          "tracks": tl.tracks.len(), "ignored": tl.ignored()});
-        crate::edit::abre(a.path.clone(), sh);
-        Ok(out)
-    });
+            crate::edit::abre(a.path.clone(), sh);
+            Ok(out)
+        },
+    );
     r.add::<ShowGetArgs>(
         "show_get",
         "Resumo do .spell aberto (ou do arquivo dado): nome, fps, duracao, saidas, patch, tracks, cues. full=true devolve o .spell inteiro.",
@@ -226,34 +230,52 @@ pub fn base() -> Registry {
     // subindo outro player com `play_show`, e o `serve --show`, que deixa o player parado em
     // t=0, nao teria como solta-lo. Chama-se `resume` e nao `play` porque `play` e' o subcomando
     // da CLI que SOBE um player (o `play_show` do registry); aqui nao se sobe nada.
-    r.add::<NoArgs>("resume", "Retoma o player pausado neste processo (o par do pause).", |_| {
-        let h = vivo()?;
-        h.play();
-        estado(&h)
-    });
-    r.add::<NoArgs>("pause", "Pausa o player em execucao neste processo.", |_| {
-        let h = vivo()?;
-        h.pause();
-        estado(&h)
-    });
+    r.add::<NoArgs>(
+        "resume",
+        "Retoma o player pausado neste processo (o par do pause).",
+        |_| {
+            let h = vivo()?;
+            h.play();
+            estado(&h)
+        },
+    );
+    r.add::<NoArgs>(
+        "pause",
+        "Pausa o player em execucao neste processo.",
+        |_| {
+            let h = vivo()?;
+            h.pause();
+            estado(&h)
+        },
+    );
     r.add::<NoArgs>("stop", "Para o player em execucao neste processo.", |_| {
         let h = vivo()?;
         h.stop();
         estado(&h)
     });
-    r.add::<LocateArgs>("locate", "Salta o player para o instante t (segundos).", |a| {
-        let h = vivo()?;
-        h.locate(a.t);
-        estado(&h)
-    });
-    r.add::<CueGoArgs>("cue_go", "Dispara a proxima cue (ou a de indice dado).", |a| {
-        let h = vivo()?;
-        h.cue_go(a.index);
-        estado(&h)
-    });
-    r.add::<NoArgs>("transport_state", "Estado do transporte do player em execucao.", |_| {
-        estado(&vivo()?)
-    });
+    r.add::<LocateArgs>(
+        "locate",
+        "Salta o player para o instante t (segundos).",
+        |a| {
+            let h = vivo()?;
+            h.locate(a.t);
+            estado(&h)
+        },
+    );
+    r.add::<CueGoArgs>(
+        "cue_go",
+        "Dispara a proxima cue (ou a de indice dado).",
+        |a| {
+            let h = vivo()?;
+            h.cue_go(a.index);
+            estado(&h)
+        },
+    );
+    r.add::<NoArgs>(
+        "transport_state",
+        "Estado do transporte do player em execucao.",
+        |_| estado(&vivo()?),
+    );
     r.add::<InputArgs>(
         "input",
         "Entrega um evento de entrada aos ganchos do player vivo (o Graph): key + value.",
@@ -289,7 +311,11 @@ mod tests {
         let c = &sc.as_array().unwrap()[0];
         assert_eq!(c["name"], "soma");
         assert_eq!(c["doc"], "Soma a + b.");
-        assert!(c["params"]["properties"]["a"].is_object(), "schema: {}", c["params"]);
+        assert!(
+            c["params"]["properties"]["a"].is_object(),
+            "schema: {}",
+            c["params"]
+        );
         assert_eq!(r.get("soma").unwrap().name, "soma");
         assert_eq!(r.iter().count(), 1);
     }
@@ -298,8 +324,17 @@ mod tests {
     #[test]
     fn base_tem_transporte_e_load() {
         let r = base();
-        let esperados = ["load", "show_get", "resume", "pause", "stop", "locate", "cue_go",
-                         "transport_state", "input"];
+        let esperados = [
+            "load",
+            "show_get",
+            "resume",
+            "pause",
+            "stop",
+            "locate",
+            "cue_go",
+            "transport_state",
+            "input",
+        ];
         for c in esperados {
             assert!(r.get(c).is_some(), "comando {} ausente", c);
         }
@@ -329,7 +364,10 @@ mod tests {
     #[test]
     fn show_get_abre_e_lembra() {
         let r = base();
-        assert_eq!(r.call("show_get", json!({})).unwrap()["aberto"], json!(false));
+        assert_eq!(
+            r.call("show_get", json!({})).unwrap()["aberto"],
+            json!(false)
+        );
         let p = concat!(env!("CARGO_MANIFEST_DIR"), "/../../shows/medgrupo.spell");
         let d = r.call("show_get", json!({ "file": p })).unwrap();
         assert_eq!(d["aberto"], json!(true));
@@ -337,9 +375,15 @@ mod tests {
         assert!(d["file"].as_str().unwrap().ends_with("medgrupo.spell"));
         assert!(!d["tracks"].as_array().unwrap().is_empty());
         assert!(d["outputs"].as_array().unwrap().iter().any(|o| o == "sacn"));
-        assert_eq!(d["transport"], Value::Null, "sem player neste binario de teste");
+        assert_eq!(
+            d["transport"],
+            Value::Null,
+            "sem player neste binario de teste"
+        );
         // sem `file`, devolve o mesmo show
         assert_eq!(r.call("show_get", json!({})).unwrap(), d);
-        assert!(r.call("show_get", json!({"file": "nao_existe.spell"})).is_err());
+        assert!(r
+            .call("show_get", json!({"file": "nao_existe.spell"}))
+            .is_err());
     }
 }

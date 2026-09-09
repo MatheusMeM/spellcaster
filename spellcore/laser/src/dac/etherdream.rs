@@ -48,7 +48,10 @@ pub fn parse_response(b: &[u8]) -> Option<Response> {
     if b.len() < RESP_LEN {
         return None;
     }
-    Some(Response { ack: b[0], status: parse_status(&b[2..])? })
+    Some(Response {
+        ack: b[0],
+        status: parse_status(&b[2..])?,
+    })
 }
 
 /// Comando `d`: cabecalho + um registro de 18 bytes por ponto. Cores 0-255 viram 0-65535
@@ -98,7 +101,11 @@ pub struct EtherDream {
 impl EtherDream {
     /// `addr` = "ip" ou "ip:porta" (porta padrao 7765). O DAC manda um status ao conectar.
     pub fn connect(addr: &str, capacity: u16) -> io::Result<EtherDream> {
-        let full = if addr.contains(':') { addr.to_string() } else { format!("{addr}:{TCP_PORT}") };
+        let full = if addr.contains(':') {
+            addr.to_string()
+        } else {
+            format!("{addr}:{TCP_PORT}")
+        };
         let sa = full
             .to_socket_addrs()?
             .next()
@@ -168,7 +175,11 @@ impl EtherDream {
         if self.status.playback_state != 2 {
             return f;
         }
-        let rate = if self.status.point_rate == 0 { self.pps } else { self.status.point_rate };
+        let rate = if self.status.point_rate == 0 {
+            self.pps
+        } else {
+            self.status.point_rate
+        };
         f.saturating_sub((self.ack_at.elapsed().as_secs_f64() * rate as f64) as u32)
     }
 
@@ -193,7 +204,9 @@ impl Dac for EtherDream {
         // ponytail: o Python usava pps/50 (~20 ms de pontos) sem olhar a capacidade ; a 30 kpps
         // isso dava 50 idas e voltas por segundo por DAC e ~1,5 % de um nucleo com 4 feeds
         // so de troca de contexto. Trocar por set_chunk() se um DAC real reclamar do bloco.
-        self.chunk = self.chunk_fixo.unwrap_or(((self.capacity as usize * 2) / 3).max(1));
+        self.chunk = self
+            .chunk_fixo
+            .unwrap_or(((self.capacity as usize * 2) / 3).max(1));
         if self.status.playback_state != 0 {
             self.cmd(b"s")?;
         }
@@ -234,9 +247,10 @@ impl Dac for EtherDream {
                         ));
                     }
                     a => {
-                        return Err(io::Error::other(
-                            format!("Ether Dream respondeu {:?} ao comando d", a as char),
-                        ))
+                        return Err(io::Error::other(format!(
+                            "Ether Dream respondeu {:?} ao comando d",
+                            a as char
+                        )))
                     }
                 }
             }
@@ -304,7 +318,10 @@ impl Emulator {
     pub fn start(capacity: u16) -> io::Result<Emulator> {
         let lis = TcpListener::bind(("127.0.0.1", 0))?;
         let port = lis.local_addr()?.port();
-        let status = Status { protocol: 1, ..Default::default() };
+        let status = Status {
+            protocol: 1,
+            ..Default::default()
+        };
         let emu = Arc::new(Emu {
             capacity,
             record: AtomicBool::new(true),
@@ -319,7 +336,11 @@ impl Emulator {
         });
         let e = emu.clone();
         let handle = std::thread::spawn(move || serve(lis, e));
-        Ok(Emulator { port, emu, handle: Some(handle) })
+        Ok(Emulator {
+            port,
+            emu,
+            handle: Some(handle),
+        })
     }
 
     /// Guardar cada ponto recebido custa memoria e CPU: desligue no bench.
@@ -383,7 +404,10 @@ fn drain(st: &mut EmuState) {
     let now = Instant::now();
     if st.status.playback_state == 2 {
         let gone = (now.duration_since(st.t).as_secs_f64() * st.status.point_rate as f64) as u32;
-        st.status.buffer_fullness = st.status.buffer_fullness.saturating_sub(gone.min(65535) as u16);
+        st.status.buffer_fullness = st
+            .status
+            .buffer_fullness
+            .saturating_sub(gone.min(65535) as u16);
         if st.status.buffer_fullness == 0 {
             st.status.playback_state = 0;
         }
@@ -412,8 +436,10 @@ fn handle(conn: TcpStream, emu: &Arc<Emu>) {
         match rd.read(&mut one) {
             Ok(0) => return,
             Ok(_) => {}
-            Err(e) if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::TimedOut => {
-                continue // ocioso: so volta para conferir o run
+            Err(e)
+                if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::TimedOut =>
+            {
+                continue; // ocioso: so volta para conferir o run
             }
             Err(_) => return,
         }
@@ -552,7 +578,9 @@ mod tests {
             let mut dac = EtherDream::connect(&format!("127.0.0.1:{}", emu.port), 1800).unwrap();
             dac.begin(20_000).unwrap();
             let f = Frame::new(
-                (0..100).map(|i| Point::new(i as f64 * 10.0, -(i as f64) * 10.0, 255, 0, 0, false)).collect(),
+                (0..100)
+                    .map(|i| Point::new(i as f64 * 10.0, -(i as f64) * 10.0, 255, 0, 0, false))
+                    .collect(),
                 "",
             );
             for _ in 0..6 {
@@ -562,7 +590,10 @@ mod tests {
         }
         assert_eq!(emu.count(), 600);
         let pts = emu.points();
-        assert_eq!((pts[1].x, pts[1].y, pts[1].r, pts[1].g, pts[1].b), (10, -10, 65535, 0, 0));
+        assert_eq!(
+            (pts[1].x, pts[1].y, pts[1].r, pts[1].g, pts[1].b),
+            (10, -10, 65535, 0, 0)
+        );
         let cmds = emu.commands();
         assert_eq!(&cmds[..3], b"pdb".as_slice());
         assert_eq!(*cmds.last().unwrap(), b's');

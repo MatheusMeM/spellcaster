@@ -248,7 +248,10 @@ fn dividir(path: &str) -> Result<(&str, String), String> {
     let i = path
         .rfind('/')
         .ok_or_else(|| format!("path {:?}: um JSON Pointer comeca com /", path))?;
-    Ok((&path[..i], path[i + 1..].replace("~1", "/").replace("~0", "~")))
+    Ok((
+        &path[..i],
+        path[i + 1..].replace("~1", "/").replace("~0", "~"),
+    ))
 }
 
 fn indice(n: usize, tok: &str, path: &str, inserindo: bool) -> Result<usize, String> {
@@ -259,7 +262,10 @@ fn indice(n: usize, tok: &str, path: &str, inserindo: bool) -> Result<usize, Str
             .map_err(|_| format!("path {:?}: {:?} nao e' indice de lista", path, tok))?
     };
     if i > n || (!inserindo && i == n) {
-        return Err(format!("path {:?}: indice {} fora da lista de {}", path, i, n));
+        return Err(format!(
+            "path {:?}: indice {} fora da lista de {}",
+            path, i, n
+        ));
     }
     Ok(i)
 }
@@ -794,22 +800,26 @@ pub fn register(r: &mut Registry) {
             })
         },
     );
-    r.add::<NoArgs>("profiles", "Nomes dos perfis disponiveis em profiles/.", |_| {
-        let dir = com_ro(|p, _| Ok(recurso_dir(p, "profiles")))?;
-        let mut v: Vec<String> = std::fs::read_dir(&dir)
-            .map_err(|e| format!("{}: {}", dir.display(), e))?
-            .flatten()
-            .filter_map(|e| {
-                let p = e.path();
-                if p.extension()? != "json" {
-                    return None;
-                }
-                p.file_stem()?.to_str().map(str::to_string)
-            })
-            .collect();
-        v.sort();
-        Ok(json!(v))
-    });
+    r.add::<NoArgs>(
+        "profiles",
+        "Nomes dos perfis disponiveis em profiles/.",
+        |_| {
+            let dir = com_ro(|p, _| Ok(recurso_dir(p, "profiles")))?;
+            let mut v: Vec<String> = std::fs::read_dir(&dir)
+                .map_err(|e| format!("{}: {}", dir.display(), e))?
+                .flatten()
+                .filter_map(|e| {
+                    let p = e.path();
+                    if p.extension()? != "json" {
+                        return None;
+                    }
+                    p.file_stem()?.to_str().map(str::to_string)
+                })
+                .collect();
+            v.sort();
+            Ok(json!(v))
+        },
+    );
     r.add::<ShowPatchArgs>(
         "show_patch",
         "Edita o show aberto por JSON Patch (RFC 6902: add, remove, replace, test). Uma op que falha cancela todas. Devolve {rev, undo}: `undo` e' a lista de ops que volta ao estado anterior, ja' na ordem de aplicacao.",
@@ -889,9 +899,7 @@ pub fn register(r: &mut Registry) {
                         a.name,
                         pr.name,
                         a.channel,
-                        chans
-                            .filter_map(|c| c["name"].as_str())
-                            .collect::<Vec<_>>()
+                        chans.filter_map(|c| c["name"].as_str()).collect::<Vec<_>>()
                     )
                 })? as u16;
             let h = vivo()?;

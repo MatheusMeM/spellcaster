@@ -172,10 +172,7 @@ fn main() {
         wall,
         pct_txt
     );
-    println!(
-        "rss={}  boot_ate_primeiro_frame={:.3}s",
-        rss_txt, boot_s
-    );
+    println!("rss={}  boot_ate_primeiro_frame={:.3}s", rss_txt, boot_s);
 
     let ok = ok_cpu && ok_rss && boot_s < 2.0;
     println!(

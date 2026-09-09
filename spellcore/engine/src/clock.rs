@@ -22,7 +22,7 @@ pub struct Stats {
 
 struct Tr {
     state: State,
-    pos: f64,  // posicao quando parado/pausado
+    pos: f64,    // posicao quando parado/pausado
     t0: Instant, // instante correspondente a t=0 quando tocando
 }
 

@@ -287,7 +287,9 @@ impl SacnIn {
                         let mut frame = [0u8; 512];
                         let k = data.len().min(512);
                         frame[..k].copy_from_slice(&data[..k]);
-                        l.lock().unwrap_or_else(|e| e.into_inner()).insert(universe, frame);
+                        l.lock()
+                            .unwrap_or_else(|e| e.into_inner())
+                            .insert(universe, frame);
                     }
                 }
             })?;
@@ -389,7 +391,11 @@ mod tests {
         let cid: [u8; 16] = std::array::from_fn(|i| (i as u8) ^ 0x5A);
         let pk = packet(300, &data512(), &cid, 42, "Fonte X", 77);
         for n in [0, 16, 47, 48, 60, 100, 107, 108, 119, 125] {
-            assert!(parse(&pk[..n]).is_none(), "truncado em {} devia dar None", n);
+            assert!(
+                parse(&pk[..n]).is_none(),
+                "truncado em {} devia dar None",
+                n
+            );
         }
         assert!(parse(&pk).is_some(), "pacote completo continua parseando");
     }

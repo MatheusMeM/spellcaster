@@ -65,15 +65,31 @@ mod tests {
 
     #[test]
     fn layout_de_12_bits_e_do_frame() {
-        assert_eq!(to_12bit(&Point::new(-32767.0, 0.0, 0, 0, 0, false)), (0, 2048));
-        assert_eq!(to_12bit(&Point::new(32767.0, 32767.0, 0, 0, 0, false)), (4095, 4095));
+        assert_eq!(
+            to_12bit(&Point::new(-32767.0, 0.0, 0, 0, 0, false)),
+            (0, 2048)
+        );
+        assert_eq!(
+            to_12bit(&Point::new(32767.0, 32767.0, 0, 0, 0, false)),
+            (4095, 4095)
+        );
         let mut out = Vec::new();
-        encode_frame(&[Point::new(0.0, 0.0, 10, 20, 30, false)], 30_000, 1, &mut out);
+        encode_frame(
+            &[Point::new(0.0, 0.0, 10, 20, 30, false)],
+            30_000,
+            1,
+            &mut out,
+        );
         assert_eq!(out.len(), 12);
         assert_eq!(&out[..7], &[0x80, 0x08, 0x00, 10, 20, 30, 30][..]);
         assert_eq!(&out[7..], &[0x30, 0x75, 1, 0, 1][..]); // 30000, n=1, flags
-        // ponto apagado sai preto
-        encode_frame(&[Point::new(0.0, 0.0, 255, 255, 255, true)], 1000, 0, &mut out);
+                                                           // ponto apagado sai preto
+        encode_frame(
+            &[Point::new(0.0, 0.0, 255, 255, 255, true)],
+            1000,
+            0,
+            &mut out,
+        );
         assert_eq!(&out[3..7], &[0, 0, 0, 0][..]);
     }
 }

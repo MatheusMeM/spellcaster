@@ -235,7 +235,12 @@ fn interfaces_linux() -> Option<Vec<Iface>> {
     let mut out = Vec::new();
     for d in addr.as_array()? {
         let name = d.get("ifname").and_then(|v| v.as_str()).unwrap_or("");
-        for a in d.get("addr_info").and_then(|v| v.as_array()).into_iter().flatten() {
+        for a in d
+            .get("addr_info")
+            .and_then(|v| v.as_array())
+            .into_iter()
+            .flatten()
+        {
             if a.get("family").and_then(|v| v.as_str()) != Some("inet") {
                 continue;
             }
@@ -369,7 +374,10 @@ pub fn scan_artnet(timeout: Duration, ifaces: &[Iface]) -> Vec<Node> {
     }
     for dst in &targets {
         if let Ok(ip) = dst.parse::<Ipv4Addr>() {
-            let _ = sock.send_to(&crate::artnet::artpoll(0, 0), SocketAddrV4::new(ip, crate::artnet::PORT));
+            let _ = sock.send_to(
+                &crate::artnet::artpoll(0, 0),
+                SocketAddrV4::new(ip, crate::artnet::PORT),
+            );
         }
     }
     let mut found: Vec<Node> = Vec::new();
@@ -517,7 +525,14 @@ pub fn parse_beacon(b: &[u8]) -> Option<(String, u16, u16, u16, u32, Status)> {
         .map(|x| format!("{x:02x}"))
         .collect::<Vec<_>>()
         .join(":");
-    Some((mac, le16(6), le16(8), le16(10), le32(12), parse_status(&b[16..])?))
+    Some((
+        mac,
+        le16(6),
+        le16(8),
+        le16(10),
+        le32(12),
+        parse_status(&b[16..])?,
+    ))
 }
 
 /// `dac_status`, 20 bytes little-endian — o mesmo bloco no beacon UDP e na resposta TCP.
@@ -890,23 +905,32 @@ Wireless LAN adapter Wi-Fi:
     #[test]
     fn suggest_regras() {
         let ifs = [
-            iface("Wi-Fi", "192.168.0.10", "255.255.255.0", Some("192.168.0.1")),
+            iface(
+                "Wi-Fi",
+                "192.168.0.10",
+                "255.255.255.0",
+                Some("192.168.0.1"),
+            ),
             iface("Ethernet", "192.168.0.7", "255.255.255.0", None),
             iface("Laser", "2.0.0.10", "255.0.0.0", None),
         ];
         let txt = suggest_with(&ifs, true).join("\n");
-        assert!(txt.contains("Laser 2.0.0.10/255.0.0.0: Art-Net ok"), "{txt}");
+        assert!(
+            txt.contains("Laser 2.0.0.10/255.0.0.0: Art-Net ok"),
+            "{txt}"
+        );
         assert!(
             txt.contains("Wi-Fi 192.168.0.10/255.255.255.0: sACN ok; Art-Net prefere"),
             "{txt}"
         );
         assert!(
-            txt.contains(
-                "netsh interface ip set address name=\"Wi-Fi\" static 2.0.0.10 255.0.0.0"
-            ),
+            txt.contains("netsh interface ip set address name=\"Wi-Fi\" static 2.0.0.10 255.0.0.0"),
             "{txt}"
         );
-        assert!(txt.contains("Wi-Fi, Ethernet na mesma subrede 192.168.0.0"), "{txt}");
+        assert!(
+            txt.contains("Wi-Fi, Ethernet na mesma subrede 192.168.0.0"),
+            "{txt}"
+        );
         assert!(!suggest_with(&ifs, false).join("\n").contains("netsh"));
         assert_eq!(suggest_with(&[], true).len(), 1);
         assert!(txt.is_ascii());
@@ -950,9 +974,18 @@ Wireless LAN adapter Wi-Fi:
         assert_eq!(
             r.ports,
             vec![
-                Port { dir: "out".into(), universe: 0x12 },
-                Port { dir: "in".into(), universe: 0x15 },
-                Port { dir: "out".into(), universe: 0x13 },
+                Port {
+                    dir: "out".into(),
+                    universe: 0x12
+                },
+                Port {
+                    dir: "in".into(),
+                    universe: 0x15
+                },
+                Port {
+                    dir: "out".into(),
+                    universe: 0x13
+                },
             ]
         );
         assert!(parse_artpollreply(&crate::artnet::artpoll(0, 0)).is_none());
@@ -999,7 +1032,9 @@ Wireless LAN adapter Wi-Fi:
         assert!(txt.is_ascii());
         assert!(txt.contains("2.0.0.50  'Node1'"), "{txt}");
         assert!(txt.contains("(nada encontrado)"), "{txt}");
-        assert!(serde_json::to_string(&s).unwrap().contains("\"interfaces\""));
+        assert!(serde_json::to_string(&s)
+            .unwrap()
+            .contains("\"interfaces\""));
     }
 
     #[test]

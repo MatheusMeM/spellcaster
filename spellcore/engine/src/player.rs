@@ -319,7 +319,7 @@ struct Rt {
     osc_out: Option<OscOut>,
     looping: bool,
     prev: f64,
-    nuni: usize,    // quantos universos sairam no ultimo frame (so' a thread de transporte le)
+    nuni: usize, // quantos universos sairam no ultimo frame (so' a thread de transporte le)
     pend: Vec<Ctl>, // fila drenada por swap: zero alocacao por frame
 }
 
@@ -601,12 +601,7 @@ impl Player {
         self.th = Some(th);
         if let Some(p) = osc_port.or(self.osc_port).filter(|p| *p > 0) {
             let mut i = OscIn::new(p).map_err(|e| format!("osc {}: {}", p, e))?;
-            let (a, b, c, d) = (
-                self.handle(),
-                self.handle(),
-                self.handle(),
-                self.handle(),
-            );
+            let (a, b, c, d) = (self.handle(), self.handle(), self.handle(), self.handle());
             i.on("/spellcaster/play", move |_, _| a.play());
             i.on("/spellcaster/pause", move |_, _| b.pause());
             i.on("/spellcaster/stop", move |_, _| c.stop());
@@ -624,7 +619,12 @@ impl Player {
         let d = lock(&self.s.done);
         match timeout {
             None => {
-                drop(self.s.cv.wait_while(d, |x| !*x).unwrap_or_else(|e| e.into_inner()));
+                drop(
+                    self.s
+                        .cv
+                        .wait_while(d, |x| !*x)
+                        .unwrap_or_else(|e| e.into_inner()),
+                );
                 true
             }
             Some(to) => {

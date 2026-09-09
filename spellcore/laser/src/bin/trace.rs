@@ -18,12 +18,18 @@ use laser::trace::{trace, Opts};
 fn main() -> Result<(), String> {
     let arg: Vec<String> = std::env::args().skip(1).collect();
     let flag = |name: &str| arg.iter().any(|a| a == name);
-    let opt = |name: &str| arg.iter().position(|x| x == name).and_then(|i| arg.get(i + 1).cloned());
+    let opt = |name: &str| {
+        arg.iter()
+            .position(|x| x == name)
+            .and_then(|i| arg.get(i + 1).cloned())
+    };
     let pos: Vec<&String> = arg.iter().filter(|a| !a.starts_with('-')).collect();
     if pos.len() < 3 {
-        return Err("uso: trace in.rgba WxH out.ild [--threshold N] [--epsilon F] \
+        return Err(
+            "uso: trace in.rgba WxH out.ild [--threshold N] [--epsilon F] \
                     [--max-points N] [--invert] [--sampled]"
-            .into());
+                .into(),
+        );
     }
     let (w, h) = pos[1]
         .split_once(['x', 'X'])
@@ -32,13 +38,17 @@ fn main() -> Result<(), String> {
 
     let mut o = Opts::default();
     if let Some(v) = opt("--threshold") {
-        o.threshold = v.parse().map_err(|_| format!("--threshold invalido: {v}"))?;
+        o.threshold = v
+            .parse()
+            .map_err(|_| format!("--threshold invalido: {v}"))?;
     }
     if let Some(v) = opt("--epsilon") {
         o.epsilon = v.parse().map_err(|_| format!("--epsilon invalido: {v}"))?;
     }
     if let Some(v) = opt("--max-points") {
-        o.max_points = v.parse().map_err(|_| format!("--max-points invalido: {v}"))?;
+        o.max_points = v
+            .parse()
+            .map_err(|_| format!("--max-points invalido: {v}"))?;
     }
     o.invert = flag("--invert");
     if flag("--sampled") {
@@ -51,7 +61,14 @@ fn main() -> Result<(), String> {
         .and_then(|n| n.checked_mul(4))
         .ok_or_else(|| format!("{}x{} nao cabe em usize", w, h))?;
     if data.len() < n {
-        return Err(format!("{}: {} bytes, {}x{} pede {}", pos[0], data.len(), w, h, n));
+        return Err(format!(
+            "{}: {} bytes, {}x{} pede {}",
+            pos[0],
+            data.len(),
+            w,
+            h,
+            n
+        ));
     }
 
     let t0 = Instant::now();
@@ -62,7 +79,14 @@ fn main() -> Result<(), String> {
     let n = pts.windows(2).filter(|w| !w[0].lit() && w[1].lit()).count()
         + usize::from(pts.first().is_some_and(|p| p.lit()));
     let total = pts.len();
-    ild::write(Path::new(&pos[2]), &[Frame::new(pts, "trace")], 5, "trace", "spell", None)?;
+    ild::write(
+        Path::new(&pos[2]),
+        &[Frame::new(pts, "trace")],
+        5,
+        "trace",
+        "spell",
+        None,
+    )?;
     println!("{}: {n} caminhos, {total} pontos, {ms:.2} ms", pos[2]);
     Ok(())
 }

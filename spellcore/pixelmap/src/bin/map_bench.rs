@@ -21,13 +21,20 @@ fn flag(name: &str) -> bool {
 fn main() {
     let pixels = arg("--pixels", 100_000.0).max(1.0) as u32;
     let frames = arg("--frames", 600.0).max(1.0) as usize;
-    let (w, h) = (arg("--width", 1920.0) as u32, arg("--height", 1080.0) as u32);
+    let (w, h) = (
+        arg("--width", 1920.0) as u32,
+        arg("--height", 1080.0) as u32,
+    );
     let bilinear = flag("--bilinear");
 
     let cols = (pixels as f64).sqrt().ceil() as u32;
     let rows = pixels.div_ceil(cols);
     let mut m = Mapper::new(&grid(cols, rows, 1, Order::Rgb));
-    m.sampling = if bilinear { Sampling::Bilinear } else { Sampling::Nearest };
+    m.sampling = if bilinear {
+        Sampling::Bilinear
+    } else {
+        Sampling::Nearest
+    };
 
     // Frame 1080p RGBA sintetico: gradiente + ruido, para nenhuma amostra cair sempre no
     // mesmo valor e o cache nao ficar irrealmente quente.

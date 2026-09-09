@@ -39,7 +39,14 @@ impl Point {
     /// Mesmo construtor do Python: trunca e satura x/y em +-32767.
     #[inline]
     pub fn new(x: f64, y: f64, r: u8, g: u8, b: u8, blank: bool) -> Point {
-        Point { x: clamp_xy(x), y: clamp_xy(y), r, g, b, blank }
+        Point {
+            x: clamp_xy(x),
+            y: clamp_xy(y),
+            r,
+            g,
+            b,
+            blank,
+        }
     }
 
     /// Aceso = nao apagado e com alguma cor. Ponto preto nao conta para o bbox.
@@ -58,7 +65,10 @@ pub struct Frame {
 
 impl Frame {
     pub fn new(points: Vec<Point>, name: &str) -> Frame {
-        Frame { points, name: name.to_string() }
+        Frame {
+            points,
+            name: name.to_string(),
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -69,7 +79,6 @@ impl Frame {
     pub fn is_empty(&self) -> bool {
         self.points.is_empty()
     }
-
 }
 
 /// bbox dos pontos acesos.
@@ -104,7 +113,10 @@ fn lerp(p: Point, q: Point, u: f64, blank: bool) -> Point {
 pub fn optimize(frame: &Frame, dwell: usize, blank_gap: usize, max_step: i32, angle: f64) -> Frame {
     let mut out = Vec::with_capacity(frame.points.len() * 2);
     optimize_into(&frame.points, &mut out, dwell, blank_gap, max_step, angle);
-    Frame { points: out, name: frame.name.clone() }
+    Frame {
+        points: out,
+        name: frame.name.clone(),
+    }
 }
 
 /// Versao sem alocacao para o caminho quente: reusa `out` (so cresce ate o pico do show).
@@ -132,7 +144,9 @@ pub fn optimize_into(
                 out.push(b);
             }
         }
-        let step = (q.x as i32 - p.x as i32).abs().max((q.y as i32 - p.y as i32).abs());
+        let step = (q.x as i32 - p.x as i32)
+            .abs()
+            .max((q.y as i32 - p.y as i32).abs());
         if step > max_step {
             let n = (step as f64 / max_step as f64).ceil() as i32;
             for k in 1..n {
@@ -149,7 +163,10 @@ pub fn optimize_into(
         // vertice: mudanca de direcao -> dwell
         if q.lit() && i + 1 < src.len() && src[i + 1].lit() {
             let (ax, ay) = (q.x as f64 - p.x as f64, q.y as f64 - p.y as f64);
-            let (bx, by) = (src[i + 1].x as f64 - q.x as f64, src[i + 1].y as f64 - q.y as f64);
+            let (bx, by) = (
+                src[i + 1].x as f64 - q.x as f64,
+                src[i + 1].y as f64 - q.y as f64,
+            );
             let (na, nb) = (ax.hypot(ay), bx.hypot(by));
             if na == 0.0 || nb == 0.0 || (ax * bx + ay * by) / (na * nb) < cos_lim {
                 for _ in 0..dwell {
@@ -187,7 +204,11 @@ fn def_max_intensity() -> u8 {
 
 impl Default for Safety {
     fn default() -> Safety {
-        Safety { min_size: def_min_size(), max_intensity: def_max_intensity(), zone: None }
+        Safety {
+            min_size: def_min_size(),
+            max_intensity: def_max_intensity(),
+            zone: None,
+        }
     }
 }
 
@@ -278,14 +299,31 @@ mod tests {
         );
         let o = optimize(&f, 2, 4, 1200, ANGLE);
         let p = &o.points;
-        assert_eq!(p.iter().filter(|q| q.blank && (q.x, q.y) == (3000, 3000)).count(), 4);
-        assert!(p.iter().filter(|q| q.blank && (q.x, q.y) == (-20000, -20000)).count() >= 5);
+        assert_eq!(
+            p.iter()
+                .filter(|q| q.blank && (q.x, q.y) == (3000, 3000))
+                .count(),
+            4
+        );
+        assert!(
+            p.iter()
+                .filter(|q| q.blank && (q.x, q.y) == (-20000, -20000))
+                .count()
+                >= 5
+        );
         assert!(p.windows(2).all(|w| (w[1].x as i32 - w[0].x as i32)
             .abs()
             .max((w[1].y as i32 - w[0].y as i32).abs())
             <= 1200));
-        assert_eq!(p.iter().filter(|q| q.lit() && (q.x, q.y) == (3000, 0)).count(), 3);
-        assert!(optimize(&Frame::default(), 2, 4, 1200, ANGLE).points.is_empty());
+        assert_eq!(
+            p.iter()
+                .filter(|q| q.lit() && (q.x, q.y) == (3000, 0))
+                .count(),
+            3
+        );
+        assert!(optimize(&Frame::default(), 2, 4, 1200, ANGLE)
+            .points
+            .is_empty());
     }
 
     #[test]
@@ -293,7 +331,12 @@ mod tests {
         // `Safety::apply` e' o caminho de producao (o feed monta a struct e chama).
         let sf = |f: &Frame, min_size, max_intensity, zone| {
             let mut out = f.clone();
-            Safety { min_size, max_intensity, zone }.apply(&mut out.points);
+            Safety {
+                min_size,
+                max_intensity,
+                zone,
+            }
+            .apply(&mut out.points);
             out
         };
         let small = sf(&square(500), 2000, 255, None);
@@ -319,6 +362,10 @@ mod tests {
         }
         .apply(&mut f.points);
         assert!(f.points.iter().all(|p| p.r == 100));
-        assert!(f.points.iter().filter(|p| p.x.abs() == 5000).all(|p| p.blank));
+        assert!(f
+            .points
+            .iter()
+            .filter(|p| p.x.abs() == 5000)
+            .all(|p| p.blank));
     }
 }

@@ -99,14 +99,10 @@ fn packets(c: &mut Criterion) {
     for (i, b) in data.iter_mut().enumerate() {
         *b = (i & 0xff) as u8;
     }
-    let cid: [u8; 16] = [
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-    ];
+    let cid: [u8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
     c.bench_function("sacn_packet", |b| {
-        b.iter(|| {
-            protocols::sacn::packet(1, black_box(&data), &cid, 0, "Spellcaster", 100)
-        })
+        b.iter(|| protocols::sacn::packet(1, black_box(&data), &cid, 0, "Spellcaster", 100))
     });
     c.bench_function("artdmx", |b| {
         b.iter(|| protocols::artnet::artdmx(1, black_box(&data), 0))

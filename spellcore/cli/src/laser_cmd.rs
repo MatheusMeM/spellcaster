@@ -90,7 +90,10 @@ fn parar(l: &mut Live) {
 /// Recolhe a thread que terminou sozinha (fim do arquivo sem loop): `play` so' existe
 /// enquanto toca, entao `playing` nunca fica preso em `true`.
 fn colher(l: &mut Live) {
-    if l.play.as_ref().is_some_and(|p| !p.run.load(Ordering::Relaxed)) {
+    if l.play
+        .as_ref()
+        .is_some_and(|p| !p.run.load(Ordering::Relaxed))
+    {
         parar(l);
     }
 }
@@ -164,9 +167,7 @@ fn abrir(a: OpenArgs) -> Result<Value, String> {
             EtherDream::connect(&a.host, CAPACITY)
                 .map_err(|e| format!("etherdream {}: {}", a.host, e))?,
         ),
-        "idn" => {
-            Box::new(Idn::connect(&a.host, 0).map_err(|e| format!("idn {}: {}", a.host, e))?)
-        }
+        "idn" => Box::new(Idn::connect(&a.host, 0).map_err(|e| format!("idn {}: {}", a.host, e))?),
         o => return Err(format!("dac desconhecido: {} (etherdream, idn)", o)),
     };
     let feed = Feed::start(d, pps, 2, safety).map_err(|e| e.to_string())?;

@@ -116,7 +116,8 @@ pub(crate) fn random16() -> [u8; 16] {
         .map(|d| d.as_nanos() as u64)
         .unwrap_or(0);
     let stack = &nanos as *const u64 as usize as u64; // ASLR: entropia entre processos
-    let seed = nanos ^ ((std::process::id() as u64) << 32) ^ stack ^ N.fetch_add(1, Ordering::Relaxed);
+    let seed =
+        nanos ^ ((std::process::id() as u64) << 32) ^ stack ^ N.fetch_add(1, Ordering::Relaxed);
     let mut out = [0u8; 16];
     for (i, half) in out.chunks_mut(8).enumerate() {
         let mut h = DefaultHasher::new();

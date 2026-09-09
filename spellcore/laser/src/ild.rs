@@ -27,22 +27,70 @@ pub fn rec_size(fmt: u8) -> Option<usize> {
 
 /// Paleta padrao ILDA (64 cores).
 pub const DEFAULT_PALETTE: [(u8, u8, u8); 64] = [
-    (255, 0, 0), (255, 16, 0), (255, 32, 0), (255, 48, 0),
-    (255, 64, 0), (255, 80, 0), (255, 96, 0), (255, 112, 0),
-    (255, 128, 0), (255, 144, 0), (255, 160, 0), (255, 176, 0),
-    (255, 192, 0), (255, 208, 0), (255, 224, 0), (255, 240, 0),
-    (255, 255, 0), (224, 255, 0), (192, 255, 0), (160, 255, 0),
-    (128, 255, 0), (96, 255, 0), (64, 255, 0), (32, 255, 0),
-    (0, 255, 0), (0, 255, 36), (0, 255, 73), (0, 255, 109),
-    (0, 255, 146), (0, 255, 182), (0, 255, 219), (0, 255, 255),
-    (0, 227, 255), (0, 198, 255), (0, 170, 255), (0, 142, 255),
-    (0, 113, 255), (0, 85, 255), (0, 56, 255), (0, 28, 255),
-    (0, 0, 255), (32, 0, 255), (64, 0, 255), (96, 0, 255),
-    (128, 0, 255), (160, 0, 255), (192, 0, 255), (224, 0, 255),
-    (255, 0, 255), (255, 32, 255), (255, 64, 255), (255, 96, 255),
-    (255, 128, 255), (255, 160, 255), (255, 192, 255), (255, 224, 255),
-    (255, 255, 255), (255, 224, 224), (255, 192, 192), (255, 160, 160),
-    (255, 128, 128), (255, 96, 96), (255, 64, 64), (255, 32, 32),
+    (255, 0, 0),
+    (255, 16, 0),
+    (255, 32, 0),
+    (255, 48, 0),
+    (255, 64, 0),
+    (255, 80, 0),
+    (255, 96, 0),
+    (255, 112, 0),
+    (255, 128, 0),
+    (255, 144, 0),
+    (255, 160, 0),
+    (255, 176, 0),
+    (255, 192, 0),
+    (255, 208, 0),
+    (255, 224, 0),
+    (255, 240, 0),
+    (255, 255, 0),
+    (224, 255, 0),
+    (192, 255, 0),
+    (160, 255, 0),
+    (128, 255, 0),
+    (96, 255, 0),
+    (64, 255, 0),
+    (32, 255, 0),
+    (0, 255, 0),
+    (0, 255, 36),
+    (0, 255, 73),
+    (0, 255, 109),
+    (0, 255, 146),
+    (0, 255, 182),
+    (0, 255, 219),
+    (0, 255, 255),
+    (0, 227, 255),
+    (0, 198, 255),
+    (0, 170, 255),
+    (0, 142, 255),
+    (0, 113, 255),
+    (0, 85, 255),
+    (0, 56, 255),
+    (0, 28, 255),
+    (0, 0, 255),
+    (32, 0, 255),
+    (64, 0, 255),
+    (96, 0, 255),
+    (128, 0, 255),
+    (160, 0, 255),
+    (192, 0, 255),
+    (224, 0, 255),
+    (255, 0, 255),
+    (255, 32, 255),
+    (255, 64, 255),
+    (255, 96, 255),
+    (255, 128, 255),
+    (255, 160, 255),
+    (255, 192, 255),
+    (255, 224, 255),
+    (255, 255, 255),
+    (255, 224, 224),
+    (255, 192, 192),
+    (255, 160, 160),
+    (255, 128, 128),
+    (255, 96, 96),
+    (255, 64, 64),
+    (255, 32, 32),
 ];
 
 #[inline]
@@ -57,10 +105,19 @@ fn bei16(b: &[u8], i: usize) -> i16 {
 
 /// `name.rstrip(b"\0 ").decode("ascii", "replace")` do Python.
 fn decode_name(b: &[u8]) -> String {
-    let end = b.iter().rposition(|&c| c != 0 && c != b' ').map_or(0, |i| i + 1);
+    let end = b
+        .iter()
+        .rposition(|&c| c != 0 && c != b' ')
+        .map_or(0, |i| i + 1);
     b[..end]
         .iter()
-        .map(|&c| if c < 0x80 { c as char } else { char::REPLACEMENT_CHARACTER })
+        .map(|&c| {
+            if c < 0x80 {
+                c as char
+            } else {
+                char::REPLACEMENT_CHARACTER
+            }
+        })
         .collect()
 }
 
@@ -108,7 +165,9 @@ pub fn read_bytes(data: &[u8]) -> Result<Vec<Frame>, String> {
         let recs = &data[pos..pos + n * rsize];
         pos += n * rsize;
         if fmt == 2 {
-            palette = (0..n).map(|i| (recs[i * 3], recs[i * 3 + 1], recs[i * 3 + 2])).collect();
+            palette = (0..n)
+                .map(|i| (recs[i * 3], recs[i * 3 + 1], recs[i * 3 + 2]))
+                .collect();
             continue;
         }
         let mut pts = Vec::with_capacity(n);
@@ -123,14 +182,29 @@ pub fn read_bytes(data: &[u8]) -> Result<Vec<Frame>, String> {
                 }
                 _ => (r[4 + z], (r[7 + z], r[6 + z], r[5 + z])), // status, B, G, R
             };
-            pts.push(Point::new(x as f64, y as f64, col.0, col.1, col.2, st & BLANK != 0));
+            pts.push(Point::new(
+                x as f64,
+                y as f64,
+                col.0,
+                col.1,
+                col.2,
+                st & BLANK != 0,
+            ));
         }
         frames.push(Frame { points: pts, name });
     }
     Ok(frames)
 }
 
-fn section(out: &mut Vec<u8>, fmt: u8, name: &str, company: &str, n: usize, idx: usize, total: usize) {
+fn section(
+    out: &mut Vec<u8>,
+    fmt: u8,
+    name: &str,
+    company: &str,
+    n: usize,
+    idx: usize,
+    total: usize,
+) {
     out.extend_from_slice(b"ILDA");
     out.extend_from_slice(&[0, 0, 0, fmt]);
     out.extend_from_slice(&encode_name(name));
@@ -180,7 +254,9 @@ pub fn write_bytes(
     let rsize = rec_size(fmt).unwrap();
     let total = frames.len();
     let pal: &[(u8, u8, u8)] = palette.unwrap_or(&DEFAULT_PALETTE);
-    let mut out = Vec::with_capacity(HDR * (total + 2) + frames.iter().map(|f| f.len().max(1) * rsize).sum::<usize>());
+    let mut out = Vec::with_capacity(
+        HDR * (total + 2) + frames.iter().map(|f| f.len().max(1) * rsize).sum::<usize>(),
+    );
     if let (Some(p), 0 | 1) = (palette, fmt) {
         section(&mut out, 2, name, company, p.len(), 0, total);
         for c in p {
@@ -188,9 +264,16 @@ pub fn write_bytes(
         }
     }
     // frame vazio: 1 ponto apagado (n=0 seria fim de arquivo)
-    let empty = [Point { blank: true, ..Point::default() }];
+    let empty = [Point {
+        blank: true,
+        ..Point::default()
+    }];
     for (idx, fr) in frames.iter().enumerate() {
-        let pts: &[Point] = if fr.points.is_empty() { &empty } else { &fr.points };
+        let pts: &[Point] = if fr.points.is_empty() {
+            &empty
+        } else {
+            &fr.points
+        };
         let fname = if fr.name.is_empty() { name } else { &fr.name };
         section(&mut out, fmt, fname, company, pts.len(), idx, total);
         for (i, p) in pts.iter().enumerate() {
@@ -228,7 +311,11 @@ mod tests {
                 Point::new(5000.0 * a.cos(), 5000.0 * a.sin(), 0, 255, 0, i == 0)
             })
             .collect();
-        vec![Frame::new(quad, "quad"), Frame::new(circ, "circ"), Frame::default()]
+        vec![
+            Frame::new(quad, "quad"),
+            Frame::new(circ, "circ"),
+            Frame::default(),
+        ]
     }
 
     fn roundtrip(fmt: u8, palette: Option<&[(u8, u8, u8)]>) -> Vec<Frame> {
@@ -239,7 +326,12 @@ mod tests {
         assert_eq!(back[0].name, "quad");
         assert_eq!(back[1].name, "circ");
         for (a, b) in src.iter().zip(&back).take(2) {
-            let key = |f: &Frame| f.points.iter().map(|p| (p.x, p.y, p.blank)).collect::<Vec<_>>();
+            let key = |f: &Frame| {
+                f.points
+                    .iter()
+                    .map(|p| (p.x, p.y, p.blank))
+                    .collect::<Vec<_>>()
+            };
             assert_eq!(key(a), key(b));
         }
         assert_eq!(back[2].len(), 1); // frame vazio vira 1 ponto apagado
@@ -250,21 +342,33 @@ mod tests {
     #[test]
     fn fmt5_true_color() {
         let b = roundtrip(5, None);
-        assert_eq!((b[0].points[0].r, b[0].points[0].g, b[0].points[0].b), (255, 0, 0));
-        assert_eq!((b[1].points[1].r, b[1].points[1].g, b[1].points[1].b), (0, 255, 0));
+        assert_eq!(
+            (b[0].points[0].r, b[0].points[0].g, b[0].points[0].b),
+            (255, 0, 0)
+        );
+        assert_eq!(
+            (b[1].points[1].r, b[1].points[1].g, b[1].points[1].b),
+            (0, 255, 0)
+        );
     }
 
     #[test]
     fn fmt1_paleta_padrao() {
         let b = roundtrip(1, None);
-        assert_eq!((b[0].points[0].r, b[0].points[0].g, b[0].points[0].b), (255, 0, 0));
+        assert_eq!(
+            (b[0].points[0].r, b[0].points[0].g, b[0].points[0].b),
+            (255, 0, 0)
+        );
     }
 
     #[test]
     fn fmt1_com_secao_de_paleta() {
         let pal = [(1u8, 2u8, 3u8), (255, 0, 0), (0, 255, 0)];
         let b = roundtrip(1, Some(&pal));
-        assert_eq!((b[1].points[1].r, b[1].points[1].g, b[1].points[1].b), (0, 255, 0));
+        assert_eq!(
+            (b[1].points[1].r, b[1].points[1].g, b[1].points[1].b),
+            (0, 255, 0)
+        );
     }
 
     #[test]

@@ -59,7 +59,11 @@ pub fn parse_hello(b: &[u8]) -> Option<Hello> {
     if b.len() < 4 {
         return None;
     }
-    Some(Hello { command: b[0], flags: b[1], sequence: u16::from_be_bytes([b[2], b[3]]) })
+    Some(Hello {
+        command: b[0],
+        flags: b[1],
+        sequence: u16::from_be_bytes([b[2], b[3]]),
+    })
 }
 
 /// Um servidor IDN visto por scan.
@@ -84,9 +88,21 @@ pub fn parse_scan_response(b: &[u8], ip: &str) -> Option<Unit> {
     let end = raw.iter().position(|&c| c == 0).unwrap_or(raw.len());
     let name = raw[..end]
         .iter()
-        .map(|&c| if c < 0x80 { c as char } else { char::REPLACEMENT_CHARACTER })
+        .map(|&c| {
+            if c < 0x80 {
+                c as char
+            } else {
+                char::REPLACEMENT_CHARACTER
+            }
+        })
         .collect();
-    Some(Unit { ip: ip.to_string(), unit_id, name, protocol_version: b[1], status: b[2] })
+    Some(Unit {
+        ip: ip.to_string(),
+        unit_id,
+        name,
+        protocol_version: b[1],
+        status: b[2],
+    })
 }
 
 /// Manda scan request (broadcast, ou o `target` de um teste) e junta as respostas ate `timeout`.
@@ -96,7 +112,13 @@ pub fn scan(target: Ipv4Addr, timeout: Duration) -> Vec<Unit> {
     };
     let _ = sock.set_broadcast(true);
     let _ = sock.set_read_timeout(Some(Duration::from_millis(200)));
-    if sock.send_to(&hello(CMD_SCAN_REQUEST, 0, 1), SocketAddr::from((target, PORT))).is_err() {
+    if sock
+        .send_to(
+            &hello(CMD_SCAN_REQUEST, 0, 1),
+            SocketAddr::from((target, PORT)),
+        )
+        .is_err()
+    {
         return Vec::new();
     }
     let mut found: Vec<Unit> = Vec::new();
@@ -106,7 +128,9 @@ pub fn scan(target: Ipv4Addr, timeout: Duration) -> Vec<Unit> {
         let Ok((n, from)) = sock.recv_from(&mut buf) else {
             continue;
         };
-        let Some(h) = parse_hello(&buf[..n]) else { continue };
+        let Some(h) = parse_hello(&buf[..n]) else {
+            continue;
+        };
         if h.command != CMD_SCAN_RESPONSE {
             continue;
         }
@@ -189,7 +213,11 @@ pub struct Idn {
 
 impl Idn {
     pub fn connect(addr: &str, channel: u8) -> io::Result<Idn> {
-        let full = if addr.contains(':') { addr.to_string() } else { format!("{addr}:{PORT}") };
+        let full = if addr.contains(':') {
+            addr.to_string()
+        } else {
+            format!("{addr}:{PORT}")
+        };
         let sa = full
             .to_socket_addrs()?
             .next()
@@ -218,7 +246,8 @@ impl Idn {
     /// `IDNCMD_PING_REQUEST`; devolve `true` se veio ping response dentro do timeout.
     pub fn ping(&mut self, timeout: Duration) -> io::Result<bool> {
         self.seq = self.seq.wrapping_add(1);
-        self.sock.send_to(&hello(CMD_PING_REQUEST, 0, self.seq), self.addr)?;
+        self.sock
+            .send_to(&hello(CMD_PING_REQUEST, 0, self.seq), self.addr)?;
         self.sock.set_read_timeout(Some(timeout))?;
         let mut b = [0u8; 64];
         match self.sock.recv_from(&mut b) {
@@ -270,7 +299,9 @@ impl Dac for Idn {
 
     fn stop(&mut self) {
         self.seq = self.seq.wrapping_add(1);
-        let _ = self.sock.send_to(&hello(CMD_MESSAGE_CLOSE, 0, self.seq), self.addr);
+        let _ = self
+            .sock
+            .send_to(&hello(CMD_MESSAGE_CLOSE, 0, self.seq), self.addr);
         self.config_sent = false;
     }
 }
@@ -285,7 +316,11 @@ mod tests {
         assert_eq!(h, [0x10, 0x00, 0x12, 0x34]);
         assert_eq!(
             parse_hello(&h),
-            Some(Hello { command: CMD_SCAN_REQUEST, flags: 0, sequence: 0x1234 })
+            Some(Hello {
+                command: CMD_SCAN_REQUEST,
+                flags: 0,
+                sequence: 0x1234
+            })
         );
         assert_eq!(parse_hello(&h[..3]), None);
     }
@@ -315,7 +350,10 @@ mod tests {
         assert_eq!(u16::from_be_bytes([out[4], out[5]]) as usize, out.len() - 4);
         assert_eq!(out.len(), 4 + 42);
         let content = u16::from_be_bytes([out[6], out[7]]);
-        assert_eq!(content, CID_CONFIG | CID_CHANNELMSG | (2 << 8) | CNK_LPGRF_FRAME);
+        assert_eq!(
+            content,
+            CID_CONFIG | CID_CHANNELMSG | (2 << 8) | CNK_LPGRF_FRAME
+        );
         assert_eq!(out[12..16], [3, 0, 7, SERVICE_MODE_LPGRF]);
         assert_eq!(u16::from_be_bytes([out[16], out[17]]), SMP_X);
         // ponto apagado sai preto

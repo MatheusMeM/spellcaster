@@ -32,11 +32,22 @@ fn figura(n: usize) -> Frame {
 fn bench(c: &mut Criterion) {
     let f = figura(1000);
     let mut out: Vec<Point> = Vec::with_capacity(8192);
-    let safety = Safety { min_size: 2000, max_intensity: 200, zone: Some((-20000.0, -20000.0, 20000.0, 20000.0)) };
+    let safety = Safety {
+        min_size: 2000,
+        max_intensity: 200,
+        zone: Some((-20000.0, -20000.0, 20000.0, 20000.0)),
+    };
 
     c.bench_function("optimize 1000 pontos", |b| {
         b.iter(|| {
-            optimize_into(black_box(&f.points), &mut out, DWELL, BLANK_GAP, MAX_STEP, ANGLE);
+            optimize_into(
+                black_box(&f.points),
+                &mut out,
+                DWELL,
+                BLANK_GAP,
+                MAX_STEP,
+                ANGLE,
+            );
             black_box(out.len())
         })
     });
@@ -54,7 +65,14 @@ fn bench(c: &mut Criterion) {
 
     c.bench_function("optimize+safety 1000 pontos", |b| {
         b.iter(|| {
-            optimize_into(black_box(&f.points), &mut out, DWELL, BLANK_GAP, MAX_STEP, ANGLE);
+            optimize_into(
+                black_box(&f.points),
+                &mut out,
+                DWELL,
+                BLANK_GAP,
+                MAX_STEP,
+                ANGLE,
+            );
             safety.apply(&mut out);
             black_box(out.len())
         })
@@ -63,7 +81,13 @@ fn bench(c: &mut Criterion) {
     // exatamente o que a thread do Feed faz por frame, sem o I/O: e o piso de CPU do
     // aceite dos 4 feeds a 30 kpps (600 pontos por frame, 50 frames/s por DAC).
     let f600 = figura(600);
-    let tf = Transform { x: 100.0, y: -50.0, scale: 0.9, rot: 33.0, color: (1.0, 0.8, 0.5) };
+    let tf = Transform {
+        x: 100.0,
+        y: -50.0,
+        scale: 0.9,
+        rot: 33.0,
+        color: (1.0, 0.8, 0.5),
+    };
     let mut work: Vec<Point> = Vec::with_capacity(1024);
     let mut wire: Vec<u8> = Vec::with_capacity(16384);
     c.bench_function("feed: transform+safety+encode 600 pontos", |b| {

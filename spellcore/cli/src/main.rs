@@ -116,7 +116,8 @@ impl EventSink for CliSink {
             Ev::Osc { address, args } => match &self.osc {
                 // float32 e' o que o `spellcaster/protocols/osc.py` emite para numero solto.
                 Some(o) => {
-                    let a: Vec<osc::Arg> = args.iter().map(|v| osc::Arg::Float(*v as f32)).collect();
+                    let a: Vec<osc::Arg> =
+                        args.iter().map(|v| osc::Arg::Float(*v as f32)).collect();
                     o.send(address, &a);
                 }
                 None => eprintln!("osc {}: show sem saida osc", address),
@@ -215,7 +216,10 @@ mod sig {
 fn play(a: PlayArgs) -> Result<Value, String> {
     let path = Path::new(&a.file);
     let sh = show::load(path)?;
-    let base = path.parent().unwrap_or_else(|| Path::new(".")).to_path_buf();
+    let base = path
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .to_path_buf();
     let sink: Box<dyn EventSink> = Box::new(CliSink::new(osc_target(&sh)));
     let hooks = script::hooks(&sh, &base, sink)?;
     let name = sh.name.clone();
@@ -232,7 +236,9 @@ fn play(a: PlayArgs) -> Result<Value, String> {
     // Cabecalho sem universos: eles so' existem depois do primeiro frame; quem os mostra e' a
     // linha de status.
     let st = h.state();
-    let dur = st.duration.map_or("sem fim".into(), |d| format!("{:.2}s", d));
+    let dur = st
+        .duration
+        .map_or("sem fim".into(), |d| format!("{:.2}s", d));
     saida(&format!("{}: {} fps, {}", name, st.fps, dur));
     // ponytail: acorda a cada 200 ms so' para ver o Ctrl+C e imprimir o status ; virar condvar
     // do player se a linha de status precisar de resolucao melhor que 1 s.
@@ -251,8 +257,10 @@ fn play(a: PlayArgs) -> Result<Value, String> {
     let st = h.state();
     p.close();
     let s = p.clock().stats();
-    Ok(json!({"name": name, "frames": st.frames, "jitter_p99_ms": s.p99 * 1e3,
-              "jitter_max_ms": s.max * 1e3, "drift": s.drift}))
+    Ok(
+        json!({"name": name, "frames": st.frames, "jitter_p99_ms": s.p99 * 1e3,
+              "jitter_max_ms": s.max * 1e3, "drift": s.drift}),
+    )
 }
 
 fn net(a: NetArgs) -> Result<Value, String> {
@@ -280,7 +288,11 @@ fn graph_check(_: NoArgs) -> Result<Value, String> {
 /// E' este registry que o MCP expoe como tools.
 fn registry() -> Registry {
     let mut r = engine::registry::base();
-    r.add::<PlayArgs>("play_show", "Toca um show .spell ate o fim ou Ctrl+C.", play);
+    r.add::<PlayArgs>(
+        "play_show",
+        "Toca um show .spell ate o fim ou Ctrl+C.",
+        play,
+    );
     r.add::<NetArgs>(
         "net",
         "Varre a rede: interfaces, nos Art-Net, fontes sACN, Ether Dream e sugestoes.",
@@ -371,7 +383,9 @@ fn main() {
             serve::serve(registry(), a.port, a.dir.into(), a.show).map(|_| Value::Null)
         }
         Cmd::Mcp(m) => match m.cmd {
-            Some(McpCmd::Install { target, path, yes }) => mcp::install::install(&target, &path, yes),
+            Some(McpCmd::Install { target, path, yes }) => {
+                mcp::install::install(&target, &path, yes)
+            }
             None => {
                 STDOUT_LIVRE.store(false, Ordering::SeqCst);
                 mcp::serve_stdio(registry()).map(|_| Value::Null)
@@ -403,8 +417,15 @@ mod tests {
     /// O contrato do argv: os cinco subcomandos e as flags que o operador digita hoje.
     #[test]
     fn argv_dos_cinco_subcomandos() {
-        let c = Cli::try_parse_from(["spellcore", "play", "shows/x.spell", "--loop", "--osc-port", "9000"])
-            .expect("play aceita posicional, --loop e --osc-port");
+        let c = Cli::try_parse_from([
+            "spellcore",
+            "play",
+            "shows/x.spell",
+            "--loop",
+            "--osc-port",
+            "9000",
+        ])
+        .expect("play aceita posicional, --loop e --osc-port");
         match c.cmd {
             Cmd::Play(a) => {
                 assert_eq!(a.file, "shows/x.spell");
@@ -461,7 +482,10 @@ mod tests {
             }
             _ => panic!("esperava serve"),
         }
-        assert!(Cli::try_parse_from(["spellcore"]).is_err(), "sem subcomando = ajuda");
+        assert!(
+            Cli::try_parse_from(["spellcore"]).is_err(),
+            "sem subcomando = ajuda"
+        );
     }
 
     /// O operador digita `play`; o registry (e o MCP) so' conhece `play_show`. O schema dos
@@ -481,7 +505,11 @@ mod tests {
             .unwrap();
         let props = &e["params"]["properties"];
         assert!(props["file"].is_object());
-        assert!(props["loop"].is_object(), "o campo JSON chama-se loop: {}", props);
+        assert!(
+            props["loop"].is_object(),
+            "o campo JSON chama-se loop: {}",
+            props
+        );
         assert!(props["osc_port"].is_object());
         assert_eq!(
             e["params"]["required"].as_array().unwrap(),

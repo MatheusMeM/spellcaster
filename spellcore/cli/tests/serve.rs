@@ -245,7 +245,12 @@ fn barramento_http_ws_monitor_e_mcp() {
     assert!(rev2 > rev1, "load incrementa rev: {} > {}", rev2, rev1);
     // o unico `show` pendente e' o do load: o `locate` no meio nao emitiu nenhum
     let ev = ws.ate(5.0, |v| v["event"] == json!("show"));
-    assert_eq!(ev["data"]["rev"], json!(rev2), "load incrementa rev: {}", ev);
+    assert_eq!(
+        ev["data"]["rev"],
+        json!(rev2),
+        "load incrementa rev: {}",
+        ev
+    );
 
     // ---- transporte e monitor binario: `--show` deixou o player parado em t=0
     let ev = ws.ate(5.0, |v| {
@@ -278,7 +283,11 @@ fn barramento_http_ws_monitor_e_mcp() {
 
     // o gancho global roda DEPOIS do programmer (posicao 6 do frame): o monitor ve o override
     // manual do operador, nao so' o que a timeline escreveu
-    ws.send(20, "level_set", json!({"universe": 1, "address": 500, "values": [222]}));
+    ws.send(
+        20,
+        "level_set",
+        json!({"universe": 1, "address": 500, "values": [222]}),
+    );
     let r = ws.ate(5.0, |v| v["id"] == json!(20));
     assert!(r["error"].is_null(), "level_set: {}", r);
     let mut visto = false;

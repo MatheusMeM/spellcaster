@@ -241,4 +241,3 @@ pub fn register(r: &mut Registry) {
         },
     );
 }
-
