@@ -65,9 +65,12 @@
     push("play", true); }
 
   /* ---------- parede ----------
-     A parede é um render target: o rastro mora NELE. Todo quadro entra um quad preto a .3 (esmaece,
-     igual ao `fillRect` de antes) e por cima os segmentos do quadro, aditivos, num `LineSegments` de
-     buffer pré-alocado. Antes era um canvas 2D 1024×640 com um `stroke` de `shadowBlur = 18` POR
+     A parede é um render target: o rastro mora NELE. Todo quadro entra um quad preto que esmaece o
+     que já estava lá (o `fillRect` de antes, só que por tempo: `1 - FADE^(dt*60)`, para o rastro
+     durar o mesmo tanto a 20 ou a 60 fps) e por cima os segmentos do quadro, num `LineSegments` de
+     buffer pré-alocado. O traço vai em source-over, como o `stroke` do canvas: traço sobre traço
+     troca a cor, não soma — aditivo saturava em branco onde a figura passa dezenas de vezes.
+     Só o halo e o ponto do galvo somam. Antes era um canvas 2D 1024×640 com um `stroke` de `shadowBlur = 18` POR
      PONTO — a 30 kpps são 500 traços desfocados por quadro na CPU, mais a subida da textura inteira
      à GPU a cada quadro: com um .ild de 3000 pontos por frame o Chrome ficava em 1,8 fps.
      ponytail: a splash continua no canvas 2D (`fillDone` é `fill("evenodd")` de polígono de letra, e
