@@ -306,9 +306,9 @@
   function loadFile(f) { if (!f) return; var r = new FileReader(); r.onload = function () { try { var d = ILDA.parse(r.result); if (!d.frames.length) throw 0; S.show = d.frames; S.frame = 0; S.pos = 0; ENG.file = ""; S.name = f.name + " · " + d.frames.length + " frames"; if (S.mode === "splash") skipSplash(); setCam("rear"); PANELS.ilda(); remember(); pino.say("Entrou pela ILDA IN: " + f.name + ", " + d.frames.length + " frames, " + d.frames[0].length + " pontos no primeiro. " + (d.frames[0].length > 1200 ? "Denso. Se piscar, abre a tampa e sobe os kpps no galvo." : "Leve. Vai voar.") + (S.key ? "" : " Arma a chave para ver na parede."), null, false); } catch (x) { pino.say("Isso não é ILDA. Formato 2 (só paleta) eu pulo, 0/1/4/5 eu leio.", null, false); } }; r.readAsArrayBuffer(f); }
 
   /* ---------- Pino ---------- */
-  // O DMX OUT e' a ponta de baixo do cabo: quem sabe onde ele esta' e' o chassi (`B.dmxOutWorld`,
-  // contrato do body.js). Sem ele, a coordenada do painel de hoje.
-  var pino = Pino3D.build(THREE, X, scene, pick, stage, cam, { on: onPin, target: B.dmxOutWorld || new THREE.Vector3(.038, .338, .173) });
+  // O DMX OUT e' a ponta de baixo do cabo: quem sabe onde ele esta' e' o chassi. `B.dmxOut` (a
+  // porta em si) da' posicao E normal do painel; `B.dmxOutWorld` e a constante ficam de reserva.
+  var pino = Pino3D.build(THREE, X, scene, pick, stage, cam, { on: onPin, port: B.dmxOut, target: B.dmxOutWorld });
   Bind.def("pino.hide", "Pino: some da tela / volta", function () { if (pino.alive()) pino.bye(); else pino.back(); });
   // o custo da corda em ms por quadro fica legivel de fora (erro e' dado; a frente de usabilidade mede por aqui)
   window.SC = window.SC || {}; SC.pinoCost = function () { return pino.cost(); }; SC.pinoRopeLive = function () { return pino.alive(); };

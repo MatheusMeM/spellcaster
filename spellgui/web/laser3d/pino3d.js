@@ -11,23 +11,39 @@
 window.Pino3D = (function () {
   "use strict";
   var PINS = [["ilda", "ILDA player", "LASER"], ["ndi", "NDI → ILDA", "FÓSFORO"], ["orq", "Orquestrador", "PATCHBAY"], ["cues", "Cenas e cues", "TEATRO DE PAPEL"], ["nfo", "Info", "N"]];
-  var N = 24, RS = 6, RAD = .0032, RAD0 = .0011, DIST = .25, ALTO = 120, MARGX = 90, MARGY = 48, FOLGA = 1.03, GRAV = -3.5;
+  var N = 24, RS = 6, RAD = .0032, RAD0 = .0011, DIST = .25, ALTO = 120, MARGX = 90, MARGY = 66, FOLGA = 1.014, GRAV = -3;
   function build(THREE, X, scene, pick, stage, cam, o) { var m = X.m, PI = Math.PI;
-    var TGT = (o && o.target) || new THREE.Vector3(.038, .338, .173);
+    /* Onde o cabo termina: a porta DMX OUT do chassi. Se `o.port` vier (o grupo `B.dmxOut`), a
+       posicao E o eixo de saida saem da matriz dela — o plugue nasce alinhado com o painel, em vez
+       de eu adivinhar a normal. `o.target` (contrato `B.dmxOutWorld`) e a constante sao o degrau
+       de baixo. ponytail: sem checar se a porta ainda existe depois; ela nao some do modelo. */
+    var TGT = new THREE.Vector3(.038, .338, .173), AX = new THREE.Vector3(0, 0, 1);
+    if (o && o.port) { o.port.updateWorldMatrix(true, false); o.port.getWorldPosition(TGT); o.port.getWorldDirection(AX); }
+    else if (o && o.target) TGT.copy(o.target);
     function add(parent, g, mat, x, y, z, k, label) { var ob = new THREE.Mesh(g, mat); ob.position.set(x, y, z); ob.castShadow = ob.receiveShadow = true; ob.renderOrder = 999; if (k) { ob.userData = { key: k, label: label }; pick.push(ob); } parent.add(ob); return ob; }
+    /* Materiais do Pino, e nao os do aparelho. A cena e' de luz fisica com um spot de ~50 cd: nela
+       qualquer dielétrico difuso satura, e o Pino de `m.silver` + `m.white` saia um borrao branco
+       de 120 px onde nao dava para achar olho nem pino. Metal escuro resolve o corpo (metal quase
+       nao tem difusa, e' o mesmo truque do `m.alu` do painel); os olhos e as sobrancelhas vao de
+       `MeshBasicMaterial`, que nao depende de luz nenhuma e por isso nao estoura em exposicao
+       alguma — o rosto continua legivel do lado do aparelho aceso ou no escuro da vista de dentro. */
+    var corpo = new THREE.MeshStandardMaterial({ color: 0x24282d, metalness: .9, roughness: .78, envMapIntensity: .3 }),
+      aro = new THREE.MeshStandardMaterial({ color: 0x9aa1a8, metalness: 1, roughness: .5, envMapIntensity: .3 }),
+      cabo = new THREE.MeshStandardMaterial({ color: 0x0a0b0d, metalness: .92, roughness: .42, envMapIntensity: .2 }),
+      olho = new THREE.MeshBasicMaterial({ color: 0xdde2e6 }), tinta = new THREE.MeshBasicMaterial({ color: 0x08090b });
     var g = new THREE.Group();
     var head = new THREE.Group(); head.position.set(0, .06, 0); head.rotation.x = -.32; g.add(head); head.userData = { key: "pino", label: "Pino: cabo DMX, cinco pinos, zero paciência" }; pick.push(head);
-    add(head, new THREE.CylinderGeometry(.010, .010, .06, 24), m.silver, 0, 0, 0); add(head, new THREE.CylinderGeometry(.0105, .0105, .006, 24), m.black, 0, .025, 0);
-    add(head, new THREE.CylinderGeometry(.008, .008, .003, 24), m.plastic, 0, .0305, 0);
-    var pins = []; PINS.forEach(function (p, i) { var a = PI / 2 + i * PI * 2 / 5 + PI / 5, pin = add(head, new THREE.CylinderGeometry(.0016, .0016, .009, 8), m.silver.clone(), Math.cos(a) * .0055, .0355, -Math.sin(a) * .0055, "pino." + p[0], "pino " + (i + 1) + " · " + p[1] + " · " + p[2]); pins.push(pin); });
-    add(head, new THREE.BoxGeometry(.004, .012, .003), m.dark, .0105, .008, .004, "pino.bye", "trava: solta o Pino");
-    add(head, new THREE.CylinderGeometry(.007, .0075, .022, 16), m.rubber, 0, -.038, 0);
-    var eyes = [], pupils = []; [-.007, .007].forEach(function (x) { var e = add(head, new THREE.SphereGeometry(.006, 16, 12), m.white, x, .014, .0085); e.castShadow = false; eyes.push(e); var p = add(e, new THREE.SphereGeometry(.0032, 12, 8), m.black, 0, 0, .0045); p.castShadow = false; pupils.push(p); var b = add(head, new THREE.BoxGeometry(.009, .0015, .0015), m.dark, x, .0225, .009); b.rotation.z = x < 0 ? .3 : -.3; });
+    add(head, new THREE.CylinderGeometry(.010, .010, .06, 24), corpo, 0, 0, 0); add(head, new THREE.CylinderGeometry(.0106, .0106, .006, 24), aro, 0, .025, 0);
+    add(head, new THREE.CylinderGeometry(.008, .008, .003, 24), corpo, 0, .0305, 0);
+    var pins = []; PINS.forEach(function (p, i) { var a = PI / 2 + i * PI * 2 / 5 + PI / 5, pin = add(head, new THREE.CylinderGeometry(.0016, .0016, .009, 8), aro.clone(), Math.cos(a) * .0055, .0355, -Math.sin(a) * .0055, "pino." + p[0], "pino " + (i + 1) + " · " + p[1] + " · " + p[2]); pins.push(pin); });
+    add(head, new THREE.BoxGeometry(.004, .012, .003), aro, .0105, .008, .004, "pino.bye", "trava: solta o Pino");
+    add(head, new THREE.CylinderGeometry(.007, .0075, .022, 16), cabo, 0, -.038, 0);
+    var eyes = [], pupils = []; [-.007, .007].forEach(function (x) { var e = add(head, new THREE.SphereGeometry(.006, 16, 12), olho, x, .014, .0085); e.castShadow = false; eyes.push(e); var p = add(e, new THREE.SphereGeometry(.0032, 12, 8), tinta, 0, 0, .0045); p.castShadow = false; pupils.push(p); var b = add(head, new THREE.BoxGeometry(.009, .0015, .0015), tinta, x, .0225, .009); b.rotation.z = x < 0 ? .3 : -.3; });
 
-    /* Desenhado por cima do aparelho sem `depthTest:false` peça a peça: os materiais do Pino são os
-       mesmos objetos do resto do modelo (`X.m.silver` e companhia), e desligar o teste neles apagaria
-       a profundidade do aparelho inteiro. A sentinela abaixo entra na lista de desenho logo antes da
-       turma do Pino (renderOrder 998 < 999) e limpa o buffer de profundidade: dali para a frente ele
+    /* Desenhado por cima do aparelho sem `depthTest:false` peça a peça: desligar o teste peça a peça
+       mata o auto-oclusão dele (pino atrás da cabeça passaria a aparecer na frente), e é uma bandeira
+       por material — e ele divide `aro` entre corpo e plugue. A sentinela abaixo entra na lista de
+       desenho logo antes da turma do Pino (renderOrder 998 < 999) e limpa o buffer de profundidade: dali para a frente ele
        é o único que existe, e continua se auto-ocultando direito (pino atrás de cabeça). */
     var clr = new THREE.Mesh(new THREE.PlaneGeometry(.001, .001), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, depthTest: false }));
     clr.renderOrder = 998; clr.frustumCulled = false; clr.onBeforeRender = function (r) { r.clearDepth(); }; g.add(clr);
@@ -45,12 +61,17 @@ window.Pino3D = (function () {
     /* Cabo: corda de Verlet da bota até o DMX OUT, num tubo de topologia fixa (24 nós × 6 lados)
        cujos vértices são reescritos por quadro — sem `new TubeGeometry` e sem `dispose()` a cada
        quadro, que seria alocar e liberar 168 vértices 60 vezes por segundo para nada. */
-    var P = Rope.make(N, [0, .3, 0], [TGT.x, TGT.y, TGT.z]), rest = .02, live = true;
-    var tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(0, .3, 0), new THREE.Vector3(TGT.x, TGT.y, TGT.z)]), N - 1, RAD, RS, false), m.rubber);
+    var END = TGT.clone().addScaledVector(AX, .058); // sai pelo alivio do plugue, nao pelo painel
+    var P = Rope.make(N, [0, .3, 0], [END.x, END.y, END.z]), rest = .02, live = true;
+    var tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(0, .3, 0), END.clone()]), N - 1, RAD, RS, false), cabo);
     tube.castShadow = false; tube.frustumCulled = false; scene.add(tube); // ponytail: cabo sem sombra; ele quase nunca encosta em superfície
-    var plug = add(scene, new THREE.CylinderGeometry(.011, .011, .045, 20), m.silver, TGT.x, TGT.y, TGT.z + .022); plug.rotation.x = PI / 2;
-    var relief = add(scene, new THREE.CylinderGeometry(.0075, .007, .016, 16), m.rubber, TGT.x, TGT.y, TGT.z + .052); relief.rotation.x = PI / 2;
-    plug.renderOrder = relief.renderOrder = 0;
+    /* Plugue XLR macho: corpo preto, colar prateado, alivio de borracha. Prateado inteiro (como era)
+       virava um barril branco em cima do painel, maior que o proprio conector do aparelho. */
+    var plug = new THREE.Group(); plug.position.copy(TGT).addScaledVector(AX, .010); plug.lookAt(plug.position.clone().add(AX)); scene.add(plug);
+    add(plug, new THREE.CylinderGeometry(.0098, .0098, .034, 20), m.alu, 0, 0, .017).rotation.x = PI / 2;
+    add(plug, new THREE.CylinderGeometry(.0108, .0108, .006, 20), aro, 0, 0, .002).rotation.x = PI / 2;
+    var relief = add(plug, new THREE.CylinderGeometry(.0072, .0045, .018, 14), cabo, 0, 0, .042); relief.rotation.x = PI / 2;
+    plug.traverse(function (x) { x.renderOrder = 0; });
     var tp = tube.geometry.attributes.position, tn = tube.geometry.attributes.normal;
     var T = new THREE.Vector3(), Nr = new THREE.Vector3(1, 0, 0), Bi = new THREE.Vector3(), tmp = new THREE.Vector3(), BOOT = new THREE.Vector3(0, -.052, 0), boca = new THREE.Vector3();
     function retube() { var pa = tp.array, na = tn.array, i, j, k, a, ca, sa, nx, ny, nz, vi, rr;
@@ -98,7 +119,7 @@ window.Pino3D = (function () {
     function back() { if (!gone) return; gone = false; live = true; scene.add(tube); plug.visible = relief.visible = true;
       boca.copy(BOOT); head.localToWorld(boca); reset(); remember(); say("Voltei. Os pinos continuam sendo o menu."); }
     function reset() { var i, k, f; for (i = 0; i < N; i++) { k = i * 6; f = i / (N - 1);
-      P[k] = P[k + 3] = boca.x + (TGT.x - boca.x) * f; P[k + 1] = P[k + 4] = boca.y + (TGT.y - boca.y) * f; P[k + 2] = P[k + 5] = boca.z + (TGT.z - boca.z) * f; } }
+      P[k] = P[k + 3] = boca.x + (END.x - boca.x) * f; P[k + 1] = P[k + 4] = boca.y + (END.y - boca.y) * f; P[k + 2] = P[k + 5] = boca.z + (END.z - boca.z) * f; } }
 
     /* Onde ele fica: em coordenadas de câmera, a DIST metros na frente. A meia-altura visível ali é
        tan(fov/2)·DIST, então `u` é quanto vale um pixel em metros e o resto é conta de canto — o
@@ -125,9 +146,9 @@ window.Pino3D = (function () {
          Pino puder ser arrastado pela tela. */
       // GRAV e' menor que 9,8: cabo DMX de 20 cm e' rigido, nao corrente de bicicleta. Com g real
       // e a mesma folga o cabo mergulhava 130 px e saia pela borda de baixo da tela.
-      var want = Math.max(.008, boca.distanceTo(TGT) * FOLGA / (N - 1));
+      var want = Math.max(.008, boca.distanceTo(END) * FOLGA / (N - 1));
       rest += (want - rest) * Math.min(1, dt * 2);
-      Rope.pin(P, 0, boca.x, boca.y, boca.z); Rope.pin(P, N - 1, TGT.x, TGT.y, TGT.z);
+      Rope.pin(P, 0, boca.x, boca.y, boca.z); Rope.pin(P, N - 1, END.x, END.y, END.z);
       Rope.step(P, rest, Math.min(dt, .033), GRAV, 3, 4); retube();
       ms += performance.now() - t0; msN++;
       v.set(0, .014, 0); head.localToWorld(v); v.project(cam); var sx = (v.x + 1) / 2 * W, sy2 = (1 - v.y) / 2 * H; if (mouse) { var dx = mouse[0] - sx, dy = mouse[1] - sy2, dd = Math.max(1, Math.hypot(dx, dy)), k = Math.min(1, dd / 200) * .0028; pupils.forEach(function (p) { p.position.x = dx / dd * k; p.position.y = -dy / dd * k; }); }
