@@ -39,10 +39,10 @@
     labels: [[.16, .36, .27], [.152, .34, .15], false],
     galvo:  [[.185, .60, .04], [.09, .38, -.10], true],
     optica: [[-.01, .66, -.23], [-.006, .336, -.031], true],
-    pcbL:   [[-.02, .53, -.02], [-.186, .404, -.02], true],
-    pcbR:   [[.02, .53, -.02], [.186, .404, -.02], true],
+    pcbL:   [[-.02, .53, -.015], [-.186, .389, -.015], true],
+    pcbR:   [[.02, .54, -.015], [.186, .399, -.015], true],
     psu:    [[-.06, .52, .02], [-.115, .343, .115], true],
-    dac:    [[-.03, .55, .0], [-.03, .404, .136], true]
+    dac:    [[.02, .55, .02], [.02, .399, .136], true]
   };
   var q = new URLSearchParams(location.search), names = Object.keys(VIEWS), lbl = document.getElementById("lbl");
   if (q.has("list")) { lbl.textContent = names.join("\n"); }

@@ -196,17 +196,87 @@ window.OPTICS = function (THREE, X, body, pick) {
     var t = add(gb, new THREE.PlaneGeometry(.019, .0042), X.M(0xffffff, { map: label(256, 56, p[0], 30), metalness: 0, roughness: .7 }), p[1], .0062, .0148);
     t.rotation.x = -PI / 2; t.castShadow = false; });
 
-  /* ---------- placas ---------- (refeitas no item 2) */
-  function pcb(w, h, mat, x, y, z, ry, k) { var g = grp(x, y, z, k); g.rotation.y = ry; add(g, new THREE.BoxGeometry(w, h, .0016), mat, 0, 0, 0);
-    [[-w / 2 + .004, -h / 2 + .004], [w / 2 - .004, h / 2 - .004]].forEach(function (p) { add(g, X.hex(.002, .007), mm.brass, p[0], p[1], -.0044).rotation.x = PI / 2; });
-    for (var i = 0; i < 3; i++) add(g, new THREE.BoxGeometry(.008, .006, .002), mm.ic, -w / 2 + .012 + i * .014, h * .2, .0018);
-    return g; }
-  pcb(.045, .03, m.pcbA, -.186, .09, -.08, PI / 2, "pcb");
-  pcb(.045, .03, m.pcbA, -.186, .09, -.03, PI / 2, "pcb");
-  pcb(.045, .03, m.pcbA, -.186, .09, .03, PI / 2, "pcb");
-  pcb(.065, .05, m.pcbB, .186, .09, -.06, -PI / 2, "galvodrv");
-  pcb(.065, .05, m.pcbB, .186, .09, .02, -PI / 2, "galvodrv");
-  pcb(.11, .055, m.pcbA, -.03, .09, .136, PI, "dac");
+  /* ---------- placas de circuito ----------
+     Uma lista so de componentes gera a textura E as pecas 3D: pins(c) devolve a posicao dos pads, a textura
+     desenha pad + trilha ate o barramento + serigrafia nesses mesmos pontos e place(c) poe o pino de metal
+     exatamente ali. Assim nada fica flutuando e trilha bate com componente.
+     Montagem: quatro espacadores sextavados de latao apoiados na chapa (7,2 mm = folga da parede ate a placa)
+     com parafuso na frente. Placas escuras de proposito: nao podem competir com a mesa optica.
+     Referencia de proporcao: driver de diodo tipo Flexmod P3 e placa de galvo tipo Sino-Galvo SG-DR2. */
+  var PPX = 6000;                                                     // px por metro na textura da placa
+  function pins(c) {                                                  // pads do componente, em metros no plano da placa
+    var t = c[0], u = c[1], v = c[2], a = c[3], b = c[4], p = [], i, n;
+    if (t === "ic") { n = Math.max(2, Math.round(b / .0018)); for (i = 0; i < n; i++) { var vv = v - b / 2 + .0009 + i * (b - .0018) / (n - 1); p.push([u - a / 2 - .0009, vv]); p.push([u + a / 2 + .0009, vv]); } }
+    else if (t === "cap") { p.push([u - .0016, v - a - .0012]); p.push([u + .0016, v - a - .0012]); }
+    else if (t === "hs") { p.push([u - a / 2 + .002, v]); p.push([u + a / 2 - .002, v]); }
+    else { n = Math.max(2, Math.round(a / .0026)); for (i = 0; i < n; i++) p.push([u - a / 2 + .0013 + i * (a - .0026) / (n - 1), v]); }
+    return p;
+  }
+  function pcbTex(w, h, comps, title) {
+    return X.tex(Math.round(w * PPX), Math.round(h * PPX), function (x, cw, ch) {
+      function U(u) { return (u + w / 2) * PPX; } function V(v) { return (h / 2 - v) * PPX; }
+      x.fillStyle = "#05130c"; x.fillRect(0, 0, cw, ch);                                       // mascara de solda
+      x.strokeStyle = "#0a2416"; x.lineWidth = 2;                                              // plano de terra hachurado
+      for (var i = -ch; i < cw; i += 13) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i + ch, ch); x.stroke(); }
+      var bus = [h * .40, -h * .40];                                                           // barramentos de alimentacao
+      x.strokeStyle = "#4a3c18"; x.lineWidth = 8; x.lineCap = "round";
+      bus.forEach(function (bv) { x.beginPath(); x.moveTo(8, V(bv)); x.lineTo(cw - 8, V(bv)); x.stroke(); });
+      comps.forEach(function (c) {
+        var q = pins(c), a = c[3], b = c[4];
+        x.strokeStyle = "#3f3416"; x.lineWidth = 4;                                            // trilha do pad ate o barramento
+        q.forEach(function (d, i) { var bv = bus[i % 2], dx = (i % 2 ? 9 : -9);
+          x.beginPath(); x.moveTo(U(d[0]), V(d[1])); x.lineTo(U(d[0]) + dx, V(d[1]) + (bv > d[1] ? -9 : 9)); x.lineTo(U(d[0]) + dx, V(bv)); x.stroke(); });
+        x.fillStyle = "#8d9298";                                                               // pads estanhados
+        q.forEach(function (d) { x.beginPath(); x.arc(U(d[0]), V(d[1]), 5, 0, 7); x.fill(); });
+        x.strokeStyle = "#93a39a"; x.lineWidth = 2.5;                                          // serigrafia: contorno + refdes
+        if (c[0] === "cap") { x.beginPath(); x.arc(U(c[1]), V(c[2]), a * PPX, 0, 7); x.stroke(); }
+        else x.strokeRect(U(c[1] - a / 2), V(c[2] + b / 2), a * PPX, b * PPX);
+        x.fillStyle = "#93a39a"; x.font = "700 " + Math.round(h * PPX * .05) + "px 'Share Tech Mono'";
+        x.fillText(c[5], U(c[1] - a / 2), V(c[2] + b / 2) - 3);
+      });
+      x.fillStyle = "#7d8b83"; x.font = "700 " + Math.round(h * PPX * .062) + "px 'Share Tech Mono'"; x.fillText(title, 9, ch - 7);
+      x.strokeStyle = "#0d3a22"; x.lineWidth = 5; x.strokeRect(3, 3, cw - 6, ch - 6);
+    }, true);
+  }
+  function place(g, c) {
+    var t = c[0], u = c[1], v = c[2], a = c[3], b = c[4], i;
+    pins(c).forEach(function (q) { add(g, new THREE.BoxGeometry(.0008, .0008, .0024), mm.pin, q[0], q[1], .0011); });  // pino encostando na placa
+    if (t === "ic") { add(g, X.rbox(a, b, .0026, .0004), mm.ic, u, v, .0021);
+      add(g, cyl(.0005, .0003, 10), mm.pin, u - a / 2 + .0013, v + b / 2 - .0013, .0035).rotation.x = PI / 2; }        // marca do pino 1
+    else if (t === "cap") { add(g, cyl(a * .96, .0008, 18), mm.conn, u, v, .0012).rotation.x = PI / 2;                  // base do eletrolitico
+      add(g, cyl(a, b, 18), mm.cap, u, v, .0016 + b / 2).rotation.x = PI / 2;
+      add(g, cyl(a * .99, .0004, 18), mm.pin, u, v, .0018 + b).rotation.x = PI / 2; }
+    else if (t === "hs") { add(g, X.rbox(a, b, .002, .0004), mm.heat, u, v + b * .55, .0018);                           // dissipador aparafusado
+      for (i = 0; i < 4; i++) add(g, new THREE.BoxGeometry(a - .003, .0012, .0055), mm.heat, u, v + b * .55 - b / 2 + .002 + i * (b - .004) / 3, .0055);
+      [-a / 2 + .002, a / 2 - .002].forEach(function (d) { add(g, cyl(.0016, .0012, 10), mm.steel, u + d, v, .0033).rotation.x = PI / 2; }); }
+    else if (t === "tb") { add(g, X.rbox(a, b, .0075, .0006), mm.conn, u, v + b * .05, .0046);                          // bornes de parafuso
+      var n = pins(c).length; for (i = 0; i < n; i++) add(g, cyl(.0011, .0008, 8), mm.steel, u - a / 2 + .0013 + i * (a - .0026) / (n - 1), v + b * .05, .0084).rotation.x = PI / 2; }
+    else { add(g, X.rbox(a, .0026, .0026, .0004), mm.conn, u, v, .0021);                                                // barra de pinos
+      pins(c).forEach(function (q) { add(g, new THREE.BoxGeometry(.0006, .0006, .004), mm.pin, q[0], q[1], .0036); }); }
+  }
+  var pcbEdge = X.M(0x120e05, { metalness: .04, roughness: .86 });
+  function board(w, h, comps, title, x, y, z, ry, k) {
+    var g = grp(x, y, z, k); g.rotation.y = ry;
+    var face = X.M(0x4d534f, { map: pcbTex(w, h, comps, title), metalness: .06, roughness: .6, envMapIntensity: .25 });   // cor escurece o mapa: placa nao pode competir com a mesa
+    add(g, new THREE.BoxGeometry(w, h, .0016), [pcbEdge, pcbEdge, pcbEdge, pcbEdge, face, pcbEdge], 0, 0, 0);
+    [[-w / 2 + .005, -h / 2 + .005], [w / 2 - .005, -h / 2 + .005], [-w / 2 + .005, h / 2 - .005], [w / 2 - .005, h / 2 - .005]].forEach(function (q) {
+      add(g, X.hex(.0022, .0072), mm.brass, q[0], q[1], -.0044).rotation.x = PI / 2;   // espacador de latao apoiado na chapa
+      add(g, cyl(.0022, .0012, 12), mm.steel, q[0], q[1], .0014).rotation.x = PI / 2;  // parafuso na frente
+    });
+    comps.forEach(function (c) { place(g, c); });
+    return g;
+  }
+  var DRV = [["hs", -.011, -.003, .022, .018, "Q1"], ["cap", -.0175, .0135, .0035, .008, "C1"], ["cap", -.006, .0135, .0035, .008, "C2"],
+    ["ic", .011, .001, .006, .011, "U1"], ["tb", .015, .013, .012, .006, "J1"], ["hdr", .013, -.013, .009, .0026, "J2"]];
+  var GDR = [["ic", -.019, .009, .008, .014, "U1"], ["ic", -.019, -.010, .008, .014, "U2"], ["hs", .000, -.019, .017, .008, "Q1"],
+    ["cap", .004, .015, .004, .009, "C1"], ["cap", .004, .002, .004, .009, "C2"], ["cap", .017, .002, .004, .009, "C3"],
+    ["tb", .020, .017, .014, .006, "J1"], ["hdr", .019, -.008, .010, .0026, "J2"]];
+  var DAC = [["ic", -.033, .008, .012, .016, "U1"], ["ic", -.012, .006, .008, .012, "U2"], ["hs", .036, .008, .015, .013, "Q1"],
+    ["cap", -.033, -.012, .004, .009, "C1"], ["cap", -.021, -.012, .004, .009, "C2"], ["cap", -.009, -.012, .004, .009, "C3"],
+    ["hdr", .010, .015, .016, .0026, "J1"], ["hdr", .010, .002, .016, .0026, "J2"], ["tb", .028, -.014, .018, .006, "J3"]];
+  var pcbL = [-.075, -.015, .045].map(function (z, i) { return board(.052, .034, DRV, ["DRV RED", "DRV GREEN", "DRV BLUE"][i], -.186, .075, z, PI / 2, "pcb"); });
+  var pcbR = [-.055, .025].map(function (z, i) { return board(.062, .046, GDR, ["GALVO X DRV", "GALVO Y DRV"][i], .186, .085, z, -PI / 2, "galvodrv"); });
+  var dacB = board(.10, .050, DAC, "SPELLCASTER DAC  ILDA", .02, .085, .136, PI, "dac");
 
   /* ---------- fonte ---------- (atrás da mesa, junto da traseira) */
   var psu = grp(-.115, .029, .115, "psu"); add(psu, X.rbox(.10, .042, .045, .002), mm.anod, 0, 0, 0);
