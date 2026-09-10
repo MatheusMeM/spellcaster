@@ -133,3 +133,37 @@ Origem: `design/FUNCOES/timeline-daw.md` §3 (leitura de Ableton Live 12 e do ma
 - **Cor por track: não entra como campo.** O Ableton deixa o usuário pintar cada track; `PRINCIPIOS.md §2` proíbe cor decorativa. Recomendação: a cor sai do `type` do track (`dmx`, `laser`, `fx`, `cue`, `media`), como as famílias de nó do Graph — zero campo novo. Pela mesma razão, marcador **não** ganha `color` (`SHORTCUTS.md` já fixou marcador cinza).
 - **Altura de faixa e dobra de lane: não entram no `.spell`.** É estado de janela, proibido dentro do show por `FUNCOES/README.md §12`; vão para o `config.json` da GUI. `loop` idem (estado de transporte); se um dia precisar persistir, o lugar é `transport.loop`, que já existe no arquivo.
 - **Não é formato, é runtime, e precisa entrar:** `mute` de track não faz nada no engine Rust (não há `mute` nem `solo` em `spellcore/engine/`; o `mute` de `spellcore/script/src/graph.rs:200` é o do nó do graph, outra coisa; mute de track só no protótipo Python, `spellcaster/gui/api.py:168-171`). Hoje os botões M e S da timeline são pintura: o DMX continua saindo. `solo` continua sendo "mute dos outros" calculado no cliente.
+
+## 09/09/2026 · interface DAW (frente `daw-pesquisa`) — aguarda voto
+
+Seis documentos novos em `design/FUNCOES/` (`daw-arranjo`, `daw-sessao`, `browser-dnd`, `mapping`, `audio-video`, `pontos-falhos`), lidos dos manuais do Ableton Live 12, do DaVinci Resolve 20 e do Resolume Arena. O que eles decidiram está lá; o que eles **não** decidem está aqui.
+
+**Formato do `.spell`**
+
+- **`clips[]` por track**: `{"t0", "len", "src", "offset"}` em segundos, `src` relativo à pasta do show. Convive com `keys[]` e com as lanes de parâmetro, não substitui nada. `migrate()` converte o `clip` (singular) do track laser sem subir `VERSION`. Motivo: hoje um clipe de laser de 46,8 s desenha uma lane vazia, porque a timeline só conhece `keys` (`daw-arranjo.md §4.1`).
+- **Tipos de track `audio` e `video`**, com `clips[]`, lane `gain` e sem `universe`. A alternativa é serem saídas, e não são: têm posição no tempo (`audio-video.md §1`).
+- **Ordem de `tracks[]` é a ordem da tela**, então reordenar reescreve o array e qualquer índice guardado (cue, mapeamento, endereço `track/3/mute`) passa a apontar para outro track. A alternativa é **`uid` por track**, que é o que `FUNCOES/README.md §12` já manda para referência entre objetos, resolve de vez o "Shortcut Target" do Resolume (`mapping.md §7`) e custa um campo. **É a decisão de maior alcance desta rodada.**
+- **`marker.go: "<endereço>"`** transforma marcador em locator (Ableton §6.4) sem objeto novo, e **`cue.fires: ["<endereço>", ...]`** é o que dá célula de grade aos tracks de mídia, cujos valores `cue.values` (só `endereço DMX → número`) não alcançam. O voto decide se os dois se chamam igual (lista nos dois) ou se o marcador fica com string.
+- **`"midi"` vira `"map"`, com a fonte no prefixo da chave** (`"key:Space"`, `"midi:144/60"`, `"osc:/spell/go"`, `"widget:go"`) — o mesmo vocabulário que `input {key}` já documenta e que `chave()` do graph já produz. `midi_map` vira `map_set`; `migrate()` prefixa o bloco antigo. É o que impede duas fontes de verdade entre a frente `midi` e o modo de mapeamento (`mapping.md §6`). O `bind.js` da rodada 5 (chave `note:1:60`, persistência em `localStorage`) perde as duas coisas: a chave vira a do engine e o mapa vai para o `.spell`.
+- **`show.outputs[]` ganha `{"type":"screen","monitor":N}`** para a segunda janela de vídeo no projetor (`audio-video.md §4`), e o track de vídeo aponta para ela por `screen`.
+
+**Atalhos**
+
+- **`Ctrl+Shift+A` passa a ser o modo de mapeamento** (o dono fixou a tecla). Consequência: "selecionar nada" sai de `Ctrl+Shift+A` e vai para **`Alt+A`**, pela própria gramática de `SHORTCUTS.md` (*"Alt = variante/limpa"*, como `Alt+I`/`Alt+O`/`Alt+X` já fazem). Nota de fonte: no Resolume `Ctrl+Shift+A` é o Advanced Output; os modos de atalho de lá são `Shift+Ctrl+K/M/O/X`. A tecla fica como o dono pediu.
+- **`Tab` continua sendo a troca de Face** (editor ↔ performance, PRD §10). Arrangement ↔ Session é a **segunda batida do `Shift+2`**, na mesma lógica de `Shift+Z` (enquadra, bate de novo e volta) e de `M` (cria marcador, bate de novo e edita). Terceira vez que `Tab` é disputada; fica decidido e sai dos pontos abertos de `FUNCOES/README.md`.
+- **`Ctrl+E` age no objeto selecionado**: clipe corta (Ableton §6.12), keyframe abre o menu de easing (`SHORTCUTS.md`). Um atalho, dois objetos.
+- **Altura de faixa por track** (Resolve p.643) contra a altura global proposta em `timeline-daw.md` item 19.
+
+**Recusas deliberadas, registradas para não voltarem por esquecimento**
+
+- **Consolidate** (Ableton §6.13): grava sample novo em `Samples/Processed/Consolidate`. Não renderizamos mídia e não escrevemos arquivo derivado na pasta do show.
+- **Follow actions** (Ableton §16.7): duas ações com probabilidade, dez tipos, `Jump Target`, multiplicador de loops. Nossa cue já tem `follow: bool` (= o Follow Action `Next`), e o resto é máquina de estados escondida na lista de cues — a máquina de estados já está sendo desenhada no lugar certo (nó `state` do graph).
+- **Toggle, latch, contador e limiar no mapa direto**: vão para o graph, que já tem `logic.*`, `math.*`, `time.*` e `state` no catálogo fechado. O mapa flat guarda chave → comando e nada de estado.
+- **Quatro modos de mapeamento por protocolo** (Resolume, `Shift+Ctrl+K/M/O/X`, uma cor cada): um modo só, porque o protocolo já vem na entrada e quatro cores contra `PRINCIPIOS.md §2`. `K`/`M`/`O` sobrevivem como filtro de fonte **dentro** do modo.
+- **NDI e Spout**: bloqueio de licença (SDK registrado, contra `FUNCOES/README.md §14`) e de contexto GPU no WebView, não de esforço. O caso real — levar imagem ao projetor — resolve-se com a segunda janela.
+- **Cor livre por track** (Resolve p.621, 16 cores), **automação vermelha × modulação azul** (Ableton §26.3), **marcador colorido**: `PRINCIPIOS.md §2`, cor significa estado.
+- **`.mov` como formato de vídeo** (Ableton §27.1): o critério é o do reprodutor, e o reprodutor é o WebView.
+
+**Defeito provado, para a frente que corrigir**
+
+- `spellgui/web/timeline.js:308-312`: `commit()` reescreve `spec.mute` a partir de **cada** lane, e as lanes de parâmetro do mesmo track carregam a cópia velha — a última escrita vence e desfaz o mute que o operador acabou de ligar. Vale igual para `solo`. Reproduzido com `shows/medgrupo.spell` (o track laser tem lanes `.rot` e `.scale` sobre o mesmo `spec`). A correção é uma fonte só: `L.mute` vira leitura de `L.spec.mute`.
