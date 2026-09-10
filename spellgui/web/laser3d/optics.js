@@ -29,13 +29,13 @@ window.OPTICS = function (THREE, X, body, pick) {
   var mm = {
     aluTop: X.M(0xffffff, { metalness: 1, roughness: .55, envMapIntensity: .45 }),        // tom vem do mapa da grade
     aluSide: X.M(0x2e3339, { metalness: 1, roughness: .6, roughnessMap: X.brushR, normalMap: X.brushN, normalScale: new V2(.16, .16), envMapIntensity: .4 }),
-    anod: X.M(0x0d1013, { metalness: 1, roughness: .88, roughnessMap: X.grainR, envMapIntensity: .22 }),      // preto anodizado
+    anod: X.M(0x161c22, { metalness: 1, roughness: .88, roughnessMap: X.grainR, envMapIntensity: .22 }),      // preto anodizado
     anodG: X.M(0x30353b, { metalness: 1, roughness: .62, roughnessMap: X.brushR, envMapIntensity: .38 }),      // alumínio usinado
     heat: X.M(0x101418, { metalness: 1, roughness: .92, roughnessMap: X.grainR, envMapIntensity: .2 }),      // dissipador anodizado
     steel: X.M(0x4a5058, { metalness: 1, roughness: .38, roughnessMap: X.brushR, envMapIntensity: .55 }),
     brass: X.M(0x6d5320, { metalness: 1, roughness: .46, roughnessMap: X.brushR, envMapIntensity: .5 }),
     rubber: X.M(0x030304, { metalness: 0, roughness: .95, roughnessMap: X.grainR }),
-    mirror: X.M(0xeef2f6, { metalness: 1, roughness: .035, side: THREE.DoubleSide }),
+    mirror: X.M(0xc8d2db, { metalness: .5, roughness: .2, envMapIntensity: 2.4, side: THREE.DoubleSide }),
     ic: X.M(0x030405, { metalness: .04, roughness: .8, roughnessMap: X.grainR }),
     pin: X.M(0x35393d, { metalness: .9, roughness: .35 }),
     cap: X.M(0x070c17, { metalness: .3, roughness: .5 }),
@@ -150,16 +150,51 @@ window.OPTICS = function (THREE, X, body, pick) {
   add(shArm, new THREE.BoxGeometry(.0016, .014, .010), mm.anod, -.0125, .0022, 0);            // lâmina, no feixe quando fechado
   add(shArm, cyl(.0032, .0022, 12), mm.steel, .009, .0022, 0);                                // contra-peso no ímã
 
-  /* ---------- galvos ---------- (bloco X/Y; refeito no item 1) */
-  var gb = grp(.088, .080, -.0875, "galvo"); add(gb, X.rbox(.06, .03, .05, .003), mm.anod, 0, 0, 0);
-  add(gb, X.rbox(.006, .073, .05, .002), mm.anod, -.033, -.0215, 0); add(gb, X.rbox(.03, .006, .05, .002), mm.anod, -.045, -.055, 0);
-  add(gb, cyl(.0075, .04, 24), mm.anod, -.013, .035, 0); add(gb, cyl(.008, .004, 24), mm.anod, -.013, .056, 0); add(gb, cyl(.0015, .012, 8), mm.steel, -.013, -.018, 0);
-  var mirX = add(gb, new THREE.BoxGeometry(.001, .012, .007), mm.mirror, -.013, -.023, 0); mirX.rotation.y = -PI / 4;
-  var yg = sub(gb, .007, -.023, 0, 3 * PI / 4);
-  add(yg, cyl(.0075, .04, 24), mm.anod, 0, 0, .032).rotation.x = PI / 2;
-  add(yg, cyl(.0015, .012, 8), mm.steel, 0, 0, .006).rotation.x = PI / 2; add(yg, cyl(.008, .004, 24), mm.anod, 0, 0, .054).rotation.x = PI / 2;
-  add(yg, X.rbox(.02, .012, .014, .001), mm.anod, 0, .011, .032);
-  var myp = sub(yg, 0, 0, 0); add(myp, new THREE.BoxGeometry(.012, .016, .001), mm.mirror, 0, 0, 0).rotation.y = -PI / 2;
+  /* ---------- bloco de galvos X/Y ----------
+     Padrão Cambridge Technology 6215H / Sino-Galvo SG-B2: motor cilíndrico anodizado de Ø 14,3 mm com flange
+     dianteiro, conector de 4 pinos atrás e o espelho colado na ponta do eixo. Os dois eixos ficam a 90° num
+     bloco em L de alumínio: pé parafusado em quatro furos da grade, chapa vertical a 45° que carrega o motor Y
+     e braço no alto de onde o motor X pende com o eixo para baixo.
+     Corpo do motor: 32 mm no X (pendurado, tem altura livre) e 24 mm no Y (encurtado dos 32 mm reais para caber
+     entre a mesa e o painel frontal) — está anotado aqui porque é a única licença de proporção do conjunto.
+     Cinemática: o feixe chega em -z, o espelho X (eixo vertical) manda em +x, o espelho Y (eixo horizontal a 45°
+     em planta, dentro do plano do espelho) manda em -z e sai pela abertura em x = .095.
+     app.js gira O.mirX.rotation.y (-PI/4 + varredura) e O.mirY.rotation.z (varredura vertical). */
+  var GBX = GX(20), GBZ = GZ(2), A45 = 3 * PI / 4;                  // pé do L em (.0875, -.10); eixo do Y = (1,0,-1)/raiz(2)
+  var gb = grp(GBX, TOP, GBZ, "galvo");                             // y local 0 = tampo da mesa
+  function motor(parent, len, z0) {                                 // eixo em +z local; z0 = face do flange
+    add(parent, cyl(.0085, .003, 28), mm.anodG, 0, 0, z0 + .0015).rotation.x = PI / 2;            // flange dianteiro
+    add(parent, cyl(.00715, len, 28), mm.anod, 0, 0, z0 + .003 + len / 2).rotation.x = PI / 2;    // corpo Ø 14,3
+    for (var i = 0; i < 3; i++) add(parent, cyl(.00728, .0012, 28), mm.anodG, 0, 0, z0 + .008 + i * (len - .014) / 2).rotation.x = PI / 2;
+    var cn = add(parent, X.rbox(.009, .006, .005, .0008), mm.conn, 0, .0092, z0 + len - .004);    // conector de 4 pinos
+    for (var j = 0; j < 4; j++) add(cn, cyl(.0004, .005, 6), mm.pin, -.003 + j * .002, .0045, 0);
+    return cn;
+  }
+  // --- bloco em L de alumínio
+  add(gb, X.rbox(.076, .006, .038, .002), mm.anodG, 0, .003, 0);                                  // pé na grade
+  bolts(gb, [[-.0125, -.0125], [.0125, -.0125], [-.0125, .0125], [.0125, .0125]], .0074, .0035);
+  add(gb, X.rbox(.024, .100, .006, .002), mm.anodG, .0199, .050, -.0124).rotation.y = A45;        // chapa vertical a 45° (motor Y)
+  add(gb, X.rbox(.046, .010, .013, .002), mm.anodG, .0037, .066, -.005);                          // braço lateral que segura o motor X (nada por cima: o motor fica à vista)
+  // --- galvo X: motor pendurado do braço com o eixo para baixo
+  var gxg = sub(gb, -.0125, 0, 0), xm = sub(gxg, 0, .0505, 0); xm.rotation.x = -PI / 2;            // +z local vira +y
+  motor(xm, .032, 0);
+  add(gxg, X.ring(.026, .00745, .011), mm.anodG, 0, .066, 0).rotation.x = PI / 2;                 // abraçadeira do motor
+  var mirX = sub(gxg, 0, .035, 0); mirX.rotation.y = -PI / 4;                                     // O.mirX: normal local = +x
+  add(mirX, cyl(.0015, .015, 10), mm.steel, 0, .0075, 0);                                          // eixo saindo do flange
+  add(mirX, new THREE.BoxGeometry(.0030, .011, .006), mm.anodG, -.0023, 0, 0);                     // suporte colado no eixo
+  add(mirX, new THREE.BoxGeometry(.0006, .010, .015), mm.mirror, .0011, 0, 0);                     // espelho X 15 x 10 mm
+  // --- galvo Y: motor na chapa a 45°, eixo dentro do plano do espelho
+  var yg = sub(gb, .0075, .035, 0, A45);
+  motor(yg, .024, .0175);
+  add(yg, X.ring(.026, .00745, .008), mm.anodG, 0, 0, .0135);                                      // abraçadeira na chapa
+  var myp = sub(yg, 0, 0, 0);                                                                      // O.mirY: gira em torno de z local
+  add(myp, cyl(.0015, .014, 10), mm.steel, 0, 0, .0105).rotation.x = PI / 2;
+  add(myp, new THREE.BoxGeometry(.0030, .013, .006), mm.anodG, -.0023, 0, .0035);
+  add(myp, new THREE.BoxGeometry(.0006, .012, .014), mm.mirror, .0011, 0, 0);                       // espelho Y 14 x 12 mm
+  // --- plaquinhas de identificação no pé
+  [["GALVO X", -.0125], ["GALVO Y", .017]].forEach(function (p) {
+    var t = add(gb, new THREE.PlaneGeometry(.019, .0042), X.M(0xffffff, { map: label(256, 56, p[0], 30), metalness: 0, roughness: .7 }), p[1], .0062, .0148);
+    t.rotation.x = -PI / 2; t.castShadow = false; });
 
   /* ---------- placas ---------- (refeitas no item 2) */
   function pcb(w, h, mat, x, y, z, ry, k) { var g = grp(x, y, z, k); g.rotation.y = ry; add(g, new THREE.BoxGeometry(w, h, .0016), mat, 0, 0, 0);
@@ -182,7 +217,7 @@ window.OPTICS = function (THREE, X, body, pick) {
   /* ---------- caminho óptico ---------- (todo ponto é o centro de uma peça de verdade) */
   var P = { g0: [GX(3) + .0389, BY, GZ(7)], d1: [GX(9), BY, GZ(7)], r0: [GX(9), BY, GZ(12) - .0389],
     d2: [GX(14), BY, GZ(7)], b0: [GX(14), BY, GZ(12) - .0389], m1: [GX(19), BY, GZ(7)],
-    sh: [GX(19), BY, GZ(5)], gx: [GX(19), BY, GZ(3)], gy: [.095, BY, GZ(3)], out: [.095, BY, -.152] };
+    sh: [GX(19), BY, GZ(5)], gx: [GX(19), BY, GZ(2)], gy: [.095, BY, GZ(2)], out: [.095, BY, -.152] };
   function segments(armed, open, lim, g) { if (!armed) return []; var r = lim.r, gg = lim.g, b = lim.b, S = [[P.g0, P.d1, [0, gg, 0]], [P.r0, P.d1, [r, 0, 0]], [P.b0, P.d2, [0, 0, b]], [P.d1, P.d2, [r, gg, 0]], [P.d2, P.m1, [r, gg, b]], [P.m1, P.sh, [r, gg, b]]];
     if (open) { S.push([P.sh, P.gx, [r, gg, b]], [P.gx, P.gy, [r, gg, b]], [P.gy, [P.out[0] + g[0] * .009, P.out[1] + g[1] * .006, P.out[2]], [r, gg, b]]); } return S; }
   return { bench: bench, lens: lens, shutter: shArm, mirX: mirX, mirY: myp, segments: segments, P: P };
