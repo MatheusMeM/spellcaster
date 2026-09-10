@@ -17,43 +17,45 @@
   // familia: "toggle" (inverte estado) | "momentary" (age enquanto apertado) | "valor" (muda um
   // numero) | "conector" (plugue: clique nao faz nada) | "navegacao" (abre a tela daquela peca).
   // Nenhuma chave pode ter duas familias, e nenhuma funcao pode aparecer em duas chaves.
+  // O rotulo e' texto de tela (tooltip da peca): vai acentuado, como o resto da pagina. Sao os
+  // nomes das PAGINAS do display (`oledLines`) que ficam em ASCII, porque aquilo e' um display.
   var CONTROLS = {
     // painel traseiro — energia e seguranca
     power:     ["toggle", "POWER: liga e desliga o aparelho"],
-    keyswitch: ["toggle", "chave: arma a emissao"],
+    keyswitch: ["toggle", "chave: arma a emissão"],
     interlock: ["toggle", "interlock: tira o plugue e o obturador fecha"],
-    acin:      ["conector", "AC IN: powerCON TRUE1, 100-240 V (quem liga e' o rocker POWER)"],
+    acin:      ["conector", "AC IN: powerCON TRUE1, 100-240 V (quem liga é o rocker POWER)"],
     // painel traseiro — display e navegacao
     enc:       ["navegacao", "encoder: gira navega, aperta entra"],
-    back:      ["navegacao", "BACK: volta uma pagina do display"],
+    back:      ["navegacao", "BACK: volta uma página do display"],
     // painel traseiro — portas
     ilda:      ["navegacao", "ILDA IN: carrega o .ild"],
-    ildathru:  ["navegacao", "ILDA OUT: encadeia o proximo projetor"],
-    dmxin:     ["navegacao", "DMX IN: endereco e modo"],
+    ildathru:  ["navegacao", "ILDA OUT: encadeia o próximo projetor"],
+    dmxin:     ["navegacao", "DMX IN: endereço e modo"],
     dmxout:    ["navegacao", "DMX OUT: repete o universo"],
     rj45:      ["navegacao", "NET: sACN, Art-Net, NDI, Spout e os DACs da rede"],
     usb:       ["navegacao", "USB: firmware"],
     fan:       ["navegacao", "ventoinha 60 mm: temperatura"],
     // corpo
-    lid:       ["navegacao", "tampa: abrir = preferencias"],
+    lid:       ["navegacao", "tampa: abrir = preferências"],
     front:     ["navegacao", "frente: abertura do feixe"],
     aperture:  ["navegacao", "abertura: classe 4, 10 W"],
-    side:      ["navegacao", "aletas de dissipacao"],
+    side:      ["navegacao", "aletas de dissipação"],
     // dentro (optics.js)
-    bench:     ["navegacao", "mesa optica: aluminio 16 mm, furacao M4 12,5 mm"],
-    r:         ["navegacao", "modulo vermelho 638 nm - 2,5 W: limite e curva"],
-    g:         ["navegacao", "modulo verde 520 nm - 3 W: limite e curva"],
-    b:         ["navegacao", "modulo azul 445 nm - 4,5 W: limite e curva"],
+    bench:     ["navegacao", "mesa óptica: alumínio 16 mm, furação M4 12,5 mm"],
+    r:         ["navegacao", "módulo vermelho 638 nm · 2,5 W: limite e curva"],
+    g:         ["navegacao", "módulo verde 520 nm · 3 W: limite e curva"],
+    b:         ["navegacao", "módulo azul 445 nm · 4,5 W: limite e curva"],
     dichro:    ["navegacao", "dicroicos: combinam R, G e B num feixe"],
     fold:      ["navegacao", "espelho de dobra HR: manda o feixe para os galvos"],
     shutter:   ["navegacao", "obturador: fecha sem chave ou sem interlock"],
     galvo:     ["navegacao", "galvos X/Y: kpps"],
     galvodrv:  ["navegacao", "driver dos galvos: buffer e velocidade"],
-    pcb:       ["navegacao", "driver do diodo: corrente e modulacao"],
+    pcb:       ["navegacao", "driver do diodo: corrente e modulação"],
     dac:       ["navegacao", "placa DAC ILDA: os conectores traseiros nascem aqui"],
-    psu:       ["navegacao", "fonte 48 V - 250 W"],
+    psu:       ["navegacao", "fonte 48 V · 250 W"],
     // Pino
-    pino:      ["navegacao", "Pino: cabo DMX, cinco pinos, zero paciencia"]
+    pino:      ["navegacao", "Pino: cabo DMX, cinco pinos, zero paciência"]
   };
   function labelOf(k) { return (CONTROLS[k] && CONTROLS[k][1]) || k; }
   function kindOf(k) { return (CONTROLS[k] && CONTROLS[k][0]) || ""; }
