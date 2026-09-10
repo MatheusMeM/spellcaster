@@ -593,17 +593,18 @@ pub fn current() -> Option<Handle>;
 `locate`/`stop` chamam `reset()` em todo hook e `CueList::reset()`. `looping` sem `duration`
 não repete (não há fim). O transporte remoto por OSC nunca toca nos Universes direto.
 
-## Registry — os 46 comandos numa tabela
+## Registry — os 59 comandos numa tabela
 
-Auditoria de setembro/2026. Uma linha por comando: os argumentos com tipo e default (o schema que
+Auditoria de setembro/2026, atualizada na integração da rodada 2 (`spellcore commands`). Uma
+linha por comando: os argumentos com tipo e default (o schema que
 o `schemars` gera do struct de `Args`, o mesmo que sai em `GET /commands`, nas tools MCP e em
 `spellcore commands <nome>`), o que faz, o que devolve e o que dispara o comando na GUI. As
 seções abaixo continuam sendo a explicação; esta tabela é o índice.
 
 Regras de leitura: `arg:tipo` é obrigatório, `arg:tipo?` é opcional sem default, `arg:tipo=v` tem
 default `v`. "Dispara na GUI" cita a página (`index.html` = TIMELINE, `teatro.html` = TEATRO,
-`patchbay.html` = PATCHBAY, `laser.html` = LASER, `face.html` = FACE) e a tecla de
-`design/SHORTCUTS.md` quando existe; `—` é comando que hoje só a IA (MCP), o OSC e a
+`patchbay.html` = PATCHBAY, `laser.html` = LASER, `face.html` = FACE, `midi.html` = MIDI,
+`help.html` = AJUDA) e a tecla de `design/SHORTCUTS.md` quando existe; `—` é comando que hoje só a IA (MCP), o OSC e a
 `help.html` chamam.
 
 | Comando | Argumentos | Faz | Devolve | Dispara na GUI |
@@ -616,7 +617,11 @@ default `v`. "Dispara na GUI" cita a página (`index.html` = TIMELINE, `teatro.h
 | `locate` | `t:number` | salta para `t` segundos | estado do transporte | TIMELINE: régua, `←`/`→`, `Home`/`End` |
 | `cue_go` | `index:integer?` | dispara a próxima cue, ou a de índice dado | estado do transporte | TEATRO: `GO` (`Enter`) |
 | `transport_state` | — | lê o transporte sem tocar em nada | `{t, state, cue, frames, fps, duration, universes}` | — (a GUI recebe o evento `transport`) |
+| `loop_set` | `on:boolean` | liga/desliga o loop do player no intervalo In–Out do show aberto | estado do transporte | TIMELINE: `Loop` (`Ctrl+L`) |
 | `input` | `key:string`, `value:number=0` | entrega um evento aos ganchos do player (o Graph) | `{key, value}` | FACE: todo widget |
+| `input_get` | `universe:integer=1` | último frame recebido no universo de ENTRADA (`show.inputs`) | `{universe, data:[512]}` | — (o previz usa o frame binário do barramento) |
+| `rec_arm` | `track:integer`, `on:boolean=true` | arma/desarma a gravação de um track `dmx` do show ABERTO | `{track, on, tracks}` | TIMELINE: `Rec arm`, `R` |
+| `rec_state` | — | tracks armados neste processo | `{recording, tracks}` | TIMELINE: no boot e a cada evento `show` |
 | `show_new` | — | zera o show aberto (sACN no universo 1, 60 s) | o show inteiro | — |
 | `show_set` | `data:any` | **importa** um show inteiro (objeto ou texto JSON) | o show inteiro | — |
 | `show_save` | `file:string=""` | grava; sem `file`, no caminho do último aberto | o caminho | TIMELINE: `Salvar`, `Ctrl+S` |
@@ -643,6 +648,14 @@ default `v`. "Dispara na GUI" cita a página (`index.html` = TIMELINE, `teatro.h
 | `module_del` | `name:string` | tira o módulo da tabela | o manifesto removido | — |
 | `module_list` | — | módulos vivos | `[{name, type, version}]` | PATCHBAY: catálogo do nó `module` |
 | `module_get` | `name:string` | o manifesto inteiro | `{name, type, version, parameters, values, commands}` | PATCHBAY: o nó `module` |
+| `midi_ports` | — | portas MIDI de entrada da máquina e qual está aberta | `{ports, open}` | MIDI: `Portas` |
+| `midi_open` | `port:string=""` | abre por nome, trecho do nome ou índice; grava `midi_port` no show aberto | `{open}` | MIDI: `Abrir` |
+| `midi_close` | — | fecha a porta e tira o `midi_port` do show aberto | `{open:null}` | MIDI: `Fechar` |
+| `midi_map` | `key:string`, `cmd:string`, `args:any?` | liga uma tecla/CC a um comando no show aberto | o mapa | MIDI: `LEARN` e a linha da tabela |
+| `midi_unmap` | `key:string` | desliga a tecla no show aberto | o mapa | MIDI: apagar a linha |
+| `midi_maps` | — | o mapa `tecla -> comando` do show aberto | o mapa | MIDI: a tabela |
+| `midi_last` | — | última tecla MIDI recebida | `{key, value, raw, seq}` | MIDI: a tecla ao vivo (4 Hz) |
+| `midi_learn` | — | espera até 5 s pela próxima tecla e devolve a chave dela | `{key, value}` | MIDI: `LEARN` |
 | `play_show` | `file:string`, `loop:boolean=false`, `osc_port:integer?` | **sobe** um player e toca até o fim ou Ctrl+C | `{name, frames, jitter_p99_ms, jitter_max_ms, drift}` | TIMELINE: `Play` sem player vivo; CLI `spellcore play` |
 | `net` | `timeout:number=2`, `json:boolean=false` | varre a rede (interfaces, Art-Net, sACN, Ether Dream) | relatório de texto, ou o scan cru | CLI `spellcore net` |
 | `graph_check` | — | compila o graph do show aberto sem rodar | `{nodes, error}` | PATCHBAY: a cada edição do graph |
@@ -654,6 +667,7 @@ default `v`. "Dispara na GUI" cita a página (`index.html` = TIMELINE, `teatro.h
 | `laser_param` | `feed:integer`, `path:string`, `value:number` | um parâmetro do feed (geo, limit, safe, shutter) | `{feed, path, value, shutter}` | LASER: sliders e `Shutter` |
 | `laser_stats` | `feed:integer` | estado do feed | `{playing, file, stat/*, jitter, cpu, safety}` | LASER: painel de stats (4 Hz) |
 | `laser_files` | `dir:string=""` | lista os `.ild` do diretório (vazio = `shows/`) | `{dir, files:[{name, path, bytes}]}` | LASER: `Listar` |
+| `clip_frame` | `clip:string`, `index:integer?`, `t:number=0`, `fps:number=30` | um quadro do `.ild` para desenhar, por `index` ou por `t` a `fps` | pontos `[x, y, r, g, b, blank]`, `x`/`y` em -1..1 | TIMELINE: previz do playhead (`Alt+M`) |
 
 ### O que a auditoria corrigiu, e o que ficou de pé
 
