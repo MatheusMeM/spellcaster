@@ -1,77 +1,188 @@
-/* Dentro: mesa óptica (um bloco só de alumínio natural com furação M4, parafusada no fundo), três módulos laser
-   em bases, dois dicroicos e um espelho de dobra em suportes cinemáticos, obturador mecânico (solenoide) ligado à
-   chave, bloco de galvos X/Y em cantoneira com os dois motores e espelhos, placas discretas nas paredes (drivers
-   dos diodos à esquerda, drivers dos galvos com dissipador à direita, DAC ILDA atrás), fonte, e todos os cabos
-   com rota. Nada solto. Coordenadas locais do corpo; feixe a y = .057. */
+/* Dentro do aparelho: mesa óptica de alumínio natural com furação M4 a 12,5 mm de verdade, três módulos laser
+   em bases parafusadas na grade, dois dicroicos e um espelho de dobra em suportes cinemáticos, obturador de
+   solenoide com braço e ímã, bloco de galvos X/Y, placas de driver nas paredes e o DAC na traseira, fonte, e os
+   cabos com rota por abraçadeiras. Nada solto e nada atravessa nada.
+
+   Referências (só de proporção; tudo é procedural, nenhum asset baixado):
+   mesa Newport SG / Thorlabs MB com furação M4 a 12,5 mm; suporte cinemático Thorlabs KM100;
+   galvo Cambridge Technology 6215H (motor Ø 14,3 mm, espelho no fim do eixo) e Sino-Galvo SG-B2;
+   módulos DPSS/diodo de 3 W com dissipador de aletas e ventoinha de 30 mm.
+
+   Coordenadas locais do corpo (origem no fundo da chapa, y = 0 na chapa de baixo). O feixe corre a y = .057
+   (BEAM_Y de body.js) e o interior útil é x ∈ [-.194, .194], z ∈ [-.144, .144].
+   A grade da mesa cai em múltiplos de 12,5 mm: GX(i)/GZ(j) devolvem furo por furo, e todo suporte, módulo e
+   parafuso está num furo. */
 window.OPTICS = function (THREE, X, body, pick) {
   "use strict";
-  var m = X.m, PI = Math.PI, BY = .057, LBL = LaserEngine.labelOf;
+  var m = X.m, PI = Math.PI, BY = .057, LBL = LaserEngine.labelOf, V2 = THREE.Vector2;
   function add(parent, g, mat, x, y, z, k, label) { var o = new THREE.Mesh(g, mat); o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; if (k) { o.userData = { key: k, label: label || LBL(k) }; pick.push(o); } parent.add(o); return o; }
   function cyl(r, h, seg) { return new THREE.CylinderGeometry(r, r, h, seg || 20); }
   function grp(x, y, z, k, label) { var g = new THREE.Group(); g.position.set(x, y, z); if (k) { g.userData = { key: k, label: label || LBL(k) }; pick.push(g); } body.add(g); return g; }
-  function bolts(parent, pts, y, r) { pts.forEach(function (p) { var s = add(parent, cyl(r || .003, .003, 12), m.steel, p[0], y, p[1]); add(s, X.hex(r ? r * .5 : .0015, .002), m.black, 0, .001, 0); }); }
-  /* mesa óptica: 300 × 16 × 200 mm, quatro parafusos M6 nos cantos */
-  var bench = add(body, X.rbox(.30, .016, .20, .004), m.bench, -.02, .014, -.03, "bench"); bolts(body, [[-.16, -.12], [.12, -.12], [-.16, .06], [.12, .06]], .0235, .004);
-  /* módulos laser: base + corpo + colimador + lente; cabo atrás */
-  var lens = {};
-  function module(k, x, z, dir, color, gold, label) { // dir: "+x" ou "-z"
-    var g = grp(x, BY, z, k, label), rot = dir === "+x" ? -PI / 2 : 0; g.rotation.y = rot; // local: emite em -z
-    add(g, X.rbox(.05, .018, .085, .002), m.dark, 0, -.026, .005); bolts(g, [[-.019, -.03], [.019, -.03], [-.019, .038], [.019, .038]], -.016);
-    add(g, X.rbox(.034, .034, .07, .003), gold ? m.brass : m.black, 0, 0, .005); if (!gold) for (var i = 0; i < 7; i++) add(g, new THREE.BoxGeometry(.04, .0015, .06), m.steel, 0, .0185 + i * .0035, .005);
-    var c = add(g, cyl(.008, .016), m.brass, 0, 0, -.038); c.rotation.x = PI / 2; add(g, cyl(.0085, .002), m.black, 0, 0, -.045).rotation.x = PI / 2;
-    var l = add(g, cyl(.004, .002, 16), new THREE.MeshBasicMaterial({ color: 0x111111 }), 0, 0, -.0465); l.rotation.x = PI / 2; l.castShadow = false; lens[k] = { m: l, c: color };
-    add(g, cyl(.004, .006), m.rubber, 0, 0, .042).rotation.x = PI / 2; return g; }
-  module("g", -.12, -.03, "+x", 0x38ff5c, true);
-  module("r", -.05, .05, "-z", 0xff2a1a, false);
-  module("b", .01, .05, "-z", 0x3a6bff, false);
-  /* suportes cinemáticos: base, poste, placa com dois parafusos de ajuste, vidro */
-  function mount(x, z, glassMat, k, label) { var g = grp(x, BY, z, k, label); g.rotation.y = PI / 4; add(g, cyl(.009, .014), m.silver, 0, -.028, -.012); add(g, cyl(.005, .024), m.silver, 0, -.011, -.012);
-    add(g, X.rbox(.026, .026, .005, .001), m.black, 0, 0, -.005); [[-.009, .009], [.009, -.009]].forEach(function (p) { add(g, cyl(.0025, .008, 10), m.steel, p[0], p[1], -.011).rotation.x = PI / 2; });
-    var gl = add(g, new THREE.PlaneGeometry(.02, .02), glassMat, 0, 0, 0); gl.castShadow = false; return g; }
-  mount(-.05, -.03, m.dichro(0x9fffd8), "dichro");
-  mount(.01, -.03, m.dichro(0xffd0a0), "dichro");
-  mount(.07, -.03, m.mirror, "fold");
-  /* obturador: solenoide na mesa, braço e lâmina no feixe; abre com a chave + interlock */
-  var sh = grp(.082, .046, -.06, "shutter"); add(sh, cyl(.007, .022), m.dark, 0, -.007, 0); add(sh, X.rbox(.024, .006, .018, .001), m.dark, 0, -.021, 0); bolts(sh, [[-.009, .0], [.009, .0]], -.0165, .002);
-  // o corpo do solenoide e a base ficam parafusados na mesa; quem gira no eixo do solenoide e' so' o braco com a lamina
-  var shArm = new THREE.Group(); sh.add(shArm); add(shArm, new THREE.BoxGeometry(.018, .002, .005), m.steel, -.006, 0, 0); add(shArm, new THREE.BoxGeometry(.0015, .018, .008), m.black, -.012, .008, 0);
-  /* galvos: cantoneira à esquerda, bloco em cima do feixe, motor X vertical, motor Y a 45° na frente, espelhos */
-  var gb = grp(.083, .080, -.09, "galvo"); add(gb, X.rbox(.06, .03, .05, .003), m.dark, 0, 0, 0);
-  add(gb, X.rbox(.006, .073, .05, .002), m.dark, -.033, -.0215, 0); add(gb, X.rbox(.03, .006, .05, .002), m.dark, -.045, -.055, 0); bolts(gb, [[-.05, -.018], [-.05, .018]], -.0515, .003);
-  var mx = add(gb, cyl(.0075, .04, 24), m.steel, -.013, .035, 0); add(gb, cyl(.008, .004, 24), m.black, -.013, .056, 0); add(gb, cyl(.0015, .012, 8), m.silver, -.013, -.018, 0);
-  var mirX = add(gb, new THREE.BoxGeometry(.001, .012, .007), m.mirror, -.013, -.023, 0); mirX.rotation.y = -PI / 4;
-  var yg = new THREE.Group(); yg.position.set(.012, -.023, 0); yg.rotation.y = 3 * PI / 4; gb.add(yg); // eixo local +z = (1,0,-1)/√2
-  var my = add(yg, cyl(.0075, .04, 24), m.steel, 0, 0, .032); my.rotation.x = PI / 2; add(yg, cyl(.0015, .012, 8), m.silver, 0, 0, .006).rotation.x = PI / 2; add(yg, cyl(.008, .004, 24), m.black, 0, 0, .054).rotation.x = PI / 2;
-  add(yg, X.rbox(.02, .012, .014, .001), m.dark, 0, .011, .032); // sela que prende o motor Y ao bloco
-  var myp = new THREE.Group(); yg.add(myp); var mirY = add(myp, new THREE.BoxGeometry(.012, .016, .001), m.mirror, 0, 0, 0); mirY.rotation.y = -PI / 2; // normal local -x → mundo (1,0,1)/√2; myp gira no eixo do motor
-  /* placas: drivers dos diodos (esquerda), drivers dos galvos com dissipador (direita), DAC ILDA (atrás); fonte */
-  function pcb(w, h, mat, x, y, z, ry, k, label, heat) { var g = grp(x, y, z, k, label); g.rotation.y = ry; add(g, new THREE.BoxGeometry(w, h, .0016), mat, 0, 0, 0); [[-w / 2 + .004, -h / 2 + .004], [w / 2 - .004, h / 2 - .004]].forEach(function (p) { add(g, X.hex(.002, .005), m.brass, p[0], p[1], -.0033).rotation.x = PI / 2; add(g, cyl(.0015, .001, 8), m.steel, p[0], p[1], .0013).rotation.x = PI / 2; });
-    for (var i = 0; i < 3; i++) { var ic = add(g, new THREE.BoxGeometry(.008, .006, .002), m.plastic, -w / 2 + .012 + i * .014, h * .2, .0018); for (var j = 0; j < 4; j++) { add(g, new THREE.BoxGeometry(.0004, .0016, .0008), m.silver, ic.position.x - .003 + j * .002, ic.position.y + .0038, .0012); add(g, new THREE.BoxGeometry(.0004, .0016, .0008), m.silver, ic.position.x - .003 + j * .002, ic.position.y - .0038, .0012); } }
-    for (i = 0; i < 2; i++) { var cap = add(g, cyl(.003, .008, 12), new THREE.MeshStandardMaterial({ color: 0x14245a, metalness: .3, roughness: .4 }), w / 2 - .01 - i * .009, -h * .2, .0045); cap.rotation.x = PI / 2; add(cap, cyl(.0028, .0005, 12), m.steel, 0, .0042, 0); }
-    add(g, new THREE.BoxGeometry(.01, .006, .006), m.plastic, -w / 2 + .01, -h * .3, .0035);
-    if (heat) { add(g, new THREE.BoxGeometry(.03, .022, .003), m.steel, w * .15, 0, .0025); for (i = 0; i < 6; i++) add(g, new THREE.BoxGeometry(.03, .0012, .012), m.steel, w * .15, -.01 + i * .004, .009); }
+  function sub(parent, x, y, z, ry) { var g = new THREE.Group(); g.position.set(x, y, z); if (ry) g.rotation.y = ry; parent.add(g); return g; }
+
+  /* ---------- materiais (locais: mat.js é de outra frente) ----------
+     Medido no bench com o spot da cena (bench.html sun = 50, app.js 90*S.dim): superfície difusa satura e vira
+     plástico branco por mais escuro que seja o albedo; superfície metálica (metalness >= .85) não satura porque
+     só devolve o especular. Por isso todo alumínio aqui é metalness ~.9 com cor CLARA (é tinta de especular,
+     não difusa) e o preto anodizado é metalness .85 com cor escura. O ganho de exposição do interior está
+     anotado em design/DECISOES.md — a iluminação é de outra frente. */
+  var mm = {
+    aluTop: X.M(0xffffff, { metalness: 1, roughness: .55, envMapIntensity: .45 }),        // tom vem do mapa da grade
+    aluSide: X.M(0x2e3339, { metalness: 1, roughness: .6, roughnessMap: X.brushR, normalMap: X.brushN, normalScale: new V2(.16, .16), envMapIntensity: .4 }),
+    anod: X.M(0x0d1013, { metalness: 1, roughness: .88, roughnessMap: X.grainR, envMapIntensity: .22 }),      // preto anodizado
+    anodG: X.M(0x30353b, { metalness: 1, roughness: .62, roughnessMap: X.brushR, envMapIntensity: .38 }),      // alumínio usinado
+    heat: X.M(0x101418, { metalness: 1, roughness: .92, roughnessMap: X.grainR, envMapIntensity: .2 }),      // dissipador anodizado
+    steel: X.M(0x4a5058, { metalness: 1, roughness: .38, roughnessMap: X.brushR, envMapIntensity: .55 }),
+    brass: X.M(0x6d5320, { metalness: 1, roughness: .46, roughnessMap: X.brushR, envMapIntensity: .5 }),
+    rubber: X.M(0x030304, { metalness: 0, roughness: .95, roughnessMap: X.grainR }),
+    mirror: X.M(0xeef2f6, { metalness: 1, roughness: .035, side: THREE.DoubleSide }),
+    ic: X.M(0x030405, { metalness: .04, roughness: .8, roughnessMap: X.grainR }),
+    pin: X.M(0x35393d, { metalness: .9, roughness: .35 }),
+    cap: X.M(0x070c17, { metalness: .3, roughness: .5 }),
+    conn: X.M(0x040506, { metalness: .04, roughness: .64 }),
+    green: X.M(0x05120a, { metalness: .05, roughness: .62 }),
+    fr4: X.M(0x171609, { metalness: .05, roughness: .82 }),
+    wK: X.M(0x020203, { metalness: 0, roughness: .86, roughnessMap: X.grainR }),
+    wR: X.M(0x160504, { metalness: 0, roughness: .82, roughnessMap: X.grainR }),
+    wG: X.M(0x0c1806, { metalness: 0, roughness: .82, roughnessMap: X.grainR }),
+    wS: X.M(0x08090b, { metalness: 0, roughness: .8, roughnessMap: X.grainR }),
+    clip: X.M(0x040506, { metalness: .05, roughness: .72 })
+  };
+  function bolts(parent, pts, y, r) { r = r || .003; pts.forEach(function (p) { var s = add(parent, cyl(r, .0028, 14), mm.steel, p[0], y, p[1]); add(s, X.hex(r * .52, .0018), mm.anod, 0, .0011, 0); }); }
+  function label(w, h, txt, px) { return X.tex(w, h, function (x, cw, ch) { x.fillStyle = "#0a0b0d"; x.fillRect(0, 0, cw, ch); x.fillStyle = "#585d62"; x.font = "700 " + (px || 22) + "px 'Share Tech Mono'"; x.textBaseline = "middle"; x.fillText(txt, 8, ch / 2); }, true); }
+
+  /* ---------- mesa óptica ----------
+     Bloco único de 325 × 200 × 12 mm com aresta chanfrada, sobre quatro pés de isolamento. A furação M4 é
+     textura no tampo (rebaixo + furo escuro) e a UV é corrigida: X.rbox é ExtrudeGeometry e as UV do tampo vêm
+     em metros, então o repeat é 1/lado (era esse o bug dos "furos gigantes"). Grupo de materiais do extrude:
+     0 = tampas (a grade), 1 = paredes e chanfro. */
+  var BW = .325, BD = .20, BT = .012, BX = -.00625, BZ = -.03125, TOP = .022, PXM = 4000; // 4 px por mm
+  function GX(i) { return BX - BW / 2 + .00625 + i * .0125; }
+  function GZ(j) { return BZ - BD / 2 + .00625 + j * .0125; }
+  var gridT = X.tex(Math.round(BW * PXM), Math.round(BD * PXM), function (x, w, h) {
+    x.fillStyle = "#3d4349"; x.fillRect(0, 0, w, h);
+    for (var i = 0; i < 9000; i++) { x.fillStyle = "rgba(255,255,255," + Math.random() * .06 + ")"; x.fillRect(Math.random() * w, Math.random() * h, 30 + Math.random() * 90, 1); }
+    for (var a = 0; a * 50 < w; a++) for (var b = 0; b * 50 < h; b++) { var cx = 25 + a * 50, cy = 25 + b * 50;
+      x.fillStyle = "#2c3137"; x.beginPath(); x.arc(cx, cy, 11, 0, 7); x.fill();          // rebaixo do furo
+      x.fillStyle = "#171a1d"; x.beginPath(); x.arc(cx, cy, 9, 0, 7); x.fill();
+      x.fillStyle = "#050607"; x.beginPath(); x.arc(cx, cy, 7, 0, 7); x.fill();           // furo M4 passante
+      x.strokeStyle = "rgba(230,240,255,.30)"; x.lineWidth = 1.8; x.beginPath(); x.arc(cx, cy, 10, 3.4, 5.7); x.stroke(); }
+  }, true);
+  gridT.wrapS = gridT.wrapT = THREE.ClampToEdgeWrapping; gridT.repeat.set(1 / BW, 1 / BD); gridT.offset.set(.5, .5);
+  mm.aluTop.map = gridT;
+  var bench = new THREE.Mesh(X.rbox(BW, BD, BT, .0022), [mm.aluTop, mm.aluSide]);
+  bench.rotation.x = -PI / 2; bench.position.set(BX, TOP - BT / 2, BZ); bench.castShadow = bench.receiveShadow = true;
+  bench.userData = { key: "bench", label: LBL("bench") }; pick.push(bench); body.add(bench);
+  var corners = [[GX(1), GZ(1)], [GX(24), GZ(1)], [GX(1), GZ(14)], [GX(24), GZ(14)]];
+  corners.forEach(function (p) { add(body, cyl(.007, .004, 16), mm.rubber, p[0], .008, p[1]); });  // pés de isolamento
+  bolts(body, corners, TOP + .0014, .0035);
+
+  /* ---------- módulos laser ----------
+     base na grade → bloco de subida → corpo anodizado com aletas → colimador de latão → lente.
+     Local: emite em -z, lente em z = -.0386, ventoinha e conector atrás em z = +.035. */
+  var lens = {}, fanT = X.tex(160, 160, function (x, w, h) {
+    x.fillStyle = "#0a0b0d"; x.fillRect(0, 0, w, h); x.fillStyle = "#15181b"; x.beginPath(); x.arc(80, 80, 74, 0, 7); x.fill();
+    x.strokeStyle = "#2f353b"; x.lineWidth = 9; x.lineCap = "round";
+    for (var i = 0; i < 7; i++) { var a = i * PI * 2 / 7; x.beginPath(); x.moveTo(80 + Math.cos(a) * 20, 80 + Math.sin(a) * 20);
+      x.quadraticCurveTo(80 + Math.cos(a + .55) * 48, 80 + Math.sin(a + .55) * 48, 80 + Math.cos(a + 1.05) * 70, 80 + Math.sin(a + 1.05) * 70); x.stroke(); }
+    x.fillStyle = "#0c0e10"; x.beginPath(); x.arc(80, 80, 22, 0, 7); x.fill();
+    x.strokeStyle = "#454b51"; x.lineWidth = 5; x.strokeRect(4, 4, w - 8, h - 8);
+    x.fillStyle = "#586067"; x.font = "700 13px 'Share Tech Mono'"; x.textAlign = "center"; x.fillText("30x30", 80, 84);
+  }, true);
+  function module(k, x, z, dir, color, fan, txt) {
+    var g = grp(x, BY, z, k), b = sub(g, 0, 0, 0, dir === "+x" ? -PI / 2 : 0);
+    add(b, X.rbox(.046, .006, .062, .0015), mm.anodG, 0, -.032, .004);                       // base (fundo em -.035 = tampo da mesa)
+    add(b, X.rbox(.030, .012, .050, .0015), mm.anodG, 0, -.023, .004);                       // bloco de subida
+    add(b, X.rbox(.036, .034, .058, .0025), mm.anod, 0, 0, .004);                            // corpo
+    add(b, X.rbox(.042, .0035, .050, .001), mm.heat, 0, .0172, .004);                        // base do dissipador
+    for (var i = 0; i < 4; i++) add(b, new THREE.BoxGeometry(.040, .0015, .046), mm.heat, 0, .0215 + i * .0055, .004);
+    var c = add(b, cyl(.008, .015, 24), mm.brass, 0, 0, -.0305); c.rotation.x = PI / 2;       // colimador
+    add(b, cyl(.0088, .0022, 24), mm.anod, 0, 0, -.0377).rotation.x = PI / 2;                 // anel de trava
+    var l = add(b, new THREE.CircleGeometry(.0048, 20), new THREE.MeshBasicMaterial({ color: 0x111111 }), 0, 0, -.0389);
+    l.castShadow = false; lens[k] = { m: l, c: color };
+    if (fan) { var f = add(b, new THREE.PlaneGeometry(.028, .028), X.M(0xffffff, { map: fanT, metalness: .1, roughness: .75 }), 0, .005, .0335); f.castShadow = false; }
+    add(b, X.rbox(.012, .008, .005, .001), mm.conn, .011, -.011, .0345);                      // conector de potência
+    var t = add(b, new THREE.PlaneGeometry(.026, .006), X.M(0xffffff, { map: label(256, 60, txt), metalness: 0, roughness: .7 }), 0, .0192, -.0175);
+    t.rotation.x = -PI / 2; t.castShadow = false;
+    return g;
+  }
+  module("g", GX(3), GZ(7), "+x", 0x38ff5c, true, "520 nm  3 W");    // x = -.125, z = -.0375
+  module("r", GX(9), GZ(12), "-z", 0xff2a1a, false, "638 nm  2 W");  // x = -.05,  z = +.025
+  module("b", GX(14), GZ(12), "-z", 0x3a6bff, false, "445 nm  4 W"); // x = .0125, z = +.025
+
+  /* ---------- suportes cinemáticos ----------
+     pé parafusado em dois furos da grade (o pé é axial à grade; só a torre gira 45°), poste, placa de trás e
+     placa do espelho ligadas por dois parafusos de ajuste e uma mola, óptica de 1/2" com anel de retenção. As
+     placas são anéis: dicroico transmite, então nada de chapa cheia atrás do vidro. */
+  function mount(x, z, glassMat, k) {
+    var g = grp(x, BY, z, k); g.rotation.y = PI / 4;
+    var bs = sub(g, 0, 0, 0, -PI / 4);                                                        // pé alinhado à grade
+    add(bs, X.rbox(.036, .006, .020, .0015), mm.anodG, 0, -.032, 0);
+    bolts(bs, [[-.0125, 0], [.0125, 0]], -.0277, .003);
+    add(g, X.rbox(.016, .030, .014, .0015), mm.anodG, 0, -.016, -.0095);                      // poste
+    add(g, X.ring(.030, .0105, .005), mm.anodG, 0, 0, -.0095);                                // placa de trás
+    add(g, X.ring(.026, .0105, .004), mm.anodG, 0, 0, -.002);                                 // placa do espelho
+    [[-.0105, .0105], [.0105, -.0105]].forEach(function (p) {                                 // parafusos de ajuste
+      var s = add(g, cyl(.0026, .0115, 12), mm.steel, p[0], p[1], -.0058); s.rotation.x = PI / 2;
+      add(s, cyl(.0038, .0022, 16), mm.anod, 0, -.0058, 0); });
+    add(g, cyl(.0016, .0075, 8), mm.steel, .0105, .0105, -.0058).rotation.x = PI / 2;         // mola
+    var gl = add(g, new THREE.CircleGeometry(.0115, 32), glassMat, 0, 0, 0); gl.castShadow = false;
+    add(g, X.ring(.026, .0105, .0016), mm.anod, 0, 0, .0009);                                 // anel de retenção
+    return g;
+  }
+  mount(GX(9), GZ(7), m.dichro(0x9fffd8), "dichro");   // x = -.05,   junta G + R
+  mount(GX(14), GZ(7), m.dichro(0xffd0a0), "dichro");  // x = .0125,  junta B
+  mount(GX(19), GZ(7), mm.mirror, "fold");             // x = .075,   dobra para os galvos
+
+  /* ---------- obturador ----------
+     solenoide de pé na mesa em dois furos, braço no eixo do solenoide à altura do feixe, lâmina no feixe quando
+     fechado e ímã de retenção do outro lado. app.js gira O.shutter.rotation.y de 0 (fechado) a 1.2 (aberto). */
+  var sh = grp(GX(20), BY, GZ(5), "shutter");                                                 // pivô em x = .0875, z = -.0625
+  add(sh, X.rbox(.030, .006, .020, .0015), mm.anodG, 0, -.032, 0);
+  bolts(sh, [[-.0125, 0], [.0125, 0]], -.0277, .003);
+  add(sh, cyl(.007, .022, 20), mm.anod, 0, -.018, 0);                                         // corpo do solenoide
+  add(sh, cyl(.0082, .0035, 20), mm.steel, 0, -.0052, 0);                                     // flange
+  add(sh, cyl(.0032, .0075, 12), mm.steel, 0, -.0018, 0);                                     // eixo
+  add(sh, X.rbox(.010, .007, .010, .001), mm.anod, .013, -.0075, 0);                          // ímã de retenção
+  add(sh, cyl(.004, .0025, 16), mm.steel, .013, -.0032, 0);
+  var shArm = sub(sh, 0, 0, 0);
+  add(shArm, new THREE.BoxGeometry(.0135, .0025, .005), mm.steel, -.0068, .0022, 0);          // braço
+  add(shArm, new THREE.BoxGeometry(.0016, .014, .010), mm.anod, -.0125, .0022, 0);            // lâmina, no feixe quando fechado
+  add(shArm, cyl(.0032, .0022, 12), mm.steel, .009, .0022, 0);                                // contra-peso no ímã
+
+  /* ---------- galvos ---------- (bloco X/Y; refeito no item 1) */
+  var gb = grp(.088, .080, -.0875, "galvo"); add(gb, X.rbox(.06, .03, .05, .003), mm.anod, 0, 0, 0);
+  add(gb, X.rbox(.006, .073, .05, .002), mm.anod, -.033, -.0215, 0); add(gb, X.rbox(.03, .006, .05, .002), mm.anod, -.045, -.055, 0);
+  add(gb, cyl(.0075, .04, 24), mm.anod, -.013, .035, 0); add(gb, cyl(.008, .004, 24), mm.anod, -.013, .056, 0); add(gb, cyl(.0015, .012, 8), mm.steel, -.013, -.018, 0);
+  var mirX = add(gb, new THREE.BoxGeometry(.001, .012, .007), mm.mirror, -.013, -.023, 0); mirX.rotation.y = -PI / 4;
+  var yg = sub(gb, .007, -.023, 0, 3 * PI / 4);
+  add(yg, cyl(.0075, .04, 24), mm.anod, 0, 0, .032).rotation.x = PI / 2;
+  add(yg, cyl(.0015, .012, 8), mm.steel, 0, 0, .006).rotation.x = PI / 2; add(yg, cyl(.008, .004, 24), mm.anod, 0, 0, .054).rotation.x = PI / 2;
+  add(yg, X.rbox(.02, .012, .014, .001), mm.anod, 0, .011, .032);
+  var myp = sub(yg, 0, 0, 0); add(myp, new THREE.BoxGeometry(.012, .016, .001), mm.mirror, 0, 0, 0).rotation.y = -PI / 2;
+
+  /* ---------- placas ---------- (refeitas no item 2) */
+  function pcb(w, h, mat, x, y, z, ry, k) { var g = grp(x, y, z, k); g.rotation.y = ry; add(g, new THREE.BoxGeometry(w, h, .0016), mat, 0, 0, 0);
+    [[-w / 2 + .004, -h / 2 + .004], [w / 2 - .004, h / 2 - .004]].forEach(function (p) { add(g, X.hex(.002, .007), mm.brass, p[0], p[1], -.0044).rotation.x = PI / 2; });
+    for (var i = 0; i < 3; i++) add(g, new THREE.BoxGeometry(.008, .006, .002), mm.ic, -w / 2 + .012 + i * .014, h * .2, .0018);
     return g; }
-  pcb(.045, .03, m.pcbA, -.192, .09, -.08, PI / 2, "pcb");
-  pcb(.045, .03, m.pcbA, -.192, .09, -.03, PI / 2, "pcb");
-  pcb(.045, .03, m.pcbA, -.192, .09, .03, PI / 2, "pcb");
-  pcb(.065, .05, m.pcbB, .192, .09, -.06, -PI / 2, "galvodrv", "", true);
-  pcb(.065, .05, m.pcbB, .192, .09, .02, -PI / 2, "galvodrv", "", true);
-  pcb(.12, .06, m.pcbA, -.03, .09, .142, PI, "dac");
-  var psu = grp(-.12, .026, .105, "psu"); add(psu, X.rbox(.10, .04, .06, .002), m.black, 0, 0, 0); bolts(psu, [[-.04, -.02], [.04, .02]], .0215, .002);
-  var psuL = X.tex(256, 128, function (x, w, h) { x.fillStyle = "#d8dcdf"; x.fillRect(0, 0, w, h); x.fillStyle = "#111"; x.font = "700 22px 'Share Tech Mono'"; x.fillText("PSU 48V 5.2A", 12, 40); x.font = "16px 'Share Tech Mono'"; x.fillText("IN 100-240V~  OUT 48V", 12, 72); x.fillText("SPELLCASTER  SC-PS250", 12, 100); }, true);
-  var lab = add(psu, new THREE.PlaneGeometry(.06, .03), new THREE.MeshStandardMaterial({ map: psuL, roughness: .6 }), 0, .0205, 0); lab.rotation.x = -PI / 2; lab.castShadow = false;
-  /* cabos: cada um com origem e destino reais */
-  [[[-.157, .057, -.03], [-.175, .05, -.03], [-.19, .07, -.04]],
-   [[-.05, .057, .09], [-.05, .045, .105], [-.1, .03, .11], [-.17, .03, .06], [-.19, .07, .035]],
-   [[.01, .057, .09], [0, .04, .108], [-.08, .028, .115], [-.16, .03, .07], [-.19, .075, .04]],
-   [[.07, .137, -.09], [.09, .142, -.082], [.15, .115, -.072], [.19, .095, -.062]],
-   [[.132, .057, -.127], [.152, .05, -.125], [.185, .06, -.09], [.19, .085, -.062]],
-   [[-.07, .03, .105], [0, .022, .122], [.08, .03, .135], [.14, .05, .135], [.19, .07, .02]],
-   [[-.09, .07, .135], [-.13, .04, .13], [-.17, .04, .1], [-.19, .07, .055]],
-   [[-.165, .06, .14], [-.15, .05, .13], [-.14, .045, .118]],
-   [[.03, .06, .138], [.03, .03, .13], [.02, .022, .1], [-.07, .022, .108]]].forEach(function (p, i) { body.add(X.tube(p, i === 7 ? .0025 : i < 3 ? .0015 : .002)); });
-  /* caminho óptico: segmentos com cor (fatores de limite aplicados no app) */
-  var P = { g0: [-.068, BY, -.03], d1: [-.05, BY, -.03], r0: [-.05, BY, -.001], d2: [.01, BY, -.03], b0: [.01, BY, -.001], m1: [.07, BY, -.03], sh: [.07, BY, -.06], gx: [.07, BY, -.09], gy: [.095, BY, -.09], out: [.095, BY, -.152] };
+  pcb(.045, .03, m.pcbA, -.186, .09, -.08, PI / 2, "pcb");
+  pcb(.045, .03, m.pcbA, -.186, .09, -.03, PI / 2, "pcb");
+  pcb(.045, .03, m.pcbA, -.186, .09, .03, PI / 2, "pcb");
+  pcb(.065, .05, m.pcbB, .186, .09, -.06, -PI / 2, "galvodrv");
+  pcb(.065, .05, m.pcbB, .186, .09, .02, -PI / 2, "galvodrv");
+  pcb(.11, .055, m.pcbA, -.03, .09, .136, PI, "dac");
+
+  /* ---------- fonte ---------- (atrás da mesa, junto da traseira) */
+  var psu = grp(-.115, .029, .115, "psu"); add(psu, X.rbox(.10, .042, .045, .002), mm.anod, 0, 0, 0);
+  bolts(psu, [[-.04, -.016], [.04, .016]], .0235, .0025);
+  var psuL = X.tex(256, 128, function (x, w, h) { x.fillStyle = "#20242a"; x.fillRect(0, 0, w, h); x.fillStyle = "#111"; x.font = "700 22px 'Share Tech Mono'"; x.fillText("PSU 48V 5.2A", 12, 40); x.font = "16px 'Share Tech Mono'"; x.fillText("IN 100-240V~  OUT 48V", 12, 72); x.fillText("SPELLCASTER  SC-PS250", 12, 100); }, true);
+  var lab = add(psu, new THREE.PlaneGeometry(.06, .03), X.M(0xffffff, { map: psuL, metalness: 0, roughness: .65 }), 0, .0215, 0); lab.rotation.x = -PI / 2; lab.castShadow = false;
+
+  /* ---------- caminho óptico ---------- (todo ponto é o centro de uma peça de verdade) */
+  var P = { g0: [GX(3) + .0389, BY, GZ(7)], d1: [GX(9), BY, GZ(7)], r0: [GX(9), BY, GZ(12) - .0389],
+    d2: [GX(14), BY, GZ(7)], b0: [GX(14), BY, GZ(12) - .0389], m1: [GX(19), BY, GZ(7)],
+    sh: [GX(19), BY, GZ(5)], gx: [GX(19), BY, GZ(3)], gy: [.095, BY, GZ(3)], out: [.095, BY, -.152] };
   function segments(armed, open, lim, g) { if (!armed) return []; var r = lim.r, gg = lim.g, b = lim.b, S = [[P.g0, P.d1, [0, gg, 0]], [P.r0, P.d1, [r, 0, 0]], [P.b0, P.d2, [0, 0, b]], [P.d1, P.d2, [r, gg, 0]], [P.d2, P.m1, [r, gg, b]], [P.m1, P.sh, [r, gg, b]]];
     if (open) { S.push([P.sh, P.gx, [r, gg, b]], [P.gx, P.gy, [r, gg, b]], [P.gy, [P.out[0] + g[0] * .009, P.out[1] + g[1] * .006, P.out[2]], [r, gg, b]]); } return S; }
   return { bench: bench, lens: lens, shutter: shArm, mirX: mirX, mirY: myp, segments: segments, P: P };
