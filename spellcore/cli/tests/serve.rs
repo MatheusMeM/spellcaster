@@ -252,18 +252,18 @@ fn barramento_http_ws_monitor_e_mcp() {
         ev
     );
 
-    // ---- transporte e monitor binario: o `load` deixou o player parado em t=0. O `locate`
-    // acima tambem emitiu um `transport` (pause, t=1) que ninguem leu: no Linux ele chega
-    // primeiro, entao o filtro pede o t=0 em vez de pegar o primeiro pause da fila.
+    // ---- transporte e monitor binario. O `transport` sai por sondagem a 10 Hz e o `load` nao
+    // toca no player (so' abre o show para edicao): o evento do `locate` acima pode ja' ter
+    // passado (descartado pelos `ate` de cima) ou ainda nao ter saido. Um `locate` novo,
+    // mandado DEPOIS de tudo lido, gera um evento que so' pode chegar daqui em diante.
+    ws.send(4, "locate", json!({"t": 2.0}));
     let ev = ws.ate(5.0, |v| {
-        v["event"] == json!("transport")
-            && v["data"]["state"] == json!("pause")
-            && v["data"]["t"] == json!(0.0)
+        v["event"] == json!("transport") && v["data"]["t"] == json!(2.0)
     });
     assert_eq!(
         ev["data"]["state"],
         json!("pause"),
-        "load para em t=0: {}",
+        "--show deixa o player parado: {}",
         ev
     );
     ws.send(5, "resume", json!({}));
