@@ -1162,6 +1162,48 @@ Wireless LAN adapter Wi-Fi:
             .contains("\"interfaces\""));
     }
 
+    // `arp -a` desta maquina, lido do console cp1252 (acento vira U+FFFD).
+    const ARP_PTBR: &str = "\
+Interface: 169.254.86.236 --- 0xc
+  Endere\u{fffd}o IP           Endere\u{fffd}o f\u{fffd}sico       Tipo
+  169.254.207.140       8a-9e-36-98-8c-ce     din\u{fffd}mico
+  169.254.255.255       ff-ff-ff-ff-ff-ff     est\u{fffd}tico
+  224.0.0.251           01-00-5e-00-00-fb     est\u{fffd}tico
+  255.255.255.255       ff-ff-ff-ff-ff-ff     est\u{fffd}tico
+";
+
+    const ARP_EN: &str = "\
+Interface: 192.168.0.132 --- 0xe
+  Internet Address      Physical Address      Type
+  192.168.0.1           74-3a-ef-76-d2-66     dynamic
+  192.168.0.255         ff-ff-ff-ff-ff-ff     static
+  239.255.255.250       01-00-5e-7f-ff-fa     static
+";
+
+    #[test]
+    fn arp_ptbr_ingles_e_linux() {
+        // a coluna muda de nome com o idioma; a chave e' o endereco fisico, nao o cabecalho
+        assert_eq!(
+            parse_arp(ARP_PTBR),
+            [(
+                "169.254.207.140".to_string(),
+                "8a:9e:36:98:8c:ce".to_string()
+            )]
+        );
+        assert_eq!(
+            parse_arp(ARP_EN),
+            [("192.168.0.1".to_string(), "74:3a:ef:76:d2:66".to_string())]
+        );
+        // `ip neigh` do Linux, mesma funcao
+        let n = parse_arp(
+            "169.254.207.140 dev eth0 lladdr 8a:9e:36:98:8c:ce REACHABLE\n\
+             10.0.0.9 dev eth0  FAILED\n",
+        );
+        assert_eq!(n.len(), 1, "{n:?}");
+        assert_eq!(n[0].0, "169.254.207.140");
+        assert!(parse_arp("").is_empty());
+    }
+
     #[test]
     fn interfaces_nao_trava() {
         // sem placa ativa a lista vem vazia; o que nao pode e panicar nem travar
