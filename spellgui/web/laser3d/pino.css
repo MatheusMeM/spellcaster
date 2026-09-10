@@ -7,7 +7,7 @@
    tail moves to the left edge, pointing back at the head, which sits below. */
 .bal { transform:none; }
 .bal::after { right:auto; left:-11px; top:auto; bottom:16px; border-left-color:transparent; border-right-color:#000; }
-/* two buttons, side by side: `–` sends the Pino away (the cable physics stops), `×` only closes the speech */
+/* two buttons, side by side: `–` sends the Pino away, `×` only closes the speech */
 .bal .m { position:absolute; right:23px; top:2px; font-weight:bold; font-size:15px; line-height:1; cursor:pointer; }
 .bal .m:hover, .bal .x:hover { color:#0A246A; }
 .bal b { padding-right:42px; }

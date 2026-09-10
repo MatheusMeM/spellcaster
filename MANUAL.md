@@ -109,9 +109,8 @@ screen.
 | RECORDER | `index.html` (the timeline) |
 | CONSOLE | `face.html?face=quatro` |
 
-The `–` button on the balloon (or the latch on Pino's body) sends Pino away: he goes down, the cable
-leaves the scene and the rope stops being simulated; the icon left behind brings him back (address
-`pino.hide`).
+The `–` button on the balloon (or the latch on Pino's body) sends Pino away: he goes down and the icon
+left behind brings him back (address `pino.hide`). There is no cable between Pino and the device.
 
 ### The drawer (Tab)
 
@@ -156,7 +155,7 @@ The map is the SolidWorks one; what changes per view is not the keyboard, it is 
 | `Ctrl` / `Shift` / `Alt` + middle | pan · zoom · roll | — | — |
 | left drag on empty space | orbits | — | orbits within the limits |
 | left drag on a part | belongs to the part, never to the camera | same | same |
-| wheel on empty space | zoom at the cursor | — | — |
+| wheel | dolly towards the focal point | — | — |
 | wheel over the encoder | turns the encoder | turns the encoder | — |
 | arrows / `Shift`+arrows / `Ctrl`+arrows / `Alt`+arrows | 15° · 90° · pan · roll | — | — |
 | `F`, `Ctrl+1..7`, `Z`, `Shift+Z` | as in SolidWorks | — | — |
@@ -279,7 +278,6 @@ own). The `FULLSCREEN` button sits at the end of the SCREEN group.
 | LASER | `dust` | BEAM DUST | YES / NO | particles inside the beam |
 | LASER | `haze` | HAZE | 0 to 1 | beam gain in the air and cloud opacity |
 | LASER | `puffs` | HAZE PUFFS | NONE / 14 / 28 | how many haze sprites stay visible |
-| SCENE | `rope` | PINO CABLE (VERLET) | YES / NO | simulates or freezes Pino's cable |
 | SCENE | `motion` | ANIMATIONS (FAN, LED) | YES / NO | fan spinning and LED blinking; off by default with `prefers-reduced-motion` |
 
 **PERFORMANCE.** A read-only block, measured and not estimated, refreshed four times a second: fps

@@ -5,7 +5,10 @@
 <link rel="stylesheet" href="pino.css">
 <style>
   html, body { height:100%; overflow:hidden; }
-  #stage { position:fixed; inset:0; }
+  /* the drawer does not cover the 3D: the two split the window. `#stage` gives up the 360 px of the drawer
+     (`#drawer` width, tokens.css) and the camera re-frames in what is left (cam.js `repose` on aspect change). */
+  #stage { position:fixed; inset:0; transition:right var(--t-ui); }
+  body:has(#drawer.on) #stage { right:360px; }
   #gl { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
   #stage.dz::after { content:"drop the .ild on the ILDA IN port"; position:absolute; inset:0; display:grid; place-items:center; font-family:var(--font-disp); font-size:24px; color:var(--las); background:rgba(0,0,0,.6); pointer-events:none; z-index:9; }
   #ttl { left:30px; top:22px; } #ttl2 { left:30px; top:46px; }
@@ -16,7 +19,7 @@
   input[type=file] { display:none; }
   /* an error is data (FUNCOES/README rule 5): a runtime failure shows up on screen, it does not become a black screen */
   #ERR { position:absolute; left:30px; top:110px; z-index:10; max-width:70ch; padding:8px 10px; background:#1A0605; border:1px solid var(--red); color:var(--red); font-size:var(--fs-1); white-space:pre-wrap; }
-  @media (prefers-reduced-motion:reduce) { #splash span { animation:none; } }
+  @media (prefers-reduced-motion:reduce) { #splash span { animation:none; } #stage { transition:none; } }
 </style>
 <script>
   window.addEventListener("error", function (e) {
@@ -31,14 +34,15 @@
   <div class="hud" id="stats"><div id="srows"></div><div class="cli" id="cli">spell ilda play show.ild --kpps 30</div></div>
   <div id="cams"><button class="lb" data-a="cam.show" disabled>1 SHOW</button><button class="lb on" data-a="cam.rear">2 REAR · MENU</button><button class="lb" data-a="cam.inside">3 INSIDE · PREFERENCES</button><button class="lb" data-a="bind">B BINDINGS</button></div>
   <div class="tip" id="tip"></div>
-  <!-- the drawer: everything that is menu and configuration lives here (Tab opens and closes, Escape closes) -->
-  <aside id="drawer"><button id="dpull" title="drawer · Tab">‹</button>
-    <header><img id="dbrand" src="brand/main.svg" alt="Feitiçaria Industrial"><nav id="dtabs"></nav></header>
-    <div id="dbody" class="panel"></div>
-  </aside>
   <div id="splash"><span>ESC SKIPS</span></div>
   <input type="file" id="file" accept=".ild,.ilda">
 </div>
+<!-- the drawer: everything that is menu and configuration lives here (Tab opens and closes, Escape closes).
+     A sibling of #stage, not a child: it takes its own column of the window instead of covering the 3D. -->
+<aside id="drawer"><button id="dpull" title="drawer · Tab">‹</button>
+  <header><img id="dbrand" src="brand/main.svg" alt="Feitiçaria Industrial"><nav id="dtabs"></nav></header>
+  <div id="dbody" class="panel"></div>
+</aside>
 <script src="../vendor/three/three.min.js"></script>
 <script src="../vendor/three/examples/js/shaders/CopyShader.js"></script>
 <script src="../vendor/three/examples/js/shaders/LuminosityHighPassShader.js"></script>
@@ -57,6 +61,5 @@
 <script src="body.js"></script>
 <script src="optics.js"></script>
 <script src="beam.js"></script>
-<script src="rope.js"></script>
 <script src="pino3d.js"></script>
 <script src="app.js"></script>

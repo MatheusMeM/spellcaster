@@ -51,7 +51,7 @@
   /// Firmware on the chassis (the owner: "engrave the firmware on the chassis itself"): the version
   /// comes from the engine, and from it alone. Without an engine the plate writes FIRMWARE OFFLINE — a
   /// device plate does not invent a number.
-  function plate(fw) { if (B.plate) B.plate({ fw: fw || null, sn: "SC-0512" }); }
+  function plate(fw) { if (B.plate) B.plate({ fw: fw || null }); }
   // ponytail: `version` is not a registry command yet ; when it is, the plate reads it from there
   // instead of the `ver` the page carries.
   function fwPlate() { bus.call("version", {}).then(function (r) { plate((r && (r.version || r.ver)) || ENG.ver); }, function () { plate(ENG.ver); }); }
@@ -198,7 +198,7 @@
       return h ? { o: h, p: hits[i].point } : null; }
     return null; }
   function unhover() { glow(hot, false); hot = null; tip.style.display = "none"; gl.style.cursor = "grab"; }
-  var CAM = SWCam(THREE, cam, gl, { hit: function (e) { return !!hitOf(e); }, pick: function (e) { ptr(e); ray.setFromCamera(mv, cam); var hs = ray.intersectObjects(scene.children, true).filter(function (h) { return h.object.visible && !h.object.isSprite && h.object.type !== "InstancedMesh"; }); return hs.length ? hs[0].point : null; }, plane: function (e, t) { ptr(e); ray.setFromCamera(mv, cam); var n = cam.getWorldDirection(new THREE.Vector3()), pl = new THREE.Plane().setFromNormalAndCoplanarPoint(n, t), p = new THREE.Vector3(); return ray.ray.intersectPlane(pl, p) ? p : null; } });
+  var CAM = SWCam(THREE, cam, gl, { hit: function (e) { return !!hitOf(e); }, pick: function (e) { ptr(e); ray.setFromCamera(mv, cam); var hs = ray.intersectObjects(scene.children, true).filter(function (h) { return h.object.visible && !h.object.isSprite && h.object.type !== "InstancedMesh"; }); return hs.length ? hs[0].point : null; } });
   var CENTER = new THREE.Vector3(0, .40, 0);
   var VIEWS = { show: [[1.5, .95, 1.25], [0, .8, -1.9]], rear: [[.015, .445, .60], [0, .40, .04]], inside: [[.09, .80, .27], [-.02, .38, -.03]], wall0: [[.25, .8, .35], [0, 1.5, -2.6]], wall: [[0, 2.0, .2], [0, 2.2, -5]] }, camSpeed = 5;
   /* A view is not just a pose: it is the law of the mouse once you get there (FUNCOES/camera-solidworks.md
@@ -235,9 +235,6 @@
   // inside the drawer Tab belongs to the keyboard, not to the device: without this the global binding
   // ate the Tab and there was no way to walk from control to control with the keyboard (SISTEMA.md §11).
   drawer.addEventListener("keydown", function (e) { if (e.key === "Tab") e.stopPropagation(); });
-  /// `cam-4` shifts the framing of the REAR view by what the drawer takes up: the drawer must not cover
-  /// the device, and it opens and closes.
-  window.SC = window.SC || {}; SC.drawerWidth = function () { return drawerOn() ? drawer.offsetWidth : 0; };
   function get(p) { var a = p.split("."), o = S; for (var i = 0; i < a.length; i++) o = o[a[i]]; return o; } function set(p, v) { var a = p.split("."), o = S; for (var i = 0; i < a.length - 1; i++) o = o[a[i]]; o[a[a.length - 1]] = v; }
   var FMT = { kpps: function (v) { return Math.round(v / 1000) + "k"; }, pct: function (v) { return Math.round(v * 100) + "%"; }, gam: function (v) { return "γ " + (+v).toFixed(2); }, n: function (v) { return v; }, x: function (v) { return "×" + (+v).toFixed(2); } }, fmtOf = {};
   function rg(label, path, min, max, step, f) { fmtOf[path] = FMT[f]; return "<div class='row'><span>" + label + "</span><input type='range' data-p='" + path + "' min='" + min + "' max='" + max + "' step='" + step + "' value='" + get(path) + "'><span class='v' data-v='" + path + "'>" + FMT[f](get(path)) + "</span></div>"; }
@@ -504,12 +501,8 @@
   function loadFile(f) { if (!f) return; var r = new FileReader(); r.onload = function () { try { var d = ILDA.parse(r.result); if (!d.frames.length) throw 0; S.show = d.frames; S.frame = 0; S.pos = 0; ENG.file = ""; S.name = f.name + " · " + d.frames.length + " frames"; if (S.mode === "splash") skipSplash(); setCam("rear"); PANELS.ilda(); remember(); pino.say("Came in through the ILDA IN: " + f.name + ", " + d.frames.length + " frames, " + d.frames[0].length + " points in the first one. " + (d.frames[0].length > 1200 ? "Dense. If it flickers, open the lid and raise the kpps on the galvo." : "Light. It will fly.") + (S.key ? "" : " Arm the key to see it on the wall."), null, false); } catch (x) { pino.say("That is not ILDA. Format 2 (palette only) I skip, 0/1/4/5 I read.", null, false); } }; r.readAsArrayBuffer(f); }
 
   /* ---------- Pino ---------- */
-  // The DMX OUT is the bottom end of the cable: the one that knows where it is is the chassis. `B.dmxOut`
-  // (the port itself) gives position AND normal of the panel; `B.dmxOutWorld` and the constant are spares.
-  var pino = Pino3D.build(THREE, X, scene, pick, stage, cam, { on: onPin, port: B.dmxOut, target: B.dmxOutWorld });
+  var pino = Pino3D.build(THREE, X, scene, pick, stage, cam, { on: onPin });
   Bind.def("pino.hide", "Pino: leaves the screen / comes back", function () { if (pino.alive()) pino.bye(); else pino.back(); });
-  // the cost of the rope in ms per frame is readable from outside (an error is data; the usability front measures through here)
-  window.SC = window.SC || {}; SC.pinoCost = function () { return pino.cost(); }; SC.pinoRopeLive = function () { return pino.alive(); };
   // The Pino is the menu of the program: each pin is a screen. Nothing gets in here out of software
   // convenience — an item only exists if it is a part of the device, and the balloon line says which part.
   var MENU = [["ilda", "1 · LASER", "this device"], ["ndi", "2 · FÓSFORO", "the network converter that does not exist yet"], ["orq", "3 · PATCHBAY", "the jack panel: what plugs into what"],
@@ -563,7 +556,7 @@
   }
 
   /* ---------- tick ---------- */
-  var last = performance.now(), W = 0, H = 0, T0 = performance.now(), lidT = 0, rearI = 0, segsW = [], tmpV = new THREE.Vector3();
+  var last = performance.now(), W = 0, H = 0, T0 = performance.now(), lidT = 0, rearI = 0, fanW = 0, segsW = [], tmpV = new THREE.Vector3();
   function size() { if (stage.clientWidth !== W || stage.clientHeight !== H) { W = stage.clientWidth; H = stage.clientHeight; var pr = R.getPixelRatio(); R.setSize(W, H, false); composer.setSize(W, H); bloom.setSize(W * pr * +VIDEO.get("bloomRes"), H * pr * +VIDEO.get("bloomRes")); fxaa.uniforms.resolution.value.set(1 / (W * pr), 1 / (H * pr)); cam.aspect = W / H; cam.updateProjectionMatrix(); } }
   /* dt never runs backwards. The `now` of requestAnimationFrame is the instant the FRAME began, and it can
      be earlier than the `performance.now()` stored in `last` at page load: on the first frames dt came out
@@ -581,7 +574,9 @@
     var want = S.cam === "inside" ? 1 : 0; lidT += (want - lidT) * Math.min(1, dt * 3); var sT = Math.min(1, lidT / .45), lT = Math.max(0, (lidT - .4) / .6); B.screws.forEach(function (s, i) { s.position.y = .004 + sT * .05; s.rotation.y = sT * 12 + i; }); B.lid.rotation.x = -lT * 1.9;
     CAM.update(dt * camSpeed / 5); rearI += (((S.cam === "rear" && S.mode === "play") ? 14 : 0) - rearI) * Math.min(1, dt * 3); B.rearLight.intensity = rearI; inLight.intensity = .35 * lidT; sun.intensity = 90 * S.dim; B.wallLight.intensity = 14 * S.dim;
     // external beams: aperture → lit points of the wall
-    var on = S.power && (S.mode === "splash" || live()), step = Math.max(1, Math.ceil(lit.length / BEAMN)), gain = (.05 + .16 * S.fog); segsW.length = 0; if (on) for (var i = 0; i < lit.length; i += step) { var L = lit[i]; segsW.push([[B.APERT.x, B.APERT.y, B.APERT.z], [(L[0][0] / WW - .5) * 8, 2.2 + (.5 - L[0][1] / WH) * 5, -5], [L[1][0] / 255 * gain, L[1][1] / 255 * gain, L[1][2] / 255 * gain]]); } beamsOut.set(segsW, 1);
+    // not from behind: the fan of beams converges on the aperture, and the additive pile plus the bloom
+    // painted a white slab over the chassis. The rear is the menu; the output stays on the wall.
+    var on = S.power && S.cam !== "rear" && (S.mode === "splash" || live()), step = Math.max(1, Math.ceil(lit.length / BEAMN)), gain = (.05 + .16 * S.fog); segsW.length = 0; if (on) for (var i = 0; i < lit.length; i += step) { var L = lit[i]; segsW.push([[B.APERT.x, B.APERT.y, B.APERT.z], [(L[0][0] / WW - .5) * 8, 2.2 + (.5 - L[0][1] / WH) * 5, -5], [L[1][0] / 255 * gain, L[1][1] / 255 * gain, L[1][2] / 255 * gain]]); } beamsOut.set(segsW, 1);
     // internal optical path
     var arm = S.power && (S.key || S.mode === "splash"), opn = S.lock, segsI = O.segments(arm, opn, S.lim, gpos).map(function (s) { return [[s[0][0], s[0][1] + .314, s[0][2]], [s[1][0], s[1][1] + .314, s[1][2]], s[2]]; }); beamsIn.set(segsI, 1.2); beamsOut.tick(t); beamsIn.tick(t);
     O.shutter.rotation.y += (((arm && opn) ? 1.2 : 0) - O.shutter.rotation.y) * Math.min(1, dt * 12); O.mirX.rotation.y = -Math.PI / 4 + gpos[0] * .1; O.mirY.rotation.z = gpos[1] * .1;
@@ -592,7 +587,11 @@
     // LIVE looked the same as SCAN FAIL. The NET LEDs only light with power.
     B.emLed.material.color.setHex(!S.power ? 0x2a0a08 : !arm ? ((!MOVE || Math.floor(t * 1.2) % 2) ? 0xffb000 : 0x2a1e00) : !S.lock ? 0xff2a1a : 0x38ff5c);
     B.led1.material.color.setHex(S.power && (S.net.sacn || S.net.artnet) ? 0x38ff5c : 0x0a2a10); B.led2.material.color.setHex(S.power && (S.net.ndi || S.net.spout) && Math.floor(t * 6) % 2 ? 0xffb000 : 0x2a1e00);
-    B.keyM.rotation.z += ((S.key ? Math.PI / 2 : 0) - B.keyM.rotation.z) * Math.min(1, dt * 8); B.lockPlug.position.z += ((S.lock ? 0 : .022) - B.lockPlug.position.z) * Math.min(1, dt * 6); B.rocker.rotation.x += ((S.power ? -.3 : .3) - B.rocker.rotation.x) * Math.min(1, dt * 18); B.blades.rotation.z += dt * (S.power && MOVE ? 24 : 0);
+    B.keyM.rotation.z += ((S.key ? Math.PI / 2 : 0) - B.keyM.rotation.z) * Math.min(1, dt * 8); B.lockPlug.position.z += ((S.lock ? 0 : .022) - B.lockPlug.position.z) * Math.min(1, dt * 6); B.rocker.rotation.x += ((S.power ? -.3 : .3) - B.rocker.rotation.x) * Math.min(1, dt * 18);
+    /* fan: 7 rad/s, with spin-up and spin-down. At 24 rad/s a 60 Hz frame turned it 0.4 rad, almost half of
+       the 7-blade period (0.9 rad): a stroboscope, it read as standing still. It follows the power switch
+       only — a fan is a part of the device, not an animation the ANIMATIONS row switches off. */
+    fanW += ((S.power ? 7 : 0) - fanW) * Math.min(1, dt * 1.5); B.blades.rotation.z -= dt * fanW;
     // the encoder and BACK sink when pressed: a physical button that does not move gives no feedback
     S.encT = Math.max(0, S.encT - dt); S.backT = Math.max(0, (S.backT || 0) - dt);
     B.knob.position.z += ((S.encT > 0 ? .0072 : .009) - B.knob.position.z) * Math.min(1, dt * 22); B.backCap.position.z += ((S.backT > 0 ? .0015 : .003) - B.backCap.position.z) * Math.min(1, dt * 22);
@@ -695,7 +694,6 @@
     dust: function () { var on = VIDEO.get("dust") === "yes"; beamsOut.dust(on); beamsIn.dust(on); },
     haze: function () { S.fog = +VIDEO.get("haze"); },
     puffs: applyPuffs,
-    rope: function () { pino.rope(VIDEO.get("rope") === "yes"); },
     motion: function () { MOVE = VIDEO.get("motion") === "yes"; }
   };
   function applyVideo(id) { if (id) { if (VAPP[id]) VAPP[id](); } else Object.keys(VAPP).forEach(function (k) { VAPP[k](); }); }

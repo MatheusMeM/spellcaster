@@ -20,7 +20,7 @@ window.VIDEO = (function () {
     QUALITY: "aliasing, shadow and texture · this is where the GPU suffers",
     "POST-PROCESSING": "what the composer does after the scene, full screen",
     LASER: "the visualizer itself: the wall, the trail, the beams and the haze",
-    SCENE: "the device, the Pino cable and whatever moves on its own"
+    SCENE: "the device and whatever moves on its own"
   };
   /* The table. Order = order on screen. Nothing here is decorative: every id has a case in `applyVideo`. */
   var OPTS = [
@@ -55,8 +55,7 @@ window.VIDEO = (function () {
     rng("haze", "LASER", "HAZE", 0, 1, .01, "", .85, .85, .85, .85),
     sel("puffs", "LASER", "HAZE PUFFS", [["0", "NONE"], ["14", "14"], ["28", "28"]], "0", "14", "14", "28"),
 
-    bool("rope", "SCENE", "PINO CABLE (VERLET)", "no", "yes", "yes", "yes"),
-    bool("motion", "SCENE", "ANIMATIONS (FAN, LED)", "yes", "yes", "yes", "yes", "off by default with prefers-reduced-motion")
+    bool("motion", "SCENE", "ANIMATIONS (LED BLINK)", "yes", "yes", "yes", "yes", "off by default with prefers-reduced-motion")
   ];
   var byId = {}; OPTS.forEach(function (o) { byId[o.id] = o; });
 

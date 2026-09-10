@@ -130,13 +130,12 @@ window.BODY = function (THREE, X, scene, pick) {
   var silkT = X.tex(2048, 920, function (x) { silkDraw(x, false); }, true);
   var silkR = X.tex(1024, 460, function (x) { x.scale(.5, .5); silkDraw(x, true); });
   var sx = silkT.image.getContext("2d");
-  /* Identification plate: FIRMWARE V<version> comes from the engine (`hud-4` calls `B.plate` on connecting);
-     without an engine the plate says FIRMWARE OFFLINE, because an invented version is a lie engraved on the
-     chassis. The 180 W / 50-60 Hz are gone: a number copied from someone else's datasheet serves no function of
-     the software. */
+  /* Identification plate, two lines and nothing else (the owner: "cut the babble"): the software version
+     comes from the engine (`hud-4` calls `B.plate` on connecting), and without an engine it says offline,
+     because an invented version is a lie engraved on the chassis. */
   function plate(o) {
-    o = o || {}; var fw = o.fw === undefined ? "0.1.2" : o.fw, sn = o.sn === undefined ? "SC-0512" : o.sn;
-    var lines = [fw ? "FIRMWARE V" + String(fw).replace(/^[vV]/, "") : "FIRMWARE OFFLINE", sn ? "S/N " + sn : "", "IEC 60825-1 · MADE IN BRAZIL"].filter(Boolean);
+    o = o || {}; var fw = o.fw === undefined ? "0.1.2" : o.fw;
+    var lines = ["Software Version: " + (fw ? String(fw).replace(/^[vV]/, "") : "offline"), "Made in Brazil"];
     sx.save(); sx.fillStyle = "#2a2e33"; sx.fillRect(U(L.sn) - PLATE.w / 2, V(L.sn) - PLATE.h / 2, PLATE.w, PLATE.h);
     var px = fit(sx, lines, PLATE.w - 22, 22, "'Share Tech Mono'");
     sx.textAlign = "center"; sx.fillStyle = "#c9ced3";
@@ -195,7 +194,7 @@ window.BODY = function (THREE, X, scene, pick) {
     if (!male) add(g, X.rbox(.006, .0035, .0045, .0008), m.black, 0, .0072, .0075);                  // latch of the NC3FD
     return g;
   }
-  xlr3(L.dmxIn, "dmxin", "", false); var dmxOut = xlr3(L.dmxOut, "dmxout", "", true);
+  xlr3(L.dmxIn, "dmxin", "", false); xlr3(L.dmxOut, "dmxout", "", true);
   // NET
   var rj = port(L.net[0], L.net[1], "rj45"); add(rj, X.rbox(.017, .014, .003, .001), m.black, 0, 0, .0015); add(rj, new THREE.BoxGeometry(.012, .008, .002), m.plastic, 0, -.001, .003); var led1 = zcyl(rj, .001, .002, m.led(0x0a2a10), -.006, .0055, .003), led2 = zcyl(rj, .001, .002, m.led(0x2a1e00), .006, .0055, .003);
   /* Rack display: a 200 × 100 mm frame, 190 × 90 mm of glass, a 1024 × 484 texture — resolution enough for the
@@ -244,8 +243,5 @@ window.BODY = function (THREE, X, scene, pick) {
   var bl = add(blades, new THREE.PlaneGeometry(.058, .058), new THREE.MeshStandardMaterial({ map: fanT, transparent: true, depthWrite: false, metalness: .6, roughness: .55 }), 0, 0, 0); bl.castShadow = bl.receiveShadow = false;
   [.0085, .0155, .0225, .0295].forEach(function (r) { add(fg, new THREE.TorusGeometry(r, .0006, 6, 40), m.silver, 0, 0, .0075); }); for (i = 0; i < 4; i++) { var sp = add(fg, cyl(.0006, .06, 6), m.silver, 0, 0, .0075); sp.rotation.z = i * PI / 4; }
   var rearLight = new THREE.SpotLight(0xfff4e6, 0, 2.5, .6, .6, 1.2); rearLight.position.set(.3, .95, 1.1); rearLight.target = rearPlate; scene.add(rearLight);
-  // centre of the DMX OUT face in world coordinates: it is where the Pino cable comes out of (contract with `pino-4`)
-  body.updateMatrixWorld(true);
-  var dmxOutWorld = dmxOut.localToWorld(new THREE.Vector3(0, 0, .0115));
-  return { body: body, lid: lid, screws: screws, APERT: APERT, BEAM_Y: BEAM_Y, keyM: keyM, lockPlug: lockPlug, rocker: rocker, emLed: emLed, armLed: armLed, led1: led1, led2: led2, knob: knob, knobHit: knobHit, backCap: backCap, blades: blades, oled: { c: oc, tex: oledTex, w: 1024, h: 484 }, dmxOut: dmxOut, dmxOutWorld: dmxOutWorld, plate: plate, rearLight: rearLight, wallLight: wallLight, L: L, H: H, D: D, W: W, T: T };
+  return { body: body, lid: lid, screws: screws, APERT: APERT, BEAM_Y: BEAM_Y, keyM: keyM, lockPlug: lockPlug, rocker: rocker, emLed: emLed, armLed: armLed, led1: led1, led2: led2, knob: knob, knobHit: knobHit, backCap: backCap, blades: blades, oled: { c: oc, tex: oledTex, w: 1024, h: 484 }, plate: plate, rearLight: rearLight, wallLight: wallLight, L: L, H: H, D: D, W: W, T: T };
 };

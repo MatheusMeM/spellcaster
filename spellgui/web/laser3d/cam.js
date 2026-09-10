@@ -1,10 +1,14 @@
 /* laser3d camera: three laws, one per view. The map and the manual URLs are in
    `design/FUNCOES/camera-solidworks.md`.
 
-     free   (SHOW view, the visualizer) — the whole SolidWorks: middle orbits around the clicked
-            point, Ctrl+middle pans, Shift+middle zooms, Alt+middle rolls, the wheel zooms at the
-            cursor, left button on empty space orbits. With limits: the camera never enters the
-            device and never goes through the wall or the floor.
+     free   (SHOW view, the visualizer) — SolidWorks, contained: middle orbits around the clicked
+            point when that point is ON the device (a click on the wall or the floor keeps the focal
+            point where it is), Ctrl+middle pans, Shift+middle zooms, Alt+middle rolls, the wheel dollies
+            towards the focal point, left button on empty space orbits. With limits: the focal point
+            lives in the box between the device and the output on the wall, the camera never enters the
+            device and never goes through the wall or the floor. The wheel used to zoom AT the cursor and
+            the middle button re-targeted on whatever was hit: each tick chased a different point (device,
+            wall, floor) and the camera swung across the room — that was the "erratic" free camera.
      rear   (REAR view, which IS the menu) — fixed pose computed from the normal of the rear panel,
             framing the 400 x 180 mm. No dragging, no middle button, no wheel zoom, no arrows.
             The only movement is a +-2 deg breathe that follows the mouse and does NOT change the distance.
@@ -38,9 +42,9 @@
      limited by `d`. */
   var LAW = {
     free: { pit: [-1.4835, 1.4835],            // +-85 deg
-            d: [.12, 6],
-            box: { x: [-3.2, 3.2], y: [.05, 3], z: [-5.05, 2] },
-            floor: .06, wall: -4.6 },
+            d: [.12, 5],
+            box: { x: [-2.5, 2.5], y: [.1, 3], z: [-5.05, 1.2] },   // focal point: device .. output on the wall
+            floor: .06, wall: -4.6, near: 1 },  // near: a middle click farther than this from the device does not re-target
     rear: {},
     inside: { pit: [.349, 1.396], yaw: 1.047 } // 20..80 deg ; +-60 deg
   };
@@ -98,7 +102,7 @@
     function setView(pos, t, snap) { fromPos(goal, new THREE.Vector3().fromArray(pos), new THREE.Vector3().fromArray(t)); goal.roll = 0; if (snap) { cur.t.copy(goal.t); cur.d = goal.d; cur.yaw = goal.yaw; cur.pit = goal.pit; cur.roll = 0; vel.x = vel.y = vel.z = vel.d = vel.yaw = vel.pit = vel.roll = 0; } }
     function basis() { var f = goal.t.clone().sub(posOf(goal)).normalize(), r = new THREE.Vector3().crossVectors(f, Y).normalize(), u = new THREE.Vector3().crossVectors(r, f).normalize(); return { f: f, r: r, u: u }; }
     // sensitivity proportional to the distance: near the device the same pixel moves less world
-    function pan(dx, dy) { var b = basis(), k = goal.d * .0014; goal.t.addScaledVector(b.r, -dx * k).addScaledVector(b.u, dy * k); }
+    function pan(dx, dy) { var b = basis(), k = goal.d * .001; goal.t.addScaledVector(b.r, -dx * k).addScaledVector(b.u, dy * k); }
     function zoomAt(s, p) { // p: world point under the cursor (or null) — target and camera go to it together
       if (p) goal.t.copy(p).add(tmp.copy(goal.t).sub(p).multiplyScalar(s));
       goal.d = goal.d * s; }
@@ -134,7 +138,8 @@
       if (left && o.hit(e)) { drag = { mode: "none", x: e.clientX, y: e.clientY, moved: false }; return; }
       var m = mode === "inside" ? "rot"                              // inside only orbits
         : e.ctrlKey ? "pan" : e.shiftKey ? "zoom" : e.altKey ? "roll" : "rot";
-      if (m === "rot" && mid && mode === "free") { var p = o.pick(e); if (p) { var pos = posOf(goal); fromPos(goal, pos, p); fromPos(cur, cam.position.clone(), p); } }
+      if (m === "rot" && mid && mode === "free") { var p = o.pick(e), c = env.center || { x: 0, y: .404, z: 0 };
+        if (p && Math.hypot(p.x - c.x, p.y - c.y, p.z - c.z) < LAW.free.near) { var pos = posOf(goal); fromPos(goal, pos, p); fromPos(cur, cam.position.clone(), p); } }
       drag = { mode: m, x: e.clientX, y: e.clientY, moved: false };
       dom.setPointerCapture(e.pointerId); e.preventDefault();
     }
@@ -145,9 +150,9 @@
       var dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY;
       // 4 px: a hand tremor with the finger on the button must not become a drag and eat the click
       if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
-      if (drag.mode === "rot") { goal.yaw -= dx * .0045; goal.pit += dy * .0045; }
+      if (drag.mode === "rot") { goal.yaw -= dx * .003; goal.pit += dy * .003; }
       else if (drag.mode === "pan") pan(dx, dy);
-      else if (drag.mode === "zoom") zoomAt(Math.exp(dy * .0035), null);
+      else if (drag.mode === "zoom") zoomAt(Math.exp(dy * .0025), null);
       else if (drag.mode === "roll") goal.roll += dx * .005;
     }
     dom.addEventListener("pointerdown", press);
@@ -162,8 +167,8 @@
     dom.addEventListener("wheel", function (e) {
       e.preventDefault();
       if (mode !== "free") return;                                   // fixed and restricted: the wheel does not zoom
-      var dir = api.reverse ? -1 : 1, s = Math.exp(dir * Math.sign(e.deltaY) * .07);   // smaller step
-      zoomAt(s, o.pick(e) || o.plane(e, goal.t));
+      var dir = api.reverse ? -1 : 1, s = Math.exp(dir * Math.sign(e.deltaY) * .05);
+      zoomAt(s, null);                                               // dolly on the focal point; the point stays
     }, { passive: false });
     dom.addEventListener("auxclick", function (e) { if (e.button === 1) e.preventDefault(); });
     dom.addEventListener("contextmenu", function (e) { e.preventDefault(); });
@@ -191,7 +196,7 @@
           if (mode === "rear") env.pit0 = fixed.pit - (api.breathe ? br.y * .035 : 0);
         }
         clamp(mode, goal, env);
-        var w = 18, dy = wrap(goal.yaw - cur.yaw);                   // yaw by the short path
+        var w = mode === "free" ? 10 : 18, dy = wrap(goal.yaw - cur.yaw);   // free: softer spring, no jolts
         cur.yaw = goal.yaw - dy; sp(cur, vel, "yaw", goal.yaw, w, dt);
         sp(cur.t, vel, "x", goal.t.x, w, dt); sp(cur.t, vel, "y", goal.t.y, w, dt); sp(cur.t, vel, "z", goal.t.z, w, dt);
         sp(cur, vel, "d", goal.d, w, dt); sp(cur, vel, "pit", goal.pit, w, dt); sp(cur, vel, "roll", goal.roll, w, dt);
