@@ -1,6 +1,6 @@
-"""Leitura/escrita de arquivos .ild (ILDA Image Data Transfer Format).
-Formatos: 0 3D indexado, 1 2D indexado, 2 paleta, 4 3D true color, 5 2D true color.
-Header 32 bytes big-endian; status bit7 = ultimo ponto, bit6 = apagado."""
+"""Reading/writing .ild files (ILDA Image Data Transfer Format).
+Formats: 0 indexed 3D, 1 indexed 2D, 2 palette, 4 true colour 3D, 5 true colour 2D.
+32-byte big-endian header; status bit7 = last point, bit6 = blanked."""
 import struct
 
 from .frame import Frame, Point
@@ -10,7 +10,7 @@ REC = {0: struct.Struct(">hhhBB"), 1: struct.Struct(">hhBB"), 2: struct.Struct("
        4: struct.Struct(">hhhBBBB"), 5: struct.Struct(">hhBBBB")}
 LAST, BLANK = 0x80, 0x40
 
-# paleta padrao ILDA (64 cores)
+# default ILDA palette (64 colours)
 DEFAULT_PALETTE = [
     (255, 0, 0), (255, 16, 0), (255, 32, 0), (255, 48, 0), (255, 64, 0), (255, 80, 0), (255, 96, 0), (255, 112, 0),
     (255, 128, 0), (255, 144, 0), (255, 160, 0), (255, 176, 0), (255, 192, 0), (255, 208, 0), (255, 224, 0), (255, 240, 0),
@@ -28,7 +28,7 @@ def _index(col, palette):
 
 
 def read(path):
-    """Le .ild -> lista de Frame. Secao de paleta (fmt 2) troca a paleta dos frames indexados seguintes."""
+    """Reads .ild -> list of Frame. A palette section (fmt 2) swaps the palette of the indexed frames that follow."""
     with open(path, "rb") as f:
         data = f.read()
     frames, palette, pos = [], DEFAULT_PALETTE, 0
@@ -36,9 +36,9 @@ def read(path):
         magic, fmt, name, _company, n, _idx, _total, _proj = HDR.unpack_from(data, pos)
         pos += HDR.size
         if magic != b"ILDA" or fmt not in REC:
-            raise ValueError(f"header invalido em {pos - HDR.size}: {magic!r} fmt={fmt}")
+            raise ValueError(f"invalid header at {pos - HDR.size}: {magic!r} fmt={fmt}")
         if n == 0:
-            break  # frame final vazio = fim
+            break  # empty final frame = end of file
         rec = REC[fmt]
         recs = [rec.unpack_from(data, pos + i * rec.size) for i in range(n)]
         pos += n * rec.size
@@ -65,16 +65,16 @@ def _section(fmt, name, company, recs, idx, total):
 
 
 def write(path, frames, fmt=5, name="", company="spell", palette=None):
-    """Grava frames em .ild. fmt 0/1 indexado: usa palette (gravada antes como secao fmt 2) ou a padrao."""
+    """Writes frames to .ild. fmt 0/1 indexed: uses palette (written first as a fmt 2 section) or the default one."""
     if fmt not in (0, 1, 4, 5):
-        raise ValueError("fmt deve ser 0, 1, 4 ou 5")
+        raise ValueError("fmt must be 0, 1, 4 or 5")
     rec, total = REC[fmt], len(frames)
     pal = palette or DEFAULT_PALETTE
     out = []
     if palette and fmt in (0, 1):
         out.append(_section(2, name, company, [REC[2].pack(*c) for c in palette], 0, total))
     for idx, fr in enumerate(frames):
-        pts = fr.points or [Point(0, 0, blank=True)]  # frame vazio: 1 ponto apagado (n=0 seria fim de arquivo)
+        pts = fr.points or [Point(0, 0, blank=True)]  # empty frame: 1 blanked point (n=0 would mean end of file)
         recs = []
         for i, p in enumerate(pts):
             st = (LAST if i == len(pts) - 1 else 0) | (BLANK if p.blank else 0)
@@ -84,6 +84,6 @@ def write(path, frames, fmt=5, name="", company="spell", palette=None):
             else:
                 recs.append(rec.pack(p.x, p.y, *z, st, p.b, p.g, p.r))
         out.append(_section(fmt, fr.name or name, company, recs, idx, total))
-    out.append(_section(fmt, name, company, [], total, total))  # terminador
+    out.append(_section(fmt, name, company, [], total, total))  # terminator
     with open(path, "wb") as f:
         f.write(b"".join(out))

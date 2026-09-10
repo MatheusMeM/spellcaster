@@ -1,15 +1,15 @@
-# Servidor da GUI: http.server serve web/ e o endpoint /ws fala WebSocket (RFC 6455 feito a mao).
+# GUI server: http.server serves web/ and the /ws endpoint speaks WebSocket (RFC 6455 done by hand).
 #
-# Protocolo /ws
-#   cliente -> servidor : texto  {"id": <n>, "cmd": "<nome>", "args": {...}}
-#   servidor -> cliente : texto  {"id": <n>, "result": ...} | {"id": <n>, "error": "Tipo: msg"}
-#   cmd "schema" e intrinseco (nao passa pelo registry) e devolve registry.schema().
-#   Todo o resto vai para registry.call(cmd, **args): a GUI nao implementa logica de produto.
+# /ws protocol
+#   client -> server : text    {"id": <n>, "cmd": "<name>", "args": {...}}
+#   server -> client : text    {"id": <n>, "result": ...} | {"id": <n>, "error": "Type: msg"}
+#   cmd "schema" is intrinsic (it does not go through the registry) and returns registry.schema().
+#   Everything else goes to registry.call(cmd, **args): the GUI implements no product logic.
 #
-# Broadcast (servidor -> todos)
-#   push(topic, payload)                 texto  {"topic": ..., "payload": ...}
-#   push(topic, bytes, universe=N)       binario topic_id:u8 + universe:u16 + payload
-#                                        (DMX = 512 bytes; ids dos topicos em TOPICS)
+# Broadcast (server -> everyone)
+#   push(topic, payload)                 text    {"topic": ..., "payload": ...}
+#   push(topic, bytes, universe=N)       binary  topic_id:u8 + universe:u16 + payload
+#                                        (DMX = 512 bytes; topic ids in TOPICS)
 import base64, hashlib, json, struct, threading, webbrowser
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 
@@ -18,18 +18,18 @@ from ..core.registry import command
 from ..paths import WEB
 
 GUID = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
-TOPICS = {"dmx": 1}                                   # ids dos topicos binarios (espelhado em app.js)
+TOPICS = {"dmx": 1}                                   # binary topic ids (mirrored in app.js)
 TEXT, BINARY, CLOSE, PING, PONG = 1, 2, 8, 9, 10
-SERVER = None                                         # ultimo GuiServer criado (api.py publica nele)
+SERVER = None                                         # last GuiServer created (api.py publishes on it)
 
 
 def accept_key(key):
-    """Sec-WebSocket-Accept = base64(sha1(chave + GUID))."""
+    """Sec-WebSocket-Accept = base64(sha1(key + GUID))."""
     return base64.b64encode(hashlib.sha1(key.encode() + GUID).digest()).decode()
 
 
 def frame(op, data):
-    """Frame do servidor: FIN=1, sem mascara (so o cliente mascara)."""
+    """Server frame: FIN=1, unmasked (only the client masks)."""
     n = len(data)
     if n < 126:
         h = bytes((0x80 | op, n))
@@ -41,7 +41,7 @@ def frame(op, data):
 
 
 def read_frame(rf):
-    """Le um frame do cliente -> (opcode, payload); (None, None) em EOF. Desmascara se vier mascarado."""
+    """Reads one client frame -> (opcode, payload); (None, None) on EOF. Unmasks it if it arrives masked."""
     h = rf.read(2)
     if len(h) < 2:
         return None, None
@@ -55,7 +55,7 @@ def read_frame(rf):
     if mask:
         data = bytes(b ^ mask[i & 3] for i, b in enumerate(data))
     return op, data
-    # ponytail: frames de continuacao (FIN=0) nao sao remontados ; remontar se algum cliente fragmentar
+    # ponytail: continuation frames (FIN=0) are not reassembled ; reassemble them if some client fragments
 
 
 class GuiServer:
@@ -78,7 +78,7 @@ class GuiServer:
                 pass
 
             def end_headers(self):
-                self.send_header("Cache-Control", "no-store")   # editar skin/JS e dar F5 basta
+                self.send_header("Cache-Control", "no-store")   # editing a skin/JS and hitting F5 is enough
                 super().end_headers()
 
             def do_GET(self):
@@ -105,11 +105,11 @@ class GuiServer:
         self.httpd.server_close()
 
     def _send(self, sock, data):
-        with self.lock:      # ponytail: um lock global de envio ; lock por cliente se um cliente lento travar os outros
+        with self.lock:      # ponytail: one global send lock ; per-client lock if a slow client stalls the others
             sock.sendall(data)
 
     def push(self, topic, payload, universe=0):
-        """Broadcast para todos os clientes. bytes -> frame binario com cabecalho de topico."""
+        """Broadcast to every client. bytes -> binary frame with a topic header."""
         if isinstance(payload, (bytes, bytearray)):
             data = frame(BINARY, struct.pack(">BH", TOPICS[topic], universe) + bytes(payload))
         else:
@@ -123,7 +123,7 @@ class GuiServer:
     def _ws(self, h):
         key = h.headers.get("Sec-WebSocket-Key")
         if not key:
-            return h.send_error(400, "Sec-WebSocket-Key ausente")
+            return h.send_error(400, "Sec-WebSocket-Key missing")
         h.close_connection = True
         h.send_response(101, "Switching Protocols")
         h.send_header("Upgrade", "websocket")
@@ -148,7 +148,7 @@ class GuiServer:
         finally:
             self.clients.discard(sock)
 
-    def _handle(self, data):   # ponytail: comando roda na thread do cliente ; thread por mensagem se um comando longo travar a conexao
+    def _handle(self, data):   # ponytail: the command runs on the client thread ; a thread per message if a long command stalls the connection
         mid = None
         try:
             m = json.loads(data)
@@ -162,9 +162,9 @@ class GuiServer:
 
 @command
 def serve(port: int = 8000, browser: bool = False):
-    """Sobe a GUI web em http://0.0.0.0:<port> (WebSocket em /ws). --browser abre o navegador."""
+    """Brings the web GUI up at http://0.0.0.0:<port> (WebSocket on /ws). --browser opens the browser."""
     srv = GuiServer(port=port).start()
-    print(f"GUI em http://127.0.0.1:{srv.port}  (Ctrl+C encerra)", flush=True)
+    print(f"GUI at http://127.0.0.1:{srv.port}  (Ctrl+C quits)", flush=True)
     if browser:
         webbrowser.open(f"http://127.0.0.1:{srv.port}")
     try:
@@ -174,8 +174,8 @@ def serve(port: int = 8000, browser: bool = False):
     return srv
 
 
-from . import api  # noqa: E402,F401  (registra show_*/track_*/key_*/transport/patch_check/profiles)
+from . import api  # noqa: E402,F401  (registers show_*/track_*/key_*/transport/patch_check/profiles)
 
-# Entradas: `python -m spellcaster.gui.window` (janela, ou navegador sem pywebview).
-# `spell serve` passa a existir quando cli.py importar o pacote gui (uma linha: `from . import gui`);
-# ponytail: nao mexi em cli.py nesta rodada ; adicionar o import junto do resto do F4.
+# Entry points: `python -m spellcaster.gui.window` (window, or browser without pywebview).
+# `spell serve` starts existing once cli.py imports the gui package (one line: `from . import gui`);
+# ponytail: cli.py was left alone in this round ; add the import along with the rest of F4.

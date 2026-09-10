@@ -1,15 +1,15 @@
-# Gera os fixtures de conformidade que o spellcore (Rust) tem que reproduzir byte a byte.
-# Fonte da verdade: o pacote Python spellcaster + shows/medgrupo.spell.
+# Generates the conformance fixtures that spellcore (Rust) has to reproduce byte for byte.
+# Source of truth: the Python package spellcaster + shows/medgrupo.spell.
 #
-#   medgrupo_u1.bin   u32 LE nframes, depois nframes * 512 bytes do universo 1 (t = n/fps)
-#   sacn_packet.bin   um pacote E1.31 completo: universo 1, seq 0, CID 00..0f, prio 100
-#   artnet_packet.bin um ArtDmx completo: universo 1, seq 0
-#   ../../shows/medgrupo_r0.spell   o mesmo show, mas com os valores ja assados em keyframes
+#   medgrupo_u1.bin   u32 LE nframes, then nframes * 512 bytes of universe 1 (t = n/fps)
+#   sacn_packet.bin   one complete E1.31 packet: universe 1, seq 0, CID 00..0f, prio 100
+#   artnet_packet.bin one complete ArtDmx: universe 1, seq 0
+#   ../../shows/medgrupo_r0.spell   the same show, but with the values already baked into keyframes
 #
-# ponytail: o track pyfx do medgrupo e Python puro e usa estado entre frames (histerese de pan
-# nos movings). Em Rust nao existe pyfx na R0; o gen.py assa o resultado frame a frame em tracks
-# dmx com curva "hold" (degrau exato) ; trocar por track fx em rhai quando a R1 entrar.
-# Uso: C:\Python313\python.exe tests/conformance/gen.py
+# ponytail: the medgrupo pyfx track is pure Python and keeps state between frames (pan hysteresis
+# on the movings). Rust has no pyfx in R0; gen.py bakes the result frame by frame into dmx tracks
+# with a "hold" curve (exact step) ; swap for an fx track in rhai when R1 lands.
+# Usage: C:\Python313\python.exe tests/conformance/gen.py
 import json
 import os
 import struct
@@ -29,7 +29,7 @@ DATA = bytes(range(256)) * 2                                   # 512 bytes: [0..
 
 
 def frames(spell_path):
-    """Roda a timeline do .spell frame a frame e devolve (fps, [bytes(512) por frame])."""
+    """Runs the .spell timeline frame by frame and returns (fps, [bytes(512) per frame])."""
     sh = showfile.load(spell_path)
     tl = Timeline(sh, sh["_dir"])
     fps = tl.fps
@@ -51,7 +51,7 @@ def write_bin(path, fr):
 
 
 def bake(src, dst, fps, fr):
-    """Reescreve o show trocando os tracks nao-DMX por um track dmx por canal com curva hold."""
+    """Rewrites the show, swapping the non-DMX tracks for one dmx track per channel with a hold curve."""
     sh = showfile.load(src)
     tracks = []
     for ch in range(512):
@@ -59,17 +59,18 @@ def bake(src, dst, fps, fr):
         for i, b in enumerate(fr):
             v = b[ch]
             if v != prev:
-                # tempo truncado (nunca arredondado para cima) em 1 us: cai sempre antes de i/fps
+                # time truncated (never rounded up) to 1 us: always lands before i/fps
                 keys.append([int(i / fps * 1e6) / 1e6, v, "hold"])
                 prev = v
         if len(keys) == 1 and keys[0][1] == 0:
-            continue                                           # canal sempre 0: nao precisa de track
+            continue                                           # channel always 0: no track needed
         if keys and keys[0][0] != 0.0:
             keys.insert(0, [0.0, 0, "hold"])
         if keys:
             tracks.append({"type": "dmx", "universe": 1, "address": ch + 1, "keys": keys})
     sh["tracks"] = tracks
     sh["outputs"] = [o for o in sh.get("outputs", ()) if o.get("type") in ("sacn", "artnet")]
+    # kept in Portuguese on purpose: this string goes into the bytes of the generated fixture
     sh["name"] = sh.get("name", "") + " (R0 assado)"
     out = {k: v for k, v in sh.items() if not k.startswith("_")}
     with open(dst, "w", encoding="utf-8", newline="\n") as f:
@@ -89,15 +90,15 @@ def main():
     baked = os.path.join(ROOT, "shows", "medgrupo_r0.spell")
     tracks = bake(src, baked, fps, fr)
     nkeys = sum(len(t["keys"]) for t in tracks)
-    print(f"medgrupo_u1.bin: {len(fr)} frames a {fps} fps")
+    print(f"medgrupo_u1.bin: {len(fr)} frames at {fps} fps")
     print(f"medgrupo_r0.spell: {len(tracks)} tracks, {nkeys} keyframes, "
           f"{os.path.getsize(baked) // 1024} KiB")
 
-    # auto-check: o show assado reproduz o .bin em todos os frames
+    # auto-check: the baked show reproduces the .bin on every frame
     fps2, fr2 = frames(baked)
     bad = [i for i, (a, b) in enumerate(zip(fr, fr2)) if a != b]
-    assert fps2 == fps and len(fr2) == len(fr) and not bad, f"assado difere em {len(bad)} frames: {bad[:5]}"
-    print("assado confere com o original em todos os frames")
+    assert fps2 == fps and len(fr2) == len(fr) and not bad, f"baked differs on {len(bad)} frames: {bad[:5]}"
+    print("baked matches the original on every frame")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
-# Markers: cortes de video pelo scene detect do ffmpeg (subprocess, ffmpeg no PATH) e
-# onsets de audio por salto de energia, so com wave + array.
+# Markers: video cuts from the ffmpeg scene detect (subprocess, ffmpeg on the PATH) and
+# audio onsets from energy jumps, with wave + array only.
 import array
 import re
 import subprocess
@@ -10,7 +10,7 @@ PTS = re.compile(r"pts_time:([0-9.]+)")
 
 
 def video(path, threshold=0.3):
-    """Instantes (s) dos cortes de cena. Devolve [] se o ffmpeg nao estiver no PATH."""
+    """Instants (s) of the scene cuts. Returns [] if ffmpeg is not on the PATH."""
     cmd = ["ffmpeg", "-nostats", "-hide_banner", "-i", str(path),
            "-vf", f"select=gt(scene\\,{threshold}),showinfo", "-an", "-f", "null", "-"]
     try:
@@ -21,18 +21,18 @@ def video(path, threshold=0.3):
 
 
 def audio(path, threshold=3.0, hop=0.02, gap=0.1, window=8):
-    """Onsets (s) de um WAV PCM 16 bits: energia da janela acima de threshold x a media das
-    window janelas anteriores, com refratario de gap segundos."""
+    """Onsets (s) of a 16-bit PCM WAV: window energy above threshold x the average of the
+    previous `window` windows, with a refractory period of `gap` seconds."""
     with wave.open(str(path), "rb") as w:
         if w.getsampwidth() != 2:
-            raise ValueError("markers.audio: use WAV PCM 16 bits")
+            raise ValueError("markers.audio: use 16-bit PCM WAV")
         ch, sr, n = w.getnchannels(), w.getframerate(), w.getnframes()
         a = array.array("h", w.readframes(n))
     if sys.byteorder == "big":
         a.byteswap()
     step = max(1, int(sr * hop)) * ch
-    # ponytail: energia RMS por janela fixa, sem FFT nem flux espectral ; trocar se precisar
-    # pegar batida grave sob musica cheia (a energia larga confunde bumbo com naipe).
+    # ponytail: RMS energy over a fixed window, no FFT and no spectral flux ; swap it if you need
+    # to catch a low beat under a full mix (broadband energy confuses the kick with the horns).
     e = [sum(x * x for x in a[i:i + step]) / step / 1073741824.0 for i in range(0, len(a) - step + 1, step)]
     out, last = [], -gap
     for i in range(window, len(e)):
@@ -45,5 +45,5 @@ def audio(path, threshold=3.0, hop=0.02, gap=0.1, window=8):
 
 
 def find(path, threshold=0.3):
-    """Markers de um arquivo: .wav pela energia, o resto pelo scene detect do ffmpeg."""
+    """Markers of a file: .wav by energy, everything else by the ffmpeg scene detect."""
     return audio(path) if str(path).lower().endswith(".wav") else video(path, threshold)

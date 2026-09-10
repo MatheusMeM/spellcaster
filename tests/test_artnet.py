@@ -53,7 +53,7 @@ class ArtDmxTest(unittest.TestCase):
         pkt[18], pkt[19] = 1, 2                      # net 1, subnet 2
         pkt[26:31] = b"Node1"; pkt[44:53] = b"Node Long"
         pkt[172:174] = struct.pack(">H", 2)
-        pkt[174:176] = bytes([0x80, 0xC0])           # porta 0 so saida, porta 1 saida e entrada
+        pkt[174:176] = bytes([0x80, 0xC0])           # port 0 output only, port 1 output and input
         pkt[186:190] = bytes([9, 8, 0, 0])           # SwIn
         pkt[190:194] = bytes([3, 4, 0, 0])           # SwOut
         pkt[201:207] = bytes.fromhex("0a1b2c3d4e5f")

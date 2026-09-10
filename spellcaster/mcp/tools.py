@@ -1,16 +1,16 @@
-# Comandos que so existem por causa do MCP (resumo do show, monitor de saida).
-# Entram no registry como qualquer outro: a CLI e a GUI tambem os enxergam.
+# Commands that only exist because of MCP (show summary, output monitor).
+# They enter the registry like any other: the CLI and the GUI see them too.
 import base64
 import json
 
 from ..core.registry import command
 
-OPEN = {}        # ponytail: um show aberto por processo, igual ao PATCH de fixtures/patch.py
-                 # ; trocar por id de sessao quando a GUI abrir dois shows ao mesmo tempo.
+OPEN = {}        # ponytail: one open show per process, same as the PATCH in fixtures/patch.py
+                 # ; swap for a session id when the GUI opens two shows at the same time.
 
 
 def current():
-    """Show corrente: o do player rodando; senao o ultimo aberto por show_summary(file)."""
+    """Current show: the running player's; otherwise the last one opened by show_summary(file)."""
     from ..player import player as pl
     if pl.CURRENT is not None:
         return pl.CURRENT.show
@@ -18,17 +18,17 @@ def current():
 
 
 def summary(file=""):
-    """Resumo do show sem imprimir nada (usado pelo resource spell://show)."""
+    """Show summary without printing anything (used by the spell://show resource)."""
     from .. import show as showfile
     if file:
         OPEN.clear()
         OPEN.update(showfile.load(file))
     sh = current()
     if sh is None:
-        return {"aberto": False, "dica": "chame show_summary(file=...) ou play_show(file=...)"}
+        return {"open": False, "hint": "call show_summary(file=...) or play_show(file=...)"}
     from ..player import player as pl
     p = pl.CURRENT
-    return {"aberto": True,
+    return {"open": True,
             "name": sh.get("name", ""),
             "file": OPEN.get("_dir") or sh.get("_dir", ""),
             "fps": sh.get("fps", 30),
@@ -45,7 +45,7 @@ def summary(file=""):
 
 @command
 def show_summary(file: str = ""):
-    """Resumo do .spell aberto (ou do arquivo dado): nome, fps, duracao, saidas, tracks, cues, patch."""
+    """Summary of the open .spell (or of the given file): name, fps, duration, outputs, tracks, cues, patch."""
     d = summary(file)
     print(json.dumps(d, indent=1, ensure_ascii=False))
     return d
@@ -53,10 +53,10 @@ def show_summary(file: str = ""):
 
 @command
 def monitor(universe: int = 1):
-    """512 bytes do universo no player em execucao, em base64 (JSON com universe, t e b64)."""
+    """512 bytes of the universe in the running player, in base64 (JSON with universe, t and b64)."""
     from ..player import player as pl
     p = pl.CURRENT
-    # ponytail: le so o engine sACN ; ler tambem o engine Art-Net quando alguem pedir monitor de Art-Net.
+    # ponytail: reads the sACN engine only ; read the Art-Net engine too when someone asks for an Art-Net monitor.
     u = None if p is None else p.eng.universes.get(int(universe))
     d = {"universe": int(universe),
          "t": None if p is None else round(p.clock.time, 3),

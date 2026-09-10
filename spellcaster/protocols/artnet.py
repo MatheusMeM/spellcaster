@@ -1,8 +1,8 @@
 """Art-Net 4 (Art-Net 4 spec, Artistic Licence): ArtDmx out/in, ArtPoll/ArtPollReply, ArtSync.
 
-Universos no Spellcaster são 1-based (como sACN). Conversão para Art-Net:
+Universes in Spellcaster are 1-based (like sACN). Conversion to Art-Net:
     port_address = universe - 1   (15 bits: net[7] | subnet[4] | universe[4])
-Ex.: universe 1 -> port-address 0 (net 0, subnet 0, uni 0); universe 17 -> subnet 1, uni 0.
+E.g.: universe 1 -> port-address 0 (net 0, subnet 0, uni 0); universe 17 -> subnet 1, uni 0.
 """
 import socket, struct, threading
 
@@ -14,15 +14,15 @@ BROADCASTS = ("2.255.255.255", "10.255.255.255", "255.255.255.255")
 
 
 def port_address(universe):
-    """universe 1-based -> port-address 15 bits."""
+    """1-based universe -> 15-bit port-address."""
     pa = universe - 1
     if not 0 <= pa <= 0x7FFF:
-        raise ValueError(f"universo fora de faixa: {universe}")
+        raise ValueError(f"universe out of range: {universe}")
     return pa
 
 
 def artdmx(universe, data, sequence, physical=0):
-    """Pacote ArtDmx. data: 2..512 bytes, comprimento par (Art-Net exige)."""
+    """ArtDmx packet. data: 2..512 bytes, even length (Art-Net requires it)."""
     data = bytes(data)
     if len(data) % 2:
         data += b"\x00"
@@ -42,7 +42,7 @@ def artsync():
 
 
 def parse(packet):
-    """Decodifica ArtDmx / ArtPoll / ArtPollReply / ArtSync -> dict. None se não for Art-Net."""
+    """Decodes ArtDmx / ArtPoll / ArtPollReply / ArtSync -> dict. None if it is not Art-Net."""
     if len(packet) < 10 or packet[:8] != HEADER:
         return None
     op = struct.unpack_from("<H", packet, 8)[0]
@@ -58,7 +58,7 @@ def parse(packet):
     if op == OP_POLL_REPLY and len(packet) >= 194:
         net, sub = packet[18], packet[19]
         types, swin, swout = packet[174:178], packet[186:190], packet[190:194]
-        ports = []                                       # port-address por porta, com a direcao do no
+        ports = []                                       # port-address per port, with the node direction
         for i in range(min(struct.unpack_from(">H", packet, 172)[0], 4)):
             if types[i] & 0x80:
                 ports.append({"dir": "out", "universe": net << 8 | sub << 4 | swout[i] & 0xF})
@@ -73,7 +73,7 @@ def parse(packet):
 
 
 class ArtNetOut:
-    """send(universe, data) por broadcast (2.x, 10.x, limited) ou unicast para `targets`."""
+    """send(universe, data) by broadcast (2.x, 10.x, limited) or unicast to `targets`."""
 
     def __init__(self, targets=None, broadcast=True, port=PORT):
         self.targets = [(t, port) for t in (targets or [])]
@@ -88,10 +88,10 @@ class ArtNetOut:
             try:
                 self.sock.sendto(pkt, t)
             except OSError:
-                pass  # rede sem rota para 2.x/10.x: ignora
+                pass  # network with no route to 2.x/10.x: ignore
 
     def send(self, universe, data):
-        s = self.seq.get(universe, 0) % 255 + 1  # 1..255, 0 = sem sequência
+        s = self.seq.get(universe, 0) % 255 + 1  # 1..255, 0 = no sequence
         self.seq[universe] = s
         self._tx(artdmx(universe, data, s))
 
@@ -100,7 +100,7 @@ class ArtNetOut:
 
 
 class ArtNetIn(threading.Thread):
-    """Escuta 6454 e guarda o último ArtDmx por universo em `frames`."""
+    """Listens on 6454 and keeps the last ArtDmx per universe in `frames`."""
 
     def __init__(self, universes, host="0.0.0.0", port=PORT):
         super().__init__(daemon=True)

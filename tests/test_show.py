@@ -1,4 +1,4 @@
-# Arquivo .spell: load/save, versao, migracao e o show do MED GRUPO.
+# .spell file: load/save, version, migration and the MED GRUPO show.
 import json
 import os
 import pathlib
@@ -13,7 +13,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class TestSpell(unittest.TestCase):
-    def test_save_load_ida_e_volta(self):
+    def test_save_load_round_trip(self):
         sh = {"name": "t", "fps": 60, "duration": 2.0, "outputs": [],
               "tracks": [{"type": "dmx", "universe": 1, "address": 1, "keys": [[0, [0]], [2, [255]]]}], "cues": []}
         d = tempfile.mkdtemp()
@@ -25,14 +25,14 @@ class TestSpell(unittest.TestCase):
             got.pop("_dir")
             got.pop("version")
             self.assertEqual(got, sh)
-            showfile.save(p, got)                       # _dir nao volta para o arquivo
+            showfile.save(p, got)                       # _dir does not go back into the file
             self.assertNotIn("_dir", json.loads(pathlib.Path(p).read_text(encoding="utf-8")))
         finally:
             for f in os.listdir(d):
                 os.remove(os.path.join(d, f))
             os.rmdir(d)
 
-    def test_migracao_e_versao_futura(self):
+    def test_migration_and_future_version(self):
         self.assertEqual(showfile.migrate({"tracks": []})["version"], showfile.VERSION)   # v0 -> v1
         with self.assertRaises(ValueError):
             showfile.migrate({"version": showfile.VERSION + 1})
@@ -44,7 +44,7 @@ class TestSpell(unittest.TestCase):
         tl = Timeline(sh, sh["_dir"])
         self.assertEqual([k.type for k in tl.tracks], ["pyfx", "fx", "laser"])
         self.assertEqual(len(tl.dmx), 1)
-        self.assertEqual(tl.dmx[0].fn(0.0), mod.look(0.0))         # pyfx aponta para o look do show
+        self.assertEqual(tl.dmx[0].fn(0.0), mod.look(0.0))         # pyfx points at the show look
         self.assertTrue((ROOT / "shows" / sh["tracks"][2]["clip"]).exists())
 
 

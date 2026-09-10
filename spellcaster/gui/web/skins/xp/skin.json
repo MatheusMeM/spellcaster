@@ -1,6 +1,6 @@
 {
   "name": "xp",
-  "author": "inspirada no tema Luna do Windows XP / Media Player 9",
+  "author": "inspired by the Luna theme of Windows XP / Media Player 9",
   "chrome": { "transport": "round", "visualizer": "bars" },
   "vars": {
     "--bg": "#ece9d8",

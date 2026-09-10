@@ -1,6 +1,6 @@
 {
   "name": "bluesky",
-  "author": "inspirada nas skins Bluesky / Radio do Windows Media Player 9",
+  "author": "inspired by the Bluesky / Radio skins of Windows Media Player 9",
   "chrome": { "transport": "round", "visualizer": "scope" },
   "vars": {
     "--bg": "#dcefff",

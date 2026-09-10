@@ -1,6 +1,6 @@
 {
   "name": "quicksilver",
-  "author": "inspirada na skin QuickSilver (codinome Corona) do Windows Media Player 9",
+  "author": "inspired by the QuickSilver skin (code name Corona) of Windows Media Player 9",
   "chrome": { "transport": "round", "visualizer": "bars" },
   "vars": {
     "--bg": "#141719",

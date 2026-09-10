@@ -1,13 +1,13 @@
-# Player standalone: transporte (play/pause/stop/locate/loop) em thread propria sobre o Clock,
-# timeline -> sACN / Art-Net / OSC, laser em thread separada a 20-30 kpps com safety() sempre aplicado.
-# Transporte remoto por OSC: /spellcaster/play | pause | stop | locate f.
+# Standalone player: transport (play/pause/stop/locate/loop) on its own thread over the Clock,
+# timeline -> sACN / Art-Net / OSC, laser on a separate thread at 20-30 kpps with safety() always applied.
+# Remote transport over OSC: /spellcaster/play | pause | stop | locate f.
 import json
 import math
 import os
 import threading
 import time
 
-from .. import fixtures  # noqa: F401  (registra o resolvedor do track fixture)
+from .. import fixtures  # noqa: F401  (registers the fixture track resolver)
 from ..paths import SHOWS
 from .. import show as showfile
 from ..core.engine import Engine
@@ -22,11 +22,11 @@ _EMPTY = {}
 
 
 def _empty(t):
-    return _EMPTY                    # Engine.tick(_empty, t) = so envia os universos ja escritos
+    return _EMPTY                    # Engine.tick(_empty, t) = only sends the universes already written
 
 
 class Player:
-    """Player(show_dict, loop=False, outputs=None). outputs substitui as saidas DMX do .spell."""
+    """Player(show_dict, loop=False, outputs=None). outputs replaces the DMX outputs of the .spell."""
 
     def __init__(self, sh, loop=False, outputs=None):
         self.show = sh
@@ -47,7 +47,7 @@ class Player:
         self._done = threading.Event()
         self._th = self._lth = self._osc_in = None
 
-    # ---- saidas ----
+    # ---- outputs ----
     def _open(self, override):
         sacn_outs, art_outs = [], []
         for c in self.show.get("outputs", ()):
@@ -72,16 +72,16 @@ class Player:
         return sacn_outs, art_outs
 
     def _load_clip(self):
-        """Frames do track laser: clipe .ild ou gerador nomeado de ilda.generators."""
+        """Frames of the laser track: .ild clip or a named generator from ilda.generators."""
         if not self.tl.laser:
             return None
         sp = self.tl.laser[0].spec
         if sp.get("clip"):
             from ..protocols.ilda import ild
             return ild.read(os.path.join(self.base, sp["clip"]))
-        return None                                  # gerador: frame calculado em laser_frame(t)
+        return None                                  # generator: frame computed in laser_frame(t)
 
-    # ---- transporte ----
+    # ---- transport ----
     def start(self):
         self._run = True
         self._done.clear()
@@ -118,7 +118,7 @@ class Player:
         self._prev = float(t)
 
     def wait(self, timeout=None):
-        """Bloqueia ate stop() (ou fim do show). Espera curta em fatias para o Ctrl+C chegar."""
+        """Blocks until stop() (or the end of the show). Waits in short slices so Ctrl+C gets through."""
         end = None if timeout is None else time.perf_counter() + timeout
         while not self._done.wait(0.2):
             if end is not None and time.perf_counter() >= end:
@@ -139,13 +139,13 @@ class Player:
         for out in self.eng.outputs + (self.art.outputs if self.art else []):
             out.close()
 
-    # ---- loop de transporte ----
+    # ---- transport loop ----
     def _loop(self):
         while self._run:
             if self.clock.state == "stop":
                 time.sleep(0.005)
                 continue
-            self.clock.run(self._tick, self.duration)     # volta em stop() ou ao chegar na duracao
+            self.clock.run(self._tick, self.duration)     # returns on stop() or when it reaches the duration
             if self._run and self.clock.state != "stop":
                 if self.loop:
                     self.locate(0.0)
@@ -164,7 +164,7 @@ class Player:
             self.art.tick(_empty, t)
 
     def _side(self, t):
-        """Tracks de efeito colateral: OSC (envia quando o valor muda), media por OSC e cues."""
+        """Side-effect tracks: OSC (sends when the value changes), media over OSC and cues."""
         for tr in self.tl.osc:
             v = tr.keys.value(t, tr.spec.get("args"))
             if v != tr.last:
@@ -183,7 +183,7 @@ class Player:
 
     # ---- laser ----
     def laser_frame(self, t):
-        """Frame do laser em t: clipe (indice = t * fps) ou gerador, transformacoes por keyframe e safety()."""
+        """Laser frame at t: clip (index = t * fps) or generator, keyframed transforms and safety()."""
         tr = self.tl.laser[0]
         fps = float(tr.spec.get("fps", self.fps))
         if self.clip:
@@ -207,7 +207,7 @@ class Player:
     def _laser_loop(self):
         d = self.dac
         pps = int(self.laser_cfg.get("pps", 25000))
-        chunk = max(1, pps // 50)                     # ~20 ms de pontos por comando
+        chunk = max(1, pps // 50)                     # ~20 ms worth of points per command
         try:
             d.connect()
             d.prepare()
@@ -221,8 +221,8 @@ class Player:
             pts = self.laser_frame(self.clock.time).points
             for i in range(0, len(pts), chunk):
                 blk = pts[i:i + chunk]
-                # ponytail: espera o buffer esvaziar por polling, igual ao EtherDream.play
-                # ; trocar por low_water quando houver DAC real na bancada.
+                # ponytail: waits for the buffer to drain by polling, same as EtherDream.play
+                # ; swap for low_water once a real DAC is on the bench.
                 while self._run and d.status["buffer_fullness"] + len(blk) > d.capacity:
                     time.sleep(len(blk) / pps / 2)
                     d.ping()
@@ -242,17 +242,17 @@ class Player:
             pass
 
 
-CURRENT = None                       # player em execucao neste processo (stop/pause/locate agem nele)
+CURRENT = None                       # player running in this process (stop/pause/locate act on it)
 
 
 @command
 def play_show(file: str, loop: bool = False):
-    """Toca um show .spell (timeline, cues, laser) ate o fim ou Ctrl+C."""
+    """Plays a .spell show (timeline, cues, laser) until the end or Ctrl+C."""
     global CURRENT
-    file = file if os.path.exists(file) else str(SHOWS / file)   # nome solto = shows/ ao lado do exe
+    file = file if os.path.exists(file) else str(SHOWS / file)   # bare name = shows/ next to the exe
     p = CURRENT = Player(showfile.load(file), loop=loop)
     outs = [c.get("type") for c in p.show.get("outputs", ())]
-    print(f"{p.show.get('name', file)}: {len(p.tl.tracks)} tracks, {p.fps} fps, {p.duration}s, saidas {outs}", flush=True)
+    print(f"{p.show.get('name', file)}: {len(p.tl.tracks)} tracks, {p.fps} fps, {p.duration}s, outputs {outs}", flush=True)
     p.start()
     p.play()
     try:
@@ -267,28 +267,28 @@ def play_show(file: str, loop: bool = False):
 
 @command
 def stop():
-    """Para o player em execucao neste processo."""
+    """Stops the player running in this process."""
     if CURRENT:
         CURRENT.stop()
 
 
 @command
 def pause():
-    """Pausa o player em execucao neste processo."""
+    """Pauses the player running in this process."""
     if CURRENT:
         CURRENT.pause()
 
 
 @command
 def locate(t: float):
-    """Salta o player para o instante t (segundos)."""
+    """Jumps the player to instant t (seconds)."""
     if CURRENT:
         CURRENT.locate(t)
 
 
 @command
 def markers(video: str, threshold: float = 0.3):
-    """Lista os cortes de cena de um video (ffmpeg) ou os onsets de um .wav (JSON)."""
+    """Lists the scene cuts of a video (ffmpeg) or the onsets of a .wav (JSON)."""
     ts = find_markers(video, threshold)
     print(json.dumps([round(x, 3) for x in ts]))
     return ts

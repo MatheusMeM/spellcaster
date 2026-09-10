@@ -1,3 +1,3 @@
-"""Timeline: keyframes com curvas, tracks, cue list e markers de video/audio."""
+"""Timeline: keyframes with curves, tracks, cue list and video/audio markers."""
 from .cues import Cue, CueList                                   # noqa: F401
 from .model import CURVES, Keyframe, Keys, Sequence, Timeline, Track, lerp   # noqa: F401

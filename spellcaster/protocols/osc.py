@@ -1,7 +1,7 @@
-"""OSC 1.0 sobre UDP: encode/decode de mensagens e bundles, OscOut, OscIn com pattern matching."""
+"""OSC 1.0 over UDP: encode/decode of messages and bundles, OscOut, OscIn with pattern matching."""
 import re, socket, struct, threading
 
-IMMEDIATE = 1  # timetag "agora"
+IMMEDIATE = 1  # "now" timetag
 
 
 def _pad(b):
@@ -13,11 +13,11 @@ def _str(s):
 
 
 class Blob(bytes):
-    """bytes marcados como blob OSC (tag b)."""
+    """bytes marked as an OSC blob (tag b)."""
 
 
 def timetag(t=None):
-    """time.time() -> NTP 64 bits (segundos desde 1900 << 32 | fração)."""
+    """time.time() -> 64-bit NTP (seconds since 1900 << 32 | fraction)."""
     if t is None:
         return IMMEDIATE
     sec, frac = divmod(t + 2208988800, 1)
@@ -25,19 +25,19 @@ def timetag(t=None):
 
 
 def _arg(v):
-    """valor Python -> (tag, bytes)."""
+    """Python value -> (tag, bytes)."""
     if v is True: return "T", b""
     if v is False: return "F", b""
     if v is None: return "N", b""
-    if v is Ellipsis: return "I", b""  # impulso
+    if v is Ellipsis: return "I", b""  # impulse
     if isinstance(v, (bytes, bytearray)): return "b", _pad(struct.pack(">i", len(v)) + bytes(v))
     if isinstance(v, int):
         return ("i", struct.pack(">i", v)) if -2**31 <= v < 2**31 else ("h", struct.pack(">q", v))
     if isinstance(v, float): return "f", struct.pack(">f", v)
     if isinstance(v, str): return "s", _str(v)
-    if isinstance(v, tuple) and len(v) == 2 and v[0] in ("d", "h", "t"):  # tipo explícito: ("d", 1.5), ("h", 7), ("t", tag)
+    if isinstance(v, tuple) and len(v) == 2 and v[0] in ("d", "h", "t"):  # explicit type: ("d", 1.5), ("h", 7), ("t", tag)
         return v[0], struct.pack({"d": ">d", "h": ">q", "t": ">Q"}[v[0]], v[1])
-    raise TypeError(f"tipo OSC nao suportado: {v!r}")
+    raise TypeError(f"unsupported OSC type: {v!r}")
 
 
 def message(address, *args):
@@ -50,7 +50,7 @@ def message(address, *args):
 
 
 def bundle(elements, tt=IMMEDIATE):
-    """elements: lista de bytes já codificados (message/bundle)."""
+    """elements: list of already encoded bytes (message/bundle)."""
     out = b"#bundle\x00" + struct.pack(">Q", tt)
     for e in elements:
         out += struct.pack(">i", len(e)) + e
@@ -63,7 +63,7 @@ def _rstr(data, i):
 
 
 def parse(data):
-    """bytes -> (address, [args]) ou ("#bundle", timetag, [elementos parseados])."""
+    """bytes -> (address, [args]) or ("#bundle", timetag, [parsed elements])."""
     if data[:8] == b"#bundle\x00":
         tt = struct.unpack_from(">Q", data, 8)[0]
         i, elems = 16, []
@@ -89,12 +89,12 @@ def parse(data):
         elif t == "F": args.append(False)
         elif t == "N": args.append(None)
         elif t == "I": args.append(Ellipsis)
-        else: raise ValueError(f"tag OSC desconhecida: {t}")
+        else: raise ValueError(f"unknown OSC tag: {t}")
     return addr, args
 
 
 def pattern_re(pattern):
-    """Padrão de endereço OSC -> regex compilada. Suporta * ? [a-z] [!a-z] {a,b}."""
+    """OSC address pattern -> compiled regex. Supports * ? [a-z] [!a-z] {a,b}."""
     out, i = "", 0
     while i < len(pattern):
         c = pattern[i]
@@ -125,7 +125,7 @@ class OscOut:
         self.sock.sendto(message(address, *args), self.addr)
 
     def bundle(self, msgs, tt=IMMEDIATE):
-        """msgs: lista de tuplas (address, *args) ou bytes já codificados."""
+        """msgs: list of (address, *args) tuples or already encoded bytes."""
         self.sock.sendto(bundle([m if isinstance(m, bytes) else message(*m) for m in msgs], tt), self.addr)
 
     def close(self):
@@ -133,7 +133,7 @@ class OscOut:
 
 
 class OscIn(threading.Thread):
-    """Escuta UDP; on(pattern, fn) chama fn(address, *args) para cada mensagem casada."""
+    """Listens on UDP; on(pattern, fn) calls fn(address, *args) for every matched message."""
 
     def __init__(self, port, host="0.0.0.0"):
         super().__init__(daemon=True)
@@ -150,7 +150,7 @@ class OscIn(threading.Thread):
 
     def _dispatch(self, p):
         if p[0] == "#bundle":
-            for e in p[2]:  # ponytail: timetag futuro ignorado, executa já ; agendar pelo Clock em F2
+            for e in p[2]:  # ponytail: a future timetag is ignored, it runs right away ; schedule it through the Clock in F2
                 self._dispatch(e)
             return
         addr, args = p
@@ -169,7 +169,7 @@ class OscIn(threading.Thread):
             try:
                 self._dispatch(parse(data))
             except (ValueError, struct.error, IndexError, UnicodeDecodeError):
-                pass  # pacote malformado: descarta
+                pass  # malformed packet: dropped
 
     def close(self):
         self._stop.set()

@@ -1,12 +1,12 @@
-# Servidor MCP (Model Context Protocol) do Spellcaster.
+# Spellcaster MCP (Model Context Protocol) server.
 #
-# Metodos: initialize, notifications/initialized, ping, tools/list, tools/call,
+# Methods: initialize, notifications/initialized, ping, tools/list, tools/call,
 #          resources/list, resources/read, prompts/list, prompts/get.
-# Transporte: stdio (uma linha JSON por mensagem, stderr para log).
-# ponytail: so stdio ; se algum cliente exigir HTTP streamable, ele entra aqui.
+# Transport: stdio (one JSON line per message, stderr for the log).
+# ponytail: stdio only ; if some client demands streamable HTTP, it goes in here.
 #
-# As tools saem do registry: nada de logica de produto aqui (mesmo contrato da GUI).
-# Entradas: `spell mcp` ou `python -m spellcaster.mcp.server`.
+# The tools come from the registry: no product logic here (same contract as the GUI).
+# Entry points: `spell mcp` or `python -m spellcaster.mcp.server`.
 import contextlib
 import io
 import json
@@ -22,25 +22,25 @@ from . import tools as spelltools
 
 PROTOCOL = "2025-06-18"
 SUPPORTED = ("2026-07-28", "2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
-# ponytail: sem negociacao real, so eco da versao pedida quando conhecida ; implementar
-# server/discover e o _meta de 2026-07-28 quando algum cliente exigir.
+# ponytail: no real negotiation, just an echo of the requested version when it is known ; implement
+# server/discover and the 2026-07-28 _meta when some client demands it.
 
-# ponytail: o decorador ja aceita mcp=False, mas marcar comando por comando obrigaria a
-# editar player/fixtures/gui/cli ; a lista mora aqui ate o proximo passo nesses arquivos.
+# ponytail: the decorator already accepts mcp=False, but marking command by command would mean
+# editing player/fixtures/gui/cli ; the list lives here until the next pass over those files.
 HIGH_LEVEL = {"play_show", "stop", "pause", "locate", "net", "markers", "patch_list",
               "show_summary", "monitor"}
 
-# Comandos que bloqueiam ate Ctrl+C: rodam em thread e a tool volta na hora.
+# Commands that block until Ctrl+C: they run in a thread and the tool returns right away.
 BACKGROUND = {"play_show", "play", "serve", "mcp", "calib_hold", "calib_sweep"}
 
 _JSON_TYPE = {"str": "string", "int": "integer", "float": "number", "bool": "boolean"}
-LOG = deque(maxlen=200)            # resource spell://log
+LOG = deque(maxlen=200)            # spell://log resource
 
-INSTRUCTIONS = ("Spellcaster: show control (sACN, Art-Net, OSC, laser ILDA). Ordem util: `net` para achar "
-                "os nos da rede, `show_summary` para ler o show aberto, `play_show` para tocar, "
-                "`monitor` para conferir os 512 bytes de um universo. Comandos fora da lista de tools "
-                "ficam em `run_command`; os resources spell://show, spell://patch, spell://net e "
-                "spell://log dao o estado atual sem gastar uma chamada de tool.")
+INSTRUCTIONS = ("Spellcaster: show control (sACN, Art-Net, OSC, ILDA laser). Useful order: `net` to find "
+                "the nodes on the network, `show_summary` to read the open show, `play_show` to play it, "
+                "`monitor` to check the 512 bytes of a universe. Commands outside the tool list "
+                "live in `run_command`; the resources spell://show, spell://patch, spell://net and "
+                "spell://log give the current state without spending a tool call.")
 
 
 class MethodNotFound(Exception):
@@ -48,7 +48,7 @@ class MethodNotFound(Exception):
 
 
 def log(msg):
-    """Log em stderr (stdout e o canal JSON-RPC) e no buffer do resource spell://log."""
+    """Logs to stderr (stdout is the JSON-RPC channel) and to the spell://log resource buffer."""
     line = time.strftime("%H:%M:%S ") + str(msg)
     LOG.append(line)
     print(line, file=sys.stderr, flush=True)
@@ -56,11 +56,11 @@ def log(msg):
 
 # ---------------------------------------------------------------- tools
 def tool_list():
-    """Tools MCP a partir do registry: uma por comando de HIGH_LEVEL + o generico run_command."""
-    out, resto = [], []
+    """MCP tools from the registry: one per HIGH_LEVEL command + the generic run_command."""
+    out, rest = [], []
     for c in registry.schema():
         if c["name"] not in HIGH_LEVEL:
-            resto.append(c["name"])
+            rest.append(c["name"])
             continue
         props, req = {}, []
         for p in c["params"]:
@@ -73,46 +73,46 @@ def tool_list():
                     "inputSchema": {"type": "object", "properties": props, "required": req}})
     out.append({
         "name": "run_command",
-        "description": "Roda qualquer comando de baixo nivel do registry. Disponiveis: "
-                       + ", ".join(sorted(resto)) + ". Use `commands` para ver os parametros de cada um.",
+        "description": "Runs any low-level registry command. Available: "
+                       + ", ".join(sorted(rest)) + ". Use `commands` to see the parameters of each one.",
         "inputSchema": {"type": "object",
-                        "properties": {"name": {"type": "string", "description": "nome do comando"},
-                                       "args": {"type": "object", "description": "argumentos por nome"}},
+                        "properties": {"name": {"type": "string", "description": "command name"},
+                                       "args": {"type": "object", "description": "arguments by name"}},
                         "required": ["name"]}})
     return out
 
 
 def call_tool(name, args):
-    """Executa a tool e devolve texto. stdout do comando e capturado (no stdio ele corromperia o JSON-RPC)."""
+    """Runs the tool and returns text. The command stdout is captured (on stdio it would corrupt the JSON-RPC)."""
     if name == "run_command":
         name, args = args.get("name", ""), dict(args.get("args") or {})
     if name not in registry.REGISTRY:
-        raise KeyError(f"comando {name!r} nao existe")
+        raise KeyError(f"command {name!r} does not exist")
     log(f"tool {name} {args}")
     if name in BACKGROUND:
         threading.Thread(target=registry.call, args=(name,), kwargs=args, daemon=True).start()
-        return f"{name} iniciado em background; use stop/pause/monitor para acompanhar"
+        return f"{name} started in the background; use stop/pause/monitor to follow it"
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf):
         r = registry.call(name, **args)
-    # ponytail: quando o comando imprime, o texto impresso e a resposta e o valor de retorno e
-    # descartado (os dois dizem a mesma coisa hoje) ; devolver os dois se algum comando divergir.
+    # ponytail: when the command prints, the printed text is the answer and the return value is
+    # discarded (today the two say the same thing) ; return both if some command ever diverges.
     return buf.getvalue().strip() or json.dumps(r, ensure_ascii=False, default=str)
 
 
 # ---------------------------------------------------------------- resources
 RESOURCES = [
-    {"uri": "spell://show", "name": "show", "title": "Show aberto",
-     "description": "Resumo do .spell aberto: fps, duracao, saidas, tracks, cues, patch.",
+    {"uri": "spell://show", "name": "show", "title": "Open show",
+     "description": "Summary of the open .spell: fps, duration, outputs, tracks, cues, patch.",
      "mimeType": "application/json"},
     {"uri": "spell://patch", "name": "patch", "title": "Patch",
-     "description": "Fixtures do patch corrente: nome, perfil, universo, endereco, canais.",
+     "description": "Fixtures of the current patch: name, profile, universe, address, channels.",
      "mimeType": "application/json"},
-    {"uri": "spell://net", "name": "net", "title": "Rede",
-     "description": "Ultimo scan de rede: interfaces, nos Art-Net, fontes sACN, DACs Ether Dream.",
+    {"uri": "spell://net", "name": "net", "title": "Network",
+     "description": "Last network scan: interfaces, Art-Net nodes, sACN sources, Ether Dream DACs.",
      "mimeType": "application/json"},
     {"uri": "spell://log", "name": "log", "title": "Log",
-     "description": "Ultimas 200 linhas de log do servidor MCP.", "mimeType": "text/plain"},
+     "description": "Last 200 log lines of the MCP server.", "mimeType": "text/plain"},
 ]
 
 
@@ -124,13 +124,13 @@ def read_resource(uri):
         rows = fxpatch.PATCH.rows() if fxpatch.PATCH is not None else []
         return json.dumps(rows, indent=1, ensure_ascii=False)
     if uri == "spell://net":
-        # ponytail: sem cache, faz um scan curto na hora ; guardar o ultimo se custar caro na pratica.
-        with contextlib.redirect_stdout(io.StringIO()):    # o `net` imprime o relatorio; aqui vale o dict
+        # ponytail: no cache, it runs a short scan on the spot ; keep the last one if it proves expensive.
+        with contextlib.redirect_stdout(io.StringIO()):    # `net` prints the report; here the dict is what counts
             d = registry.call("net", timeout=1)
         return json.dumps(d, indent=1, ensure_ascii=False, default=str)
     if uri == "spell://log":
         return "\n".join(LOG)
-    raise KeyError(f"resource {uri!r} nao existe")
+    raise KeyError(f"resource {uri!r} does not exist")
 
 
 def _mime(uri):
@@ -139,46 +139,46 @@ def _mime(uri):
 
 # ---------------------------------------------------------------- prompts
 PROMPTS = [
-    {"name": "montar_show_do_video", "title": "Montar show a partir de um video",
-     "description": "Passo a passo para transformar os cortes de um video em cues de um show.",
-     "arguments": [{"name": "video", "description": "caminho do video ou .wav", "required": True}]},
-    {"name": "calibrar_grupo", "title": "Calibrar um grupo de moving heads",
-     "description": "Passo a passo para achar pan/tilt, roda de cor e gobo de um grupo.",
-     "arguments": [{"name": "grupo", "description": "nome do grupo no patch", "required": True}]},
+    {"name": "build_show_from_video", "title": "Build a show from a video",
+     "description": "Step by step to turn the cuts of a video into the cues of a show.",
+     "arguments": [{"name": "video", "description": "path of the video or .wav", "required": True}]},
+    {"name": "calibrate_group", "title": "Calibrate a group of moving heads",
+     "description": "Step by step to find the pan/tilt, colour wheel and gobo of a group.",
+     "arguments": [{"name": "group", "description": "name of the group in the patch", "required": True}]},
 ]
 
-_P_VIDEO = """Monte um show do Spellcaster a partir do video {video}. Siga nesta ordem:
+_P_VIDEO = """Build a Spellcaster show from the video {video}. Follow this order:
 
-1. `net` (timeout 2) para ver interfaces, nos Art-Net e fontes sACN; confirme comigo a interface de saida.
-2. `patch_list` para ver as fixtures ja patcheadas. Se estiver vazio, pergunte quais fixtures existem
-   antes de continuar; nao invente perfil nem endereco.
-3. `markers` com video={video} para pegar a lista de cortes de cena (segundos).
-4. Monte o .spell: uma cue por corte, fade curto (0.2 s) em corte seco e fade longo em transicao lenta.
-   Use `run_command` para os comandos de baixo nivel que faltarem, e `commands` para ver a assinatura deles.
-5. `show_summary` para conferir tracks, cues e duracao antes de tocar.
-6. `play_show` e, logo depois, `monitor` no universo principal para confirmar que esta saindo DMX.
-7. `stop` ao terminar. Nunca deixe o show tocando sem me avisar."""
+1. `net` (timeout 2) to see interfaces, Art-Net nodes and sACN sources; confirm the output interface with me.
+2. `patch_list` to see the fixtures already patched. If it is empty, ask which fixtures exist
+   before going on; do not invent a profile or an address.
+3. `markers` with video={video} to get the list of scene cuts (seconds).
+4. Build the .spell: one cue per cut, short fade (0.2 s) on a hard cut and a long fade on a slow transition.
+   Use `run_command` for the low-level commands that are missing, and `commands` to see their signature.
+5. `show_summary` to check tracks, cues and duration before playing.
+6. `play_show` and, right after it, `monitor` on the main universe to confirm DMX is going out.
+7. `stop` when you are done. Never leave the show playing without telling me."""
 
-_P_GRUPO = """Calibre o grupo {grupo} do patch corrente. Siga nesta ordem:
+_P_GROUP = """Calibrate the group {group} of the current patch. Follow this order:
 
-1. `patch_list` e o resource spell://patch para ver quais unidades formam o grupo {grupo} e qual perfil usam.
-2. `net` para confirmar que a saida esta na interface certa antes de mandar luz.
-3. Pan/tilt: `run_command` com name=calib_hold e args {{"grupo": "{grupo}", "pan": ..., "tilt": ...}}.
-   Va por bissecao, um eixo de cada vez, e me pergunte o que aparece no palco a cada passo.
-4. Roda de cor e gobo: `run_command` com name=calib_sweep, channel=color (depois gobo) e um valor por
-   unidade, ex. values="0,64,128,255". Anote qual valor deu qual cor/gobo.
-5. `monitor` no universo do grupo para confirmar os bytes que estao saindo.
-6. Feche com um resumo em tabela: unidade, pan, tilt, valores de cor e de gobo. Nao grave nada
-   no .spell sem eu confirmar."""
+1. `patch_list` and the spell://patch resource to see which units make up the group {group} and which profile they use.
+2. `net` to confirm the output is on the right interface before sending light out.
+3. Pan/tilt: `run_command` with name=calib_hold and args {{"group": "{group}", "pan": ..., "tilt": ...}}.
+   Go by bisection, one axis at a time, and ask me what shows up on stage at every step.
+4. Colour wheel and gobo: `run_command` with name=calib_sweep, channel=color (then gobo) and one value per
+   unit, e.g. values="0,64,128,255". Write down which value gave which colour/gobo.
+5. `monitor` on the group universe to confirm the bytes that are going out.
+6. Close with a summary table: unit, pan, tilt, colour and gobo values. Do not write anything
+   into the .spell without my confirmation."""
 
 
 def get_prompt(name, args):
-    if name == "montar_show_do_video":
+    if name == "build_show_from_video":
         txt = _P_VIDEO.format(video=args.get("video", "<video>"))
-    elif name == "calibrar_grupo":
-        txt = _P_GRUPO.format(grupo=args.get("grupo", "<grupo>"))
+    elif name == "calibrate_group":
+        txt = _P_GROUP.format(group=args.get("group", "<group>"))
     else:
-        raise KeyError(f"prompt {name!r} nao existe")
+        raise KeyError(f"prompt {name!r} does not exist")
     d = next(p for p in PROMPTS if p["name"] == name)
     return {"description": d["description"],
             "messages": [{"role": "user", "content": {"type": "text", "text": txt}}]}
@@ -199,7 +199,7 @@ def method(name, p):
     if name == "tools/call":
         try:
             txt = call_tool(p.get("name", ""), dict(p.get("arguments") or {}))
-        except Exception as e:                       # erro de execucao vai no resultado, nao no JSON-RPC
+        except Exception as e:                       # a runtime error goes in the result, not in the JSON-RPC
             log(f"tools/call: {type(e).__name__}: {e}")
             return {"content": [{"type": "text", "text": f"{type(e).__name__}: {e}"}], "isError": True}
         return {"content": [{"type": "text", "text": txt}], "isError": False}
@@ -216,10 +216,10 @@ def method(name, p):
 
 
 def handle(m):
-    """Uma mensagem JSON-RPC -> resposta (dict) ou None (notificacao / resposta do cliente)."""
+    """One JSON-RPC message -> response (dict) or None (notification / client response)."""
     mid = m.get("id")
     name = m.get("method")
-    if name is None:                                  # resposta do cliente a uma request nossa: ignorada
+    if name is None:                                  # a client answer to a request of ours: ignored
         return None
     if name.startswith("notifications/"):
         log(f"<- {name}")
@@ -227,7 +227,7 @@ def handle(m):
     try:
         r = method(name, dict(m.get("params") or {}))
     except MethodNotFound:
-        return None if mid is None else _err(mid, -32601, f"metodo desconhecido: {name}")
+        return None if mid is None else _err(mid, -32601, f"unknown method: {name}")
     except KeyError as e:
         return None if mid is None else _err(mid, -32602, str(e))
     except Exception as e:
@@ -245,10 +245,10 @@ def notification(level, data):
             "params": {"level": level, "logger": "spellcaster", "data": data}}
 
 
-# ---------------------------------------------------------------- eventos do player
+# ---------------------------------------------------------------- player events
 def watch(send, period=0.5, stop=None):
-    """ponytail: o Player nao tem hooks de evento ; polling do estado a 2 Hz nesta thread.
-    Trocar por callback quando Player expuser on_cue/on_end."""
+    """ponytail: the Player has no event hooks ; state polling at 2 Hz on this thread.
+    Swap for a callback once Player exposes on_cue/on_end."""
     from ..player import player as pl
     last = None
     while stop is None or not stop.is_set():
@@ -268,14 +268,14 @@ def watch(send, period=0.5, stop=None):
             elif now[1] != last[1]:
                 send(notification("info", {"event": "transport", "state": now[1]}))
             last = now
-        except Exception as e:                        # o watcher nunca derruba o servidor
+        except Exception as e:                        # the watcher never takes the server down
             send(notification("error", {"event": "error", "text": f"{type(e).__name__}: {e}"}))
             last = None
 
 
-# ---------------------------------------------------------------- transporte stdio
+# ---------------------------------------------------------------- stdio transport
 def serve_stdio(inp=None, out=None):
-    """Uma linha JSON por mensagem em stdin/stdout; log em stderr. Volta em EOF."""
+    """One JSON line per message on stdin/stdout; log on stderr. Returns on EOF."""
     if inp is None:
         inp = sys.stdin
     if out is None:
@@ -285,12 +285,12 @@ def serve_stdio(inp=None, out=None):
     lock = threading.Lock()
 
     def send(msg):
-        with lock:                                    # ensure_ascii: console cp1252 nao quebra o canal
+        with lock:                                    # ensure_ascii: a cp1252 console does not break the channel
             out.write(json.dumps(msg, default=str) + "\n")
             out.flush()
 
     threading.Thread(target=watch, args=(send,), daemon=True).start()
-    log("MCP stdio pronto")
+    log("MCP stdio ready")
     for line in inp:
         line = line.strip()
         if not line:
@@ -308,10 +308,10 @@ def serve_stdio(inp=None, out=None):
 
 @command
 def mcp():
-    """Servidor MCP por stdio (Claude Desktop / Claude Code): uma linha JSON por mensagem."""
+    """MCP server over stdio (Claude Desktop / Claude Code): one JSON line per message."""
     return serve_stdio()
 
 
 if __name__ == "__main__":
-    from .. import cli  # noqa: F401   (importar a CLI registra todos os comandos no registry)
+    from .. import cli  # noqa: F401   (importing the CLI registers every command in the registry)
     serve_stdio()

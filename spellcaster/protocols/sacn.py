@@ -1,5 +1,5 @@
-# sACN (ANSI E1.31): saída multicast por interface + unicast localhost, entrada, discovery. Só stdlib.
-# Interface comum de saída (todos os protocolos): send(universe:int, data:bytes) e close().
+# sACN (ANSI E1.31): multicast output per interface + localhost unicast, input, discovery. Stdlib only.
+# Common output interface (every protocol): send(universe:int, data:bytes) and close().
 import socket, struct, threading, uuid
 
 PORT = 5568
@@ -12,7 +12,7 @@ def mcast(universe):
 
 
 def packet(universe, data, cid, seq, source_name="Spellcaster", priority=100):
-    """Pacote E1.31 data (start code 0). Função pura: mesmos bytes do gerador do MED GRUPO."""
+    """E1.31 data packet (start code 0). Pure function: the same bytes as the MED GRUPO generator."""
     data = bytes(data)
     dmp = struct.pack(">HBBHHH", 0x7000 | (11 + len(data)), 0x02, 0xA1, 0, 1, 1 + len(data)) + b"\0" + data
     fr = struct.pack(">H", 0x7000 | (77 + len(dmp))) + struct.pack(">I", 2) \
@@ -22,7 +22,7 @@ def packet(universe, data, cid, seq, source_name="Spellcaster", priority=100):
 
 
 def parse(pk):
-    """Devolve dict do pacote data (vector 4) ou discovery (vector 8); None se não for E1.31."""
+    """Returns a dict for a data packet (vector 4) or a discovery packet (vector 8); None if it is not E1.31."""
     if len(pk) < 48 or pk[:16] != ROOT:
         return None
     vec = struct.unpack(">I", pk[18:22])[0]
@@ -33,7 +33,7 @@ def parse(pk):
         return {"kind": "data", "cid": cid, "name": name, "priority": prio, "seq": seq,
                 "universe": universe, "data": pk[126:]}
     if vec == 8 and len(pk) >= 120 and struct.unpack(">I", pk[40:44])[0] == 2:
-        # n pelo comprimento declarado do Universe Discovery PDU (8 + 2n), limitado ao que chegou
+        # n from the declared length of the Universe Discovery PDU (8 + 2n), capped by what actually arrived
         n = max(0, min(((struct.unpack_from(">H", pk, 112)[0] & 0x0FFF) - 8) // 2, (len(pk) - 120) // 2))
         return {"kind": "discovery", "cid": cid, "name": name,
                 "universes": list(struct.unpack(f">{n}H", pk[120:120 + 2 * n]))}
@@ -41,7 +41,7 @@ def parse(pk):
 
 
 def interfaces():
-    """IPv4 locais (por hostname) + loopback."""
+    """Local IPv4 addresses (by hostname) + loopback."""
     return sorted({ai[4][0] for ai in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)} | {"127.0.0.1"})
 
 
@@ -86,11 +86,11 @@ def _listener(groups):
 
 
 class SacnIn:
-    """Escuta os universos e guarda o último frame de cada um. get(universe) -> bytes | None."""
+    """Listens to the universes and keeps the last frame of each one. get(universe) -> bytes | None."""
 
     def __init__(self, universes=(1,)):
         self.last = {}
-        self.sources = {}                       # universe -> nome da última fonte vista
+        self.sources = {}                       # universe -> name of the last source seen
         self._sock = _listener([mcast(u) for u in universes])
         self._run = True
         self._th = threading.Thread(target=self._loop, daemon=True)

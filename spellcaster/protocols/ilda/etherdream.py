@@ -1,5 +1,5 @@
-"""Ether Dream DAC: beacon UDP 7654 (1 Hz), stream de pontos TCP 7765. Tudo little-endian.
-Fluxo: connect -> 'p' prepare -> 'd' data -> 'b' begin -> 'd' data enquanto o buffer estiver abaixo da capacidade."""
+"""Ether Dream DAC: UDP beacon on 7654 (1 Hz), TCP point stream on 7765. All little-endian.
+Flow: connect -> 'p' prepare -> 'd' data -> 'b' begin -> 'd' data while the buffer stays below capacity."""
 import socket
 import struct
 import threading
@@ -21,9 +21,9 @@ def parse_status(b):
 
 
 def parse_response(b):
-    """22 bytes: ack ('a' ok, 'F' cheio, 'I' invalido, '!' stop), comando ecoado, status."""
+    """22 bytes: ack ('a' ok, 'F' full, 'I' invalid, '!' stop), echoed command, status."""
     if len(b) < RESP_LEN:
-        raise ValueError(f"resposta curta: {len(b)} bytes")
+        raise ValueError(f"short response: {len(b)} bytes")
     return {"ack": chr(b[0]), "command": chr(b[1]), "status": parse_status(b[2:])}
 
 
@@ -34,7 +34,7 @@ def parse_beacon(b):
 
 
 def encode_data(points):
-    """Comando 'd': pontos Point (x, y, r, g, b, blank) ou tuplas (x, y, r, g, b). Cores 0-255 -> 0-65535."""
+    """Command 'd': Point points (x, y, r, g, b, blank) or (x, y, r, g, b) tuples. Colours 0-255 -> 0-65535."""
     out = [b"d", struct.pack("<H", len(points))]
     for p in points:
         if hasattr(p, "blank"):
@@ -51,21 +51,21 @@ class EtherDream:
     def __init__(self, ip, port=TCP_PORT, capacity=1800):
         self.ip, self.port, self.capacity = ip, port, capacity
         self.sock = None
-        self.status = None  # ultimo dac_status recebido
+        self.status = None  # last dac_status received
         self._run = False
         self._thread = None
 
     def connect(self, timeout=2):
         self.sock = socket.create_connection((self.ip, self.port), timeout)
         self.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        return self._read()  # o DAC manda um status ao conectar
+        return self._read()  # the DAC sends a status on connect
 
     def _read(self):
         buf = b""
         while len(buf) < RESP_LEN:
             chunk = self.sock.recv(RESP_LEN - len(buf))
             if not chunk:
-                raise ConnectionError("Ether Dream fechou a conexao")
+                raise ConnectionError("Ether Dream closed the connection")
             buf += chunk
         r = parse_response(buf)
         self.status = r["status"]
@@ -88,8 +88,8 @@ class EtherDream:
         return self.cmd(b"?")
 
     def play(self, frames, pps=20000, chunk=None):
-        """Toca frames (iteravel de Frame ou listas de pontos) em thread; para quando acabar ou em stop()."""
-        chunk = chunk or max(1, pps // 50)  # ~20 ms de pontos por comando
+        """Plays frames (iterable of Frame or lists of points) in a thread; stops when it ends or on stop()."""
+        chunk = chunk or max(1, pps // 50)  # ~20 ms worth of points per command
         self._run = True
         self._thread = threading.Thread(target=self._loop, args=(frames, pps, chunk), daemon=True)
         self._thread.start()
@@ -104,7 +104,7 @@ class EtherDream:
             pts = getattr(fr, "points", fr)
             for i in range(0, len(pts), chunk):
                 block = pts[i:i + chunk]
-                # ponytail: polling do buffer_fullness a cada ack ; trocar por low_water medido em DAC real
+                # ponytail: polls buffer_fullness on every ack ; swap for low_water measured on a real DAC
                 while self._run and self.status["buffer_fullness"] + len(block) > self.capacity:
                     time.sleep(len(block) / pps / 2)
                     self.ping()
@@ -112,8 +112,8 @@ class EtherDream:
                     return
                 r = self.send(block)
                 if r["ack"] != "a":
-                    raise RuntimeError(f"Ether Dream respondeu {r['ack']!r} ao comando d")
-                if not begun or self.status["playback_state"] == 0:  # inicio ou underrun
+                    raise RuntimeError(f"Ether Dream answered {r['ack']!r} to command d")
+                if not begun or self.status["playback_state"] == 0:  # start or underrun
                     self.begin(pps)
                     begun = True
         self._run = False
@@ -135,8 +135,8 @@ class EtherDream:
 
 
 class Emulator:
-    """Servidor TCP minimo que responde ack e simula o buffer; para testes sem DAC.
-    received = pontos recebidos (tuplas control,x,y,r,g,b,i,u1,u2); commands = bytes de comando na ordem."""
+    """Minimal TCP server that answers ack and simulates the buffer; for tests without a DAC.
+    received = points received (control,x,y,r,g,b,i,u1,u2 tuples); commands = command bytes in order."""
 
     def __init__(self, host="127.0.0.1", port=0, capacity=1800):
         self.capacity = capacity
@@ -170,7 +170,7 @@ class Emulator:
         return ack + cmd + STATUS.pack(*self.state.values())
 
     def _drain(self):
-        """Consome pontos pelo tempo decorrido quando tocando; buffer vazio = underrun -> idle."""
+        """Consumes points by elapsed time while playing; empty buffer = underrun -> idle."""
         now, st = time.monotonic(), self.state
         if st["playback_state"] == 2:
             st["buffer_fullness"] = max(0, st["buffer_fullness"] - int((now - self._t) * st["point_rate"]))

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" data-transport="square" data-visualizer="bars">
+<html lang="en" data-transport="square" data-visualizer="bars">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -20,23 +20,23 @@
 
 <main id="panels">
   <!--
-  CONTRATO DE MONTAGEM DOS PAINEIS  (timeline em canvas, patch e outputs vem em outra rodada)
+  PANEL MOUNTING CONTRACT  (timeline on canvas; patch and outputs come in another round)
 
     App.panel("timeline", { mount(el) { ... } })
 
-  - Registrar antes ou depois do load, tanto faz; mount(el) roda UMA vez, na primeira vez que
-    o painel aparece, e recebe a <section data-panel="..."> ja visivel (tem largura/altura reais,
-    da para dimensionar canvas). Nao ha unmount: o painel so e escondido (display:none).
-  - Dentro do painel:
-      App.rpc(cmd, args)      -> Promise com o result do registry (unico caminho para o engine)
-      App.on(topic, fn)       -> broadcast; fn(payload) em topico de texto,
-                                 fn(universe, Uint8Array(512)) no topico "dmx"
+  - Register before or after load, it makes no difference; mount(el) runs ONCE, the first time
+    the panel shows up, and receives the <section data-panel="..."> already visible (it has real
+    width/height, so a canvas can be sized). There is no unmount: the panel is only hidden (display:none).
+  - Inside the panel:
+      App.rpc(cmd, args)      -> Promise with the registry result (the only path to the engine)
+      App.on(topic, fn)       -> broadcast; fn(payload) on a text topic,
+                                 fn(universe, Uint8Array(512)) on the "dmx" topic
       App.transport           -> {state, t, dur, loop}; App.play/pause/stop/locate/toggleLoop
-      App.log(txt)            -> linha no painel Log
-      document.addEventListener("skin", e => ...)  -> skin trocada (e.detail = skin.json)
-  - A skin e so CSS: usar as variaveis (--bg, --panel, --chrome, --accent, --text, --muted,
-    --font, --radius, --bevel, --glow). O painel nunca le o nome da skin.
-  - Carregar o JS do painel com <script src="timeline.js" defer> aqui embaixo, junto de app.js.
+      App.log(txt)            -> a line in the Log panel
+      document.addEventListener("skin", e => ...)  -> skin changed (e.detail = skin.json)
+  - The skin is CSS only: use the variables (--bg, --panel, --chrome, --accent, --text, --muted,
+    --font, --radius, --bevel, --glow). The panel never reads the skin name.
+  - Load the panel JS with <script src="timeline.js" defer> down here, next to app.js.
   -->
   <section data-panel="timeline"></section>
   <section data-panel="patch"></section>
@@ -47,18 +47,18 @@
 
 <footer class="transport">
   <div class="buttons">
-    <button id="play" title="Play/Pause (espaco)"><svg viewBox="0 0 16 16"><path class="ic-play" d="M3 2l11 6-11 6z"/><path class="ic-pause" d="M3 2h4v12H3zM9 2h4v12H9z"/></svg></button>
+    <button id="play" title="Play/Pause (space)"><svg viewBox="0 0 16 16"><path class="ic-play" d="M3 2l11 6-11 6z"/><path class="ic-pause" d="M3 2h4v12H3zM9 2h4v12H9z"/></svg></button>
     <button id="stop" title="Stop"><svg viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10"/></svg></button>
     <button id="loop" title="Loop (L)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8a5 5 0 0 1 9-3M13 8a5 5 0 0 1-9 3"/><path d="M12 2v3h-3M4 14v-3h3"/></svg></button>
   </div>
   <span class="timecode" id="tc">00:00:00:00</span>
   <input type="range" id="scrub" min="0" max="60" step="0.01" value="0" title="Scrub (Home = 0)">
-  <canvas id="vu" width="240" height="40" title="VU dos universos"></canvas>
+  <canvas id="vu" width="240" height="40" title="Universe VU"></canvas>
 </footer>
 
 <script src="skins.js"></script>
 <script src="app.js"></script>
-<!-- paineis: cada um chama App.panel(nome, {mount(el)}) no DOMContentLoaded; inspector.js e docado na timeline -->
+<!-- panels: each one calls App.panel(name, {mount(el)}) on DOMContentLoaded; inspector.js is docked in the timeline -->
 <script src="inspector.js"></script>
 <script src="timeline.js"></script>
 <script src="patch.js"></script>

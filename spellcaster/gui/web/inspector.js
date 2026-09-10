@@ -1,6 +1,6 @@
-// Inspector: propriedades do track e do keyframe selecionados, com edicao numerica.
-// Fica docado na coluna da direita da timeline (nao e um painel de aba: quem edita quer ver a
-// timeline ao mesmo tempo). Le e escreve o modelo local do TL e pede o commit por la.
+// Inspector: properties of the selected track and keyframe, with numeric editing.
+// It stays docked in the right-hand column of the timeline (it is not a tab panel: whoever edits wants
+// to see the timeline at the same time). It reads and writes the local TL model and asks for the commit there.
 "use strict";
 
 const Inspector = {
@@ -48,15 +48,15 @@ const Inspector = {
     if (!this.box) return;
     const L = TL.lanes[TL.cur];
     this.box.textContent = "";
-    if (!L) { this.box.innerHTML = '<p class="insp-none">nada selecionado</p>'; return; }
+    if (!L) { this.box.innerHTML = '<p class="insp-none">nothing selected</p>'; return; }
     const sp = L.spec;
 
     this.head("Track " + L.si + (L.param ? " . " + L.param : ""));
-    this.row("nome", this.input(sp.name || "", v => { sp.name = v; L.name = v + (L.param ? "." + L.param : ""); TL.commit(); }));
-    this.row("tipo", this.input(sp.type || "", v => { sp.type = L.type = v; TL.commit(); }));
-    this.row("universo", this.input(sp.universe === undefined ? 1 : sp.universe, v => { sp.universe = +v || 1; TL.commit(); }, "number"));
-    this.row("endereco", this.input(sp.address === undefined ? 1 : sp.address, v => { sp.address = isNaN(+v) ? v : +v; TL.commit(); }));
-    this.row("escala", this.input(L.vmax, v => { L.vmax = +v || 255; TL.dirty = true; }, "number"));
+    this.row("name", this.input(sp.name || "", v => { sp.name = v; L.name = v + (L.param ? "." + L.param : ""); TL.commit(); }));
+    this.row("type", this.input(sp.type || "", v => { sp.type = L.type = v; TL.commit(); }));
+    this.row("universe", this.input(sp.universe === undefined ? 1 : sp.universe, v => { sp.universe = +v || 1; TL.commit(); }, "number"));
+    this.row("address", this.input(sp.address === undefined ? 1 : sp.address, v => { sp.address = isNaN(+v) ? v : +v; TL.commit(); }));
+    this.row("scale", this.input(L.vmax, v => { L.vmax = +v || 255; TL.dirty = true; }, "number"));
     const mute = this.row("mute", this.input("", () => {}, "checkbox"));
     mute.checked = L.mute;
     mute.onchange = () => { L.mute = mute.checked; TL.commit(); };
@@ -65,10 +65,10 @@ const Inspector = {
     solo.onchange = () => { L.solo = solo.checked; TL.commit(); };
 
     const n = TL.selCount();
-    if (!n) { this.head("Keyframe"); this.box.insertAdjacentHTML("beforeend", '<p class="insp-none">nenhum keyframe</p>'); return; }
+    if (!n) { this.head("Keyframe"); this.box.insertAdjacentHTML("beforeend", '<p class="insp-none">no keyframe</p>'); return; }
     if (n > 1) {
       this.head(n + " keyframes");
-      this.row("curva", this.sel(["linear", "hold", "in", "out", "inout", "bezier"], "linear", v => {
+      this.row("curve", this.sel(["linear", "hold", "in", "out", "inout", "bezier"], "linear", v => {
         for (const [li, ks] of TL.sel) for (const i of ks) TL.lanes[li].cu[i] = CURVES.indexOf(v);
         TL.commit();
       }));
@@ -79,14 +79,14 @@ const Inspector = {
     const K = TL.lanes[li];
     this.head("Keyframe " + ki + " / " + K.n);
     this.row("t (s)", this.input(Math.round(K.ts[ki] * 1e4) / 1e4, v => { K.ts[ki] = Math.max(0, +v || 0); TL.resort(li); TL.commit(); }, "number"));
-    this.row("valor", this.input(K.raw[ki] !== null ? JSON.stringify(K.raw[ki]) : K.vs[ki], v => {
+    this.row("value", this.input(K.raw[ki] !== null ? JSON.stringify(K.raw[ki]) : K.vs[ki], v => {
       let parsed;
       try { parsed = JSON.parse(v); } catch (e) { parsed = v; }
       if (typeof parsed === "number") { K.vs[ki] = parsed; K.raw[ki] = null; }
       else { K.raw[ki] = parsed; K.vs[ki] = Array.isArray(parsed) && typeof parsed[0] === "number" ? parsed[0] : 0; }
       TL.commit();
     }));
-    this.row("curva", this.sel(["linear", "hold", "in", "out", "inout", "bezier"], CURVES[K.cu[ki]], v => {
+    this.row("curve", this.sel(["linear", "hold", "in", "out", "inout", "bezier"], CURVES[K.cu[ki]], v => {
       K.cu[ki] = CURVES.indexOf(v);
       TL.commit();
     }));

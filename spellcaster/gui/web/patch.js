@@ -1,5 +1,5 @@
-// Patch: grade de fixtures (nome, perfil, universo, endereco, canais). Quem valida e o registry:
-// cada edicao grava o show (show_set) e pede patch_check; a sobreposicao vem de la e aparece em vermelho.
+// Patch: fixture grid (name, profile, universe, address, channels). The registry is what validates:
+// every edit saves the show (show_set) and asks for patch_check; the overlap comes from there and shows in red.
 "use strict";
 
 (function () {
@@ -14,7 +14,7 @@
   }
 
   function commit() {
-    // pega o show inteiro de novo para nao passar por cima do que a timeline editou
+    // fetches the whole show again so as not to run over what the timeline edited
     return App.rpc("show_get").then(sh => {
       sh.patch = rows;
       return App.rpc("show_set", { data: JSON.stringify(sh) });
@@ -73,13 +73,13 @@
     });
   }
 
-  // O registro espera o DOMContentLoaded: App.route() usa elementos que app.js so pega la.
+  // Registration waits for DOMContentLoaded: App.route() uses elements that app.js only grabs there.
 addEventListener("DOMContentLoaded", () => App.panel("patch", {
     mount(el) {
       el.innerHTML =
-        '<div class="tl-bar"><button id="pt-add">+ Fixture</button><button id="pt-reload">Recarregar</button>' +
+        '<div class="tl-bar"><button id="pt-add">+ Fixture</button><button id="pt-reload">Reload</button>' +
         '<span class="tl-msg" id="pt-cnt"></span><span class="pt-err" id="pt-err"></span></div>' +
-        '<table class="grid"><thead><tr><th>nome<th>perfil<th>universo<th>endereco<th>canais<th></tr></thead>' +
+        '<table class="grid"><thead><tr><th>name<th>profile<th>universe<th>address<th>channels<th></tr></thead>' +
         '<tbody id="pt-tb"></tbody></table>';
       tb = el.querySelector("#pt-tb");
       err = el.querySelector("#pt-err");

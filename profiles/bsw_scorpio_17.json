@@ -1,6 +1,6 @@
 {
  "name": "FOS Scorpio BSW 17ch",
- "note": "Calibrado no Capture (medgrupo_rj.c2p, 08/09/2026). Roda de cor e roda de gobo medidas na marra; zoom 80 = 13 graus, 255 = 36 graus. O canal 12 nao tem funcao no perfil de fabrica e fica fora do dicionario de nomes (o patch reserva os 17 mesmo assim).",
+ "note": "Calibrated in Capture (medgrupo_rj.c2p, 2026-09-08). Colour wheel and gobo wheel measured by hand; zoom 80 = 13 degrees, 255 = 36 degrees. Channel 12 has no function in the factory profile and stays out of the name dictionary (the patch reserves all 17 anyway).",
  "channels": [
   {"name": "pan", "offset": 0, "fine": 1},
   {"name": "tilt", "offset": 2, "fine": 3},

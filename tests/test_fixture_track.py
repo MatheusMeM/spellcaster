@@ -14,8 +14,8 @@ class FixtureTrack(unittest.TestCase):
         tl = Timeline(SHOW)
         tl.apply(uni, 1.0)
         d = uni.get_or_create(1).data
-        self.assertEqual(d[308], 127)        # dim (ch10 do BSW) na metade da rampa
-        self.assertEqual(d[303], 48)         # color = amarelo
+        self.assertEqual(d[308], 127)        # dim (BSW ch10) halfway up the ramp
+        self.assertEqual(d[303], 48)         # color = amarelo (yellow on the wheel)
         tl.apply(uni, 2.0)
         self.assertEqual(uni.get_or_create(1).data[308], 255)
 

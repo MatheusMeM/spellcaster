@@ -1,11 +1,11 @@
-# Validacao de conformidade: roda o binario Rust `spellcore play shows/medgrupo_r0.spell`,
-# captura o sACN em 127.0.0.1 com o SacnIn do Python e compara byte a byte com medgrupo_u1.bin.
+# Conformance check: runs the Rust binary `spellcore play shows/medgrupo_r0.spell`, captures sACN
+# on 127.0.0.1 with the Python SacnIn and compares it byte for byte with medgrupo_u1.bin.
 #
-# O indice do frame vem da SEQUENCIA do E1.31, nao do relogio: o mesmo frame chega varias vezes
-# (uma copia multicast por interface + a copia unicast em 127.0.0.1) com a mesma sequencia.
-# Duplicata e descartada; salto de sequencia avanca o indice na mesma medida.
+# The frame index comes from the E1.31 SEQUENCE, not from the clock: the same frame arrives several
+# times (one multicast copy per interface + the unicast copy on 127.0.0.1) with the same sequence.
+# A duplicate is dropped; a sequence jump advances the index by the same amount.
 #
-# Uso: C:\Python313\python.exe tests/conformance/capture_sacn.py [--secs 3] [--exe <spellcore.exe>]
+# Usage: C:\Python313\python.exe tests/conformance/capture_sacn.py [--secs 3] [--exe <spellcore.exe>]
 import argparse
 import os
 import socket
@@ -24,14 +24,14 @@ DEFAULT_EXE = os.path.join(os.environ.get("TEMP", ""), "spellcore_target", "rele
 
 
 class Recorder(sacn.SacnIn):
-    """SacnIn que guarda (seq, data) de cada pacote em vez de so o ultimo frame."""
+    """SacnIn that keeps (seq, data) of every packet instead of only the last frame."""
 
     def _loop(self):
         self.got = []
         while self._run:
             try:
                 pk, _ = self._sock.recvfrom(2048)
-            except socket.timeout:          # timeout e' OSError: tem que vir antes
+            except socket.timeout:          # timeout is an OSError: it has to come first
                 continue
             except OSError:
                 break
@@ -53,13 +53,13 @@ def main():
     ap.add_argument("--show", default=os.path.join(ROOT, "shows", "medgrupo_r0.spell"))
     a = ap.parse_args()
     if not os.path.exists(a.exe):
-        print(f"FALTA o binario: {a.exe}")
+        print(f"MISSING binary: {a.exe}")
         return 2
 
     ref = fixture(os.path.join(HERE, "medgrupo_u1.bin"))
     rec = Recorder(universes=(1,))
     rec.got = []
-    time.sleep(0.3)                                   # deixa o socket entrar no grupo multicast
+    time.sleep(0.3)                                   # let the socket join the multicast group
     proc = subprocess.Popen([a.exe, "play", a.show], cwd=ROOT,
                             stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     time.sleep(a.secs)
@@ -79,7 +79,7 @@ def main():
         if last is None:
             idx = 0
         elif seq == last:
-            continue                                  # copia do mesmo frame (multicast + unicast)
+            continue                                  # copy of the same frame (multicast + unicast)
         else:
             idx += (seq - last) % 256
         last = seq
@@ -93,13 +93,13 @@ def main():
                 d = next((i for i in range(min(len(data), 512)) if data[i:i + 1] != ref[idx][i:i + 1]), -1)
                 first_bad = (idx, d, data[d] if 0 <= d < len(data) else None, ref[idx][d] if d >= 0 else None)
 
-    print(f"pacotes recebidos: {len(got)} ; frames distintos comparados: {ok + bad}")
-    print(f"frames iguais ao fixture: {ok} ; diferentes: {bad}")
+    print(f"packets received: {len(got)} ; distinct frames compared: {ok + bad}")
+    print(f"frames equal to the fixture: {ok} ; different: {bad}")
     if first_bad:
-        print(f"primeiro erro: frame {first_bad[0]} canal {first_bad[1] + 1} "
-              f"recebido {first_bad[2]} esperado {first_bad[3]}")
+        print(f"first mismatch: frame {first_bad[0]} channel {first_bad[1] + 1} "
+              f"got {first_bad[2]} expected {first_bad[3]}")
     if err:
-        print("stderr do spellcore:", err[:400])
+        print("spellcore stderr:", err[:400])
     return 0 if ok and not bad else 1
 
 

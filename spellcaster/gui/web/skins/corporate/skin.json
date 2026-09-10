@@ -1,6 +1,6 @@
 {
   "name": "corporate",
-  "author": "inspirada na skin Corporate do Windows Media Player 8",
+  "author": "inspired by the Corporate skin of Windows Media Player 8",
   "chrome": { "transport": "square", "visualizer": "bars" },
   "vars": {
     "--bg": "#e8ebee",

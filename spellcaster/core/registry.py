@@ -1,4 +1,4 @@
-# Registro de comandos: cada função registrada vira verbo de CLI, OSC-API, GUI e tool MCP.
+# Command registry: every registered function becomes a CLI verb, an OSC-API call, a GUI action and an MCP tool.
 import inspect
 
 REGISTRY = {}
@@ -6,7 +6,7 @@ _TYPES = {int: "int", float: "float", str: "str", bool: "bool"}
 
 
 def command(name=None, mcp=True):
-    """@command / @command() / @command("nome", mcp=False)."""
+    """@command / @command() / @command("name", mcp=False)."""
     if callable(name):
         return command()(name)
 
@@ -18,6 +18,7 @@ def command(name=None, mcp=True):
 
 def _coerce(typ, v):
     if typ is bool and isinstance(v, str):
+        # "sim" stays: accepted input value, not display text
         return v.strip().lower() in ("1", "true", "yes", "on", "sim")
     if typ in _TYPES and not isinstance(v, typ):
         return typ(v)

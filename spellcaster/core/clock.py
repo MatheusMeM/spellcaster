@@ -1,4 +1,4 @@
-# Relógio único do engine: tick fixo com compensação de deriva (perf_counter) e transporte play/pause/stop/locate.
+# The engine's only clock: fixed tick with drift compensation (perf_counter) and play/pause/stop/locate transport.
 import threading, time
 
 
@@ -7,8 +7,8 @@ class Clock:
         self.fps = fps
         self._lock = threading.Lock()
         self._state = "stop"          # stop | play | pause
-        self._pos = 0.0               # posição quando parado/pausado
-        self._t0 = 0.0                # perf_counter correspondente a t=0 quando tocando
+        self._pos = 0.0               # position while stopped/paused
+        self._t0 = 0.0                # perf_counter matching t=0 while playing
 
     @property
     def time(self):
@@ -41,7 +41,7 @@ class Clock:
             self._t0 = time.perf_counter() - t
 
     def run(self, fn, duration=None):
-        """Chama fn(t) a cada tick até stop() ou t >= duration. Em pause, fn segue sendo chamada com t congelado."""
+        """Calls fn(t) on every tick until stop() or t >= duration. While paused, fn keeps being called with t frozen."""
         if self._state == "stop":
             self.play()
         period = 1.0 / self.fps
@@ -56,4 +56,4 @@ class Clock:
             if d > 0:
                 time.sleep(d)
             else:
-                nxt = time.perf_counter()   # ponytail: atrasou, não acumula o atraso ; trocar por fase fixa se precisar de sync externo (LTC/MTC)
+                nxt = time.perf_counter()   # ponytail: it fell behind, does not accumulate the lag ; swap for fixed phase if external sync is needed (LTC/MTC)

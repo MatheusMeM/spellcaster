@@ -1,12 +1,12 @@
-"""Geradores de figura.
-Coordenadas ILDA +-32767; cores (r, g, b) 0-255.
-Uso: python -m spellcaster.protocols.ilda.generators saida.ild [SX SY]  (regenera o laser MED GRUPO)."""
+"""Figure generators.
+ILDA coordinates +-32767; colours (r, g, b) 0-255.
+Usage: python -m spellcaster.protocols.ilda.generators output.ild [SX SY]  (regenerates the MED GRUPO laser)."""
 import math
 import sys
 
 from .frame import Frame, Point
 
-AMARELO = (255, 230, 0); BRANCO = (255, 255, 255); CIANO = (0, 200, 255)
+YELLOW = (255, 230, 0); WHITE = (255, 255, 255); CYAN = (0, 200, 255)
 
 
 def _p(x, y, col):
@@ -23,7 +23,7 @@ def circle(cx, cy, r, col, n=60, ph=0.0):
 
 
 def polyline(verts, col, k=15, close=False):
-    """Segmentos entre vertices com k passos cada; vertice repetido nas juncoes vira dwell natural."""
+    """Segments between vertices with k steps each; a vertex repeated at the joints becomes a natural dwell."""
     if close:
         verts = list(verts) + [verts[0]]
     pts = []
@@ -33,13 +33,13 @@ def polyline(verts, col, k=15, close=False):
 
 
 def rect(cx, cy, w, h, col, k=15):
-    """w, h = meia-largura e meia-altura."""
+    """w, h = half-width and half-height."""
     return polyline([(cx - w, cy - h), (cx + w, cy - h), (cx + w, cy + h), (cx - w, cy + h)], col, k, close=True)
 
 
 def blank_to(pts):
-    """Ponto apagado no inicio da figura para o salto.
-    O alvo sai daqui, nao do chamador: passado a mao ele erra quando a fase (ph) gira."""
+    """Blanked point at the start of the figure, for the jump.
+    The target comes from here, not from the caller: passed by hand it gets it wrong when the phase (ph) turns."""
     return [Point(pts[0].x, pts[0].y, blank=True)] + pts if pts else pts
 
 
@@ -49,35 +49,35 @@ def ease(a, b, u):
 
 
 def medgrupo(t, sx=20000, sy=10000):
-    """Laser da abertura MED GRUPO RJ (video 25 fps, 46,8 s). sx, sy = meia-largura/altura da tela em ILDA.
-    0-10 contagem | 10-12,5 flash | 12,5-33,5 cidades | 33,5-40 logo | 40-44 fade."""
+    """MED GRUPO RJ opening laser (video 25 fps, 46.8 s). sx, sy = half-width/height of the screen in ILDA units.
+    0-10 countdown | 10-12.5 flash | 12.5-33.5 cities | 33.5-40 logo | 40-44 fade."""
     pts = []
     if t < 10:
         beat = t % 1.0; r = sy * (0.55 + 0.12 * math.exp(-4 * beat))
-        pts += circle(0, 0, r, AMARELO, ph=t * 0.8)
+        pts += circle(0, 0, r, YELLOW, ph=t * 0.8)
         if int(t) % 2 == 0:
-            pts += blank_to(rect(0, 0, sx * 0.98, sy * 0.98, CIANO))
+            pts += blank_to(rect(0, 0, sx * 0.98, sy * 0.98, CYAN))
     elif t < 12.5:
         u = (t - 10) / 2.5; s = ease(0.1, 1.6, u)
-        pts += rect(0, 0, sx * s, sy * s, BRANCO)
-        pts += blank_to(rect(0, 0, sx * s * 0.6, sy * s * 0.6, BRANCO))
+        pts += rect(0, 0, sx * s, sy * s, WHITE)
+        pts += blank_to(rect(0, 0, sx * s * 0.6, sy * s * 0.6, WHITE))
     elif t < 33.5:
         u = (t - 12.5) / 21
         y = sy * math.sin(u * 2 * math.pi * 3) * 0.6
-        pts += rect(sx * 0.35, y, sx * 0.5, sy * 0.18, AMARELO)
-        pts += blank_to(circle(-sx * 0.62, -sy * 0.1, sy * 0.35, CIANO, ph=t * 2))
+        pts += rect(sx * 0.35, y, sx * 0.5, sy * 0.18, YELLOW)
+        pts += blank_to(circle(-sx * 0.62, -sy * 0.1, sy * 0.35, CYAN, ph=t * 2))
     elif t < 40:
         u = (t - 33.5) / 6.5; r = ease(sy * 1.4, sy * 0.6, u)
-        pts += circle(0, 0, r, BRANCO, ph=t * 3)
-        pts += blank_to(circle(0, 0, r * 0.85, AMARELO, ph=-t * 3))
+        pts += circle(0, 0, r, WHITE, ph=t * 3)
+        pts += blank_to(circle(0, 0, r * 0.85, YELLOW, ph=-t * 3))
     elif t < 44:
         u = (t - 40) / 4; r = ease(sy * 0.6, 0, u)
-        pts += circle(0, 0, r, BRANCO)
+        pts += circle(0, 0, r, WHITE)
     return Frame(pts)
 
 
 def render(fn, fps=25, dur=46.8, **kw):
-    """Lista de Frame chamando fn(t, **kw) a cada 1/fps."""
+    """List of Frame calling fn(t, **kw) every 1/fps."""
     return [fn(i / fps, **kw) for i in range(int(dur * fps))]
 
 

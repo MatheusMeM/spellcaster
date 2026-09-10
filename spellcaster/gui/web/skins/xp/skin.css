@@ -1,4 +1,4 @@
-/* xp - Luna: barra azul-royal em degrade, painel bege/branco, botao verde de start, laranja de foco. */
+/* xp - Luna: royal blue gradient bar, beige/white panel, green start button, orange focus. */
 .chrome {
   background: linear-gradient(#4b8ef7, #245edb 45%, #1c3fbf);
   border-bottom: 2px solid #17399f; border-radius: 0 0 8px 8px;

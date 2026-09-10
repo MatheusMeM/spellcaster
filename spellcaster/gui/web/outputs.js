@@ -1,11 +1,11 @@
-// Monitor de saida: cada universo vira uma grade 16 x 32 (512 canais) com VU por canal, alimentada
-// pelo topico binario "dmx". O buffer de cada universo e alocado uma vez; o desenho so pinta
-// retangulos com cores de uma LUT de 256 entradas — nada e alocado por frame.
+// Output monitor: each universe becomes a 16 x 32 grid (512 channels) with a per-channel VU, fed by
+// the binary "dmx" topic. The buffer of each universe is allocated once; the drawing only paints
+// rectangles with colours from a 256-entry LUT -- nothing is allocated per frame.
 "use strict";
 
 (function () {
   const COLS = 32, ROWS = 16, PADX = 14, HEAD = 16;
-  const unis = new Map();                       // numero -> {data, peak}
+  const unis = new Map();                       // number -> {data, peak}
   let cv, cx, box, dirty = true, lut = null, lut2 = null, W = 0, H = 0, dpr = 1, seen = 0;
 
   function rgb(css) {
@@ -41,7 +41,7 @@
 
   function resize() {
     const r = cv.getBoundingClientRect();
-    if (r.width < 1) return;                                                   // painel escondido
+    if (r.width < 1) return;                                                   // panel hidden
     dpr = window.devicePixelRatio || 1;
     W = Math.max(200, r.width | 0);
     H = Math.max(120, r.height | 0);
@@ -60,10 +60,10 @@
     cx.textBaseline = "top";
     if (!unis.size) {
       cx.fillStyle = muted;
-      cx.fillText("sem frames: de play (o topico dmx so anda com o player rodando)", 4, 8);
+      cx.fillText("no frames: hit play (the dmx topic only moves with the player running)", 4, 8);
       return;
     }
-    // celula cresce para ocupar o painel: com poucos universos a grade fica legivel de longe
+    // the cell grows to fill the panel: with few universes the grid stays readable from a distance
     const perRow = Math.ceil(Math.sqrt(unis.size)), nrow = Math.ceil(unis.size / perRow);
     const CW = Math.max(4, Math.min(24, ((W - 8) / perRow - PADX) / COLS)) | 0;
     const CH = Math.max(4, Math.min(CW, ((H - 8) / nrow - HEAD - 10) / ROWS)) | 0;
@@ -82,7 +82,7 @@
         cx.fillStyle = v ? lut[v] : bg;
         cx.fillRect(x, y, CW - 1, CH - 1);
         const p = pk[ch] = v > pk[ch] ? v : pk[ch] * 0.94;
-        if (p > 8 && p > v + 4) {                       // marca de pico (VU) acima do valor atual
+        if (p > 8 && p > v + 4) {                       // peak mark (VU) above the current value
           cx.fillStyle = lut2;
           cx.fillRect(x, y, CW - 1, 1);
         }
@@ -91,16 +91,16 @@
   }
 
   function tick() {
-    if (performance.now() - seen < 1500) dirty = true;   // deixa o pico decair depois do ultimo frame
+    if (performance.now() - seen < 1500) dirty = true;   // lets the peak decay after the last frame
     if (dirty && cv.offsetParent !== null) { dirty = false; draw(); }
     requestAnimationFrame(tick);
   }
 
-  // O registro espera o DOMContentLoaded: App.route() usa elementos que app.js so pega la.
+  // Registration waits for DOMContentLoaded: App.route() uses elements that app.js only grabs there.
 addEventListener("DOMContentLoaded", () => App.panel("outputs", {
     mount(el) {
-      el.innerHTML = '<div class="out-bar">Universos: grade 16 x 32 = 512 canais. Brilho = valor, ' +
-                     'risco no topo = pico.<span class="tl-msg" id="out-msg"></span></div>' +
+      el.innerHTML = '<div class="out-bar">Universes: 16 x 32 grid = 512 channels. Brightness = value, ' +
+                     'tick on top = peak.<span class="tl-msg" id="out-msg"></span></div>' +
                      '<canvas id="out-cv"></canvas>';
       cv = el.querySelector("#out-cv");
       cx = cv.getContext("2d");
@@ -111,7 +111,7 @@ addEventListener("DOMContentLoaded", () => App.panel("outputs", {
       document.addEventListener("skin", palette);
       App.on("dmx", (u, data) => {
         feed(u, data);
-        if (box) box.textContent = unis.size + " universos";
+        if (box) box.textContent = unis.size + " universes";
       });
       requestAnimationFrame(tick);
     },
