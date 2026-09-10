@@ -96,8 +96,8 @@ async fn show_get(State(st): State<Arc<St>>) -> Response {
     }
 }
 
-// ponytail: quatro tipos ; o `--dir` tem html, js, css e .spell — imagem e fonte entram quando
-// alguma pagina trouxer uma.
+// ponytail: lista fechada ; o `--dir` tem as paginas, o .spell, a fonte e a midia do laser3d —
+// tipo novo entra quando alguma pagina trouxer um.
 fn mime(p: &str) -> &'static str {
     match p.rsplit('.').next().unwrap_or("") {
         "html" => "text/html; charset=utf-8",
@@ -105,6 +105,11 @@ fn mime(p: &str) -> &'static str {
         "css" => "text/css; charset=utf-8",
         "json" | "spell" => "application/json",
         "md" => "text/markdown; charset=utf-8", // design/SHORTCUTS.md, que a help.html le
+        "woff2" => "font/woff2",
+        "svg" => "image/svg+xml",
+        "png" => "image/png",
+        "mp3" => "audio/mpeg",
+        "mp4" => "video/mp4",
         _ => "application/octet-stream",
     }
 }
@@ -504,5 +509,11 @@ mod tests {
         assert_eq!(mime("a/b/quatro.face.json"), "application/json");
         assert_eq!(mime("design/SHORTCUTS.md"), "text/markdown; charset=utf-8");
         assert_eq!(mime("sem_extensao"), "application/octet-stream");
+        // fonte e midia das paginas 3D
+        assert_eq!(mime("laser3d/michroma.woff2"), "font/woff2");
+        assert_eq!(mime("a.svg"), "image/svg+xml");
+        assert_eq!(mime("a.png"), "image/png");
+        assert_eq!(mime("a.mp3"), "audio/mpeg");
+        assert_eq!(mime("a.mp4"), "video/mp4");
     }
 }

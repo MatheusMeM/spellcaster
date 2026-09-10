@@ -12,6 +12,12 @@
 
 use std::path::{Path, PathBuf};
 
+/// A pagina que a janela abre. E' a vista 3D do laser (`design/laser/` virou produto na frente
+/// `ui-3d`), por pedido do dono: o programa e' o modelo do aparelho, nao uma aba com uma timeline.
+/// Enquanto a frente `ui-3d` nao entrar, este caminho e' 404 e a janela abre em branco — trocar
+/// por `/spellgui/web/index.html` para voltar a timeline.
+const PAGINA: &str = "/spellgui/web/laser3d/app.html";
+
 /// `spellcaster [show.spell] [--dir RAIZ]`. Devolve `(show, dir)`.
 // ponytail: dois argumentos, parser a mao ; clap entra quando houver o terceiro.
 fn args(it: impl Iterator<Item = String>) -> (Option<String>, Option<String>) {
@@ -78,6 +84,9 @@ fn janela() -> Result<(), String> {
     let show = show_abs(show, &cwd);
     std::env::set_current_dir(&raiz).map_err(|e| format!("{}: {}", raiz.display(), e))?;
 
+    // O mapa MIDI chama o registry COMPLETO, o mesmo que o `spellcore` monta (cli/src/lib.rs).
+    engine::midi::builder(cli::registry);
+
     let (tx, rx) = mpsc::channel();
     let r = raiz.clone();
     std::thread::spawn(move || {
@@ -90,7 +99,7 @@ fn janela() -> Result<(), String> {
     let addr = rx
         .recv_timeout(Duration::from_secs(10))
         .map_err(|_| "o barramento nao ligou em 10 s".to_string())?;
-    let url = format!("http://127.0.0.1:{}/spellgui/web/index.html", addr.port());
+    let url = format!("http://127.0.0.1:{}{}", addr.port(), PAGINA);
 
     let ev = EventLoop::new();
     let win = WindowBuilder::new()
