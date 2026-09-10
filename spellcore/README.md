@@ -659,7 +659,7 @@ default `v`. "Dispara na GUI" cita a página (`index.html` = TIMELINE, `teatro.h
 | `play_show` | `file:string`, `loop:boolean=false`, `osc_port:integer?` | **sobe** um player e toca até o fim ou Ctrl+C | `{name, frames, jitter_p99_ms, jitter_max_ms, drift}` | TIMELINE: `Play` sem player vivo; CLI `spellcore play` |
 | `net` | `timeout:number=2`, `json:boolean=false` | varre a rede (interfaces, Art-Net, sACN, Ether Dream) | relatório de texto, ou o scan cru | CLI `spellcore net` |
 | `graph_check` | — | compila o graph do show aberto sem rodar | `{nodes, error}` | PATCHBAY: a cada edição do graph |
-| `laser_dacs` | `timeout:number=2` | procura DACs (Ether Dream por beacon, IDN por scan) | `[{type, id, host}]` | LASER: `Procurar` |
+| `laser_dacs` | `timeout:number=2` | procura DACs (Ether Dream por beacon UDP e, sem beacon, por status TCP; IDN por scan) | `[{type, id, host, via}]` | LASER: `Procurar` |
 | `laser_open` | `dac:string`, `host:string=""`, `kpps:number=30`, `safety:any=null` | abre o DAC e sobe o feed (a safety nunca desliga) | `{feed, dac, pps}` | LASER: `Abrir` |
 | `laser_play` | `feed:integer`, `file:string`, `fps:number=30`, `loop:boolean=false` | empurra os frames do `.ild` ao DAC | `{feed, file, frames, fps, loop}` | LASER: `Play` |
 | `laser_stop` | `feed:integer` | para o playback; o DAC continua aberto | `{feed, playing:false}` | LASER: `Stop` |
@@ -799,7 +799,7 @@ o laser o que `player::current()` é para o transporte (um processo, N feeds).
 
 | Comando | Faz | Devolve |
 |---|---|---|
-| `laser_dacs(timeout=2)` | Ether Dream por beacon (`netscan`) e IDN por scan | lista de `{type, id, host}` |
+| `laser_dacs(timeout=2)` | Ether Dream por beacon e, se nenhum beacon chegar em metade do prazo, por status TCP nos vizinhos da ARP (`netscan`); IDN por scan | lista de `{type, id, host, via}`, `via` = `beacon` ou `tcp` (achado por TCP não traz `buffer`/`max_pps`: só o beacon os carrega) |
 | `laser_open(dac, host="", kpps=30, safety?)` | abre o DAC e sobe o `Feed`; `safety` = `{min_size, max_intensity, zone}`, nunca desligável | `{feed, dac, pps}` |
 | `laser_play(feed, file, fps=30, loop=false)` | thread que lê o `.ild` e faz `feed.push` no ritmo (o `.ild` não carrega taxa); sem `loop`, o fim do arquivo desarma o transporte e `laser_stats` volta a `playing:false` | `{feed, file, frames, fps, loop}` |
 | `laser_stop(feed)` | para o playback; o DAC continua aberto | `{feed, playing:false}` |
@@ -808,6 +808,17 @@ o laser o que `player::current()` é para o transporte (um processo, N feeds).
 | `laser_stats(feed)` | `playing`, arquivo, `stat/sent`, `stat/dropped`, `stat/errors`, jitter, cpu e a safety corrente | objeto |
 | `laser_files(dir="shows")` | os `.ild` do diretório | `{dir, files:[{name, path, bytes}]}` |
 | `clip_frame(clip, t=0, index?, fps=30)` | um quadro do `.ild` para desenhar (o previz da timeline): `index` escolhe direto, senão é `floor(t*fps)` com o clipe repetindo, a conta do player. `clip` sem caminho resolve na pasta do `.spell` aberto; não toca em DAC nenhum | `{clip, index, frames, name, points:[[x, y, r, g, b, blank]]}` com `x` e `y` normalizados em -1..1 |
+
+**Descoberta do Ether Dream (`laser_dacs`, `net`).** O DAC anuncia um beacon UDP de 36 bytes em
+`255.255.255.255:7654`, 1 Hz. No Windows, com o **Ether Dream Sitter** aberto, o `bind` em
+`0.0.0.0:7654` é recusado com `WSAEACCES` (10013) mesmo com `SO_REUSEADDR` — o Windows só
+compartilha o datagrama se os **dois** sockets pedirem, e o Sitter não pede. Medido nesta
+máquina (Sitter no PID 53580, DAC em 169.254.207.140, PC em 169.254.86.236/16): `bind 0.0.0.0`
+falha, `bind 169.254.86.236:7654` passa **e recebe o broadcast** (4 beacons em 4 s). Por isso o
+`netscan` escuta no IP de cada placa, e não só no coringa; e, se nada chegar na metade do prazo,
+pede o status por TCP 7765 aos vizinhos da tabela ARP (`arp -a` / `ip neigh`, texto lido, nunca
+executado) — um Ether Dream responde 22 bytes (`ack` + comando ecoado + `dac_status`) ao aceitar
+a conexão.
 
 `path` de `laser_param` (os mesmos paths de `modules/laser.json`, a declaração do módulo laser);
 as chaves `stat/*` de `laser_stats` são os `values` do mesmo arquivo, só as que `FeedStats` conta:

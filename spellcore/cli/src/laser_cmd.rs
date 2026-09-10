@@ -114,11 +114,11 @@ fn def_timeout() -> f64 {
 
 fn dacs(a: DacsArgs) -> Result<Value, String> {
     let t = Duration::from_secs_f64(a.timeout.clamp(0.1, 30.0));
-    let mut out: Vec<Value> = netscan::scan_etherdream(t)
+    let mut out: Vec<Value> = netscan::scan_etherdream(t, &netscan::interfaces())
         .iter()
         .map(|d| {
             json!({"type": "etherdream", "id": d.mac, "host": d.ip,
-                   "buffer": d.buffer_capacity, "max_pps": d.max_point_rate})
+                   "buffer": d.buffer_capacity, "max_pps": d.max_point_rate, "via": d.via})
         })
         .collect();
     // ponytail: sem Helios na lista ; o DAC USB entra quando o driver (hidapi/rusb) entrar —
@@ -515,4 +515,33 @@ pub fn register(r: &mut Registry) {
         "Um quadro do .ild para desenhar: escolhe por `index` ou por `t` a `fps`, e devolve os pontos [x, y, r, g, b, blank] com x e y normalizados em -1..1.",
         clip_frame,
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use laser::Emulator;
+
+    /// Sem beacon (o Sitter fica com a UDP 7654, ou o broadcast nao passa), quem acha o DAC e' o
+    /// pedido de status na TCP: o `Emulator` responde `a?` + `dac_status` ao aceitar a conexao,
+    /// que e' o que o hardware faz. Mora na CLI porque o `protocols` nao depende do `laser`.
+    #[test]
+    fn fallback_tcp_acha_o_dac_sem_beacon() {
+        let emu = Emulator::start(1800).expect("emulador");
+        let vizinhos = [("127.0.0.1".to_string(), "8a:9e:36:98:8c:ce".to_string())];
+        let wait = Duration::from_millis(500);
+
+        let achados = netscan::probe_etherdream(&vizinhos, emu.port, wait);
+        assert_eq!(achados.len(), 1, "{achados:?}");
+        assert_eq!(achados[0].ip, "127.0.0.1");
+        assert_eq!(achados[0].mac, "8a:9e:36:98:8c:ce");
+        assert_eq!(achados[0].via, "tcp");
+        assert_eq!(achados[0].status.protocol, 1);
+
+        // porta sem ninguem escutando: lista vazia, sem travar
+        let livre = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let porta = livre.local_addr().unwrap().port();
+        drop(livre);
+        assert!(netscan::probe_etherdream(&vizinhos, porta, wait).is_empty());
+    }
 }
