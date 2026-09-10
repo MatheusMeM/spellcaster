@@ -18,7 +18,7 @@ o `spellcore serve` (ou qualquer servidor estático) entrega. Cor e tipografia v
 | `laser3d/` | **a página principal do programa**: o projetor laser 10 W em 3D (three.js r128 + PBR, feixe em GLSL com bloom, mesa óptica, câmera no padrão SolidWorks, splash na parede, bindings tecla+MIDI com learn, Pino como menu das telas). `engine.js` é o mapa estado → comando (`cmdFor`); `bind.js` guarda as bindings e expõe `Bind.manifest()`; `tokens.css` é o design system só desta ferramenta. O modelo, o feixe, a câmera e o Pino vêm do protótipo de design votado, copiados sem mexer |
 | `vendor/` | three.js r128 (`build` + os passes de post-processing) e as duas fontes `.woff2` (Michroma, Share Tech Mono). Vendorizado de propósito: o programa roda em evento, **sem rede** — nenhuma página pede CDN |
 | `dev/commands.json` | `Registry::schema()` congelado, usado no modo offline |
-| `test/*.test.js` | `node --test spellgui/web/test/*.test.js` |
+| `test/*.test.js` | `node --test spellgui/web/test/*.test.js`. Toda página declara `<meta charset="utf-8">` nos primeiros 1024 bytes porque nem todo servidor manda charset no `Content-Type` (`python -m http.server`, protocolo asset do Tauri, `file://`) e sem isso o acento vira mojibake; `charset.test.js` vigia isso e o BOM. |
 
 ## Como abrir
 
