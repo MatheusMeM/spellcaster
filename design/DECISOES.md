@@ -219,3 +219,17 @@ Seis documentos novos em `design/FUNCOES/` (`daw-arranjo`, `daw-sessao`, `browse
 - Não estava no pedido; foi decidido aqui porque o pedido mandou seguir o manual e o manual discorda
   do que havia. **Reversível em uma linha** (as duas teclas no `Bind.def` de `app.js`) se o voto disser
   que a intuição "Z aproxima" vale mais que a compatibilidade com o CAD.
+
+## 10/09/2026 · frente hud-4 · O nome do comando que mapeia uma entrada — aguarda voto
+
+- O **interlock deixou de ser um botão** na página do laser: é uma **entrada** do aparelho, e a aba INTERLOCK da gaveta é o lugar onde se declara **quem a aciona**. A identidade é um endereço textual, `laser/1/interlock`, o mesmo em tecla, MIDI, OSC, Art-Net, MQTT e CLI (FUNCOES/README regra 2).
+- **O que já funciona hoje:** tecla e MIDI, pelo `Bind` que a página já tinha (`Bind.def("lock.toggle")`), e no engine o MIDI por `spell midi_map --key 176/1 --cmd laser_param`. O botão `SIMULAR ABERTURA` aciona a entrada sem hardware.
+- **O que o voto decide:** o nome do comando de registry que mapeia uma fonte **não-MIDI** para um endereço. A proposta é uma forma só para todas: `spell map <fonte> <endereço>` — `spell map osc laser/1/interlock`, `spell map artnet 1/512 laser/1/interlock`, `spell map mqtt spell/laser/1/interlock laser/1/interlock`. A alternativa é um comando por protocolo (`osc_map`, `artnet_map`, `mqtt_map`), como o `midi_map` que já existe.
+- **O que fica fora enquanto o voto não sai:** o comando em si. A aba mostra o endereço, o universo/canal e o tópico (guardados em `localStorage`, prontos para virar argumento) e escreve **"em breve"** na linha do comando que falta. Nada de fingir que mapeia.
+- Motivo: `midi_map` existe e cria precedente para a segunda forma; a primeira é uma linha de CLI só para N protocolos. É escolha de nome de comando do produto, não de código — e nome de comando é contrato.
+
+## 10/09/2026 · frente hud-4 · A linha de Art-Net/sACN do HUD: declaração acende texto, frame acende LED
+
+- O bloco de estatísticas do HUD só escreve **fato do engine**. A linha de uma entrada Art-Net ou sACN aparece **se, e só se**, `show_get {full:true}` devolver essa entrada em `show.inputs`; o LED dela acende **só quando chega frame de verdade** (tópico binário 2 do barramento), e apaga sozinho quando o frame para.
+- `shows/medgrupo.spell` não declara `inputs`: por isso hoje **não existe linha de Art-Net/sACN na tela** — e é assim que tem que ser. Um LED apagado ao lado de um protocolo que ninguém configurou é ruído; um protocolo inventado é mentira.
+- Mesma regra na plaqueta do chassi: a versão de firmware vem do engine, e sem engine a plaqueta escreve `FIRMWARE OFFLINE` em vez de um número.

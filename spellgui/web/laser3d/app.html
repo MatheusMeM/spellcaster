@@ -7,14 +7,9 @@
   #stage { position:fixed; inset:0; }
   #gl { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
   #stage.dz::after { content:"solta o .ild na porta ILDA IN"; position:absolute; inset:0; display:grid; place-items:center; font-family:var(--font-disp); font-size:24px; color:var(--las); background:rgba(0,0,0,.6); pointer-events:none; z-index:9; }
-  #ttl { left:30px; top:22px; } #sub { left:30px; top:48px; opacity:.85; }
-  #st1 { right:30px; top:22px; text-align:right; } #st2 { right:30px; top:44px; font-size:var(--fs-1); opacity:.8; text-align:right; } #cli { right:30px; top:64px; text-align:right; }
-  #warn { left:30px; bottom:12px; } #midi { right:30px; bottom:12px; font-size:var(--fs-0); color:var(--dim); }
+  #ttl { left:30px; top:22px; } #ttl2 { left:30px; top:46px; }
+  #stats { right:30px; top:22px; }
   #cams { position:absolute; left:30px; top:78px; display:flex; gap:8px; z-index:4; flex-wrap:wrap; max-width:640px; }
-  #panel { right:150px; top:96px; width:300px; display:none; } #panel.on { display:block; } #panel.wide { width:560px; right:60px; max-height:620px; overflow:auto; }
-  #panel .cv { margin:4px 0 8px; display:block; border:1px solid var(--line); }
-  #panel .fl { max-height:180px; overflow:auto; margin:6px 0 0; border-top:1px solid var(--line); }
-  #panel .fl button { display:block; width:100%; text-align:left; margin-top:4px; }
   #splash { position:absolute; inset:0; display:grid; place-items:end center; padding-bottom:44px; z-index:7; font-size:var(--fs-2); color:var(--las); text-shadow:0 0 8px var(--las); pointer-events:none; }
   #splash.off { display:none; } #splash span { animation:blink 1s steps(2) infinite; } @keyframes blink { 50% { opacity:0; } }
   input[type=file] { display:none; }
@@ -31,12 +26,15 @@
 </script>
 <div id="stage" class="room">
   <canvas id="gl"></canvas>
-  <div class="hud title" id="ttl">SPELLCASTER</div><div class="hud" id="sub">LASER 10 W RGB</div>
-  <div class="hud" id="st1"></div><div class="hud" id="st2"></div><div class="hud cli" id="cli">spell ilda play show.ild --kpps 30</div>
-  <div class="hud warn" id="warn">PERIGO · LASER CLASSE 4 · 10 W · NÃO OLHE PARA O FEIXE</div><div class="hud" id="midi"></div>
+  <div class="hud title" id="ttl">SPELLCASTER</div><div class="hud title" id="ttl2">LASER</div>
+  <div class="hud" id="stats"><div id="srows"></div><div class="cli" id="cli">spell ilda play show.ild --kpps 30</div></div>
   <div id="cams"><button class="lb" data-a="cam.show" disabled>1 SHOW</button><button class="lb on" data-a="cam.rear">2 TRÁS · MENU</button><button class="lb" data-a="cam.inside">3 DENTRO · PREFERÊNCIAS</button><button class="lb" data-a="bind">B BINDINGS</button></div>
   <div class="tip" id="tip"></div>
-  <div class="panel" id="panel"><span class="x">×</span><div id="pbody"></div></div>
+  <!-- a gaveta: tudo que é menu e configuração mora aqui (Tab abre e fecha, Escape fecha) -->
+  <aside id="drawer"><button id="dpull" title="gaveta · Tab">‹</button>
+    <header><img id="dbrand" src="brand/main.svg" alt="Feitiçaria Industrial"><nav id="dtabs"></nav></header>
+    <div id="dbody" class="panel"></div>
+  </aside>
   <div id="splash"><span>ESC PULA</span></div>
   <input type="file" id="file" accept=".ild,.ilda">
 </div>

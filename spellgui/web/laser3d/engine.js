@@ -15,16 +15,18 @@
   // Um controle, uma funcao. `[familia, rotulo]` por `userData.key` das pecas de `body.js` e
   // `optics.js`; e' daqui que sai o tooltip e e' daqui que `app.js` decide o que o clique faz.
   // familia: "toggle" (inverte estado) | "momentary" (age enquanto apertado) | "valor" (muda um
-  // numero) | "conector" (plugue: clique nao faz nada) | "navegacao" (abre a tela daquela peca).
-  // Nenhuma chave pode ter duas familias, e nenhuma funcao pode aparecer em duas chaves.
-  // O rotulo e' texto de tela (tooltip da peca): vai acentuado, como o resto da pagina. Sao os
-  // nomes das PAGINAS do display (`oledLines`) que ficam em ASCII, porque aquilo e' um display.
+  // numero) | "navegacao" (abre a aba daquela peca na gaveta) | "mapear" (a peca e' uma ENTRADA do
+  // aparelho: o clique abre onde se escolhe QUEM a aciona) | "peca" (chapa, aleta, plugue,
+  // ventoinha: nao acende, nao tem tooltip e o clique nao faz nada — o dono nao quer menu de hover
+  // nessas pecas). Nenhuma chave pode ter duas familias, e nenhuma funcao em duas chaves.
+  // Rotulo vazio = sem tooltip. O rotulo e' texto de tela: vai acentuado, como o resto da pagina.
+  // Sao os nomes das PAGINAS do display (`oledLines`) que ficam em ASCII, porque aquilo e' display.
   var CONTROLS = {
     // painel traseiro — energia e seguranca
     power:     ["toggle", "POWER: liga e desliga o aparelho"],
     keyswitch: ["toggle", "chave: arma a emissão"],
-    interlock: ["toggle", "interlock: tira o plugue e o obturador fecha"],
-    acin:      ["conector", "AC IN: powerCON TRUE1, 100-240 V (quem liga é o rocker POWER)"],
+    interlock: ["mapear", "interlock: é uma entrada — clique para mapear quem aciona"],
+    acin:      ["peca", ""],
     // painel traseiro — display e navegacao
     enc:       ["navegacao", "encoder: gira navega, aperta entra"],
     back:      ["navegacao", "BACK: volta uma página do display"],
@@ -34,31 +36,34 @@
     dmxin:     ["navegacao", "DMX IN: endereço e modo"],
     dmxout:    ["navegacao", "DMX OUT: repete o universo"],
     rj45:      ["navegacao", "NET: sACN, Art-Net, NDI, Spout e os DACs da rede"],
-    usb:       ["navegacao", "USB: firmware"],
-    fan:       ["navegacao", "ventoinha 60 mm: temperatura"],
-    // corpo
-    lid:       ["navegacao", "tampa: abrir = preferências"],
-    front:     ["navegacao", "frente: abertura do feixe"],
-    aperture:  ["navegacao", "abertura: classe 4, 10 W"],
-    side:      ["navegacao", "aletas de dissipação"],
+    fan:       ["peca", ""],
+    // corpo — a tampa continua abrindo no clique (e' navegacao), mas sem tooltip
+    lid:       ["navegacao", ""],
+    front:     ["peca", ""],
+    aperture:  ["peca", ""],
+    side:      ["peca", ""],
     // dentro (optics.js)
-    bench:     ["navegacao", "mesa óptica: alumínio 16 mm, furação M4 12,5 mm"],
+    bench:     ["peca", ""],
     r:         ["navegacao", "módulo vermelho 638 nm · 2,5 W: limite e curva"],
     g:         ["navegacao", "módulo verde 520 nm · 3 W: limite e curva"],
     b:         ["navegacao", "módulo azul 445 nm · 4,5 W: limite e curva"],
-    dichro:    ["navegacao", "dicroicos: combinam R, G e B num feixe"],
-    fold:      ["navegacao", "espelho de dobra HR: manda o feixe para os galvos"],
+    dichro:    ["peca", ""],
+    fold:      ["peca", ""],
     shutter:   ["navegacao", "obturador: fecha sem chave ou sem interlock"],
     galvo:     ["navegacao", "galvos X/Y: kpps"],
     galvodrv:  ["navegacao", "driver dos galvos: buffer e velocidade"],
-    pcb:       ["navegacao", "driver do diodo: corrente e modulação"],
-    dac:       ["navegacao", "placa DAC ILDA: os conectores traseiros nascem aqui"],
-    psu:       ["navegacao", "fonte 48 V · 250 W"],
+    pcb:       ["peca", ""],
+    dac:       ["peca", ""],
+    psu:       ["peca", ""],
     // Pino
     pino:      ["navegacao", "Pino: cabo DMX, cinco pinos, zero paciência"]
   };
-  function labelOf(k) { return (CONTROLS[k] && CONTROLS[k][1]) || k; }
+  function labelOf(k) { return (CONTROLS[k] && CONTROLS[k][1]) || ""; }
   function kindOf(k) { return (CONTROLS[k] && CONTROLS[k][0]) || ""; }
+  // Peca inerte: nao acende, nao tem tooltip, cursor normal, clique nao faz nada. Chave que nao
+  // esta' na tabela cai aqui tambem (peca de modelo sem funcao declarada — e' assim que a USB
+  // apagada some da interface). Chave com namespace (`pino.<pino>`) e' de outro dono: nao e' peca.
+  function inert(k) { return String(k).indexOf(".") < 0 && (kindOf(k) === "" || kindOf(k) === "peca"); }
 
   function cmdFor(id, v, st) {
     st = st || {};
@@ -153,7 +158,7 @@
     return out;
   }
 
-  var api = { cmdFor: cmdFor, CONTROLS: CONTROLS, labelOf: labelOf, kindOf: kindOf, PAGES: PAGES, FIELDS: FIELDS, oledLines: oledLines };
+  var api = { cmdFor: cmdFor, CONTROLS: CONTROLS, labelOf: labelOf, kindOf: kindOf, inert: inert, PAGES: PAGES, FIELDS: FIELDS, oledLines: oledLines };
   if (typeof window !== "undefined") window.LaserEngine = api;
   if (typeof module !== "undefined") module.exports = api;
 })();

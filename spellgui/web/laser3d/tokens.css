@@ -27,9 +27,24 @@ kbd { border-bottom-width:2px; }
 /* HUD: texto sobre a cena, sempre com brilho do próprio material */
 .hud { position:absolute; pointer-events:none; text-shadow:0 0 8px currentColor; font-size:var(--fs-2); color:var(--las); }
 .hud.title { font-family:var(--font-disp); font-size:var(--fs-5); color:var(--fg); }
-.hud.cli { color:var(--amb); opacity:.85; }
-.hud.warn { font-size:var(--fs-0); color:var(--amb); }
+.hud .cli { color:var(--amb); opacity:.85; }
 .hud.danger { color:var(--red); }
+/* LED: o indicador físico do aparelho, em CSS. Estado nunca é só a cor (SISTEMA.md §11) — o LED
+   anda sempre colado ao rótulo que o nomeia. Apagado é corpo escuro, não invisível. */
+.led { width:9px; height:9px; border-radius:50%; flex:none; background:#0E1216; border:1px solid var(--line-2); }
+.led.lg { width:14px; height:14px; }
+.led.nil { visibility:hidden; }
+.led.on { background:var(--las); border-color:var(--las); box-shadow:0 0 9px var(--las); }
+.led.warn { background:var(--amb); border-color:var(--amb); box-shadow:0 0 9px var(--amb); }
+.led.err { background:var(--red); border-color:var(--red); box-shadow:0 0 9px var(--red); }
+.led.blink { animation:ledb 1.2s steps(2) infinite; }
+@keyframes ledb { 50% { opacity:.2; } }
+/* stats do HUD: uma linha por fato vivo, à direita; só aparece o que está ligado */
+#stats { display:flex; flex-direction:column; align-items:flex-end; gap:3px; }
+#stats .r { display:flex; align-items:center; gap:8px; color:var(--dim); }
+#stats .r.pri { font-size:var(--fs-3); color:var(--fg); }
+#stats .r.las { color:var(--las); } #stats .r.amb { color:var(--amb); } #stats .r.red { color:var(--red); }
+#stats .cli { font-size:var(--fs-1); margin-top:5px; }
 /* botão laser: contorno do acento, preenchimento só quando ativo */
 .lb { background:rgba(0,0,0,.45); border:1px solid var(--las); color:var(--las); font-family:var(--font-mono); font-size:var(--fs-2); letter-spacing:.06em; padding:7px 12px; cursor:pointer; box-shadow:var(--glow), inset 0 0 8px rgba(56,255,92,.08); transition:box-shadow var(--t-fast), background var(--t-fast); }
 .lb.on { background:rgba(56,255,92,.18); box-shadow:var(--glow-on); }
@@ -57,8 +72,29 @@ kbd { border-bottom-width:2px; }
 .panel td .lb { padding:2px 6px; font-size:var(--fs-0); }
 .panel td .lb.learn { border-color:var(--amb); color:var(--amb); animation:pulse 1s infinite; }
 @keyframes pulse { 50% { opacity:.4; } }
-/* tooltip: fundo do acento, texto preto, sem borda */
+/* tooltip: fundo do acento, texto preto, sem borda. Peça sem rótulo não tem tooltip: sem rótulo
+   não há o que dizer, e uma tarja verde vazia é pior que nada. */
 .tip { position:absolute; padding:4px 8px; font-size:var(--fs-1); color:#000; background:var(--las); pointer-events:none; display:none; z-index:6; white-space:nowrap; }
+.tip:empty { display:none !important; }
+/* gaveta da direita: todo menu e toda configuração. Abre e fecha pelo puxador ou por Tab. */
+#drawer { position:absolute; right:0; top:0; bottom:0; width:360px; background:var(--panel); border-left:1px solid var(--las); box-shadow:-10px 0 26px rgba(0,0,0,.6); z-index:8; display:flex; flex-direction:column; transform:translateX(100%); transition:transform var(--t-ui); }
+#drawer.on { transform:none; }
+#dpull { position:absolute; left:-24px; top:50%; width:24px; height:70px; margin-top:-35px; background:var(--panel); border:1px solid var(--las); border-right:0; color:var(--las); font:16px var(--font-mono); cursor:pointer; box-shadow:var(--glow); }
+#drawer.on #dpull { transform:scaleX(-1); }
+#drawer header { padding:14px 14px 0; border-bottom:1px solid var(--line); }
+#dbrand { display:block; height:18px; width:auto; margin-bottom:12px; opacity:.9; }
+#dtabs { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:-1px; }
+#dtabs .lb { padding:5px 8px; font-size:var(--fs-1); }
+#dbody.panel { position:static; flex:1; overflow:auto; border:0; box-shadow:none; clip-path:none; background:transparent; padding:12px 14px 24px; }
+#dbody h3 { margin:18px 0 2px; } #dbody h3:first-child { margin-top:0; }
+#dbody .cv { margin:4px 0 8px; display:block; border:1px solid var(--line); }
+#dbody .fl { max-height:190px; overflow:auto; margin:6px 0 0; border-top:1px solid var(--line); }
+#dbody .fl button { display:block; width:100%; text-align:left; margin-top:4px; }
+#dbody .map { display:grid; grid-template-columns:70px 1fr; gap:6px 8px; align-items:center; font-size:var(--fs-2); margin:8px 0; }
+#dbody .map > span:nth-child(odd) { color:var(--dim); letter-spacing:.08em; }
+#dbody .tx { background:#0A0D10; color:var(--fg); border:1px solid var(--line-2); font-family:var(--font-mono); font-size:var(--fs-2); padding:4px 6px; width:100%; box-sizing:border-box; }
+#dbody .tx.n { width:64px; }
+#dbody .soon { color:var(--amb); }
 /* sala: nunca retangular */
 .room { position:relative; background:#000; overflow:hidden; user-select:none; clip-path:polygon(var(--chamfer-room) 0, calc(100% - var(--chamfer-room)) 0, 100% var(--chamfer-room), 100% calc(100% - var(--chamfer-room)), calc(100% - var(--chamfer-room)) 100%, calc(50% + 120px) 100%, calc(50% + 96px) calc(100% - 26px), calc(50% - 96px) calc(100% - 26px), calc(50% - 120px) 100%, var(--chamfer-room) 100%, 0 calc(100% - var(--chamfer-room)), 0 var(--chamfer-room)); }
 /* Pino fala em balão Win98: a única coisa "de software" na cena, de propósito */
@@ -82,4 +118,4 @@ ul.l { padding-left:18px; color:#C6CDD3; line-height:1.6; font-size:14px; max-wi
 .opts button.on { border-color:var(--las); color:var(--las); box-shadow:var(--glow); }
 textarea { width:100%; max-width:720px; min-height:80px; background:#0A0D10; color:var(--fg); border:1px solid var(--line-2); font-family:var(--font-mono); font-size:var(--fs-3); padding:8px; box-sizing:border-box; }
 .save { margin-top:10px; background:var(--las); color:#000; border:0; font-family:var(--font-disp); font-size:var(--fs-2); padding:10px 16px; cursor:pointer; }
-@media (prefers-reduced-motion:reduce) { .lb, .panel { transition:none; } .panel td .lb.learn { animation:none; } }
+@media (prefers-reduced-motion:reduce) { .lb, .panel, #drawer { transition:none; } .panel td .lb.learn, .led.blink { animation:none; } }
