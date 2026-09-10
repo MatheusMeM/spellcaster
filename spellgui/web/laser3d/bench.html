@@ -46,7 +46,8 @@
     hinge:  [[-.62, .60, .52], [0, .42, .06], true],
     armed:  [[-.13, .40, .26], [-.150, .352, .15], false],
     xlr:    [[.028, .345, .21], [.022, .326, .15], false],
-    plate:  [[.152, .325, .21], [.152, .318, .15], false]
+    plate:  [[.152, .325, .21], [.152, .318, .15], false],
+    tampa:  [[-.12, .62, -.048], [-.12, .50, -.048], false]
   };
   var q = new URLSearchParams(location.search), names = Object.keys(VIEWS), lbl = document.getElementById("lbl");
   if (q.has("list")) { lbl.textContent = names.join("\n"); }

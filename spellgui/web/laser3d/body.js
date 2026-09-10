@@ -86,8 +86,12 @@ window.BODY = function (THREE, X, scene, pick) {
     var lines = ["PERIGO · RADIAÇÃO LASER", "EVITE EXPOSIÇÃO AO FEIXE", "SAÍDA 10 W · 445-638 nm", "PRODUTO LASER CLASSE 4"], px = fit(x, lines, 318, 32, "'Share Tech Mono'");
     x.textAlign = "left"; x.fillStyle = "#000"; lines.forEach(function (l, j2) { x.fillText(l, 170, 72 + j2 * (px + 13)); });
   }, true);
-  var lab = add(lid, new THREE.PlaneGeometry(.07, .035), new THREE.MeshStandardMaterial({ map: lbl, metalness: 0, roughness: .62 }), -.12, .0032, .0955); lab.rotation.x = -PI / 2; lab.castShadow = false;
-  var sub = add(lid, new THREE.PlaneGeometry(.042, .0127), new THREE.MeshStandardMaterial({ map: svgTex("brand/submark.svg", 512, 155, .45), transparent: true, metalness: .7, roughness: .45 }), .14, .0032, .2355); sub.rotation.x = -PI / 2; sub.castShadow = false;
+  /* O chanfro do ExtrudeGeometry cresce PARA FORA: X.rbox(w, h, d, r) mede h + 2r de altura, então a face de
+     cima da tampa está em T / 2 + r, e não em T / 2. Com y = .0032 as duas etiquetas ficavam 2,8 mm DENTRO da
+     chapa — invisíveis na vista de topo. Meio milímetro de folga é o que sobra para o adesivo. */
+  var LBLY = T / 2 + .003 + .0005;
+  var lab = add(lid, new THREE.PlaneGeometry(.07, .035), new THREE.MeshStandardMaterial({ map: lbl, metalness: 0, roughness: .62 }), -.12, LBLY, .0955); lab.rotation.x = -PI / 2; lab.castShadow = false;
+  var sub = add(lid, new THREE.PlaneGeometry(.042, .0127), new THREE.MeshStandardMaterial({ map: svgTex("brand/submark.svg", 512, 155, .45), transparent: true, metalness: .7, roughness: .45 }), .14, LBLY, .2355); sub.rotation.x = -PI / 2; sub.castShadow = false;
   // frente: abertura com janela
   var BEAM_Y = .057; add(body, X.rbox(.04, .026, .004, .001), m.black, .095, BEAM_Y, -D / 2 - .001, "aperture");
   var apGlass = add(body, new THREE.PlaneGeometry(.03, .018), m.glassDark, .095, BEAM_Y, -D / 2 - .0035); apGlass.rotation.y = PI; apGlass.castShadow = false;

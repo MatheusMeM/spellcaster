@@ -201,3 +201,10 @@ Seis documentos novos em `design/FUNCOES/` (`daw-arranjo`, `daw-sessao`, `browse
 - **Os cinco pinos continuam sendo as cinco telas** (1 laser · 2 fósforo · 3 patchbay · 4 teatro · 5 info). O balão ganhou **dois itens que não são pino**: o **GRAVADOR** (a timeline, `index.html`) e a **MESA** (a Face, `face.html`). Cada um leva a frase que justifica a peça: a timeline é a fita do aparelho, a Face são os botões grandes que o operador aperta no show.
 - **O que o voto decide:** se peça sem pino pode morar no balão, ou se cada uma precisa virar um pino — o que exigiria um Pino com sete pinos (XLR-7 não existe) ou um segundo cabo.
 - Motivo: a regra é "nada aparece por conveniência de software". Dois itens sem pino são a exceção que o balão está abrindo; ou ela é aceita com a justificativa, ou o aparelho precisa crescer um conector.
+
+## 10/09/2026 · chassi-4 · A dobradiça da tampa fica na FRENTE, não atrás
+
+- **O pedido dizia** "dobradiça de verdade, em `z = D/2`" (traseira). **Ficou em `z = −D/2 + 4,5 mm`** (frente), no centro do raio da aresta dianteira.
+- **Motivo:** quem abre a tampa é `app.js`, que escreve um ângulo **negativo** em `lid.rotation.x`. Com o eixo atrás, ângulo negativo joga a chapa para baixo e para trás: ela atravessa o painel traseiro e o flightcase — é exatamente o "tampa clipando" reclamado. Com o eixo na frente, o mesmo ângulo negativo abre a tampa para cima e para a frente, sem varrer nada entre 0 e −1,9 rad, e sem precisar de limite de curso artificial.
+- **A alternativa era editar `app.js`** (inverter o sinal), e `app.js` não é desta frente. Se o integrador preferir a dobradiça atrás, o conserto é uma linha em `app.js` (`rotation.x = +ângulo`) mais mover `lid.position.z` de volta para `D/2 − 4,5 mm`.
+- **Efeito colateral que fica para o integrador:** `app.js` sobe os parafusos da tampa 50 mm (`s.position.y = .004 + sT * .05`). Eles são filhos da tampa e acompanham o giro, mas o curso é exagerado; 8 mm bastaria.
