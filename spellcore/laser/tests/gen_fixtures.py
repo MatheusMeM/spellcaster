@@ -1,15 +1,15 @@
-"""Gera as fixtures binarias de conformidade do crate `laser` a partir do pacote Python.
+"""Generates the binary conformance fixtures of the `laser` crate from the Python package.
 
     C:\\Python313\\python.exe spellcore/laser/tests/gen_fixtures.py
 
-Para cada caso grava `fixtures/<nome>_in.ild` (entrada) e `fixtures/<nome>_out.ild`
-(resultado do Python) mais `fixtures/cases.json` com a operacao e os parametros.
-O `.ild` fmt 5 guarda x, y, r, g, b e blank sem perda, entao serve de formato de fixture
-sem precisar inventar outro (o proprio leitor/escritor esta preso byte a byte pelo
-teste do shows/medgrupo_laser.ild).
+For each case it writes `fixtures/<name>_in.ild` (input) and `fixtures/<name>_out.ild`
+(the Python result) plus `fixtures/cases.json` with the operation and the parameters.
+The `.ild` fmt 5 stores x, y, r, g, b and blank without loss, so it works as the fixture
+format without inventing another one (the reader/writer itself is locked byte by byte by
+the shows/medgrupo_laser.ild test).
 
-O Rust le `_in.ild`, roda a mesma operacao com os mesmos parametros e tem que dar
-exatamente os pontos de `_out.ild`.
+Rust reads `_in.ild`, runs the same operation with the same parameters and must give
+exactly the points of `_out.ild`.
 """
 import json
 import os
@@ -25,7 +25,7 @@ MEDGRUPO = os.path.join(ROOT, "shows", "medgrupo_laser.ild")
 
 
 def salto():
-    """Mesmo frame do tests/test_ilda.py: vertice de 90 graus, salto apagado, passo longo."""
+    """Same frame as tests/test_ilda.py: 90 degree vertex, blanked jump, long step."""
     return Frame([Point(0, 0, 255, 0, 0), Point(3000, 0, 255, 0, 0), Point(3000, 3000, 255, 0, 0),
                   Point(-20000, -20000, blank=True), Point(-20000, -20000, 255, 0, 0),
                   Point(-19000, -20000, 255, 0, 0)], "lasr")
@@ -36,7 +36,7 @@ def quad(size, col=(255, 0, 0), k=4):
 
 
 def cases(med):
-    """(nome, frame de entrada, operacao, parametros)."""
+    """(name, input frame, operation, parameters)."""
     yield "opt_salto", salto(), "optimize", dict(dwell=2, blank_gap=4, max_step=1200, angle=25)
     yield "opt_quad", quad(10000), "optimize", dict(dwell=3, blank_gap=2, max_step=800, angle=40)
     yield "opt_med0", med[0], "optimize", dict(dwell=2, blank_gap=4, max_step=1200, angle=25)
@@ -69,20 +69,20 @@ def main():
     index = []
     for name, src, op, params in cases(med):
         src = Frame(list(src.points), "lasr")
-        assert src.points, name  # frame vazio nao sobrevive ao .ild
+        assert src.points, name  # an empty frame does not survive the .ild
         pin = os.path.join(OUT, name + "_in.ild")
         ild.write(pin, [src], fmt=5, name="lasr", company="spell")
-        # recarrega: o Rust parte exatamente destes bytes
+        # reload: Rust starts from exactly these bytes
         back = ild.read(pin)[0]
         out = apply(op, back, params)
         ild.write(os.path.join(OUT, name + "_out.ild"), [out], fmt=5, name="lasr", company="spell")
         index.append({"name": name, "op": op, "params": params,
                       "n_in": len(back), "n_out": len(out)})
-        print(f"{name:16s} {op:16s} {len(back):5d} -> {len(out):5d} pontos")
+        print(f"{name:16s} {op:16s} {len(back):5d} -> {len(out):5d} points")
     with open(os.path.join(OUT, "cases.json"), "w", encoding="ascii", newline="\n") as f:
         json.dump(index, f, indent=1)
         f.write("\n")
-    print(len(index), "casos em", OUT)
+    print(len(index), "cases in", OUT)
 
 
 if __name__ == "__main__":

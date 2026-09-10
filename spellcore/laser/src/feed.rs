@@ -1,10 +1,10 @@
-//! Um `Feed` = um DAC com thread propria, ring de frames de tamanho fixo e safety
-//! obrigatoria antes de todo envio.
+//! One `Feed` = one DAC with its own thread, a fixed-size frame ring and mandatory safety
+//! before every send.
 //!
-//! Regra do PRD (secao 3): cada saida em sua thread com fila de tamanho fixo; frame velho
-//! e descartado, nunca enfileirado. `push` do engine nunca bloqueia.
-//! Caminho quente sem alocacao: os slots do ring, o buffer de trabalho da thread e o
-//! buffer de comando do DAC sao reusados; depois do primeiro frame nada mais cresce.
+//! PRD rule (section 3): each output in its own thread with a fixed-size queue; an old frame
+//! is dropped, never queued. The engine's `push` never blocks.
+//! Allocation-free hot path: the ring slots, the thread work buffer and the DAC command
+//! buffer are reused; after the first frame nothing grows any more.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
@@ -16,14 +16,14 @@ use serde::{Deserialize, Serialize};
 use crate::dac::Dac;
 use crate::frame::{clamp_c, Point, Safety};
 
-/// Transformacao por frame do track de laser (`keys` do `.spell`).
-/// Ordem: rotacao em torno da origem, escala, translacao. Cor multiplica por canal.
+/// Per-frame transform of the laser track (`keys` of the `.spell`).
+/// Order: rotation around the origin, scale, translation. Color multiplies per channel.
 #[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Transform {
     pub x: f64,
     pub y: f64,
     pub scale: f64,
-    /// Graus.
+    /// Degrees.
     pub rot: f64,
     pub color: (f64, f64, f64),
 }
@@ -49,7 +49,7 @@ impl Transform {
             && self.color == (1.0, 1.0, 1.0)
     }
 
-    /// Reusa `out`; nao aloca depois do primeiro frame do mesmo tamanho.
+    /// Reuses `out`; does not allocate after the first frame of the same size.
     pub fn apply(&self, src: &[Point], out: &mut Vec<Point>) {
         out.clear();
         out.reserve(src.len());
@@ -75,23 +75,23 @@ impl Transform {
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct FeedStats {
-    /// Frames entregues ao DAC.
+    /// Frames delivered to the DAC.
     pub sent: u64,
-    /// Frames descartados por ring cheio (o engine correu mais que o DAC).
+    /// Frames dropped because the ring was full (the engine ran ahead of the DAC).
     pub dropped: u64,
     pub errors: u64,
-    /// Jitter de entrega: desvio do intervalo entre envios em relacao a media, em segundos.
+    /// Delivery jitter: deviation of the interval between sends from the mean, in seconds.
     pub p50: f64,
     pub p99: f64,
     pub max: f64,
-    /// Tempo de CPU da thread do feed, em segundos (Windows: GetThreadTimes).
+    /// CPU time of the feed thread, in seconds (Windows: GetThreadTimes).
     pub cpu: f64,
 }
 
 const JITTER_N: usize = 4096;
 
 struct Ring {
-    /// N+1 slots: a thread fica com um enquanto o produtor escreve nos outros.
+    /// N+1 slots: the thread holds one while the producer writes into the others.
     slots: Vec<Vec<Point>>,
     head: usize,
     len: usize,
@@ -102,7 +102,7 @@ struct Shared {
     ring: Mutex<Ring>,
     cv: Condvar,
     params: Mutex<(Transform, Safety)>,
-    stats: Mutex<(u64, u64, u64, f64, Vec<f64>)>, // sent, dropped, errors, cpu, intervalos
+    stats: Mutex<(u64, u64, u64, f64, Vec<f64>)>, // sent, dropped, errors, cpu, intervals
     run: AtomicBool,
 }
 
@@ -113,9 +113,9 @@ pub struct Feed {
 }
 
 impl Feed {
-    /// Sobe a thread do DAC. `ring` = frames em voo; 2 ou 3 basta (frame velho nao serve
-    /// para nada num laser). `safety` e obrigatoria e pode ser trocada em runtime, nunca
-    /// desligada.
+    /// Starts the DAC thread. `ring` = frames in flight; 2 or 3 is enough (an old frame is of
+    /// no use on a laser). `safety` is mandatory and can be swapped at runtime, never turned
+    /// off.
     pub fn start(
         mut dac: Box<dyn Dac>,
         pps: u32,
@@ -150,7 +150,7 @@ impl Feed {
         &self.name
     }
 
-    /// Entrega um frame. Nunca bloqueia: com o ring cheio, o frame MAIS VELHO e descartado.
+    /// Delivers a frame. Never blocks: with the ring full, the OLDEST frame is dropped.
     pub fn push(&self, points: &[Point]) {
         let mut r = self.shared.ring.lock().unwrap_or_else(|e| e.into_inner());
         if r.closed {
@@ -216,7 +216,7 @@ impl Feed {
         st
     }
 
-    /// Para a thread e apaga o DAC. Idempotente; o `Drop` chama.
+    /// Stops the thread and blanks the DAC. Idempotent; `Drop` calls it.
     pub fn stop(&mut self) {
         self.shared.run.store(false, Ordering::Relaxed);
         {
@@ -244,7 +244,7 @@ fn run(mut dac: Box<dyn Dac>, sh: Arc<Shared>) {
     let (mut sent, mut errors) = (0u64, 0u64);
     let mut iv: Vec<f64> = Vec::with_capacity(JITTER_N);
     while sh.run.load(Ordering::Relaxed) {
-        // ---- pega o frame mais velho do ring, trocando o buffer (sem copiar, sem alocar)
+        // ---- take the oldest frame from the ring, swapping the buffer (no copy, no alloc)
         {
             let mut r = sh.ring.lock().unwrap_or_else(|e| e.into_inner());
             while r.len == 0 && !r.closed {
@@ -268,7 +268,7 @@ fn run(mut dac: Box<dyn Dac>, sh: Arc<Shared>) {
         }
         let (tf, safety) = *sh.params.lock().unwrap_or_else(|e| e.into_inner());
         tf.apply(&scratch, &mut work);
-        // SAFETY DO ENGINE: sempre, depois da transformacao (que pode encolher a figura).
+        // ENGINE SAFETY: always, after the transform (which may shrink the figure).
         safety.apply(&mut work);
         match dac.send(&work) {
             Ok(()) => {
@@ -302,9 +302,9 @@ fn run(mut dac: Box<dyn Dac>, sh: Arc<Shared>) {
     g.4 = iv;
 }
 
-// -------- CPU da propria thread. Mesmo padrao do bench/src/bin/throughput.rs.
-// ponytail: extern "system" direto, sem windows-sys por dois simbolos ; e o que o resto
-// do spellcore ja faz.
+// -------- CPU of the thread itself. Same pattern as bench/src/bin/throughput.rs.
+// ponytail: extern "system" directly, no windows-sys for two symbols ; it is what the rest
+// of spellcore already does.
 
 #[cfg(windows)]
 #[link(name = "kernel32")]
@@ -321,12 +321,13 @@ fn thread_cpu() -> Option<f64> {
             return None;
         }
     }
-    Some((k + u) as f64 * 1e-7) // FILETIME conta 100 ns
+    Some((k + u) as f64 * 1e-7) // FILETIME counts 100 ns
 }
 
 #[cfg(not(windows))]
 fn thread_cpu() -> Option<f64> {
-    // ponytail: campos 14/15 de /proc/self/task/<tid>/stat, tick fixo em 100 Hz ; igual ao bench
+    // ponytail: fields 14/15 of /proc/self/task/<tid>/stat, tick fixed at 100 Hz ; same as the
+    // bench
     let s = std::fs::read_to_string("/proc/thread-self/stat").ok()?;
     let f: Vec<&str> = s.rsplit(')').next()?.split_whitespace().collect();
     let ut: f64 = f.get(11)?.parse().ok()?;
@@ -340,7 +341,7 @@ mod tests {
     use crate::dac::etherdream::{Emulator, EtherDream};
 
     #[test]
-    fn transform_gira_escala_e_translada() {
+    fn transform_rotates_scales_and_translates() {
         let src = [Point::new(1000.0, 0.0, 200, 100, 50, false)];
         let mut out = Vec::new();
         Transform {
@@ -353,13 +354,13 @@ mod tests {
         .apply(&src, &mut out);
         assert_eq!((out[0].x, out[0].y), (5, 2000));
         assert_eq!((out[0].r, out[0].g, out[0].b), (200, 50, 0));
-        // identidade copia sem mexer
+        // identity copies without touching anything
         Transform::default().apply(&src, &mut out);
         assert_eq!(out[0], src[0]);
     }
 
     #[test]
-    fn ring_descarta_o_frame_velho() {
+    fn ring_drops_the_old_frame() {
         let emu = Emulator::start(1800).unwrap();
         emu.record(false);
         let dac = EtherDream::connect(&format!("127.0.0.1:{}", emu.port), 1800).unwrap();
@@ -373,19 +374,19 @@ mod tests {
         std::thread::sleep(Duration::from_millis(300));
         feed.stop();
         let st = feed.stats();
-        assert!(st.sent > 0, "nada foi enviado");
+        assert!(st.sent > 0, "nothing was sent");
         assert!(
             st.dropped > 0,
-            "o ring nao descartou nada com 200 frames de uma vez"
+            "the ring dropped nothing with 200 frames at once"
         );
         assert_eq!(st.errors, 0);
-        // todo frame ou saiu ou foi descartado; no maximo os 2 do ring ficam para tras
+        // every frame either went out or was dropped; at most the 2 in the ring are left behind
         let contados = st.sent + st.dropped;
         assert!((198..=200).contains(&contados), "sent+dropped = {contados}");
     }
 
     #[test]
-    fn safety_roda_antes_de_todo_envio() {
+    fn safety_runs_before_every_send() {
         let emu = Emulator::start(1800).unwrap();
         let dac = EtherDream::connect(&format!("127.0.0.1:{}", emu.port), 1800).unwrap();
         let mut feed = Feed::start(
@@ -399,7 +400,7 @@ mod tests {
             },
         )
         .unwrap();
-        // figura de 100 unidades: ganho 100/2000 -> 255 vira 12
+        // figure of 100 units: gain 100/2000 -> 255 becomes 12
         let pts: Vec<Point> = (0..50)
             .map(|i| Point::new(i as f64 * 2.0, 0.0, 255, 255, 255, false))
             .collect();
@@ -410,7 +411,7 @@ mod tests {
         assert_eq!(got.len(), 50);
         assert!(
             got.iter().all(|p| p.r == 12 * 257),
-            "safety nao escureceu: {:?}",
+            "safety did not darken: {:?}",
             got[0]
         );
     }

@@ -1,6 +1,6 @@
-// bench `map_bench`: pixel mapping de 100 000 pixels de um frame 1080p a 60 Hz.
-// Gate do PRD (secao 3): < 2 ms por frame. Sai com erro se o p99 estourar.
-// Saida ASCII pura (console cp1252).
+// bench `map_bench`: pixel mapping of 100 000 pixels from a 1080p frame at 60 Hz.
+// PRD gate (section 3): < 2 ms per frame. Exits with an error if the p99 goes over.
+// Pure ASCII output (cp1252 console).
 
 use pixelmap::{grid, Frame, Mapper, Order, Sampling};
 use std::time::Instant;
@@ -36,8 +36,8 @@ fn main() {
         Sampling::Nearest
     };
 
-    // Frame 1080p RGBA sintetico: gradiente + ruido, para nenhuma amostra cair sempre no
-    // mesmo valor e o cache nao ficar irrealmente quente.
+    // Synthetic 1080p RGBA frame: gradient + noise, so no sample always lands on the same
+    // value and the cache does not stay unrealistically warm.
     let mut px = vec![0u8; w as usize * h as usize * 4];
     for (i, b) in px.iter_mut().enumerate() {
         *b = ((i * 37 + i / 991) & 0xff) as u8;
@@ -45,7 +45,7 @@ fn main() {
     let frame = Frame::rgba(w, h, &px).unwrap();
 
     for _ in 0..30 {
-        m.render(&frame); // aquece o pool do rayon e o cache
+        m.render(&frame); // warms up the rayon pool and the cache
     }
 
     let mut ms: Vec<f64> = Vec::with_capacity(frames);
@@ -61,7 +61,7 @@ fn main() {
     let p99 = p(0.99);
 
     println!(
-        "map_bench {} px ({}x{}) em {} universos, frame {}x{} RGBA, {}, {} frames",
+        "map_bench {} px ({}x{}) in {} universes, frame {}x{} RGBA, {}, {} frames",
         m.pixels(),
         cols,
         rows,
@@ -72,7 +72,7 @@ fn main() {
         frames
     );
     println!(
-        "por frame: media={:.3}ms p50={:.3}ms p99={:.3}ms max={:.3}ms",
+        "per frame: mean={:.3}ms p50={:.3}ms p99={:.3}ms max={:.3}ms",
         media,
         p(0.5),
         p99,
@@ -80,8 +80,8 @@ fn main() {
     );
     let ok = p99 < 2.0;
     println!(
-        "alvo: p99 < 2.000ms por frame -> {}",
-        if ok { "OK" } else { "FALHA" }
+        "target: p99 < 2.000ms per frame -> {}",
+        if ok { "OK" } else { "FAIL" }
     );
     std::process::exit(if ok { 0 } else { 1 });
 }

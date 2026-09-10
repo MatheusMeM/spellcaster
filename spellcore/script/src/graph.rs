@@ -1,9 +1,9 @@
-//! Graph runtime da secao 10 do PRD: comportamento do show (o que cada botao, tecla, OSC,
-//! MIDI, timer ou marker faz), vivendo no `.spell` e rodando no engine com ou sem GUI.
+//! Graph runtime of section 10 of the PRD: show behavior (what each button, key, OSC, MIDI,
+//! timer or marker does), living in the `.spell` and running in the engine with or without GUI.
 //!
-//! Catalogo FECHADO. Pedido novo vira track, nao vira no.
+//! CLOSED catalog. A new request becomes a track, not a node.
 //!
-//! | tipo | config | pinos de entrada | pinos de saida |
+//! | type | config | input pins | output pins |
 //! |---|---|---|---|
 //! | `in.widget`      | `widget`                        | -            | `press` |
 //! | `in.key`         | `key`                           | -            | `down`  |
@@ -21,7 +21,7 @@
 //! | `logic.select`   | -                               | `a`,`b`,`sel`| `out`   |
 //! | `math.map`       | `in_min`,`in_max`,`out_min`,`out_max`,`clamp` | `in` | `out` |
 //! | `math.curve`     | `curve`, `c`                    | `in`         | `out`   |
-//! | `math.expr`      | `expr` (uma linha de Rhai, `a` e `b` no escopo) | `a`,`b` | `out` |
+//! | `math.expr`      | `expr` (one line of Rhai, `a` and `b` in scope) | `a`,`b` | `out` |
 //! | `time.delay`     | `ms`                            | `in`         | `out`   |
 //! | `time.hold`      | `ms`                            | `in`         | `out`   |
 //! | `cmd`            | `cmd`, `args`                   | `trigger`    | `done`  |
@@ -30,40 +30,43 @@
 //! | `out.param`      | `target`                        | `in`         | -       |
 //! | `out.notify`     | `text`                          | `in`         | -       |
 //! | `state`          | `group` ("main"), `initial`     | `enter`,`exit` | `active` |
-//! | `module`         | `module` (nome do `modules/<nome>.json`) | um por `parameter`, depois um por `command` | um por `value` |
+//! | `module`         | `module` (name of `modules/<name>.json`) | one per `parameter`, then one per `command` | one per `value` |
 //!
-//! Sinal e' `f64`; "ligado" e' `>= 0.5`; "borda de subida" e' passar de `< 0.5` para `>= 0.5`.
-//! Um no de entrada de EVENTO da' um pulso de UM frame com o valor recebido em
-//! `FrameHook::input`; `in.timer` e `in.state` valem por nivel.
+//! The signal is `f64`; "on" is `>= 0.5`; a "rising edge" is going from `< 0.5` to `>= 0.5`.
+//! An EVENT input node gives a ONE frame pulse with the value received in
+//! `FrameHook::input`; `in.timer` and `in.state` work by level.
 //!
-//! # Estado e mute (proposta desta rodada; ver `design/DECISOES.md`)
+//! # State and mute (proposal of this round; see `design/DECISOES.md`)
 //!
-//! Qualquer no aceita duas chaves a mais: `"mute": true` (o no nao emite) e
-//! `"state": "<id de um no state>"` (o no so' emite enquanto aquele estado esta' ativo).
-//! "Nao emite" e' a mesma coisa nos dois casos: as saidas do no ficam em 0, nenhum `Ev` sai e o
-//! `time.delay` pendente e' cancelado. Ao voltar, o no volta como estava (o `q` do toggle e do
-//! latch, o `n` do counter), com as bordas zeradas e o proximo valor de uma saida de NIVEL
-//! (`out.osc`, `out.param`, `out.widget`, `module`) reemitido: e' o "reemitir ao ativar" do
-//! Chataigne. Trigger que ja' esteja alto no frame em que o estado abre dispara uma vez.
+//! Any node accepts two extra keys: `"mute": true` (the node does not emit) and
+//! `"state": "<id of a state node>"` (the node only emits while that state is active).
+//! "Does not emit" is the same thing in both cases: the node outputs stay at 0, no `Ev` goes
+//! out and the pending `time.delay` is cancelled. On return the node comes back as it was (the
+//! `q` of the toggle and of the latch, the `n` of the counter), with the edges zeroed and the
+//! next value of a LEVEL output (`out.osc`, `out.param`, `out.widget`, `module`) re-emitted:
+//! it is Chataigne's "re-emit on activation". A trigger already high on the frame the state
+//! opens fires once.
 //!
-//! `state` e' UM ativo por `group`: pulso em `enter` liga este e desliga os outros do mesmo
-//! grupo; pulso em `exit` desliga; `reset()` volta ao `initial`. No `state` calado tambem nao
-//! emite: o `active` dele sai 0, ainda que a maquina guarde o estado por dentro.
-// ponytail: o estado vale a partir do ponto em que o no `state` e' avaliado, entao um no gated
-// que venha ANTES dele na ordem topologica ve o valor do frame anterior ; virar pre-passe so' dos
-// nos `state` se algum show real depender do frame exato.
+//! `state` is ONE active per `group`: a pulse on `enter` turns this one on and the others of
+//! the same group off; a pulse on `exit` turns it off; `reset()` goes back to `initial`. A
+//! silenced `state` node does not emit either: its `active` comes out 0, even though the
+//! machine keeps the state internally.
+// ponytail: the state applies from the point where the `state` node is evaluated, so a gated
+// node that comes BEFORE it in the topological order sees the previous frame value ; make it a
+// pre-pass of the `state` nodes only if some real show depends on the exact frame.
 //!
-//! `module` e' o app declarado em `modules/<nome>.json`, lido por `engine::module::load` (a mesma
-//! pasta e o mesmo `Module` tipado dos comandos `module_*`; o graph nao tem leitor proprio).
-//! Cada `parameter` NUMERICO e' uma ENTRADA: valor mudou -> `Ev::Param{target:"<modulo>/<path>"}`, com
-//! `norm` mapeando o sinal 0..1 para `[n0,n1]` antes do clamp em `min`..`max`. Cada `value` e' uma
-//! SAIDA de nivel alimentada por `FrameHook::input("module:<modulo>/<path>", v)`. Cada `command`
-//! e' uma entrada de trigger -> `Ev::Cmd{name:"<modulo>/<cmd>", args:{}}`. Parametro `enum` ou
-//! `string` NAO vira pino: `Ev::Param` carrega `f64`.
+//! `module` is the app declared in `modules/<name>.json`, read by `engine::module::load` (the
+//! same folder and the same typed `Module` of the `module_*` commands; the graph has no reader
+//! of its own). Each NUMERIC `parameter` is an INPUT: the value changed ->
+//! `Ev::Param{target:"<module>/<path>"}`, with `norm` mapping the 0..1 signal to `[n0,n1]`
+//! before the clamp into `min`..`max`. Each `value` is a level OUTPUT fed by
+//! `FrameHook::input("module:<module>/<path>", v)`. Each `command` is a trigger input ->
+//! `Ev::Cmd{name:"<module>/<cmd>", args:{}}`. An `enum` or `string` parameter does NOT become
+//! a pin: `Ev::Param` carries an `f64`.
 //!
-//! JSON: `{"nodes":[{"id","type",...}], "edges":[["no.pino","no.pino"], ...]}`.
-//! Compila para uma lista de nos em ordem topologica com os pinos indexados por INTEIRO
-//! (nenhum lookup por texto no caminho quente). Ciclo e' erro na compilacao.
+//! JSON: `{"nodes":[{"id","type",...}], "edges":[["node.pin","node.pin"], ...]}`.
+//! Compiles to a list of nodes in topological order with the pins indexed by INTEGER
+//! (no text lookup on the hot path). A cycle is a compilation error.
 
 use engine::hook::{Ev, EventSink, FrameHook};
 use engine::module::Module;
@@ -73,17 +76,19 @@ use serde_json::Value;
 use std::collections::{HashMap, VecDeque};
 use std::path::Path;
 
-/// Fila de eventos de entrada e de saida, pre-alocadas.
-// ponytail: 64 eventos por frame em cada sentido ; um GO e um OSC por frame estao a ordens de
-// grandeza disso. Sobe quando algum graph real encostar no teto (o contador `perdidos` avisa).
+/// Input and output event queues, pre-allocated.
+// ponytail: 64 events per frame in each direction ; one GO and one OSC per frame are orders of
+// magnitude below that. Raise it when some real graph touches the ceiling (the `perdidos`
+// counter warns).
 const FILA: usize = 64;
 
-/// Pendencias de `time.delay`.
-// ponytail: 8 mudancas em voo por no de delay ; virar fila dinamica se um graph real estourar.
+/// Pending items of `time.delay`.
+// ponytail: 8 changes in flight per delay node ; make it a dynamic queue if a real graph
+// overflows it.
 const DELAY_N: usize = 8;
 
 enum Kind {
-    /// in.widget / in.key / in.osc / in.midi / in.marker: o valor chega pela fila.
+    /// in.widget / in.key / in.osc / in.midi / in.marker: the value arrives through the queue.
     Evento,
     Timer {
         every: f64,
@@ -169,20 +174,20 @@ enum Kind {
         txt: String,
         p: f64,
     },
-    /// Maquina de estados: `i` e' o indice deste estado em `Graph::estados`.
+    /// State machine: `i` is the index of this state in `Graph::estados`.
     Estado {
         i: usize,
         pe: f64,
         px: f64,
     },
-    /// App declarado: uma entrada por parameter, depois uma por command; uma saida por value.
+    /// Declared app: one input per parameter, then one per command; one output per value.
     Modulo {
         params: Vec<Par>,
         cmds: Vec<(String, f64)>,
     },
 }
 
-/// Um `parameter` de um no `module`, ja' resolvido para o caminho quente.
+/// A `parameter` of a `module` node, already resolved for the hot path.
 struct Par {
     alvo: String,
     norm: Option<(f64, f64)>,
@@ -197,15 +202,16 @@ struct No {
     base: usize,
     nin: usize,
     nout: usize,
-    /// `"mute": true` no JSON: o no nao emite.
+    /// `"mute": true` in the JSON: the node does not emit.
     mute: bool,
-    /// `"state": "<id>"` no JSON: indice em `Graph::estados` do estado que libera este no.
+    /// `"state": "<id>"` in the JSON: index in `Graph::estados` of the state that enables this
+    /// node.
     estado: Option<usize>,
-    /// arestas que CHEGAM neste no: (slot de origem, slot de destino)
+    /// edges that ARRIVE at this node: (source slot, destination slot)
     ins: Vec<(usize, usize)>,
 }
 
-/// Pinos de entrada e de saida de cada tipo do catalogo.
+/// Input and output pins of each type in the catalog.
 fn pinos(t: &str) -> Option<(&'static [&'static str], &'static [&'static str])> {
     Some(match t {
         "in.widget" => (&[], &["press"]),
@@ -221,16 +227,17 @@ fn pinos(t: &str) -> Option<(&'static [&'static str], &'static [&'static str])> 
         "cmd" => (&["trigger"], &["done"]),
         "out.widget" | "out.osc" | "out.param" | "out.notify" => (&["in"], &[]),
         "state" => (&["enter", "exit"], &["active"]),
-        // "module": pinos vem do modules/<nome>.json, resolvidos em `pinos_no`
+        // "module": pins come from modules/<name>.json, resolved in `pinos_no`
         "module" => (&[], &[]),
         _ => return None,
     })
 }
 
-/// `modules/<nome>.json` do show, pela mesma regra de `profiles/` e `faces/`: o `engine` resolve
-/// a pasta e le o manifesto tipado; o graph nao tem leitor proprio de module.json.
-// ponytail: `base_dir` e' o diretorio do show, e `recurso_dir` quer o caminho do .spell ; o nome
-// sintetico so' existe para dar a ele o pai certo — some quando o Graph receber o .spell.
+/// The show's `modules/<name>.json`, by the same rule as `profiles/` and `faces/`: the `engine`
+/// resolves the folder and reads the typed manifest; the graph has no module.json reader.
+// ponytail: `base_dir` is the show directory, and `recurso_dir` wants the .spell path ; the
+// synthetic name only exists to give it the right parent - it goes away when the Graph gets
+// the .spell.
 fn carrega_modulo(base: &Path, nome: &str) -> Result<Module, String> {
     let spell = base.join("show.spell");
     let dir = engine::module::modules_dir(&spell.to_string_lossy());
@@ -238,16 +245,16 @@ fn carrega_modulo(base: &Path, nome: &str) -> Result<Module, String> {
         .map_err(|e| format!("module {nome:?}: {e}"))
 }
 
-/// Parametros que viram pino: so' os numericos.
-// ponytail: pino so' numerico ; enum/string entram quando `Ev::Param` carregar `Value`.
+/// Parameters that become pins: only the numeric ones.
+// ponytail: numeric pins only ; enum/string come in when `Ev::Param` carries a `Value`.
 fn params_num(m: &Module) -> impl Iterator<Item = (&String, &engine::module::Param)> {
     m.parameters
         .iter()
         .filter(|(_, p)| p.r#type != "enum" && p.r#type != "string")
 }
 
-/// Pinos deste no. Iguais aos do tipo, menos `module`, que os tira do manifesto (`BTreeMap`:
-/// a ordem das chaves e' estavel, e o layout dos slots depende dela).
+/// Pins of this node. The same as the type's, except `module`, which takes them from the
+/// manifest (`BTreeMap`: the key order is stable, and the slot layout depends on it).
 fn pinos_no(tipo: &str, m: Option<&Module>) -> (Vec<String>, Vec<String>) {
     match m {
         Some(m) => {
@@ -277,7 +284,7 @@ fn b(n: &Value, k: &str, pad: bool) -> bool {
     n.get(k).and_then(|v| v.as_bool()).unwrap_or(pad)
 }
 
-/// Chave de evento que este no escuta ("widget:go", "key:Space", ...), se for no de evento.
+/// Event key this node listens to ("widget:go", "key:Space", ...), if it is an event node.
 fn chave(tipo: &str, n: &Value) -> Option<String> {
     Some(match tipo {
         "in.widget" => format!("widget:{}", txt(n, "widget", "")),
@@ -294,7 +301,7 @@ fn monta(
     n: &Value,
     rhai: &mut Option<(Rhai, Scope<'static>)>,
     m: Option<&Module>,
-    // se este no E' um `state`, o indice dele em `Graph::estados`
+    // if this node IS a `state`, its index in `Graph::estados`
     meu: Option<usize>,
 ) -> Result<Kind, String> {
     Ok(match tipo {
@@ -309,11 +316,11 @@ fn monta(
                 uni: f(n, "universe", 1.0) as u16,
                 addr: (f(n, "address", 1.0) as u16).clamp(1, 512),
             },
-            // ponytail: in.state so' le "t" e um canal DMX dos Universes do frame ; cue,
-            // fixture e o resto entram quando o FrameHook receber o Handle do player.
+            // ponytail: in.state only reads "t" and a DMX channel from the frame Universes ;
+            // cue, fixture and the rest come in when the FrameHook receives the player Handle.
             o => {
                 return Err(format!(
-                    "in.state: \"what\" desconhecido: {o} (use \"t\" ou \"dmx\")"
+                    "in.state: unknown \"what\": {o} (use \"t\" or \"dmx\")"
                 ))
             }
         },
@@ -422,8 +429,9 @@ fn monta(
                 .map(|(k, p)| Par {
                     alvo: format!("{nome}/{k}"),
                     norm: p.norm.map(|a| (a[0], a[1])),
-                    // ponytail: sem min/max declarados o clamp e' identidade ; parametro sem
-                    // faixa e' o caso do app que ainda nao mediu o proprio limite.
+                    // ponytail: with no min/max declared the clamp is the identity ; a
+                    // parameter without a range is the app that has not measured its own
+                    // limit yet.
                     min: p.min.unwrap_or(f64::NEG_INFINITY),
                     max: p.max.unwrap_or(f64::INFINITY),
                     ult: f64::NAN,
@@ -436,38 +444,38 @@ fn monta(
                 .collect();
             Kind::Modulo { params, cmds }
         }
-        _ => return Err(format!("tipo fora do catalogo: {tipo}")),
+        _ => return Err(format!("type outside the catalog: {tipo}")),
     })
 }
 
 pub struct Graph {
     nos: Vec<No>,
     vals: Vec<f64>,
-    /// "widget:go" / "module:laser/geo/scale" -> slots que essa chave alimenta
+    /// "widget:go" / "module:laser/geo/scale" -> slots this key feeds
     por_chave: HashMap<String, Vec<usize>>,
-    /// slots de saida dos nos de evento: zerados no inicio de cada frame (pulso de 1 frame)
+    /// output slots of the event nodes: zeroed at the start of each frame (1-frame pulse)
     ev_slots: Vec<usize>,
     inq: Vec<(usize, f64)>,
     outq: Vec<Ev>,
     sink: Box<dyn EventSink>,
     perdidos: u64,
     rhai: Option<(Rhai, Scope<'static>)>,
-    /// um por no `state`: ativo agora
+    /// one per `state` node: active now
     estados: Vec<bool>,
-    /// grupo (internado) de cada estado, e o `initial` a que `reset()` volta
+    /// (interned) group of each state, and the `initial` that `reset()` goes back to
     grupos: Vec<usize>,
     iniciais: Vec<bool>,
-    /// por estado: slot do pino `active` e indice do no `state` em `nos`
+    /// per state: slot of the `active` pin and index of the `state` node in `nos`
     est_slots: Vec<(usize, usize)>,
 }
 
 impl Graph {
-    /// Sem diretorio de show: nenhum no `module` pode ser resolvido.
+    /// With no show directory: no `module` node can be resolved.
     pub fn new(spec: &Value, sink: Box<dyn EventSink>) -> Result<Graph, String> {
         Graph::new_in(spec, sink, Path::new("."))
     }
 
-    /// `base` e' o diretorio do show: `module` le `base/modules/<nome>.json`.
+    /// `base` is the show directory: `module` reads `base/modules/<name>.json`.
     pub fn new_in(
         spec: &Value,
         sink: Box<dyn EventSink>,
@@ -476,31 +484,31 @@ impl Graph {
         let brutos = spec
             .get("nodes")
             .and_then(|v| v.as_array())
-            .ok_or_else(|| "graph sem \"nodes\"".to_string())?;
+            .ok_or_else(|| "graph without \"nodes\"".to_string())?;
         let n = brutos.len();
         let mut idx: HashMap<&str, usize> = HashMap::with_capacity(n);
         let mut tipos: Vec<&str> = Vec::with_capacity(n);
-        // um por no `state`, em ordem de arquivo
+        // one per `state` node, in file order
         let mut est_de_id: HashMap<&str, usize> = HashMap::new();
         let mut grupos: Vec<usize> = Vec::new();
         let mut declarados: Vec<bool> = Vec::new();
         let mut nomes_grupo: HashMap<String, usize> = HashMap::new();
-        // module.json de cada no `module`, lido uma vez
+        // module.json of each `module` node, read once
         let mut mods: HashMap<usize, Module> = HashMap::new();
         for (i, no) in brutos.iter().enumerate() {
             let id = no
                 .get("id")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| format!("no {i} sem \"id\""))?;
+                .ok_or_else(|| format!("node {i} without \"id\""))?;
             let tipo = no
                 .get("type")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| format!("no {id:?} sem \"type\""))?;
+                .ok_or_else(|| format!("node {id:?} without \"type\""))?;
             if pinos(tipo).is_none() {
-                return Err(format!("no {id:?}: tipo fora do catalogo: {tipo}"));
+                return Err(format!("node {id:?}: type outside the catalog: {tipo}"));
             }
             if idx.insert(id, i).is_some() {
-                return Err(format!("id repetido no graph: {id:?}"));
+                return Err(format!("duplicate id in the graph: {id:?}"));
             }
             if tipo == "state" {
                 let g = txt(no, "group", "main");
@@ -519,7 +527,7 @@ impl Graph {
         }
         let pinos_de: Vec<(Vec<String>, Vec<String>)> =
             (0..n).map(|i| pinos_no(tipos[i], mods.get(&i))).collect();
-        // um ativo por grupo tambem na carga: o ultimo `initial` do grupo ganha
+        // one active per group at load time too: the last `initial` of the group wins
         let mut venc: Vec<Option<usize>> = vec![None; nomes_grupo.len()];
         for (i, &d) in declarados.iter().enumerate() {
             if d {
@@ -528,52 +536,53 @@ impl Graph {
         }
         let mut estados = vec![false; grupos.len()];
         venc.iter().flatten().for_each(|&i| estados[i] = true);
-        let iniciais = estados.clone(); // ja' com a exclusao aplicada: e' onde `reset()` volta
-                                        // `"state": "<id>"` de cada no, resolvido para o indice do estado
+        // already with the exclusion applied: it is where `reset()` goes back to
+        let iniciais = estados.clone();
+        // `"state": "<id>"` of each node, resolved to the state index
         let mut gated: Vec<Option<usize>> = Vec::with_capacity(n);
         for no in brutos.iter() {
             gated.push(match no.get("state").and_then(|v| v.as_str()) {
                 None => None,
                 Some(s) => Some(*est_de_id.get(s).ok_or_else(|| {
                     format!(
-                        "no {:?}: \"state\": {s:?} nao e' um no do tipo state",
+                        "node {:?}: \"state\": {s:?} is not a node of type state",
                         no["id"].as_str().unwrap_or("?")
                     )
                 })?),
             });
         }
 
-        // arestas: "no.pino" -> "no.pino", resolvidas para (no, pino) inteiros
+        // edges: "node.pin" -> "node.pin", resolved to integer (node, pin)
         let vazio = Vec::new();
         let brutas = match spec.get("edges") {
             None => &vazio,
             Some(v) => v
                 .as_array()
-                .ok_or_else(|| "\"edges\" nao e' lista".to_string())?,
+                .ok_or_else(|| "\"edges\" is not a list".to_string())?,
         };
         let mut arestas: Vec<(usize, usize, usize, usize)> = Vec::with_capacity(brutas.len());
         for a in brutas {
             let par = a
                 .as_array()
                 .filter(|p| p.len() == 2)
-                .ok_or_else(|| format!("aresta {a} nao e' [\"no.pino\", \"no.pino\"]"))?;
+                .ok_or_else(|| format!("edge {a} is not [\"node.pin\", \"node.pin\"]"))?;
             let lado = |s: &Value, saida: bool| -> Result<(usize, usize), String> {
                 let s = s
                     .as_str()
-                    .ok_or_else(|| format!("aresta {a}: pino nao e' texto"))?;
+                    .ok_or_else(|| format!("edge {a}: pin is not text"))?;
                 let (no, pino) = s
                     .rsplit_once('.')
-                    .ok_or_else(|| format!("pino {s:?} sem ponto (use \"no.pino\")"))?;
+                    .ok_or_else(|| format!("pin {s:?} without a dot (use \"node.pin\")"))?;
                 let i = *idx
                     .get(no)
-                    .ok_or_else(|| format!("aresta {a}: no {no:?} nao existe"))?;
+                    .ok_or_else(|| format!("edge {a}: node {no:?} does not exist"))?;
                 let (ins, outs) = &pinos_de[i];
                 let lista = if saida { outs } else { ins };
                 let p = lista.iter().position(|x| *x == pino).ok_or_else(|| {
                     format!(
-                        "no {no:?} ({}) nao tem pino de {} {pino:?}; tem {lista:?}",
+                        "node {no:?} ({}) has no {} pin {pino:?}; it has {lista:?}",
                         tipos[i],
-                        if saida { "saida" } else { "entrada" }
+                        if saida { "output" } else { "input" }
                     )
                 })?;
                 Ok((i, p))
@@ -583,7 +592,7 @@ impl Graph {
             arestas.push((si, sp, di, dp));
         }
 
-        // ordem topologica (Kahn, fila em ordem de arquivo: saida deterministica)
+        // topological order (Kahn, queue in file order: deterministic output)
         let mut grau = vec![0usize; n];
         let mut adj: Vec<Vec<usize>> = vec![Vec::new(); n];
         for &(s, _, d, _) in &arestas {
@@ -607,16 +616,16 @@ impl Graph {
                 .map(|i| brutos[i]["id"].as_str().unwrap_or("?"))
                 .collect();
             return Err(format!(
-                "ciclo no graph, entre os nos: {}",
+                "cycle in the graph, among the nodes: {}",
                 presos.join(", ")
             ));
         }
-        let mut topo = vec![0usize; n]; // indice de arquivo -> indice topologico
+        let mut topo = vec![0usize; n]; // file index -> topological index
         for (k, &i) in ordem.iter().enumerate() {
             topo[i] = k;
         }
 
-        // slots: cada no ocupa nin + nout posicoes consecutivas em `vals`
+        // slots: each node takes nin + nout consecutive positions in `vals`
         let mut rhai = None;
         let mut nos: Vec<No> = Vec::with_capacity(n);
         let mut base = 0usize;
@@ -644,7 +653,7 @@ impl Graph {
                 est_slots[e] = (base + ins.len(), nos.len());
             }
             if tipos[i] == "module" {
-                // uma SAIDA de nivel por value, alimentada por `input("module:<mod>/<path>")`
+                // one level OUTPUT per value, fed by `input("module:<mod>/<path>")`
                 let nome = txt(&brutos[i], "module", "");
                 for (j, val) in outs.iter().enumerate() {
                     let k = format!("module:{nome}/{val}");
@@ -690,10 +699,10 @@ impl Graph {
         self.nos.len()
     }
 
-    /// Reescreve o pino `active` de cada estado: a exclusao de grupo pode acontecer depois do no
-    /// `state` ter sido avaliado. No `state` calado (`mute`, ou ele proprio dentro de um estado
-    /// inativo) nao emite: o `active` dele fica no 0 que o gate escreveu, ainda que a maquina
-    /// continue guardando o estado por dentro.
+    /// Rewrites the `active` pin of each state: the group exclusion can happen after the `state`
+    /// node has been evaluated. A silenced `state` node (`mute`, or itself inside an inactive
+    /// state) does not emit: its `active` stays at the 0 the gate wrote, even though the machine
+    /// keeps holding the state internally.
     fn ativos(&mut self) {
         for i in 0..self.est_slots.len() {
             let (s, k) = self.est_slots[i];
@@ -718,7 +727,7 @@ fn subiu(v: f64, p: &mut f64) -> bool {
 
 impl FrameHook for Graph {
     fn frame(&mut self, t: f64, uni: &mut Universes) {
-        // 1. pulso de um frame: zera as saidas dos nos de evento e aplica a fila
+        // 1. one-frame pulse: zeroes the outputs of the event nodes and applies the queue
         for &s in &self.ev_slots {
             self.vals[s] = 0.0;
         }
@@ -727,7 +736,7 @@ impl FrameHook for Graph {
         }
         self.inq.clear();
 
-        // 2. nos em ordem topologica; nenhuma alocacao aqui (so' Ev, e evento e' raro)
+        // 2. nodes in topological order; no allocation here (only Ev, and an event is rare)
         for k in 0..self.nos.len() {
             let No {
                 id,
@@ -744,7 +753,7 @@ impl FrameHook for Graph {
             }
             let b = *base;
             let o = b + *nin;
-            // mute ou estado inativo: saidas em 0, nenhum Ev, delay pendente cancelado
+            // mute or inactive state: outputs at 0, no Ev, pending delay cancelled
             if *mute || estado.is_some_and(|i| !self.estados[i]) {
                 for s in o..o + *nout {
                     self.vals[s] = 0.0;
@@ -777,7 +786,7 @@ impl FrameHook for Graph {
                         *q = 1.0;
                     }
                     if lig(self.vals[b + 1]) {
-                        *q = 0.0; // reset ganha do set
+                        *q = 0.0; // reset wins over set
                     }
                     self.vals[o] = *q;
                 }
@@ -834,7 +843,7 @@ impl FrameHook for Graph {
                 Kind::Expr { ast, avisou } => {
                     let (a, bb) = (self.vals[b], self.vals[b + 1]);
                     if let Some((eng, sc)) = self.rhai.as_mut() {
-                        // escopo de 2 entradas: get_mut e' comparacao de nome, sem alocar
+                        // scope of 2 inputs: get_mut is a name comparison, no allocation
                         if let Some(d) = sc.get_mut("a") {
                             *d = Dynamic::from(a);
                         }
@@ -863,7 +872,7 @@ impl FrameHook for Graph {
                             fila[*n] = (t + *d, v);
                             *n += 1;
                         } else {
-                            *ult = v; // fila cheia: aplica na hora em vez de perder o sinal
+                            *ult = v; // queue full: apply now instead of losing the signal
                         }
                     }
                     let mut i = 0;
@@ -961,7 +970,7 @@ impl FrameHook for Graph {
                     if subiu(self.vals[b], pe) {
                         for j in 0..self.estados.len() {
                             if self.grupos[j] == self.grupos[i] {
-                                self.estados[j] = false; // um ativo por grupo
+                                self.estados[j] = false; // one active per group
                             }
                         }
                         self.estados[i] = true;
@@ -1001,10 +1010,10 @@ impl FrameHook for Graph {
             }
         }
 
-        // 3. o pino `active` guarda o estado do FIM do frame
+        // 3. the `active` pin holds the state at the END of the frame
         self.ativos();
 
-        // 4. drena as saidas para o mundo
+        // 4. drains the outputs to the world
         for e in &self.outq {
             self.sink.emit(e);
         }
@@ -1029,8 +1038,8 @@ impl FrameHook for Graph {
         self.outq.clear();
         self.estados.copy_from_slice(&self.iniciais);
         self.ativos();
-        // reset = silenciar (bordas, delay pendente, saidas de nivel) mais o VALOR guardado,
-        // que o silencio preserva de proposito
+        // reset = silence (edges, pending delay, level outputs) plus the stored VALUE, which
+        // the silencing preserves on purpose
         for no in self.nos.iter_mut() {
             silencia(&mut no.kind);
             match &mut no.kind {
@@ -1044,9 +1053,10 @@ impl FrameHook for Graph {
     }
 }
 
-/// Silencia um no (mute ou estado inativo). Cancela o delay pendente, zera as bordas e faz a
-/// proxima saida de NIVEL ser reemitida ao voltar. O valor guardado (`q` do toggle e do latch, `n`
-/// do counter) fica: o no volta como estava, so' nao emitiu enquanto esteve fora.
+/// Silences a node (mute or inactive state). Cancels the pending delay, zeroes the edges and
+/// makes the next LEVEL output be re-emitted on return. The stored value (`q` of the toggle and
+/// of the latch, `n` of the counter) stays: the node comes back as it was, it just did not emit
+/// while it was out.
 fn silencia(k: &mut Kind) {
     match k {
         Kind::Toggle { p, .. } | Kind::Debounce { p, .. } | Kind::Cmd { p, .. } => *p = 0.0,
@@ -1085,7 +1095,7 @@ fn silencia(k: &mut Kind) {
     }
 }
 
-/// Enfileira um evento de saida. Fila cheia nao cresce: conta em `perdidos`.
+/// Enqueues an output event. A full queue does not grow: it counts into `perdidos`.
 fn emite(outq: &mut Vec<Ev>, perdidos: &mut u64, e: Ev) {
     if outq.len() < FILA {
         outq.push(e);
@@ -1102,7 +1112,7 @@ fn b2f(b: bool) -> f64 {
 mod tests {
     use super::*;
 
-    /// Sink de teste: guarda os eventos num Vec compartilhado.
+    /// Test sink: keeps the events in a shared Vec.
     #[derive(Clone, Default)]
     struct Sink(std::sync::Arc<std::sync::Mutex<Vec<Ev>>>);
 
@@ -1118,21 +1128,21 @@ mod tests {
             &serde_json::from_str::<Value>(j).unwrap(),
             Box::new(s.clone()),
         )
-        .expect("compila");
+        .expect("compiles");
         (g, s)
     }
 
     #[test]
-    fn logica_or_latch_toggle_e_not() {
+    fn logic_or_latch_toggle_and_not() {
         let (mut g, _) = monta_graph(
             r#"{"nodes":[{"id":"go","type":"in.widget","widget":"go"},
                          {"id":"k","type":"in.key","key":"Space"},
                          {"id":"any","type":"logic.or"},
                          {"id":"tg","type":"logic.toggle"},
-                         {"id":"nao","type":"logic.not"},
+                         {"id":"inv","type":"logic.not"},
                          {"id":"lt","type":"logic.latch"}],
                 "edges":[["go.press","any.a"],["k.down","any.b"],["any.out","tg.in"],
-                         ["tg.out","nao.in"],["any.out","lt.set"],["k.down","lt.reset"]]}"#,
+                         ["tg.out","inv.in"],["any.out","lt.set"],["k.down","lt.reset"]]}"#,
         );
         let mut u = Universes::new();
         let saida = |g: &Graph, id: &str| -> f64 {
@@ -1145,21 +1155,21 @@ mod tests {
         g.frame(0.1, &mut u);
         assert_eq!(saida(&g, "any"), 1.0);
         assert_eq!(saida(&g, "tg"), 1.0);
-        assert_eq!(saida(&g, "nao"), 0.0);
+        assert_eq!(saida(&g, "inv"), 0.0);
         assert_eq!(saida(&g, "lt"), 1.0);
-        g.frame(0.2, &mut u); // o pulso dura um frame; o toggle segura
+        g.frame(0.2, &mut u); // the pulse lasts one frame; the toggle holds
         assert_eq!(saida(&g, "any"), 0.0);
         assert_eq!(saida(&g, "tg"), 1.0);
         g.input("widget:go", 1.0);
         g.frame(0.3, &mut u);
-        assert_eq!(saida(&g, "tg"), 0.0, "segunda borda desliga o toggle");
+        assert_eq!(saida(&g, "tg"), 0.0, "the second edge turns the toggle off");
         g.input("key:Space", 1.0);
         g.frame(0.4, &mut u);
-        assert_eq!(saida(&g, "lt"), 0.0, "reset ganha do set");
+        assert_eq!(saida(&g, "lt"), 0.0, "reset wins over set");
     }
 
     #[test]
-    fn math_map_curve_e_expr() {
+    fn math_map_curve_and_expr() {
         let (mut g, _) = monta_graph(
             r#"{"nodes":[{"id":"t","type":"in.state","what":"t"},
                          {"id":"m","type":"math.map","in_min":0,"in_max":10,"out_min":0,"out_max":255},
@@ -1174,14 +1184,14 @@ mod tests {
             g.vals[g.nos[k].base + g.nos[k].nin]
         };
         assert!((v(&g, "m") - 12.75).abs() < 1e-12);
-        assert!((v(&g, "c") - 0.5).abs() < 1e-12); // inout em 0,5 = 0,5
+        assert!((v(&g, "c") - 0.5).abs() < 1e-12); // inout at 0.5 = 0.5
         assert!((v(&g, "e") - 2.0).abs() < 1e-12);
         g.frame(20.0, &mut u);
-        assert_eq!(v(&g, "m"), 255.0, "map com clamp");
+        assert_eq!(v(&g, "m"), 255.0, "map with clamp");
     }
 
     #[test]
-    fn time_delay_e_hold() {
+    fn time_delay_and_hold() {
         let (mut g, _) = monta_graph(
             r#"{"nodes":[{"id":"go","type":"in.widget","widget":"go"},
                          {"id":"d","type":"time.delay","ms":300},
@@ -1195,27 +1205,27 @@ mod tests {
         };
         g.input("widget:go", 1.0);
         g.frame(0.0, &mut u);
-        assert_eq!(v(&g, "d"), 0.0, "o delay ainda nao venceu");
+        assert_eq!(v(&g, "d"), 0.0, "the delay has not fired yet");
         assert_eq!(v(&g, "h"), 1.0);
         g.frame(0.2, &mut u);
         assert_eq!(v(&g, "d"), 0.0);
         assert_eq!(v(&g, "h"), 1.0);
         g.frame(0.31, &mut u);
-        assert_eq!(v(&g, "d"), 1.0, "300 ms depois o delay solta");
-        assert_eq!(v(&g, "h"), 0.0, "e o hold ja' caiu");
+        assert_eq!(v(&g, "d"), 1.0, "300 ms later the delay releases");
+        assert_eq!(v(&g, "h"), 0.0, "and the hold has already dropped");
     }
 
     #[test]
-    fn cmd_e_saidas_emitem_no_sink() {
+    fn cmd_and_outputs_emit_into_the_sink() {
         let (mut g, s) = monta_graph(
             r#"{"nodes":[{"id":"go","type":"in.widget","widget":"go"},
                          {"id":"next","type":"cmd","cmd":"cue_go","args":{"index":3}},
                          {"id":"flash","type":"out.widget","widget":"go","prop":"glow","hold_ms":300},
-                         {"id":"eco","type":"out.osc","address":"/spell/go"},
-                         {"id":"aviso","type":"out.notify","text":"GO"},
+                         {"id":"echo","type":"out.osc","address":"/spell/go"},
+                         {"id":"notice","type":"out.notify","text":"GO"},
                          {"id":"par","type":"out.param","target":"par1.dim"}],
                 "edges":[["go.press","next.trigger"],["next.done","flash.in"],
-                         ["next.done","eco.in"],["next.done","aviso.in"],["next.done","par.in"]]}"#,
+                         ["next.done","echo.in"],["next.done","notice.in"],["next.done","par.in"]]}"#,
         );
         let mut u = Universes::new();
         g.frame(0.0, &mut u);
@@ -1241,7 +1251,7 @@ mod tests {
             target: "par1.dim".into(),
             value: 1.0
         }));
-        // o glow do out.widget apaga sozinho depois do hold_ms
+        // the out.widget glow turns itself off after hold_ms
         s.0.lock().unwrap().clear();
         g.frame(0.5, &mut u);
         assert!(s.0.lock().unwrap().contains(&Ev::Widget {
@@ -1252,15 +1262,16 @@ mod tests {
     }
 
     #[test]
-    fn ordem_topologica_avalia_a_cadeia_em_um_frame() {
-        // no arquivo os nos vem de tras para a frente: so' a ordem topologica resolve em 1 frame
+    fn topological_order_evaluates_the_chain_in_one_frame() {
+        // in the file the nodes come back to front: only the topological order solves it in one
+        // frame
         let (mut g, _) = monta_graph(
             r#"{"nodes":[{"id":"c","type":"math.expr","expr":"a + 1.0"},
                          {"id":"b","type":"math.expr","expr":"a + 1.0"},
                          {"id":"a","type":"in.state","what":"t"}],
                 "edges":[["a.out","b.a"],["b.out","c.a"]]}"#,
         );
-        assert_eq!(g.nos[0].id, "a", "o no sem entrada vem primeiro");
+        assert_eq!(g.nos[0].id, "a", "the node with no input comes first");
         let mut u = Universes::new();
         g.frame(1.0, &mut u);
         let k = g.nos.iter().position(|n| n.id == "c").unwrap();
@@ -1268,11 +1279,11 @@ mod tests {
     }
 
     #[test]
-    fn ciclo_e_erro_com_os_nos_presos() {
+    fn a_cycle_is_an_error_with_the_stuck_nodes() {
         let e = Graph::new(
             &serde_json::from_str::<Value>(
                 r#"{"nodes":[{"id":"a","type":"logic.not"},{"id":"b","type":"logic.not"},
-                             {"id":"solto","type":"in.key","key":"X"}],
+                             {"id":"loose","type":"in.key","key":"X"}],
                     "edges":[["a.out","b.in"],["b.out","a.in"]]}"#,
             )
             .unwrap(),
@@ -1280,43 +1291,43 @@ mod tests {
         );
         let e = match e {
             Err(e) => e,
-            Ok(_) => panic!("ciclo tinha que ser erro"),
+            Ok(_) => panic!("a cycle had to be an error"),
         };
         assert!(
-            e.contains("ciclo") && e.contains('a') && e.contains('b'),
+            e.contains("cycle") && e.contains('a') && e.contains('b'),
             "{e}"
         );
-        assert!(!e.contains("solto"), "{e}");
+        assert!(!e.contains("loose"), "{e}");
     }
 
     #[test]
-    fn pino_e_tipo_desconhecidos_sao_erro_util() {
+    fn unknown_pin_and_type_are_a_useful_error() {
         let bad = |j: &str| -> String {
             match Graph::new(
                 &serde_json::from_str::<Value>(j).unwrap(),
                 Box::new(engine::NullSink),
             ) {
                 Err(e) => e,
-                Ok(_) => panic!("tinha que falhar: {j}"),
+                Ok(_) => panic!("had to fail: {j}"),
             }
         };
-        assert!(bad(r#"{"nodes":[{"id":"x","type":"in.video"}]}"#).contains("catalogo"));
+        assert!(bad(r#"{"nodes":[{"id":"x","type":"in.video"}]}"#).contains("catalog"));
         let e = bad(
             r#"{"nodes":[{"id":"a","type":"in.key","key":"X"},{"id":"b","type":"logic.not"}],
-                "edges":[["a.down","b.entrada"]]}"#,
+                "edges":[["a.down","b.nope"]]}"#,
         );
-        assert!(e.contains("entrada") && e.contains("\"in\""), "{e}");
+        assert!(e.contains("nope") && e.contains("\"in\""), "{e}");
     }
 
-    /// Valor do primeiro pino de saida de um no, pelo id.
+    /// Value of the first output pin of a node, by id.
     fn saida(g: &Graph, id: &str) -> f64 {
         let k = g.nos.iter().position(|n| n.id == id).unwrap();
         g.vals[g.nos[k].base + g.nos[k].nin]
     }
 
     #[test]
-    fn dois_estados_do_mesmo_grupo_se_excluem() {
-        // ordem de arquivo escolhida para que os `state` sejam avaliados ANTES do no gated
+    fn two_states_of_the_same_group_exclude_each_other() {
+        // file order chosen so that the `state` nodes are evaluated BEFORE the gated node
         let (mut g, s) = monta_graph(
             r#"{"nodes":[{"id":"ea","type":"in.widget","widget":"a"},
                          {"id":"eb","type":"in.widget","widget":"b"},
@@ -1329,33 +1340,40 @@ mod tests {
         );
         let mut u = Universes::new();
         g.frame(0.0, &mut u);
-        assert_eq!(saida(&g, "sa"), 1.0, "initial liga o estado");
+        assert_eq!(saida(&g, "sa"), 1.0, "initial turns the state on");
         assert_eq!(saida(&g, "sb"), 0.0);
         s.0.lock().unwrap().clear();
         g.input("widget:go", 1.0);
         g.frame(0.1, &mut u);
-        assert_eq!(s.0.lock().unwrap().len(), 1, "estado ativo: o cmd sai");
+        assert_eq!(
+            s.0.lock().unwrap().len(),
+            1,
+            "active state: the cmd goes out"
+        );
 
-        // entrar em sb desliga sa no mesmo frame; o cmd gated ja' nao emite
+        // entering sb turns sa off in the same frame; the gated cmd no longer emits
         s.0.lock().unwrap().clear();
         g.input("widget:b", 1.0);
         g.input("widget:go", 1.0);
         g.frame(0.2, &mut u);
-        assert_eq!(saida(&g, "sa"), 0.0, "um ativo por grupo");
+        assert_eq!(saida(&g, "sa"), 0.0, "one active per group");
         assert_eq!(saida(&g, "sb"), 1.0);
-        assert!(s.0.lock().unwrap().is_empty(), "estado inativo: nada sai");
+        assert!(
+            s.0.lock().unwrap().is_empty(),
+            "inactive state: nothing goes out"
+        );
 
-        // voltar para sa religa o no
+        // going back to sa switches the node on again
         s.0.lock().unwrap().clear();
         g.input("widget:a", 1.0);
         g.input("widget:go", 1.0);
         g.frame(0.3, &mut u);
         assert_eq!(saida(&g, "sb"), 0.0);
-        assert_eq!(s.0.lock().unwrap().len(), 1, "voltou a emitir ao entrar");
+        assert_eq!(s.0.lock().unwrap().len(), 1, "emits again on entering");
     }
 
     #[test]
-    fn estado_inativo_cancela_o_delay_pendente() {
+    fn an_inactive_state_cancels_the_pending_delay() {
         let (mut g, _) = monta_graph(
             r#"{"nodes":[{"id":"e","type":"in.widget","widget":"e"},
                          {"id":"x","type":"in.widget","widget":"x"},
@@ -1371,22 +1389,22 @@ mod tests {
         g.frame(0.05, &mut u);
         assert_eq!(saida(&g, "s"), 0.0);
         g.frame(0.4, &mut u);
-        assert_eq!(saida(&g, "d"), 0.0, "delay pendente foi cancelado");
+        assert_eq!(saida(&g, "d"), 0.0, "the pending delay was cancelled");
         g.input("widget:e", 1.0);
         g.frame(0.5, &mut u);
-        assert_eq!(saida(&g, "d"), 0.0, "e nao solta atrasado ao voltar");
+        assert_eq!(saida(&g, "d"), 0.0, "and does not fire late on return");
         g.input("widget:go", 1.0);
         g.frame(0.51, &mut u);
         g.frame(0.9, &mut u);
         assert_eq!(
             saida(&g, "d"),
             1.0,
-            "o delay volta a funcionar no estado ativo"
+            "the delay works again in the active state"
         );
     }
 
     #[test]
-    fn mute_silencia_o_no() {
+    fn mute_silences_the_node() {
         let (mut g, s) = monta_graph(
             r#"{"nodes":[{"id":"go","type":"in.widget","widget":"go"},
                          {"id":"c","type":"cmd","cmd":"cue_go","mute":true},
@@ -1398,14 +1416,14 @@ mod tests {
         s.0.lock().unwrap().clear();
         g.input("widget:go", 1.0);
         g.frame(0.1, &mut u);
-        assert!(s.0.lock().unwrap().is_empty(), "no mutado nao emite");
-        assert_eq!(saida(&g, "c"), 0.0, "e a saida dele fica em 0");
+        assert!(s.0.lock().unwrap().is_empty(), "a muted node does not emit");
+        assert_eq!(saida(&g, "c"), 0.0, "and its output stays at 0");
     }
 
     #[test]
-    fn state_calado_nao_reescreve_o_active() {
-        // "sm" tem mute; "sg" esta' dentro de "s0", que nunca liga. Nenhum dos dois pode sair 1,
-        // nem pela fase que reescreve o `active` no fim do frame.
+    fn a_silenced_state_does_not_rewrite_the_active() {
+        // "sm" has mute; "sg" is inside "s0", which never turns on. Neither of them may come
+        // out 1, not even through the phase that rewrites the `active` at the end of the frame.
         let (mut g, s) = monta_graph(
             r#"{"nodes":[{"id":"e","type":"in.widget","widget":"e"},
                          {"id":"go","type":"in.widget","widget":"go"},
@@ -1417,30 +1435,42 @@ mod tests {
         );
         let mut u = Universes::new();
         g.frame(0.0, &mut u);
-        assert_eq!(saida(&g, "sm"), 0.0, "state mutado sai 0 mesmo com initial");
-        assert_eq!(saida(&g, "sg"), 0.0, "state dentro de estado inativo sai 0");
+        assert_eq!(
+            saida(&g, "sm"),
+            0.0,
+            "a muted state comes out 0 even with initial"
+        );
+        assert_eq!(
+            saida(&g, "sg"),
+            0.0,
+            "a state inside an inactive state comes out 0"
+        );
         g.input("widget:e", 1.0);
         g.frame(0.1, &mut u);
-        assert_eq!(saida(&g, "sm"), 0.0, "o enter tambem nao passa pelo mute");
-        // o mute cala o pino, nao a maquina: "sm" segue ativo por dentro e libera "c"
+        assert_eq!(
+            saida(&g, "sm"),
+            0.0,
+            "the enter does not get past the mute either"
+        );
+        // mute silences the pin, not the machine: "sm" stays active inside and enables "c"
         s.0.lock().unwrap().clear();
         g.input("widget:go", 1.0);
         g.frame(0.2, &mut u);
-        assert_eq!(
-            s.0.lock().unwrap().len(),
-            1,
-            "o gate por sm continua valendo"
-        );
+        assert_eq!(s.0.lock().unwrap().len(), 1, "the gate by sm still applies");
         g.reset(0.0);
-        assert_eq!(saida(&g, "sm"), 0.0, "e o reset nao acende o pino calado");
+        assert_eq!(
+            saida(&g, "sm"),
+            0.0,
+            "and reset does not light the silenced pin"
+        );
     }
 
     #[test]
-    fn chaves_desconhecidas_do_editor_sao_ignoradas() {
+    fn unknown_editor_keys_are_ignored() {
         let (mut g, _) = monta_graph(
             r#"{"nodes":[{"id":"go","type":"in.widget","widget":"go"},
                          {"id":"n","type":"logic.not","x":120,"y":-40,"group":"g1",
-                          "label":"inverte","cor":"ambar"}],
+                          "label":"invert","cor":"amber"}],
                 "edges":[["go.press","n.in"]]}"#,
         );
         let mut u = Universes::new();
@@ -1448,11 +1478,15 @@ mod tests {
         assert_eq!(saida(&g, "n"), 1.0);
         g.input("widget:go", 1.0);
         g.frame(0.1, &mut u);
-        assert_eq!(saida(&g, "n"), 0.0, "x/y/group/label nao mudam o runtime");
+        assert_eq!(
+            saida(&g, "n"),
+            0.0,
+            "x/y/group/label do not change the runtime"
+        );
     }
 
     #[test]
-    fn module_emite_param_na_mudanca_le_value_e_dispara_command() {
+    fn module_emits_param_on_change_reads_value_and_fires_command() {
         let dir = std::env::temp_dir().join("spellcore_graph_modulo");
         std::fs::create_dir_all(dir.join("modules")).unwrap();
         std::fs::write(
@@ -1475,10 +1509,10 @@ mod tests {
                 "edges":[["k.press","tg.in"],["tg.out","m.geo/scale"],["t.press","m.blank"]]}"#,
         )
         .unwrap();
-        let mut g = Graph::new_in(&spec, Box::new(s.clone()), &dir).expect("compila");
+        let mut g = Graph::new_in(&spec, Box::new(s.clone()), &dir).expect("compiles");
         let mut u = Universes::new();
 
-        // parametro enum/string nao vira pino: aresta para ele nao compila
+        // an enum/string parameter does not become a pin: an edge to it does not compile
         let ruim: Value = serde_json::from_str(
             r#"{"nodes":[{"id":"k","type":"in.widget","widget":"k"},
                          {"id":"m","type":"module","module":"laser"}],
@@ -1486,7 +1520,7 @@ mod tests {
         )
         .unwrap();
         let Err(e) = Graph::new_in(&ruim, Box::new(Sink::default()), &dir) else {
-            panic!("enum/string nao tem pino: a aresta tinha que falhar");
+            panic!("enum/string has no pin: the edge had to fail");
         };
         assert!(e.contains("dev/host"), "{e}");
 
@@ -1497,13 +1531,13 @@ mod tests {
                 target: "laser/geo/scale".into(),
                 value: 0.0
             }],
-            "primeiro frame sincroniza o parametro"
+            "the first frame syncs the parameter"
         );
         s.0.lock().unwrap().clear();
         g.frame(0.1, &mut u);
-        assert!(s.0.lock().unwrap().is_empty(), "sem mudanca, sem Param");
+        assert!(s.0.lock().unwrap().is_empty(), "no change, no Param");
 
-        // toggle sobe: 1.0 mapeado por norm [0,2] = 2.0, clampado em max 1.5
+        // toggle goes up: 1.0 mapped by norm [0,2] = 2.0, clamped at max 1.5
         g.input("widget:k", 1.0);
         g.frame(0.2, &mut u);
         assert_eq!(
@@ -1514,15 +1548,15 @@ mod tests {
             }]
         );
 
-        // um value chega pelo input e vira a saida do no
+        // a value arrives through input and becomes the node output
         s.0.lock().unwrap().clear();
         g.input("module:laser/stats/pps", 31000.0);
         g.frame(0.3, &mut u);
         assert_eq!(saida(&g, "m"), 31000.0);
         g.frame(0.4, &mut u);
-        assert_eq!(saida(&g, "m"), 31000.0, "value e' nivel, nao pulso");
+        assert_eq!(saida(&g, "m"), 31000.0, "a value is a level, not a pulse");
 
-        // command vira Ev::Cmd na borda de subida
+        // a command becomes Ev::Cmd on the rising edge
         s.0.lock().unwrap().clear();
         g.input("widget:t", 1.0);
         g.frame(0.5, &mut u);
@@ -1536,7 +1570,7 @@ mod tests {
     }
 
     #[test]
-    fn in_state_dmx_le_o_universo_do_frame() {
+    fn in_state_dmx_reads_the_frame_universe() {
         let (mut g, _) = monta_graph(
             r#"{"nodes":[{"id":"d","type":"in.state","what":"dmx","universe":1,"address":5}]}"#,
         );

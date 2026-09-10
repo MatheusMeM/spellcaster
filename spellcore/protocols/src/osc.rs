@@ -1,5 +1,5 @@
-//! OSC 1.0 sobre UDP: encode/decode de mensagens e bundles, OscOut, OscIn com pattern matching.
-//! Espelha `spellcaster/protocols/osc.py`.
+//! OSC 1.0 over UDP: encode/decode of messages and bundles, OscOut, OscIn with pattern
+//! matching. Mirrors `spellcaster/protocols/osc.py`.
 
 use std::io;
 use std::net::{Ipv4Addr, SocketAddrV4, ToSocketAddrs, UdpSocket};
@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use socket2::{Domain, Protocol, Socket, Type};
 
-/// Timetag "agora".
+/// "Now" timetag.
 pub const IMMEDIATE: u64 = 1;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -29,8 +29,8 @@ pub enum Arg {
 
 #[allow(clippy::manual_is_multiple_of)]
 fn pad(out: &mut Vec<u8>) {
-    // ponytail: `% 4` e nao `is_multiple_of` (que so existe a partir do Rust 1.87)
-    // ; o workspace declara rust-version 1.75.
+    // ponytail: `% 4` and not `is_multiple_of` (which only exists from Rust 1.87 on)
+    // ; the workspace declares rust-version 1.75.
     while out.len() % 4 != 0 {
         out.push(0);
     }
@@ -42,7 +42,7 @@ fn put_str(out: &mut Vec<u8>, s: &str) {
     pad(out);
 }
 
-/// Segundos desde a epoca Unix -> NTP 64 bits (segundos desde 1900 << 32 | fracao).
+/// Seconds since the Unix epoch -> 64-bit NTP (seconds since 1900 << 32 | fraction).
 pub fn timetag(secs: f64) -> u64 {
     let x = secs + 2_208_988_800.0;
     let sec = x.floor();
@@ -96,7 +96,7 @@ pub fn message(address: &str, args: &[Arg]) -> Vec<u8> {
     out
 }
 
-/// `elements`: mensagens/bundles ja codificados.
+/// `elements`: already encoded messages/bundles.
 pub fn bundle(elements: &[Vec<u8>], tt: u64) -> Vec<u8> {
     let mut out = Vec::with_capacity(16 + elements.iter().map(|e| e.len() + 4).sum::<usize>());
     out.extend_from_slice(b"#bundle\0");
@@ -118,7 +118,7 @@ fn get<const N: usize>(d: &[u8], i: usize) -> Option<[u8; N]> {
     d.get(i..i + N)?.try_into().ok()
 }
 
-/// String OSC em `i`: devolve (texto, proximo indice alinhado em 4).
+/// OSC string at `i`: returns (text, next index aligned to 4).
 fn read_str(d: &[u8], i: usize) -> Option<(String, usize)> {
     let end = i + d.get(i..)?.iter().position(|&c| c == 0)?;
     let s = String::from_utf8_lossy(&d[i..end]).into_owned();
@@ -183,18 +183,18 @@ pub fn parse(data: &[u8]) -> Option<Parsed> {
             b'F' => args.push(Arg::Bool(false)),
             b'N' => args.push(Arg::Nil),
             b'I' => args.push(Arg::Impulse),
-            _ => return None, // tag desconhecida: pacote descartado
+            _ => return None, // unknown tag: packet discarded
         }
     }
     Some(Parsed::Msg(addr, args))
 }
 
-// ------------------------------------------------------------------ padroes
+// ----------------------------------------------------------------- patterns
 
-/// Casamento de padrao de endereco OSC: `*`, `?`, `[a-z]`, `[!a-z]`, `{a,b}`.
-/// `*` e `?` nunca atravessam `/`; o resto do padrao e literal.
-// ponytail: backtracking recursivo direto sobre os bytes, sem crate de regex
-// ; padroes de show tem poucos caracteres. Trocar por automato se algum dia virar rota quente.
+/// OSC address pattern matching: `*`, `?`, `[a-z]`, `[!a-z]`, `{a,b}`.
+/// `*` and `?` never cross `/`; the rest of the pattern is literal.
+// ponytail: recursive backtracking straight over the bytes, no regex crate
+// ; show patterns have few characters. Switch to an automaton if it ever becomes a hot path.
 pub fn matches(pattern: &str, address: &str) -> bool {
     m(pattern.as_bytes(), address.as_bytes())
 }
@@ -272,7 +272,9 @@ impl OscOut {
                     std::net::SocketAddr::V4(v) => Some(v),
                     _ => None,
                 })
-                .ok_or_else(|| io::Error::new(io::ErrorKind::AddrNotAvailable, "host sem IPv4"))?
+                .ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::AddrNotAvailable, "host with no IPv4")
+                })?
         };
         let s = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
         s.set_broadcast(true)?;
@@ -286,7 +288,7 @@ impl OscOut {
         let _ = self.sock.send_to(&message(address, args), self.addr);
     }
 
-    /// Bundle de mensagens ja codificadas.
+    /// Bundle of already encoded messages.
     pub fn send_bundle(&self, elements: &[Vec<u8>], tt: u64) {
         let _ = self.sock.send_to(&bundle(elements, tt), self.addr);
     }
@@ -298,7 +300,7 @@ impl OscOut {
 
 type Handler = Box<dyn Fn(&str, &[Arg]) + Send>;
 
-/// Escuta UDP; `on(pattern, f)` chama `f(address, args)` para cada mensagem casada.
+/// Listens on UDP; `on(pattern, f)` calls `f(address, args)` for every matched message.
 pub struct OscIn {
     handlers: Arc<Mutex<Vec<(String, Handler)>>>,
     port: u16,
@@ -330,7 +332,7 @@ impl OscIn {
                     };
                     if let Some(p) = parse(&buf[..n]) {
                         dispatch(&h, &p);
-                    } // pacote malformado: descarta
+                    } // malformed packet: dropped
                 }
             })?;
         Ok(OscIn {
@@ -341,7 +343,7 @@ impl OscIn {
         })
     }
 
-    /// Porta efetiva (util quando `new(0)` pega porta efemera).
+    /// Effective port (useful when `new(0)` takes an ephemeral port).
     pub fn port(&self) -> u16 {
         self.port
     }
@@ -369,7 +371,8 @@ impl Drop for OscIn {
 
 fn dispatch(handlers: &Arc<Mutex<Vec<(String, Handler)>>>, p: &Parsed) {
     match p {
-        // ponytail: timetag futuro ignorado, executa ja ; agendar pelo Clock na R1.
+        // ponytail: a future timetag is ignored, it runs right away ; schedule through the
+        // Clock in R1.
         Parsed::Bundle(_, elems) => elems.iter().for_each(|e| dispatch(handlers, e)),
         Parsed::Msg(addr, args) => {
             let hs = handlers.lock().unwrap_or_else(|e| e.into_inner());
@@ -387,13 +390,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn round_trip_todos_os_tipos() {
+    fn round_trip_all_types() {
         let tt = timetag(1_700_000_000.5);
         let args = vec![
             Arg::Int(1),
             Arg::Int(-2),
             Arg::Float(3.5),
-            Arg::Str("ola".into()),
+            Arg::Str("hello".into()),
             Arg::Blob(vec![1, 2, 3]),
             Arg::Bool(true),
             Arg::Bool(false),
@@ -404,12 +407,12 @@ mod tests {
             Arg::Time(tt),
         ];
         let raw = message("/x/y", &args);
-        assert_eq!(raw.len() % 4, 0, "mensagem alinhada em 4");
+        assert_eq!(raw.len() % 4, 0, "message aligned to 4");
         assert_eq!(parse(&raw), Some(Parsed::Msg("/x/y".into(), args)));
     }
 
     #[test]
-    fn alinhamento_e_bytes_conhecidos() {
+    fn alignment_and_known_bytes() {
         for a in ["/a", "/ab", "/abc", "/abcd"] {
             for s in ["", "x", "xyz", "wxyz"] {
                 let msg = message(a, &[Arg::Str(s.into()), Arg::Blob(b"12345".to_vec())]);
@@ -431,7 +434,7 @@ mod tests {
     }
 
     #[test]
-    fn bundle_com_duas_mensagens() {
+    fn bundle_with_two_messages() {
         let a = message("/a", &[Arg::Int(1)]);
         let b = message("/b", &[Arg::Str("z".into())]);
         let raw = bundle(&[a, b], IMMEDIATE);
@@ -479,7 +482,7 @@ mod tests {
     fn loopback_out_in() {
         let mut rx = match OscIn::new(0) {
             Ok(r) => r,
-            Err(e) => return println!("pulado: bind OSC falhou: {:?}", e.kind()),
+            Err(e) => return println!("skipped: OSC bind failed: {:?}", e.kind()),
         };
         let port = rx.port();
         let got = Arc::new(Mutex::new(Vec::<String>::new()));
@@ -489,11 +492,11 @@ mod tests {
         });
         let g2 = got.clone();
         rx.on("/other", move |_, _| {
-            g2.lock().unwrap().push("errado".into());
+            g2.lock().unwrap().push("wrong".into());
         });
         let tx = match OscOut::new("127.0.0.1", port) {
             Ok(t) => t,
-            Err(_) => return println!("pulado: socket OSC de saida indisponivel"),
+            Err(_) => return println!("skipped: OSC output socket unavailable"),
         };
         tx.send("/spell/play", &[Arg::Int(1), Arg::Str("go".into())]);
         tx.send_bundle(
@@ -512,9 +515,9 @@ mod tests {
         rx.close();
         let g = got.lock().unwrap().clone();
         if g.is_empty() {
-            return println!("pulado: UDP em loopback nao entregou (firewall?)");
+            return println!("skipped: loopback UDP did not deliver (firewall?)");
         }
-        assert_eq!(g.len(), 3, "3 mensagens casadas, nenhuma de /other: {g:?}");
+        assert_eq!(g.len(), 3, "3 matched messages, none from /other: {g:?}");
         assert!(g[0].starts_with("/spell/play "), "{:?}", g[0]);
         assert!(g[1].starts_with("/spell/a "), "{:?}", g[1]);
         assert!(g[2].starts_with("/spell/b "), "{:?}", g[2]);

@@ -1,8 +1,9 @@
-//! `pixelmap` — R3 do Spellcaster: amostra um frame RGB/RGBA e escreve os bytes DMX de cada
-//! pixel fisico, um buffer de 512 canais por universo, pronto para `protocols::Output::send`.
+//! `pixelmap` - Spellcaster R3: samples an RGB/RGBA frame and writes the DMX bytes of each
+//! physical pixel, one 512-channel buffer per universe, ready for
+//! `protocols::Output::send`.
 //!
-//! Crate autocontido: nao depende de `engine` nem de `protocols`. A fonte do frame e um
-//! `&[u8]` — quando a R2 (midia) existir, o texture pool entrega o mesmo slice.
+//! Self-contained crate: it depends neither on `engine` nor on `protocols`. The frame source
+//! is a `&[u8]` - when R2 (media) exists, the texture pool hands over the same slice.
 //!
 //! ```
 //! use pixelmap::{Fixture, Frame, Mapper, Order, PixelMap};
@@ -18,8 +19,8 @@
 //! }
 //! ```
 //!
-//! No `.spell` o bloco vive fora de `tracks` e sobrevive ao round-trip do `engine::Show`
-//! (campo `extra`, `#[serde(flatten)]`). O chamador desserializa com serde_json:
+//! In the `.spell` the block lives outside `tracks` and survives the `engine::Show`
+//! round-trip (field `extra`, `#[serde(flatten)]`). The caller deserializes with serde_json:
 //!
 //! ```json
 //! {"pixelmaps": [{"name": "wall", "source": "media/1",
@@ -30,7 +31,7 @@
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
-/// Ordem dos canais de cor de um pixel fisico.
+/// Color channel order of a physical pixel.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Order {
@@ -41,7 +42,7 @@ pub enum Order {
 }
 
 impl Order {
-    /// Quantos canais DMX o pixel ocupa.
+    /// How many DMX channels the pixel takes.
     pub const fn channels(self) -> usize {
         match self {
             Order::Rgbw => 4,
@@ -49,12 +50,12 @@ impl Order {
         }
     }
 
-    /// Escreve a cor em `out` (ate 4 bytes), truncando no que couber.
+    /// Writes the color into `out` (up to 4 bytes), truncating to what fits.
     ///
-    /// RGBW extrai o branco por `w = min(r, g, b)` e desconta dos tres — e a conversao que
-    /// nao estoura o fluxo total da luminaria.
-    // ponytail: extracao de branco fixa ; virar campo do Fixture quando aparecer luminaria
-    // que espere W independente (branco quente separado, CCT).
+    /// RGBW extracts the white as `w = min(r, g, b)` and subtracts it from the three - it is
+    /// the conversion that does not blow past the total output of the fixture.
+    // ponytail: fixed white extraction ; make it a Fixture field when a fixture shows up that
+    // expects an independent W (separate warm white, CCT).
     #[inline]
     fn write(self, r: u8, g: u8, b: u8, out: &mut [u8]) {
         let px = match self {
@@ -70,43 +71,44 @@ impl Order {
     }
 }
 
-/// Um pixel fisico: onde ele le no frame (`u`, `v` normalizados) e onde escreve em DMX.
+/// One physical pixel: where it reads in the frame (normalized `u`, `v`) and where it writes
+/// in DMX.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Fixture {
-    /// Universo, 1-based (sACN).
+    /// Universe, 1-based (sACN).
     pub universe: u16,
-    /// Primeiro canal DMX, 1-based.
+    /// First DMX channel, 1-based.
     pub channel: u16,
     #[serde(default)]
     pub order: Order,
-    /// Coordenada normalizada no frame; fora de 0..1 e clampada na borda.
+    /// Normalized coordinate in the frame; outside 0..1 it is clamped to the edge.
     pub u: f32,
     pub v: f32,
 }
 
-/// Um mapa do `.spell`: uma fonte de video e os pixels fisicos que a leem.
+/// One map from the `.spell`: one video source and the physical pixels that read it.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct PixelMap {
     #[serde(default)]
     pub name: String,
-    /// Fonte do frame, `"media/<id>"`. Resolvida pela R2; o crate nao a interpreta.
+    /// Frame source, `"media/<id>"`. Resolved by R2; the crate does not interpret it.
     #[serde(default)]
     pub source: String,
     #[serde(default)]
     pub fixtures: Vec<Fixture>,
 }
 
-/// Como o pixel le o frame.
+/// How the pixel reads the frame.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum Sampling {
-    /// Pixel mais proximo. Default: um LED e um pixel, nao ha o que interpolar.
+    /// Nearest pixel. Default: one LED is one pixel, there is nothing to interpolate.
     #[default]
     Nearest,
-    /// Bilinear entre os 4 vizinhos. Para mapa mais denso que a fonte.
+    /// Bilinear between the 4 neighbors. For a map denser than the source.
     Bilinear,
 }
 
-/// Frame de entrada emprestado: `stride` = 3 (RGB) ou 4 (RGBA), linhas contiguas.
+/// Borrowed input frame: `stride` = 3 (RGB) or 4 (RGBA), contiguous rows.
 #[derive(Clone, Copy, Debug)]
 pub struct Frame<'a> {
     pub w: u32,
@@ -124,19 +126,19 @@ impl<'a> Frame<'a> {
         Frame::new(w, h, 4, px)
     }
 
-    /// Fronteira de confianca: o frame vem do decoder e e validado UMA vez aqui; o caminho
-    /// quente le sem checar de novo.
+    /// Trust boundary: the frame comes from the decoder and is validated ONCE here; the hot
+    /// path reads without checking again.
     pub fn new(w: u32, h: u32, stride: usize, px: &'a [u8]) -> Result<Frame<'a>, String> {
         if w == 0 || h == 0 {
-            return Err(format!("frame {}x{}: dimensao zero", w, h));
+            return Err(format!("frame {}x{}: zero dimension", w, h));
         }
         if stride != 3 && stride != 4 {
-            return Err(format!("stride {}: so RGB (3) ou RGBA (4)", stride));
+            return Err(format!("stride {}: only RGB (3) or RGBA (4)", stride));
         }
         let need = w as usize * h as usize * stride;
         if px.len() < need {
             return Err(format!(
-                "frame {}x{} stride {}: {} bytes, precisa de {}",
+                "frame {}x{} stride {}: {} bytes, needs {}",
                 w,
                 h,
                 stride,
@@ -153,7 +155,7 @@ impl<'a> Frame<'a> {
         (self.px[i], self.px[i + 1], self.px[i + 2])
     }
 
-    /// Amostra em coordenada normalizada. `u`/`v` fora de 0..1 sao clampados na borda.
+    /// Samples at a normalized coordinate. `u`/`v` outside 0..1 are clamped to the edge.
     #[inline]
     pub fn sample(&self, u: f32, v: f32, s: Sampling) -> (u8, u8, u8) {
         let (u, v) = (u.clamp(0.0, 1.0), v.clamp(0.0, 1.0));
@@ -165,7 +167,7 @@ impl<'a> Frame<'a> {
                 self.texel(x, y)
             }
             Sampling::Bilinear => {
-                // centro do texel em u = (x + 0.5) / w
+                // texel center at u = (x + 0.5) / w
                 let fx = (u * self.w as f32 - 0.5).max(0.0);
                 let fy = (v * self.h as f32 - 0.5).max(0.0);
                 let x0 = (fx as u32).min(xmax);
@@ -193,9 +195,9 @@ impl<'a> Frame<'a> {
     }
 }
 
-/// Mapa de um painel retangular `cols` x `rows` lido inteiro do frame, pixels em ordem de
-/// leitura, empacotados a partir de `first_universe`. Um pixel nunca cruza universo: cabem
-/// `512 / order.channels()` por universo (170 em RGB; os 2 canais que sobram ficam em zero).
+/// Map of a rectangular `cols` x `rows` panel read whole from the frame, pixels in reading
+/// order, packed from `first_universe` on. A pixel never crosses a universe:
+/// `512 / order.channels()` fit per universe (170 in RGB; the 2 leftover channels stay zero).
 pub fn grid(cols: u32, rows: u32, first_universe: u16, order: Order) -> PixelMap {
     let per = 512 / order.channels();
     let mut fixtures = Vec::with_capacity(cols as usize * rows as usize);
@@ -224,19 +226,19 @@ struct Uni {
     data: [u8; 512],
 }
 
-/// Mapa compilado: fixtures agrupadas por universo e um buffer de 512 canais por universo,
-/// alocados uma vez. `render` nao aloca.
+/// Compiled map: fixtures grouped by universe and one 512-channel buffer per universe,
+/// allocated once. `render` does not allocate.
 ///
-/// O Mapper e dono dos universos que lista: canal que nenhuma fixture cobre fica em zero.
-/// Universo que tambem recebe tracks `dmx` e somado pelo chamador, nao aqui.
+/// The Mapper owns the universes it lists: a channel no fixture covers stays zero.
+/// A universe that also receives `dmx` tracks is merged by the caller, not here.
 pub struct Mapper {
     pub sampling: Sampling,
     unis: Vec<Uni>,
 }
 
 impl Mapper {
-    /// Compila o mapa. Fixture com universo 0 ou primeiro canal fora de 1..=512 e descartada
-    /// aqui; a que passa dos 512 no ultimo canal e truncada no `render`.
+    /// Compiles the map. A fixture with universe 0 or a first channel outside 1..=512 is
+    /// dropped here; one that goes past 512 on its last channel is truncated in `render`.
     pub fn new(map: &PixelMap) -> Mapper {
         let mut unis: Vec<Uni> = Vec::new();
         for f in &map.fixtures {
@@ -269,9 +271,10 @@ impl Mapper {
         self.unis.iter().map(|u| u.fixtures.len()).sum()
     }
 
-    /// Amostra o frame e reescreve os buffers. Paralelo por universo.
-    // ponytail: amostragem em CPU com rayon ; trocar pelo compute shader wgpu do PRD quando
-    // `map_bench` nao fechar os 2 ms (mais pixels, bilinear em 4K, varias fontes por frame).
+    /// Samples the frame and rewrites the buffers. Parallel per universe.
+    // ponytail: CPU sampling with rayon ; switch to the PRD's wgpu compute shader when
+    // `map_bench` no longer fits the 2 ms (more pixels, bilinear at 4K, several sources per
+    // frame).
     pub fn render(&mut self, frame: &Frame) {
         let s = self.sampling;
         self.unis.par_iter_mut().for_each(|u| {
@@ -283,13 +286,13 @@ impl Mapper {
         });
     }
 
-    /// `(universo, 512 bytes)` de cada universo, em ordem crescente — exatamente o par que
-    /// `protocols::Output::send` recebe.
+    /// `(universe, 512 bytes)` of each universe, in ascending order - exactly the pair that
+    /// `protocols::Output::send` receives.
     pub fn frames(&self) -> impl Iterator<Item = (u16, &[u8; 512])> {
         self.unis.iter().map(|u| (u.number, &u.data))
     }
 
-    /// Buffer de um universo, se o mapa o cobre.
+    /// Buffer of one universe, if the map covers it.
     pub fn universe(&self, number: u16) -> Option<&[u8; 512]> {
         self.unis
             .binary_search_by_key(&number, |u| u.number)

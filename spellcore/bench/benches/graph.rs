@@ -1,9 +1,9 @@
-//! Aceite da R1: um Graph de 500 nos avaliado em MENOS de 0,1 ms por frame.
+//! R1 acceptance: a 500-node Graph evaluated in LESS than 0.1 ms per frame.
 //!
-//! O graph e' montado com o catalogo inteiro da secao 10 do PRD, em cadeia (cada no consome
-//! saidas de nos anteriores), para que a ordem topologica tenha profundidade real e nao seja
-//! uma fileira de nos independentes. Duas medidas: com `math.expr` (5% dos nos, cada um e' um
-//! eval do Rhai) e sem nenhum `math.expr`, que e' o caso do graph tipico de operacao.
+//! The graph is built with the whole catalog of section 10 of the PRD, chained (each node
+//! consumes outputs of earlier nodes), so that the topological order has real depth and is not
+//! a row of independent nodes. Two measurements: with `math.expr` (5% of the nodes, each one a
+//! Rhai eval) and with no `math.expr` at all, which is the typical operating graph.
 //!
 //! `cargo bench -p bench --bench graph`
 
@@ -13,7 +13,7 @@ use engine::{NullSink, Universes};
 use script::Graph;
 use serde_json::{json, Value};
 
-/// Tipos usados no miolo da cadeia, com o nome do pino de saida e os pinos de entrada.
+/// Types used in the middle of the chain, with the name of the output pin and the input pins.
 const MIOLO: &[(&str, &str, &[&str])] = &[
     ("logic.or", "out", &["a", "b"]),
     ("math.map", "out", &["in"]),
@@ -35,7 +35,7 @@ const MIOLO: &[(&str, &str, &[&str])] = &[
     ("out.notify", "", &["in"]),
 ];
 
-/// As 7 entradas do catalogo, com o nome do pino de saida de cada uma.
+/// The 7 inputs of the catalog, with the name of the output pin of each one.
 const ENTRADAS: &[(&str, &str)] = &[
     ("in.widget", "press"),
     ("in.key", "down"),
@@ -46,11 +46,11 @@ const ENTRADAS: &[(&str, &str)] = &[
     ("in.state", "out"),
 ];
 
-/// Monta um graph de `n` nos. `com_expr = false` troca todo `math.expr` por `math.map`.
+/// Builds a graph of `n` nodes. `com_expr = false` swaps every `math.expr` for `math.map`.
 fn monta(n: usize, com_expr: bool) -> Value {
     let mut nodes = Vec::with_capacity(n);
     let mut edges: Vec<Value> = Vec::new();
-    // saida disponivel de cada no ja' criado: (id, pino) — nos de out.* nao entregam nada
+    // available output of each node already created: (id, pin) - out.* nodes deliver nothing
     let mut saidas: Vec<(String, &str)> = Vec::new();
     for (i, (tipo, pino)) in ENTRADAS.iter().enumerate() {
         let id = format!("e{i}");
@@ -84,7 +84,7 @@ fn monta(n: usize, com_expr: bool) -> Value {
         no["target"] = json!("par1.dim");
         no["text"] = json!("ok");
         nodes.push(no);
-        // liga cada entrada a uma saida ja' existente: DAG por construcao
+        // wires each input to an already existing output: a DAG by construction
         let ins = if tipo == "math.map" { &["in"][..] } else { ins };
         for (k, pin) in ins.iter().enumerate() {
             let (src, sp) = &saidas[(i * 7 + k * 3) % saidas.len()];
@@ -98,7 +98,10 @@ fn monta(n: usize, com_expr: bool) -> Value {
 }
 
 fn frame(c: &mut Criterion) {
-    for (nome, com_expr) in [("graph 500 nos", true), ("graph 500 nos sem expr", false)] {
+    for (nome, com_expr) in [
+        ("graph 500 nodes", true),
+        ("graph 500 nodes without expr", false),
+    ] {
         let mut g = Graph::new(&monta(500, com_expr), Box::new(NullSink)).unwrap();
         assert_eq!(g.nodes(), 500);
         let mut uni = Universes::new();

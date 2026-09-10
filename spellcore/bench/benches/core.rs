@@ -1,5 +1,5 @@
-// Criterion: caminho quente do engine (curvas, eval de keyframes, Timeline::apply)
-// e a montagem de pacote dos dois protocolos. harness = false no Cargo.toml.
+// Criterion: hot path of the engine (curves, keyframe eval, Timeline::apply) and the packet
+// assembly of both protocols. harness = false in Cargo.toml.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use engine::timeline::{Curve, Keyframe, Keys, Timeline, Value, BEZ};
@@ -33,7 +33,7 @@ fn curve(c: &mut Criterion) {
 }
 
 fn keys_eval(c: &mut Criterion) {
-    // 3000 keyframes, curvas alternadas: o mesmo formato dos tracks do medgrupo.
+    // 3000 keyframes, alternating curves: the same shape as the medgrupo tracks.
     let curves = [
         Curve::Linear,
         Curve::In,
@@ -51,7 +51,7 @@ fn keys_eval(c: &mut Criterion) {
             })
             .collect(),
     );
-    // pontos espalhados: forca a busca binaria a cair em faixas diferentes.
+    // scattered points: forces the binary search to land in different ranges.
     let ts: Vec<f64> = (0..64).map(|i| i as f64 * 29.999 / 64.0).collect();
     let mut out: Vec<f64> = Vec::with_capacity(8);
 
@@ -65,19 +65,19 @@ fn keys_eval(c: &mut Criterion) {
 }
 
 fn timeline_apply(c: &mut Criterion) {
-    // ponytail: se o .spell nao estiver gerado o bench some em vez de quebrar a suite ;
-    // rodar tests/conformance/gen.py para tras.
+    // ponytail: if the .spell is not generated the bench disappears instead of breaking the
+    // suite ; run tests/conformance/gen.py to get it back.
     let show = match engine::show::load(Path::new(SHOW)) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("timeline_apply pulado: {}", e);
+            eprintln!("timeline_apply skipped: {}", e);
             return;
         }
     };
     let mut tl = match Timeline::new(&show) {
         Ok(t) => t,
         Err(e) => {
-            eprintln!("timeline_apply pulado: {}", e);
+            eprintln!("timeline_apply skipped: {}", e);
             return;
         }
     };

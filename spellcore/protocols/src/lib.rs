@@ -1,8 +1,9 @@
-//! Protocolos de saida/entrada do Spellcaster: sACN (E1.31), Art-Net 4, OSC 1.0, MIDI de entrada
-//! e varredura de rede.
+//! Spellcaster output/input protocols: sACN (E1.31), Art-Net 4, OSC 1.0, MIDI input
+//! and network scan.
 //!
-//! Crate autocontido: nao depende de `engine`. A referencia de comportamento e o pacote Python
-//! `spellcaster/protocols/` — os bytes na rede tem que ser identicos (fixtures em tests/conformance).
+//! Self-contained crate: does not depend on `engine`. The behavior reference is the Python
+//! package `spellcaster/protocols/` - the bytes on the wire must be identical (fixtures in
+//! tests/conformance).
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Condvar, Mutex};
@@ -13,24 +14,25 @@ pub mod netscan;
 pub mod osc;
 pub mod sacn;
 
-/// Toda saida de protocolo do engine.
+/// Every protocol output of the engine.
 ///
-/// `close(&mut self)` e nao `close(self)` do PRD: `Box<dyn Output>` exige object safety,
-/// e um metodo que consome `self` nao pode ser chamado atraves de um trait object.
-// ponytail: close por &mut, dupla chamada e no-op ; so mudaria se o engine passasse a possuir
-// as saidas por valor, o que quebraria Box<dyn Output>.
+/// `close(&mut self)` and not the PRD's `close(self)`: `Box<dyn Output>` requires object
+/// safety, and a method that consumes `self` cannot be called through a trait object.
+// ponytail: close takes &mut, a second call is a no-op ; would only change if the engine
+// came to own the outputs by value, which would break Box<dyn Output>.
 pub trait Output: Send {
     fn send(&mut self, universe: u16, data: &[u8; 512]);
     fn close(&mut self);
 }
 
-// --------------------------------------------------------------------- fila
-// Fila de frames entre a thread do engine e a thread de I/O de uma saida.
-// Maximo de 2 frames POR UNIVERSO; ao encher, o frame VELHO daquele universo e descartado
-// (o novo sempre entra). `push` nunca bloqueia por espera — so pelo lock, que a thread de I/O
-// solta antes de tocar no socket.
-// ponytail: fila com Mutex+Condvar, nao lock-free ; trocar por ring SPSC se o bench de
-// throughput acusar contencao (16+16 universos a 60 Hz = 1920 push/s, irrisorio para um mutex).
+// -------------------------------------------------------------------- queue
+// Frame queue between the engine thread and the I/O thread of an output.
+// At most 2 frames PER UNIVERSE; when full, the OLD frame of that universe is dropped
+// (the new one always gets in). `push` never blocks waiting - only on the lock, which the
+// I/O thread releases before touching the socket.
+// ponytail: queue with Mutex+Condvar, not lock-free ; switch to an SPSC ring if the
+// throughput bench shows contention (16+16 universes at 60 Hz = 1920 push/s, trivial for a
+// mutex).
 
 pub(crate) const DEPTH: usize = 2;
 
@@ -48,8 +50,8 @@ impl Queue {
     pub(crate) fn new(universes: usize) -> Arc<Queue> {
         Arc::new(Queue {
             state: Mutex::new(QState {
-                // capacidade fixa: DEPTH por universo (+1 folga para universo nao declarado).
-                // Nunca realoca no caminho quente porque o push descarta antes de inserir.
+                // fixed capacity: DEPTH per universe (+1 slack for an undeclared universe).
+                // Never reallocates on the hot path because push drops before inserting.
                 frames: VecDeque::with_capacity(DEPTH * universes.max(1) + 1),
                 running: true,
             }),
@@ -64,7 +66,7 @@ impl Queue {
         }
         if st.frames.iter().filter(|(u, _)| *u == universe).count() >= DEPTH {
             if let Some(i) = st.frames.iter().position(|(u, _)| *u == universe) {
-                st.frames.remove(i); // descarta o mais velho desse universo
+                st.frames.remove(i); // drop the oldest of this universe
             }
         }
         st.frames.push_back((universe, *data));
@@ -72,7 +74,7 @@ impl Queue {
         self.cv.notify_one();
     }
 
-    /// Bloqueia ate ter frame ou ate a fila ser fechada. `None` = hora de sair.
+    /// Blocks until there is a frame or the queue is closed. `None` = time to exit.
     pub(crate) fn pop(&self) -> Option<(u16, [u8; 512])> {
         let mut st = self.state.lock().unwrap_or_else(|e| e.into_inner());
         loop {
@@ -104,9 +106,9 @@ impl Queue {
 }
 
 // --------------------------------------------------------------------- util
-/// 16 bytes pseudo-aleatorios para o CID do sACN (equivalente ao uuid4() do Python).
-// ponytail: hash de relogio+pid+contador, nao CSPRNG ; o CID so precisa ser unico na rede,
-// nao imprevisivel. Trocar por getrandom se algum dia virar identidade de seguranca.
+/// 16 pseudo-random bytes for the sACN CID (equivalent to Python's uuid4()).
+// ponytail: hash of clock+pid+counter, not a CSPRNG ; the CID only needs to be unique on
+// the network, not unpredictable. Switch to getrandom if it ever becomes a security identity.
 pub(crate) fn random16() -> [u8; 16] {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
@@ -117,7 +119,7 @@ pub(crate) fn random16() -> [u8; 16] {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_nanos() as u64)
         .unwrap_or(0);
-    let stack = &nanos as *const u64 as usize as u64; // ASLR: entropia entre processos
+    let stack = &nanos as *const u64 as usize as u64; // ASLR: entropy across processes
     let seed =
         nanos ^ ((std::process::id() as u64) << 32) ^ stack ^ N.fetch_add(1, Ordering::Relaxed);
     let mut out = [0u8; 16];
@@ -134,15 +136,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn queue_descarta_frame_velho() {
+    fn queue_drops_old_frame() {
         let q = Queue::new(1);
         for i in 0..100u16 {
             let mut d = [0u8; 512];
             d[0] = i as u8;
             q.push(1, &d);
         }
-        assert_eq!(q.len(), DEPTH, "fila deve ficar em 2 frames");
-        // o que sobrou sao os DOIS mais novos, na ordem
+        assert_eq!(q.len(), DEPTH, "queue must stay at 2 frames");
+        // what is left are the TWO newest, in order
         assert_eq!(q.pop().unwrap().1[0], 98);
         assert_eq!(q.pop().unwrap().1[0], 99);
         q.stop();
@@ -150,7 +152,7 @@ mod tests {
     }
 
     #[test]
-    fn queue_por_universo() {
+    fn queue_per_universe() {
         let q = Queue::new(3);
         for u in 1..=3u16 {
             for _ in 0..10 {
@@ -161,7 +163,7 @@ mod tests {
     }
 
     #[test]
-    fn cid_nao_repete() {
+    fn cid_does_not_repeat() {
         assert_ne!(random16(), random16());
         assert_ne!(random16(), [0u8; 16]);
     }

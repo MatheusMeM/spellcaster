@@ -1,26 +1,30 @@
-//! Crate `script` da R1: o track `fx` em Rhai e o Graph runtime (secao 10 do PRD).
-//! Nada aqui conhece rede nem GUI; o engine nao conhece Rhai (o contato e' `engine::hook`).
+//! Crate `script` of R1: the `fx` track in Rhai and the Graph runtime (section 10 of the PRD).
+//! Nothing here knows network or GUI; the engine does not know Rhai (the contact is
+//! `engine::hook`).
 //!
-//! # API que o host expoe ao arquivo `.rhai` (contrato)
+//! # API the host exposes to the `.rhai` file (contract)
 //!
 //! ```text
-//! set(universe, addr, values)  escreve no universo dado; `values` e' um array de numeros
-//!                              ou um numero solto. Mesma semantica de engine::Universe::set:
-//!                              addr 1-based, truncagem para zero, clamp 0..255, e o que
-//!                              passar do canal 512 (ou addr fora de 1..512) e' ignorado.
-//! set(addr, values)            idem, no universo do track.
-//! st(i)          -> float      le o slot i do estado que persiste ENTRE frames (0.0 no inicio).
-//! st(i, v)                     escreve o slot i. O vetor cresce sozinho; reset() zera tudo.
+//! set(universe, addr, values)  writes into the given universe; `values` is an array of
+//!                              numbers or a bare number. Same semantics as
+//!                              engine::Universe::set: addr 1-based, truncation toward zero,
+//!                              clamp 0..255, and whatever goes past channel 512 (or an addr
+//!                              outside 1..512) is ignored.
+//! set(addr, values)            same, in the track universe.
+//! st(i)          -> float      reads slot i of the state that persists BETWEEN frames
+//!                              (0.0 at the start).
+//! st(i, v)                     writes slot i. The vector grows on its own; reset() zeroes
+//!                              everything.
 //! ```
 //!
-//! Mais a biblioteca padrao do Rhai: `sin`, `cos`, `tan`, `exp`, `ln`, `sqrt`, `abs`,
-//! `atan(y, x)` (= atan2), `hypot`, `to_degrees`, `to_radians`, `int` (trunca, devolve float),
-//! `to_int` (trunca, devolve inteiro), `floor`, `ceiling`, `round`, `PI()`, `E()`, arrays.
-//! Sem arquivo, sem rede, sem processo, sem relogio: o Engine sobe com `default-features = false`
-//! e o Rhai nao traz nenhum desses pacotes.
+//! Plus the Rhai standard library: `sin`, `cos`, `tan`, `exp`, `ln`, `sqrt`, `abs`,
+//! `atan(y, x)` (= atan2), `hypot`, `to_degrees`, `to_radians`, `int` (truncates, returns a
+//! float), `to_int` (truncates, returns an integer), `floor`, `ceiling`, `round`, `PI()`,
+//! `E()`, arrays. No file, no network, no process, no clock: the Engine starts with
+//! `default-features = false` and Rhai brings none of those packages.
 //!
-//! O script PRECISA definir `fn look(t)`. O topo do arquivo roda UMA vez, na carga.
-//! `print`/`debug` do script saem em stderr (stdout e' da CLI).
+//! The script MUST define `fn look(t)`. The top of the file runs ONCE, at load time.
+//! The script's `print`/`debug` go to stderr (stdout belongs to the CLI).
 
 use engine::hook::{EventSink, FrameHook};
 use engine::{Show, Universes};
@@ -32,13 +36,13 @@ pub mod graph;
 
 pub use graph::Graph;
 
-/// Escritas do frame corrente + estado persistente do script.
-/// O `set()` do Rhai nao pode receber `&mut Universes` (a closure registrada e' 'static),
-/// entao ele anota aqui e o `frame()` reproduz nos Universes no fim. `log`/`buf` sao limpos
-/// com `clear()` (mantem a capacidade): zero alocacao depois do primeiro frame.
+/// Writes of the current frame + persistent state of the script.
+/// Rhai's `set()` cannot take a `&mut Universes` (the registered closure is 'static), so it
+/// notes them here and `frame()` replays them into the Universes at the end. `log`/`buf` are
+/// cleared with `clear()` (keeping the capacity): zero allocation after the first frame.
 #[derive(Default)]
 struct Pend {
-    /// (universo, addr 1-based, offset em `buf`, quantidade)
+    /// (universe, 1-based addr, offset in `buf`, count)
     log: Vec<(u16, u16, u32, u32)>,
     buf: Vec<u8>,
     st: Vec<f64>,
@@ -69,7 +73,8 @@ impl Pend {
             return;
         }
         let off = self.buf.len() as u32;
-        // `v as u8` no Rust trunca para zero e satura: igual ao max(0, min(255, int(v))) do Python.
+        // `v as u8` in Rust truncates toward zero and saturates: same as Python's
+        // max(0, min(255, int(v))).
         self.buf.extend(vals.iter().map(|v| *v as u8));
         self.anota(uni, addr, off);
     }
@@ -91,7 +96,7 @@ impl Pend {
     }
 
     fn st_set(&mut self, i: i64, v: f64) {
-        // ponytail: teto de 4096 slots de estado ; subir se algum show precisar de mais.
+        // ponytail: ceiling of 4096 state slots ; raise it if some show needs more.
         if !(0..4096).contains(&i) {
             return;
         }
@@ -104,7 +109,9 @@ impl Pend {
 
 fn base_engine() -> Engine {
     let mut e = Engine::new();
-    e.set_max_expr_depths(256, 256); // ponytail: default 64/32 recusa o medgrupo.rhai ; show e confiavel, subir se algum script bater
+    // ponytail: the 64/32 default rejects medgrupo.rhai ; the show is trusted, raise it if some
+    // script hits the limit
+    e.set_max_expr_depths(256, 256);
     e.on_print(|s| eprintln!("fx: {s}"));
     e.on_debug(|s, _, pos| eprintln!("fx {pos}: {s}"));
     e
@@ -146,8 +153,8 @@ fn register(e: &mut Engine, pend: &Arc<Mutex<Pend>>, uni: u16) {
     });
 }
 
-/// Track `{"type":"fx","script":"...rhai","universe":N}`: compila o `.rhai` uma vez e roda
-/// `look(t)` por frame, com o estado do script preservado entre frames.
+/// Track `{"type":"fx","script":"...rhai","universe":N}`: compiles the `.rhai` once and runs
+/// `look(t)` per frame, with the script state preserved between frames.
 pub struct Fx {
     eng: Engine,
     ast: AST,
@@ -171,7 +178,7 @@ impl Fx {
             .iter_functions()
             .any(|f| f.name == "look" && f.params.len() == 1)
         {
-            return Err(format!("{}: precisa definir fn look(t)", path.display()));
+            return Err(format!("{}: must define fn look(t)", path.display()));
         }
         let mut scope = Scope::new();
         eng.run_ast_with_scope(&mut scope, &ast)
@@ -197,15 +204,17 @@ impl FrameHook for Fx {
             p.log.clear();
             p.buf.clear();
         }
-        // eval_ast(false): o topo do arquivo ja' rodou na carga; por frame so' a funcao.
+        // eval_ast(false): the top of the file already ran at load time; per frame only the
+        // function.
         let opts = CallFnOptions::new().eval_ast(false);
         if let Err(e) =
             self.eng
                 .call_fn_with_options::<Dynamic>(opts, &mut self.scope, &self.ast, "look", (t,))
         {
-            // ponytail: erro em runtime desliga o hook e imprime UMA vez ; sem isso um erro de
-            // script vira 30 linhas por segundo no console do operador. reset() religa.
-            eprintln!("{}: {} -- fx desligado ate o proximo reset", self.nome, e);
+            // ponytail: a runtime error switches the hook off and prints ONCE ; without this a
+            // script error becomes 30 lines per second in the operator console. reset() turns
+            // it back on.
+            eprintln!("{}: {} -- fx off until the next reset", self.nome, e);
             self.off = true;
             return;
         }
@@ -227,8 +236,8 @@ impl FrameHook for Fx {
     }
 }
 
-/// Hooks de um show, na ordem de execucao: um `Fx` por track `"fx"` (na ordem do arquivo,
-/// caminho relativo a `base`) e, depois, o `Graph` de `show["graph"]` se existir.
+/// Hooks of a show, in execution order: one `Fx` per `"fx"` track (in file order, path
+/// relative to `base`) and then the `Graph` of `show["graph"]` if it exists.
 pub fn hooks(
     show: &Show,
     base: &Path,
@@ -242,7 +251,7 @@ pub fn hooks(
         let f = tr
             .get("script")
             .and_then(|x| x.as_str())
-            .ok_or_else(|| "track fx sem \"script\"".to_string())?;
+            .ok_or_else(|| "fx track without \"script\"".to_string())?;
         let u = tr.get("universe").and_then(|x| x.as_u64()).unwrap_or(1) as u16;
         v.push(Box::new(Fx::new(&base.join(f), u)?));
     }
@@ -263,7 +272,7 @@ mod tests {
     }
 
     #[test]
-    fn set_tem_a_semantica_do_universe() {
+    fn set_has_the_universe_semantics() {
         let p = escreve(
             "spellcore_fx_set.rhai",
             "fn look(t) { set(1, [10.0, -5.0, 300.0, 255.9]); set(2, 513, 1); set(9, 0.0); }",
@@ -275,11 +284,11 @@ mod tests {
         let d = &u.get(7).unwrap().data;
         assert_eq!(&d[0..4], &[10, 0, 255, 255]);
         assert_eq!(d[8], 0);
-        assert!(u.get(2).is_none(), "addr 513 tem que ser ignorado");
+        assert!(u.get(2).is_none(), "addr 513 must be ignored");
     }
 
     #[test]
-    fn estado_persiste_entre_frames_e_reset_zera() {
+    fn state_persists_between_frames_and_reset_zeroes_it() {
         let p = escreve(
             "spellcore_fx_st.rhai",
             "fn look(t) { st(0, st(0) + 1.0); set(1, 1, st(0)); }",
@@ -297,18 +306,18 @@ mod tests {
     }
 
     #[test]
-    fn script_sem_look_e_erro_na_carga() {
+    fn a_script_without_look_is_a_load_error() {
         let p = escreve("spellcore_fx_semlook.rhai", "fn outra(t) { }");
         let e = match Fx::new(&p, 1) {
             Err(e) => e,
-            Ok(_) => panic!("script sem look(t) tinha que falhar"),
+            Ok(_) => panic!("a script without look(t) had to fail"),
         };
         std::fs::remove_file(&p).ok();
         assert!(e.contains("look"), "{e}");
     }
 
     #[test]
-    fn hooks_le_os_tracks_fx_na_ordem() {
+    fn hooks_reads_the_fx_tracks_in_order() {
         let dir = std::env::temp_dir();
         std::fs::write(
             dir.join("spellcore_h1.rhai"),

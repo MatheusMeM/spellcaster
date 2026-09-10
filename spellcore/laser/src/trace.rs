@@ -1,43 +1,43 @@
-//! FOSFORO: bitmap RGBA -> contornos -> pontos ILDA.
+//! FOSFORO: RGBA bitmap -> contours -> ILDA points.
 //!
-//! A metade do NDI->ILDA que nao depende de SDK (`design/FUNCOES/ndi-ilda.md`, algoritmo
-//! "Contornos"): mascara por luma, seguimento de borda de Moore, simplificacao
-//! Ramer-Douglas-Peucker, ordenacao dos caminhos por vizinho mais proximo, blanking entre
-//! caminhos e as MESMAS `optimize`/`safety` do resto do crate. Puro Rust, sem dependencia
-//! nova; a entrada e um buffer RGBA cru, venha ele de onde vier.
+//! The half of NDI->ILDA that does not depend on an SDK (`design/FUNCOES/ndi-ilda.md`,
+//! algorithm "Contornos"): luma mask, Moore boundary following, Ramer-Douglas-Peucker
+//! simplification, path ordering by nearest neighbor, blanking between paths and the SAME
+//! `optimize`/`safety` as the rest of the crate. Pure Rust, no new dependency; the input is
+//! a raw RGBA buffer, wherever it comes from.
 //!
-//! Deterministico: mesma entrada, mesmos bytes de saida (empate de distancia sempre fica
-//! com o menor indice, e nao ha iteracao sobre hash).
+//! Deterministic: same input, same output bytes (a distance tie always keeps the smallest
+//! index, and there is no iteration over a hash).
 //!
-//! ponytail: sem NDI ; entra quando o NDI SDK estiver instalado (ROADMAP R2) — so falta
-//! quem preencha o `rgba`.
-//! ponytail: sem Spout e sem captura de tela ; mesma porta de entrada, mesmo motivo.
-//! ponytail: sem suavizacao temporal entre frames ; Damping/Lag/OneEuro sao nos do graph
-//! em `script` (design/FUNCOES/ndi-ilda.md secao 1), nao parametro escondido daqui.
-//! ponytail: so o algoritmo "Contornos" ; esqueleto (Zhang-Suen) e raster entram quando o
-//! material de origem for traco ou texto cheio.
-//! ponytail: um caminho por objeto, so o contorno externo ; buraco interno vira caminho
-//! quando alguem pedir anel — hoje custaria um segundo passe de bordas.
-//! ponytail: mascara so por luma ; a mascara pelo alfa (fundo transparente com RGB preto)
-//! entra junto com o NDI, que e quem produz esse quadro — hoje nao ha produtor.
+//! ponytail: no NDI ; it arrives when the NDI SDK is installed (ROADMAP R2) - all that is
+//! missing is someone to fill in the `rgba`.
+//! ponytail: no Spout and no screen capture ; same entry point, same reason.
+//! ponytail: no temporal smoothing between frames ; Damping/Lag/OneEuro are graph nodes in
+//! `script` (design/FUNCOES/ndi-ilda.md section 1), not a hidden parameter here.
+//! ponytail: only the "Contornos" algorithm ; skeleton (Zhang-Suen) and raster arrive when
+//! the source material is a stroke or solid text.
+//! ponytail: one path per object, outer contour only ; an inner hole becomes a path when
+//! someone asks for a ring - today it would cost a second edge pass.
+//! ponytail: luma mask only ; the alpha mask (transparent background with black RGB) arrives
+//! together with NDI, which is what produces such a frame - today there is no producer.
 
 use crate::frame::{optimize_into, Point, Safety, ANGLE, BLANK_GAP, DWELL, LIM, MAX_STEP};
 
-/// Teto de caminhos por quadro, do design (MadMapper: "o engine desiste acima de 2 000").
-/// Segura tambem o custo O(n^2) da ordenacao por vizinho mais proximo.
+/// Ceiling of paths per frame, from the design (MadMapper: "the engine gives up above
+/// 2 000"). It also caps the O(n^2) cost of the nearest-neighbor ordering.
 pub const MAX_PATHS: usize = 2000;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Opts {
-    /// Corte da mascara: pixel entra quando `luma > threshold`.
+    /// Mask cutoff: a pixel is in when `luma > threshold`.
     pub threshold: u8,
-    /// Tolerancia do Ramer-Douglas-Peucker, EM PIXELS da imagem de entrada.
+    /// Ramer-Douglas-Peucker tolerance, IN PIXELS of the input image.
     pub epsilon: f32,
-    /// Teto de pontos ANTES de `optimize` (que ainda acrescenta dwell e blanking).
+    /// Ceiling of points BEFORE `optimize` (which still adds dwell and blanking).
     pub max_points: usize,
-    /// Inverte a mascara (figura escura sobre fundo claro).
+    /// Inverts the mask (dark figure on a light background).
     pub invert: bool,
-    /// Cor unica para todos os pontos; `None` amostra o pixel de origem sob cada ponto.
+    /// Single color for every point; `None` samples the source pixel under each point.
     pub color: Option<(u8, u8, u8)>,
 }
 
@@ -53,7 +53,7 @@ impl Default for Opts {
     }
 }
 
-/// Vizinhanca de Moore em sentido horario (imagem tem Y para baixo).
+/// Moore neighborhood clockwise (the image has Y going down).
 const D: [(i32, i32); 8] = [
     (1, 0),
     (1, 1),
@@ -78,8 +78,8 @@ impl Grid<'_> {
     }
 }
 
-/// Mascara por luma BT.601 em inteiro. Uma passada so: 2 Mpx num quadro 1080p, e a
-/// mascara e metade do custo do quadro.
+/// Mask by integer BT.601 luma. One pass only: 2 Mpx in a 1080p frame, and the mask is half
+/// the cost of the frame.
 fn mask(rgba: &[u8], w: usize, h: usize, o: &Opts) -> Vec<bool> {
     rgba[..w * h * 4]
         .as_chunks::<4>()
@@ -92,8 +92,8 @@ fn mask(rgba: &[u8], w: usize, h: usize, o: &Opts) -> Vec<bool> {
         .collect()
 }
 
-/// Proximo pixel de borda no sentido horario a partir da direcao de chegada `bdir`.
-/// Devolve o pixel e a nova direcao de chegada.
+/// Next boundary pixel clockwise from the arrival direction `bdir`.
+/// Returns the pixel and the new arrival direction.
 #[inline]
 fn step(g: &Grid, p: (i32, i32), bdir: usize) -> Option<((i32, i32), usize)> {
     for k in 1..=8 {
@@ -106,13 +106,13 @@ fn step(g: &Grid, p: (i32, i32), bdir: usize) -> Option<((i32, i32), usize)> {
     None
 }
 
-/// Contorno externo de Moore a partir de `start` (que tem o vizinho da esquerda apagado).
-/// Para pelo criterio de Jacob: mesmo pixel chegando pela mesma direcao. Sai fechado.
+/// Moore outer contour from `start` (whose left neighbor is off).
+/// Stops by Jacob's criterion: same pixel arriving from the same direction. Comes out closed.
 fn contour(g: &Grid, start: (i32, i32)) -> Vec<(i32, i32)> {
     let mut c = vec![start];
     let (mut p, mut bdir) = match step(g, start, 4) {
         Some(s) => s,
-        None => return c, // pixel isolado
+        None => return c, // isolated pixel
     };
     let first = (p, bdir);
     let cap = (g.w as usize * g.h as usize) * 2 + 8;
@@ -134,8 +134,8 @@ fn contour(g: &Grid, start: (i32, i32)) -> Vec<(i32, i32)> {
     c
 }
 
-/// Ramer-Douglas-Peucker iterativo (pilha explicita: contorno de 1080p passa de 10 000
-/// pontos e a versao recursiva estoura a pilha). Empate de distancia fica no menor indice.
+/// Iterative Ramer-Douglas-Peucker (explicit stack: a 1080p contour goes past 10 000 points
+/// and the recursive version blows the stack). A distance tie keeps the smallest index.
 fn rdp(pts: &[(i32, i32)], eps: f32) -> Vec<(i32, i32)> {
     if pts.len() < 3 {
         return pts.to_vec();
@@ -155,7 +155,7 @@ fn rdp(pts: &[(i32, i32)], eps: f32) -> Vec<(i32, i32)> {
         let (mut best, mut bd) = (a, -1.0f64);
         for (i, q) in pts.iter().enumerate().take(b).skip(a + 1) {
             let (qx, qy) = (q.0 as f64 - ax, q.1 as f64 - ay);
-            // caminho fechado: a == b, entao a "reta" degenera e a distancia e ao ponto
+            // closed path: a == b, so the "line" degenerates and the distance is to the point
             let d = if len2 == 0.0 {
                 qx * qx + qy * qy
             } else {
@@ -180,11 +180,11 @@ fn rdp(pts: &[(i32, i32)], eps: f32) -> Vec<(i32, i32)> {
         .collect()
 }
 
-/// Corte proporcional: cada caminho fica com `len * max / total` pontos, por amostragem
-/// uniforme que preserva as duas pontas (e portanto o fecho do contorno).
-// ponytail: o minimo de 2 pontos por caminho pode passar de `max` quando ha mais de
-// max/2 caminhos ; MAX_PATHS segura o pior caso, e quem quiser exatidao filtra por
-// comprimento antes (o `Limite: manter os N mais longos` do design).
+/// Proportional cut: each path keeps `len * max / total` points, by uniform sampling that
+/// preserves both ends (and therefore the closing of the contour).
+// ponytail: the minimum of 2 points per path can exceed `max` when there are more than
+// max/2 paths ; MAX_PATHS caps the worst case, and whoever wants exactness filters by
+// length first (the design's `Limit: keep the N longest`).
 fn decimate(paths: &mut [Vec<(i32, i32)>], max: usize) {
     let total: usize = paths.iter().map(|p| p.len()).sum();
     if max == 0 || total <= max {
@@ -201,32 +201,33 @@ fn decimate(paths: &mut [Vec<(i32, i32)>], max: usize) {
     }
 }
 
-/// Ordena os caminhos por vizinho mais proximo a partir do canto superior esquerdo,
-/// para encurtar os saltos apagados.
-// ponytail: guloso O(n^2) sem inverter caminho ; MAX_PATHS=2000 e o teto do custo
+/// Orders the paths by nearest neighbor starting from the top-left corner, to shorten the
+/// blanked jumps.
+// ponytail: greedy O(n^2) without reversing a path ; MAX_PATHS=2000 is the cost ceiling
 fn order(paths: &mut [Vec<(i32, i32)>]) {
     let mut cur = (0i64, 0i64);
     for i in 0..paths.len() {
-        // `rotate_right` guarda a ordem original entre os nao escolhidos, entao o empate
-        // continua ficando com o menor indice de entrada
+        // `rotate_right` keeps the original order among the unchosen ones, so a tie still
+        // goes to the smallest input index
         let best = (i..paths.len())
             .min_by_key(|&j| {
                 let s = paths[j][0];
                 (s.0 as i64 - cur.0).pow(2) + (s.1 as i64 - cur.1).pow(2)
             })
-            .expect("a faixa comeca em i e nunca e vazia");
+            .expect("the range starts at i and is never empty");
         paths[i..=best].rotate_right(1);
         let e = paths[i][paths[i].len() - 1];
         cur = (e.0 as i64, e.1 as i64);
     }
 }
 
-/// Caminhos vetorizados em coordenadas ILDA (-32767..32767, Y para cima), ANTES do
-/// blanking, do `optimize` e da `safety`. Um caminho por objeto, fechado.
+/// Vectorized paths in ILDA coordinates (-32767..32767, Y up), BEFORE blanking, `optimize`
+/// and `safety`. One path per object, closed.
 ///
-/// A imagem entra inteira e centrada, com a proporcao preservada (o lado maior ocupa a
-/// faixa toda). Buffer menor que `w * h * 4` devolve vazio, e `w * h * 4` que estoura `usize`
-/// tambem: a dimensao vem de fora (linha de comando, produtor de quadro), nao do proprio buffer.
+/// The image goes in whole and centered, with the aspect ratio preserved (the longer side
+/// takes the whole range). A buffer smaller than `w * h * 4` returns empty, and a `w * h * 4`
+/// that overflows `usize` too: the dimension comes from outside (command line, frame
+/// producer), not from the buffer itself.
 pub fn paths(rgba: &[u8], w: usize, h: usize, o: &Opts) -> Vec<Vec<Point>> {
     let Some(n) = w.checked_mul(h).and_then(|n| n.checked_mul(4)) else {
         return Vec::new();
@@ -245,7 +246,7 @@ pub fn paths(rgba: &[u8], w: usize, h: usize, o: &Opts) -> Vec<Vec<Point>> {
     'fora: for y in 0..g.h {
         for x in 0..g.w {
             let i = (y * g.w + x) as usize;
-            // candidato = pixel aceso, ainda nao tracado, com o vizinho da esquerda apagado
+            // candidate = lit pixel, not traced yet, with the left neighbor off
             if !m[i] || seen[i] || (x > 0 && m[i - 1]) {
                 continue;
             }
@@ -254,11 +255,11 @@ pub fn paths(rgba: &[u8], w: usize, h: usize, o: &Opts) -> Vec<Vec<Point>> {
             for &(cx, cy) in &c {
                 seen[(cy * g.w + cx) as usize] = true;
             }
-            // O contorno EXTERNO de uma componente e o unico cujo pixel de cima-a-esquerda
-            // e o proprio candidato: o raster chega nele primeiro. Saindo da borda de um
-            // buraco, o ciclo tem minimo menor que `p` — e retraco da mesma componente e
-            // cai fora. Substitui o flood fill da componente inteira, que custava ~40 ns
-            // por pixel aceso (80 ms num quadro 1080p todo aceso).
+            // The OUTER contour of a component is the only one whose top-left pixel is the
+            // candidate itself: the raster reaches it first. Starting from the edge of a
+            // hole, the cycle has a minimum smaller than `p` - it is a re-trace of the same
+            // component and is dropped. It replaces the flood fill of the whole component,
+            // which cost ~40 ns per lit pixel (80 ms in a fully lit 1080p frame).
             if c.iter().min_by_key(|&&(px, py)| (py, px)) == Some(&p) {
                 raw.push(c);
                 if raw.len() >= MAX_PATHS {
@@ -290,10 +291,10 @@ pub fn paths(rgba: &[u8], w: usize, h: usize, o: &Opts) -> Vec<Vec<Point>> {
         .collect()
 }
 
-/// Um quadro RGBA vira um frame ILDA pronto para o `Feed`: caminhos, salto apagado entre
-/// eles, `optimize` e `safety` padrao.
-// ponytail: safety padrao aqui dentro ; zona e limite proprios se aplicam depois, com
-// `frame::safety` — o `Feed` reaplica a dele em todo envio de qualquer jeito.
+/// An RGBA frame becomes an ILDA frame ready for the `Feed`: paths, a blanked jump between
+/// them, `optimize` and the default `safety`.
+// ponytail: default safety in here ; a custom zone and limit apply afterwards, with
+// `frame::safety` - the `Feed` reapplies its own on every send anyway.
 pub fn trace(rgba: &[u8], w: usize, h: usize, o: &Opts) -> Vec<Point> {
     let ps = paths(rgba, w, h, o);
     if ps.is_empty() {
@@ -302,8 +303,8 @@ pub fn trace(rgba: &[u8], w: usize, h: usize, o: &Opts) -> Vec<Point> {
     let mut src = Vec::with_capacity(ps.iter().map(|p| p.len() + 1).sum());
     for (i, p) in ps.iter().enumerate() {
         if i > 0 {
-            // ponto apagado no inicio do proximo caminho: o `optimize` abre o gap e
-            // interpola o salto sozinho
+            // blanked point at the start of the next path: `optimize` opens the gap and
+            // interpolates the jump on its own
             src.push(Point {
                 blank: true,
                 ..p[0]
@@ -322,7 +323,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn rdp_reduz_reta_e_guarda_canto() {
+    fn rdp_reduces_line_and_keeps_corner() {
         let reta: Vec<(i32, i32)> = (0..20).map(|i| (i, 0)).collect();
         assert_eq!(rdp(&reta, 1.0), vec![(0, 0), (19, 0)]);
         let l = [(0, 0), (5, 0), (10, 0), (10, 5), (10, 10)];
@@ -330,7 +331,7 @@ mod tests {
     }
 
     #[test]
-    fn decimate_corta_proporcional() {
+    fn decimate_cuts_proportionally() {
         let mut p = vec![(0..100).map(|i| (i, 0)).collect::<Vec<_>>()];
         decimate(&mut p, 10);
         assert_eq!(p[0].len(), 10);

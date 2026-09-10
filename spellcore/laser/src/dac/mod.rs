@@ -1,4 +1,4 @@
-//! Saidas de laser. Um DAC = um destino fisico (Ether Dream, Helios, projetor IDN).
+//! Laser outputs. One DAC = one physical destination (Ether Dream, Helios, IDN projector).
 
 pub mod etherdream;
 pub mod helios;
@@ -8,20 +8,21 @@ use std::io;
 
 use crate::frame::Point;
 
-/// Contrato de todo DAC. Espelha o `trait Output` de `protocols` (send + close), mas em
-/// pontos e nao em universos DMX.
+/// Contract of every DAC. Mirrors the `trait Output` of `protocols` (send + close), but in
+/// points and not in DMX universes.
 ///
-/// O controle de fluxo (buffer do DAC, chunking) e responsabilidade do proprio DAC: o
-/// `Feed` so entrega pontos ja passados pela safety.
-// ponytail: sem `open()` no trait ; cada DAC abre no construtor e devolve io::Result, entao
-// um DAC no trait object ja esta conectado. Entra `reopen()` quando houver reconexao a quente.
+/// Flow control (DAC buffer, chunking) is the DAC's own responsibility: the `Feed` only
+/// delivers points that already went through safety.
+// ponytail: no `open()` in the trait ; each DAC opens in the constructor and returns
+// io::Result, so a DAC behind the trait object is already connected. `reopen()` arrives when
+// there is hot reconnection.
 pub trait Dac: Send {
-    /// Nome curto para log (`etherdream:192.168.0.50`).
+    /// Short name for the log (`etherdream:192.168.0.50`).
     fn name(&self) -> String;
-    /// Prepara e comeca a tocar a `pps` pontos por segundo.
+    /// Prepares and starts playing at `pps` points per second.
     fn begin(&mut self, pps: u32) -> io::Result<()>;
-    /// Envia pontos. Pode bloquear enquanto o buffer do DAC estiver cheio.
+    /// Sends points. May block while the DAC buffer is full.
     fn send(&mut self, points: &[Point]) -> io::Result<()>;
-    /// Para a saida e apaga. Idempotente.
+    /// Stops the output and blanks. Idempotent.
     fn stop(&mut self);
 }

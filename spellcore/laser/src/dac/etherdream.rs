@@ -1,9 +1,9 @@
-//! Ether Dream DAC: beacon UDP 7654 (1 Hz), stream de pontos TCP 7765. Tudo little-endian.
+//! Ether Dream DAC: UDP beacon 7654 (1 Hz), TCP point stream 7765. All little-endian.
 //!
-//! Fluxo: connect -> `p` prepare -> `d` data -> `b` begin -> `d` enquanto o buffer estiver
-//! abaixo da capacidade. Porte de `spellcaster/protocols/ilda/etherdream.py`.
+//! Flow: connect -> `p` prepare -> `d` data -> `b` begin -> `d` while the buffer stays below
+//! capacity. Port of `spellcaster/protocols/ilda/etherdream.py`.
 //!
-//! O beacon (descoberta) ja existe em `protocols::netscan`; aqui so se reexporta.
+//! The beacon (discovery) already exists in `protocols::netscan`; it is only re-exported here.
 
 use std::io::{self, Read, Write};
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
@@ -18,13 +18,14 @@ use crate::frame::Point;
 pub use protocols::netscan::{parse_beacon, parse_status, Status};
 
 pub const TCP_PORT: u16 = 7765;
-/// ack + comando ecoado + dac_status.
+/// ack + echoed command + dac_status.
 pub const RESP_LEN: usize = 22;
 /// `<HhhHHHHHH`: control x y r g b i u1 u2.
 pub const POINT_LEN: usize = 18;
-/// Teto de espera pelo buffer do DAC antes de desistir. O Python esperava para sempre.
-// ponytail: teto fixo de 2 s ; um DAC que nao drena em 2 s esta morto e a thread do Feed
-// tem que voltar a viver para o show poder parar. Vira parametro se aparecer DAC lento.
+/// Ceiling on waiting for the DAC buffer before giving up. Python waited forever.
+// ponytail: fixed ceiling of 2 s ; a DAC that does not drain in 2 s is dead and the Feed
+// thread has to come back to life so the show can stop. Becomes a parameter if a slow DAC
+// shows up.
 const WAIT_LIMIT: Duration = Duration::from_secs(2);
 
 fn pack_status(s: &Status, out: &mut Vec<u8>) {
@@ -39,7 +40,7 @@ fn pack_status(s: &Status, out: &mut Vec<u8>) {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Response {
-    /// `a` ok, `F` cheio, `I` invalido, `!` stop.
+    /// `a` ok, `F` full, `I` invalid, `!` stop.
     pub ack: u8,
     pub status: Status,
 }
@@ -54,8 +55,8 @@ pub fn parse_response(b: &[u8]) -> Option<Response> {
     })
 }
 
-/// Comando `d`: cabecalho + um registro de 18 bytes por ponto. Cores 0-255 viram 0-65535
-/// (x257); ponto apagado sai preto. Reusa `out`, nao aloca depois do primeiro frame.
+/// Command `d`: header + one 18-byte record per point. Colors 0-255 become 0-65535 (x257); a
+/// blanked point goes out black. Reuses `out`, does not allocate after the first frame.
 pub fn encode_data(points: &[Point], out: &mut Vec<u8>) {
     out.clear();
     out.reserve(3 + points.len() * POINT_LEN);
@@ -93,13 +94,13 @@ pub struct EtherDream {
     chunk: usize,
     chunk_fixo: Option<usize>,
     begun: bool,
-    /// Instante do ultimo ack: base do modelo local do buffer (`est_fullness`).
+    /// Instant of the last ack: base of the local buffer model (`est_fullness`).
     ack_at: Instant,
     buf: Vec<u8>,
 }
 
 impl EtherDream {
-    /// `addr` = "ip" ou "ip:porta" (porta padrao 7765). O DAC manda um status ao conectar.
+    /// `addr` = "ip" or "ip:port" (default port 7765). The DAC sends a status on connect.
     pub fn connect(addr: &str, capacity: u16) -> io::Result<EtherDream> {
         let full = if addr.contains(':') {
             addr.to_string()
@@ -109,7 +110,7 @@ impl EtherDream {
         let sa = full
             .to_socket_addrs()?
             .next()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "endereco invalido"))?;
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "invalid address"))?;
         let sock = TcpStream::connect_timeout(&sa, Duration::from_secs(2))?;
         sock.set_nodelay(true)?;
         sock.set_read_timeout(Some(Duration::from_secs(2)))?;
@@ -125,7 +126,7 @@ impl EtherDream {
             ack_at: Instant::now(),
             buf: Vec::new(),
         };
-        d.read_resp()?; // status de boas-vindas
+        d.read_resp()?; // welcome status
         Ok(d)
     }
 
@@ -133,22 +134,22 @@ impl EtherDream {
         let s = self
             .sock
             .as_mut()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::NotConnected, "Ether Dream fechou"))?;
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotConnected, "Ether Dream closed"))?;
         let mut b = [0u8; RESP_LEN];
         s.read_exact(&mut b)?;
         let r = parse_response(&b)
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "resposta curta"))?;
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "short response"))?;
         self.status = r.status.clone();
         self.ack_at = Instant::now();
         Ok(r)
     }
 
-    /// Envia bytes crus e le a resposta.
+    /// Sends raw bytes and reads the response.
     pub fn cmd(&mut self, data: &[u8]) -> io::Result<Response> {
         let s = self
             .sock
             .as_mut()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::NotConnected, "Ether Dream fechou"))?;
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotConnected, "Ether Dream closed"))?;
         s.write_all(data)?;
         self.read_resp()
     }
@@ -157,19 +158,19 @@ impl EtherDream {
         self.cmd(b"p")
     }
 
-    /// Pontos por comando `d`. Padrao: 2/3 da capacidade do DAC. E o botao de calibracao
-    /// do DAC: bloco maior = menos idas e voltas na rede; bloco menor = menos latencia.
+    /// Points per `d` command. Default: 2/3 of the DAC capacity. It is the DAC calibration
+    /// knob: a larger block = fewer network round trips; a smaller block = less latency.
     pub fn set_chunk(&mut self, n: usize) {
         self.chunk_fixo = Some(n.max(1));
         self.chunk = n.max(1);
     }
 
-    /// Quanto o buffer do DAC deve ter AGORA: o valor do ultimo ack menos o que o DAC
-    /// consumiu desde entao. Evita um `?` (ping) por bloco so para reler o buffer_fullness:
-    /// a 30 kpps com 4 feeds isso era 2/3 das idas e voltas na rede.
-    // ponytail: modelo local do buffer, ressincronizado a cada ack e com o ack 'F' como rede
-    // de seguranca ; trocar pelo low_water do proprio DAC quando houver hardware na bancada
-    // para medir a deriva do relogio dele.
+    /// How much the DAC buffer should hold RIGHT NOW: the value of the last ack minus what the
+    /// DAC consumed since then. Avoids one `?` (ping) per block just to reread
+    /// buffer_fullness: at 30 kpps with 4 feeds that was 2/3 of the network round trips.
+    // ponytail: local buffer model, resynchronized on every ack and with the 'F' ack as a
+    // safety net ; switch to the DAC's own low_water when there is hardware on the bench to
+    // measure its clock drift.
     fn est_fullness(&self) -> u32 {
         let f = self.status.buffer_fullness as u32;
         if self.status.playback_state != 2 {
@@ -187,7 +188,7 @@ impl EtherDream {
         let mut buf = std::mem::take(&mut self.buf);
         encode_data(block, &mut buf);
         let r = self.cmd(&buf);
-        self.buf = buf; // devolve a capacidade: proximo envio nao aloca
+        self.buf = buf; // give the capacity back: the next send does not allocate
         r
     }
 }
@@ -199,11 +200,12 @@ impl Dac for EtherDream {
 
     fn begin(&mut self, pps: u32) -> io::Result<()> {
         self.pps = pps.max(1);
-        // Bloco = 2/3 do buffer do DAC: e o maior comando que ainda deixa um terco do
-        // buffer como folga contra underrun, e cada comando e uma ida e volta na rede.
-        // ponytail: o Python usava pps/50 (~20 ms de pontos) sem olhar a capacidade ; a 30 kpps
-        // isso dava 50 idas e voltas por segundo por DAC e ~1,5 % de um nucleo com 4 feeds
-        // so de troca de contexto. Trocar por set_chunk() se um DAC real reclamar do bloco.
+        // Block = 2/3 of the DAC buffer: it is the largest command that still leaves a third
+        // of the buffer as slack against underrun, and each command is a network round trip.
+        // ponytail: Python used pps/50 (~20 ms of points) without looking at the capacity ; at
+        // 30 kpps that gave 50 round trips per second per DAC and ~1.5 % of a core with 4
+        // feeds in context switching alone. Switch to set_chunk() if a real DAC complains
+        // about the block.
         self.chunk = self
             .chunk_fixo
             .unwrap_or(((self.capacity as usize * 2) / 3).max(1));
@@ -221,11 +223,11 @@ impl Dac for EtherDream {
             loop {
                 let falta = block.len() as i64 + self.est_fullness() as i64 - self.capacity as i64;
                 if falta > 0 {
-                    // dorme exatamente o tempo que o DAC leva para abrir espaco: nenhum ping
+                    // sleep exactly as long as the DAC takes to free space: no ping at all
                     if t0.elapsed() > WAIT_LIMIT {
                         return Err(io::Error::new(
                             io::ErrorKind::TimedOut,
-                            "buffer do DAC nao drena",
+                            "the DAC buffer does not drain",
                         ));
                     }
                     std::thread::sleep(Duration::from_secs_f64(falta as f64 / self.pps as f64));
@@ -234,12 +236,12 @@ impl Dac for EtherDream {
                 match self.data(block)?.ack {
                     b'a' => break,
                     b'F' => {
-                        // o DAC estava mais cheio que a estimativa; o proprio ack acabou de
-                        // ressincronizar o modelo, entao espera um bloco e repete
+                        // the DAC was fuller than the estimate; the ack itself has just
+                        // resynchronized the model, so wait one block and repeat
                         if t0.elapsed() > WAIT_LIMIT {
                             return Err(io::Error::new(
                                 io::ErrorKind::TimedOut,
-                                "buffer do DAC cheio",
+                                "the DAC buffer is full",
                             ));
                         }
                         std::thread::sleep(Duration::from_secs_f64(
@@ -248,14 +250,14 @@ impl Dac for EtherDream {
                     }
                     a => {
                         return Err(io::Error::other(format!(
-                            "Ether Dream respondeu {:?} ao comando d",
+                            "Ether Dream answered {:?} to the d command",
                             a as char
                         )))
                     }
                 }
             }
             if !self.begun || self.status.playback_state == 0 {
-                // inicio ou underrun
+                // start or underrun
                 self.cmd(&begin_cmd(0, self.pps))?;
                 self.begun = true;
             }
@@ -278,9 +280,9 @@ impl Drop for EtherDream {
     }
 }
 
-// ------------------------------------------------------------------ emulador
+// ------------------------------------------------------------------ emulator
 
-/// Um ponto como o DAC recebeu (u1/u2 sempre 0, nao guardados).
+/// One point as the DAC received it (u1/u2 always 0, not kept).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EmuPoint {
     pub control: u16,
@@ -307,7 +309,8 @@ struct Emu {
     st: Mutex<EmuState>,
 }
 
-/// Servidor TCP minimo que responde ack e simula o buffer; para testes e bench sem DAC.
+/// Minimal TCP server that answers ack and simulates the buffer; for tests and bench with no
+/// DAC.
 pub struct Emulator {
     pub port: u16,
     emu: Arc<Emu>,
@@ -343,7 +346,7 @@ impl Emulator {
         })
     }
 
-    /// Guardar cada ponto recebido custa memoria e CPU: desligue no bench.
+    /// Keeping every received point costs memory and CPU: turn it off in the bench.
     pub fn record(&self, on: bool) {
         self.emu.record.store(on, Ordering::Relaxed);
     }
@@ -352,7 +355,7 @@ impl Emulator {
         self.emu.st.lock().unwrap().points.clone()
     }
 
-    /// Total de pontos recebidos (contado mesmo com `record(false)`).
+    /// Total points received (counted even with `record(false)`).
     pub fn count(&self) -> u64 {
         self.emu.count.load(Ordering::Relaxed)
     }
@@ -361,7 +364,7 @@ impl Emulator {
         self.emu.st.lock().unwrap().commands.clone()
     }
 
-    /// Beacon UDP de 36 bytes, para testar o parser sem hardware.
+    /// 36-byte UDP beacon, to test the parser without hardware.
     pub fn beacon(&self, mac: [u8; 6]) -> Vec<u8> {
         let mut out = Vec::with_capacity(36);
         out.extend_from_slice(&mac);
@@ -375,7 +378,7 @@ impl Emulator {
 
     pub fn stop(&mut self) {
         self.emu.run.store(false, Ordering::Relaxed);
-        // acorda o accept bloqueado
+        // wake up the blocked accept
         let _ = TcpStream::connect(("127.0.0.1", self.port));
         if let Some(h) = self.handle.take() {
             let _ = h.join();
@@ -399,7 +402,7 @@ fn serve(lis: TcpListener, emu: Arc<Emu>) {
     }
 }
 
-/// Consome pontos pelo tempo decorrido quando tocando; buffer vazio = underrun -> idle.
+/// Consumes points by elapsed time while playing; empty buffer = underrun -> idle.
 fn drain(st: &mut EmuState) {
     let now = Instant::now();
     if st.status.playback_state == 2 {
@@ -418,8 +421,8 @@ fn drain(st: &mut EmuState) {
 fn handle(conn: TcpStream, emu: &Arc<Emu>) {
     let _ = conn.set_nodelay(true);
     let _ = conn.set_read_timeout(Some(Duration::from_millis(250)));
-    // um comando 'd' de 1200 pontos sao 21603 bytes: sem buffer isso viraria 3 syscalls
-    // (1 + 2 + 21600) e 3 acordadas de thread por frame, que aparecem no CPU do feed.
+    // a 'd' command of 1200 points is 21603 bytes: without buffering that would become 3
+    // syscalls (1 + 2 + 21600) and 3 thread wakeups per frame, which show up in the feed CPU.
     let mut rd = std::io::BufReader::with_capacity(64 * 1024, &conn);
     let mut resp = Vec::with_capacity(RESP_LEN);
     let mut raw: Vec<u8> = Vec::new();
@@ -439,13 +442,13 @@ fn handle(conn: TcpStream, emu: &Arc<Emu>) {
             Err(e)
                 if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::TimedOut =>
             {
-                continue; // ocioso: so volta para conferir o run
+                continue; // idle: it only loops back to check run
             }
             Err(_) => return,
         }
         let c = one[0];
         let mut ack = b'a';
-        // le o corpo do comando fora do lock
+        // read the command body outside the lock
         let mut args = [0u8; 6];
         let mut npts = 0usize;
         match c {
@@ -537,7 +540,7 @@ mod tests {
     use crate::frame::Frame;
 
     #[test]
-    fn encode_data_igual_ao_python() {
+    fn encode_data_same_as_python() {
         let mut buf = Vec::new();
         encode_data(
             &[
@@ -561,7 +564,7 @@ mod tests {
     }
 
     #[test]
-    fn beacon_do_emulador_parseia() {
+    fn emulator_beacon_parses() {
         let emu = Emulator::start(1800).unwrap();
         let b = emu.beacon([1, 2, 3, 4, 5, 6]);
         let (mac, hw, sw, cap, rate, st) = parse_beacon(&b).unwrap();
@@ -572,7 +575,7 @@ mod tests {
     }
 
     #[test]
-    fn loopback_com_emulador() {
+    fn loopback_with_emulator() {
         let emu = Emulator::start(1800).unwrap();
         {
             let mut dac = EtherDream::connect(&format!("127.0.0.1:{}", emu.port), 1800).unwrap();

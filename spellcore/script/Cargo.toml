@@ -6,11 +6,11 @@ edition.workspace = true
 [dependencies]
 engine = { workspace = true }
 serde_json = { workspace = true }
-# rhai minimo: std (sem no_std, precisa de arquivo e float), sync (FrameHook: Send),
-# no_custom_syntax (nenhuma sintaxe nova no show), no_time (relogio vem do engine),
-# only_i64 (um so tipo inteiro), no_module (script nao importa modulo),
-# no_closure (nenhum closure no show). Testado e recusado: no_object corta a sintaxe
-# de metodo `x.len()` e quebra o medgrupo.rhai; no_position poupa 28 672 bytes mas
-# apaga linha/coluna do erro de compilacao do show. ponytail: fila de features fixa ;
-# revisar quando o .rhai do show precisar de mapa, modulo ou closure.
+# minimal rhai: std (no no_std, it needs files and floats), sync (FrameHook: Send),
+# no_custom_syntax (no new syntax in the show), no_time (the clock comes from the engine),
+# only_i64 (a single integer type), no_module (the script imports no module),
+# no_closure (no closure in the show). Tried and rejected: no_object cuts the method
+# syntax `x.len()` and breaks medgrupo.rhai; no_position saves 28 672 bytes but erases
+# the line/column of the show compilation error. ponytail: fixed feature list ;
+# revisit when the show .rhai needs a map, a module or a closure.
 rhai = { version = "1.26", default-features = false, features = ["std", "sync", "no_custom_syntax", "no_time", "only_i64", "no_module", "no_closure"] }

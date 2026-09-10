@@ -1,6 +1,6 @@
-// Criterion: o caminho quente do pixel mapping — 100 000 pixels de um frame 1080p, nearest e
-// bilinear, mais o custo de um universo sozinho (170 pixels) para separar rayon de amostragem.
-// Saida ASCII pura (console cp1252).
+// Criterion: the hot path of pixel mapping - 100 000 pixels from a 1080p frame, nearest and
+// bilinear, plus the cost of a single universe (170 pixels) to separate rayon from sampling.
+// Pure ASCII output (cp1252 console).
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use pixelmap::{grid, Frame, Mapper, Order};
@@ -34,7 +34,7 @@ fn bench(c: &mut Criterion) {
     });
 
     let mut um = Mapper::new(&grid(170, 1, 1, Order::Rgb));
-    c.bench_function("1 universo (170 px) nearest", |b| {
+    c.bench_function("1 universe (170 px) nearest", |b| {
         b.iter(|| {
             um.render(black_box(&frame));
             black_box(um.universe(1).map(|d| d[0]))
