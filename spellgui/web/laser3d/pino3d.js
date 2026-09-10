@@ -14,9 +14,13 @@ window.Pino3D = (function () {
     add(head, new THREE.BoxGeometry(.004, .012, .003), m.dark, .0105, .008, .004, "pino.bye", "trava: solta o Pino");
     add(head, new THREE.CylinderGeometry(.007, .0075, .022, 16), m.rubber, 0, -.038, 0);
     var eyes = [], pupils = []; [-.007, .007].forEach(function (x) { var e = add(head, new THREE.SphereGeometry(.006, 16, 12), m.white, x, .014, .0085); e.castShadow = false; eyes.push(e); var p = add(e, new THREE.SphereGeometry(.0032, 12, 8), m.black, 0, 0, .0045); p.castShadow = false; pupils.push(p); var b = add(head, new THREE.BoxGeometry(.009, .0015, .0015), m.dark, x, .0225, .009); b.rotation.z = x < 0 ? .3 : -.3; });
-    // cabo: da bota, enrolado no case, até a fêmea plugada no DMX OUT (mundo −.015, .359, .215)
-    var pts = [[0, .0337, .0144], [.01, .012, .035], [.035, .004, .055], [-.01, .004, .07], [-.05, .004, .04], [-.04, .004, -.01], [-.12, .004, -.02], [-.2, .004, .02], [-.27, .03, .05], [-.295, .059, .055]];
-    g.add(X.tube(pts, .003)); var fem = add(scene, new THREE.CylinderGeometry(.011, .011, .045, 20), m.silver, -.015, .359, .19); fem.rotation.x = PI / 2; add(scene, new THREE.CylinderGeometry(.0075, .007, .016, 16), m.rubber, -.015, .359, .219).rotation.x = PI / 2;
+    /* Cabo: da bota, enrolado no case, até a fêmea plugada no DMX OUT — que fica em (.038, .338,
+       .1503) no mundo (`body.L.dmxOut`, painel em z = D/2, corpo em y = .314). A fêmea estava presa
+       nas coordenadas de um layout de painel antigo (−.015, .359, .19): o Pino aparecia plugado no
+       ar, 5 cm ao lado da porta, e o painel DMX OUT dizia "o Pino está plugado aqui" sobre um
+       conector vazio. */
+    var pts = [[0, .0337, .0144], [.01, .012, .035], [.035, .004, .055], [-.01, .004, .07], [-.05, .004, .04], [-.04, .004, -.01], [-.12, .004, -.02], [-.2, .004, .02], [-.225, .006, .045], [-.242, .038, .053]];
+    g.add(X.tube(pts, .003)); var fem = add(scene, new THREE.CylinderGeometry(.011, .011, .045, 20), m.silver, .038, .338, .173); fem.rotation.x = PI / 2; add(scene, new THREE.CylinderGeometry(.0075, .007, .016, 16), m.rubber, .038, .338, .203).rotation.x = PI / 2;
     // balão
     var bal = document.createElement("div"); bal.className = "bal"; stage.appendChild(bal); var talking = 0, t = 0, blink = 0, gone = false, cur = null, v = new THREE.Vector3();
     function say(text, items, hint) { bal.innerHTML = '<span class="x">×</span><b>' + text + "</b>" + (items ? "<ul>" + items.map(function (it) { return "<li data-a=\"" + it[0] + "\">" + it[1] + (it[2] ? " <small>" + it[2] + "</small>" : "") + "</li>"; }).join("") + "</ul>" : "") + (hint === false ? "" : '<div class="hint">' + (hint || "os pinos são o menu: 1 laser · 2 fósforo · 3 patchbay · 4 teatro · 5 info · trava = some") + "</div>"); bal.classList.add("on"); talking = 1.2; }
