@@ -306,7 +306,12 @@
   function loadFile(f) { if (!f) return; var r = new FileReader(); r.onload = function () { try { var d = ILDA.parse(r.result); if (!d.frames.length) throw 0; S.show = d.frames; S.frame = 0; S.pos = 0; ENG.file = ""; S.name = f.name + " · " + d.frames.length + " frames"; if (S.mode === "splash") skipSplash(); setCam("rear"); PANELS.ilda(); remember(); pino.say("Entrou pela ILDA IN: " + f.name + ", " + d.frames.length + " frames, " + d.frames[0].length + " pontos no primeiro. " + (d.frames[0].length > 1200 ? "Denso. Se piscar, abre a tampa e sobe os kpps no galvo." : "Leve. Vai voar.") + (S.key ? "" : " Arma a chave para ver na parede."), null, false); } catch (x) { pino.say("Isso não é ILDA. Formato 2 (só paleta) eu pulo, 0/1/4/5 eu leio.", null, false); } }; r.readAsArrayBuffer(f); }
 
   /* ---------- Pino ---------- */
-  var pino = Pino3D.build(THREE, X, scene, pick, stage, cam, { on: onPin });
+  // O DMX OUT e' a ponta de baixo do cabo: quem sabe onde ele esta' e' o chassi (`B.dmxOutWorld`,
+  // contrato do body.js). Sem ele, a coordenada do painel de hoje.
+  var pino = Pino3D.build(THREE, X, scene, pick, stage, cam, { on: onPin, target: B.dmxOutWorld || new THREE.Vector3(.038, .338, .173) });
+  Bind.def("pino.hide", "Pino: some da tela / volta", function () { if (pino.alive()) pino.bye(); else pino.back(); });
+  // o custo da corda em ms por quadro fica legivel de fora (erro e' dado; a frente de usabilidade mede por aqui)
+  window.SC = window.SC || {}; SC.pinoCost = function () { return pino.cost(); }; SC.pinoRopeLive = function () { return pino.alive(); };
   // O Pino é o menu do programa: cada pino é uma tela. Nada entra aqui por conveniência de
   // software — o item só existe se for peça do aparelho, e a frase do balão diz qual peça é.
   var MENU = [["ilda", "1 · LASER", "este aparelho"], ["ndi", "2 · FÓSFORO", "o conversor de rede que ainda não existe"], ["orq", "3 · PATCHBAY", "o painel de jacks: o que liga no quê"],
