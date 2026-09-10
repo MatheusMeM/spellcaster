@@ -35,7 +35,7 @@ window.OPTICS = function (THREE, X, body, pick) {
     steel: X.M(0x4a5058, { metalness: 1, roughness: .38, roughnessMap: X.brushR, envMapIntensity: .55 }),
     brass: X.M(0x6d5320, { metalness: 1, roughness: .46, roughnessMap: X.brushR, envMapIntensity: .5 }),
     rubber: X.M(0x030304, { metalness: 0, roughness: .95, roughnessMap: X.grainR }),
-    mirror: X.M(0xc8d2db, { metalness: .5, roughness: .2, envMapIntensity: 2.4, side: THREE.DoubleSide }),
+    mirror: X.M(0xe6edf4, { metalness: 1, roughness: .045, envMapIntensity: 1.6, side: THREE.DoubleSide }),   // 1a superficie: metal puro, senao o spot estoura e vira papel branco
     ic: X.M(0x030405, { metalness: .04, roughness: .8, roughnessMap: X.grainR }),
     pin: X.M(0x35393d, { metalness: .9, roughness: .35 }),
     cap: X.M(0x070c17, { metalness: .3, roughness: .5 }),
@@ -102,7 +102,7 @@ window.OPTICS = function (THREE, X, body, pick) {
     l.castShadow = false; lens[k] = { m: l, c: color };
     if (fan) { var f = add(b, new THREE.PlaneGeometry(.028, .028), X.M(0xffffff, { map: fanT, metalness: .1, roughness: .75 }), 0, .005, .0335); f.castShadow = false; }
     add(b, X.rbox(.012, .008, .005, .001), mm.conn, .011, -.011, .0345);                      // conector de potência
-    var t = add(b, new THREE.PlaneGeometry(.026, .006), X.M(0xffffff, { map: label(256, 60, txt), metalness: 0, roughness: .7 }), 0, .0192, -.0175);
+    var t = add(b, new THREE.PlaneGeometry(.026, .006), X.M(0xffffff, { map: label(256, 60, txt), metalness: 1, roughness: .55, envMapIntensity: .5 }), 0, .0192, -.0175);
     t.rotation.x = -PI / 2; t.castShadow = false;
     return g;
   }
@@ -119,15 +119,15 @@ window.OPTICS = function (THREE, X, body, pick) {
     var bs = sub(g, 0, 0, 0, -PI / 4);                                                        // pé alinhado à grade
     add(bs, X.rbox(.036, .006, .020, .0015), mm.anodG, 0, -.032, 0);
     bolts(bs, [[-.0125, 0], [.0125, 0]], -.0277, .003);
-    add(g, X.rbox(.016, .030, .014, .0015), mm.anodG, 0, -.016, -.0095);                      // poste
-    add(g, X.ring(.030, .0105, .005), mm.anodG, 0, 0, -.0095);                                // placa de trás
-    add(g, X.ring(.026, .0105, .004), mm.anodG, 0, 0, -.002);                                 // placa do espelho
+    add(g, X.rbox(.016, .026, .014, .0015), mm.anodG, 0, -.020, -.0095);                      // poste (topo 5,5 mm abaixo do feixe: o chanfro do rbox soma 1,5 mm de cada lado)
+    add(g, X.ring(.030, .0140, .004), mm.anodG, 0, 0, -.0075);                                // placa de trás (furo largo: o feixe transmitido atravessa a 45°)
+    add(g, X.ring(.026, .0120, .003), mm.anodG, 0, 0, -.0022);                                // placa do espelho
     [[-.0105, .0105], [.0105, -.0105]].forEach(function (p) {                                 // parafusos de ajuste
       var s = add(g, cyl(.0026, .0115, 12), mm.steel, p[0], p[1], -.0058); s.rotation.x = PI / 2;
       add(s, cyl(.0038, .0022, 16), mm.anod, 0, -.0058, 0); });
     add(g, cyl(.0016, .0075, 8), mm.steel, .0105, .0105, -.0058).rotation.x = PI / 2;         // mola
     var gl = add(g, new THREE.CircleGeometry(.0115, 32), glassMat, 0, 0, 0); gl.castShadow = false;
-    add(g, X.ring(.026, .0105, .0016), mm.anod, 0, 0, .0009);                                 // anel de retenção
+    add(g, X.ring(.026, .0120, .0014), mm.anod, 0, 0, .0011);                                 // anel de retenção
     return g;
   }
   mount(GX(9), GZ(7), m.dichro(0x9fffd8), "dichro");   // x = -.05,   junta G + R
@@ -186,14 +186,14 @@ window.OPTICS = function (THREE, X, body, pick) {
   // --- galvo Y: motor na chapa a 45°, eixo dentro do plano do espelho
   var yg = sub(gb, .0075, .035, 0, A45);
   motor(yg, .024, .0175);
-  add(yg, X.ring(.026, .00745, .008), mm.anodG, 0, 0, .0135);                                      // abraçadeira na chapa
+  add(yg, X.ring(.026, .00745, .008), mm.anodG, 0, 0, .0240);                                      // abraçadeira no corpo (fora do feixe de saída)
   var myp = sub(yg, 0, 0, 0);                                                                      // O.mirY: gira em torno de z local
   add(myp, cyl(.0015, .014, 10), mm.steel, 0, 0, .0105).rotation.x = PI / 2;
   add(myp, new THREE.BoxGeometry(.0030, .013, .006), mm.anodG, -.0023, 0, .0035);
   add(myp, new THREE.BoxGeometry(.0006, .012, .014), mm.mirror, .0011, 0, 0);                       // espelho Y 14 x 12 mm
   // --- plaquinhas de identificação no pé
   [["GALVO X", -.0125], ["GALVO Y", .017]].forEach(function (p) {
-    var t = add(gb, new THREE.PlaneGeometry(.019, .0042), X.M(0xffffff, { map: label(256, 56, p[0], 30), metalness: 0, roughness: .7 }), p[1], .0062, .0148);
+    var t = add(gb, new THREE.PlaneGeometry(.019, .0042), X.M(0xffffff, { map: label(256, 56, p[0], 30), metalness: 1, roughness: .55, envMapIntensity: .5 }), p[1], .0085, .0148);                     // 0,5 mm acima do pe (o chanfro do rbox leva o topo a .008)
     t.rotation.x = -PI / 2; t.castShadow = false; });
 
   /* ---------- placas de circuito ----------
