@@ -1,6 +1,6 @@
 #!/bin/sh
-# Tarball Lite para Raspberry Pi OS: pacote Python (stdlib pura) + shows + profiles + systemd + install.sh.
-# Uso: sh packaging/build_lite.sh [pasta-de-saida]      (default: /tmp)
+# Lite tarball for Raspberry Pi OS: Python package (pure stdlib) + shows + profiles + systemd + install.sh.
+# Usage: sh packaging/build_lite.sh [output-folder]      (default: /tmp)
 set -e
 OUT=${1:-/tmp}
 

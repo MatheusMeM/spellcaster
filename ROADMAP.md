@@ -1,222 +1,222 @@
-# Spellcaster — roadmap (protótipo Python F0–F7; estado das fases Rust na seção 7)
+# Spellcaster — roadmap (Python prototype F0–F7; state of the Rust phases in section 7)
 
-Show-control portátil da Feitiçaria Industrial: timeline + sACN / Art-Net / OSC / ILDA (laser), GUI web com skins, MCP embutido, player standalone, versão Lite para Raspberry Pi (CLI pura por SSH). Repositório: github.com/MatheusMeM/spellcaster. Pacote Python `spellcaster`, CLI `spell`.
+Portable show control by Feitiçaria Industrial: timeline + sACN / Art-Net / OSC / ILDA (laser), web GUI with skins, embedded MCP, standalone player, Lite version for the Raspberry Pi (pure CLI over SSH). Repository: github.com/MatheusMeM/spellcaster. Python package `spellcaster`, CLI `spell`.
 
-Origem: o gerador sACN de `show_medgrupo.py` (plenária MED GRUPO RJ, 09/2026). Tudo que já foi calibrado lá (pacote E1.31, perfis BSW/Sharpy/BX-402, geometria de grupo com histerese e rampa, cues por corte de vídeo) migra para cá como código de produção.
+Origin: the sACN generator in `show_medgrupo.py` (MED GRUPO RJ plenary, 09/2026). Everything already calibrated there (E1.31 packet, BSW/Sharpy/BX-402 profiles, group geometry with hysteresis and ramp, cues on video cuts) migrates here as production code.
 
-## 1. Decisões de stack
+## 1. Stack decisions
 
-| Decisão | Escolha | Por quê |
+| Decision | Choice | Why |
 |---|---|---|
-| Linguagem | Python 3.13, stdlib primeiro | Reaproveita o que existe; roda nativo no Raspberry Pi; o time já opera em Python. |
-| GUI | Web (HTML/CSS/JS vanilla) servida pelo próprio processo; janela via `pywebview` (WebView2, já presente no Windows 10/11) | Uma GUI serve o desktop, o Pi Lite (acessado pelo navegador) e o tablet na mesa. Skins = CSS. Zero framework JS. |
-| Timeline | Editor em `<canvas>` próprio | Nenhuma lib pronta atende timeline de show (tracks heterogêneas, curvas, cues, markers de vídeo). |
-| Empacotamento Windows | PyInstaller **onedir** numa pasta do pendrive + `Spellcaster.exe` | Onefile extrai em `%TEMP%` a cada abertura (lento, dispara antivírus). Onedir abre em < 1 s e não grava nada fora do pendrive. |
-| Lite (Pi) | Mesmo pacote sem `pywebview`; `pip install` ou tarball; serviço `systemd` | Mesmo código, mesma GUI (pelo navegador), sem tela no Pi. |
-| Arquivo de show | JSON legível (`.spell`) | Git-friendly; o MCP e o humano leem o mesmo arquivo. |
-| MCP | Gerado automaticamente do registro de comandos do engine | AI-nativo por construção: cada comando existe uma vez e aparece em CLI, GUI, OSC-API e MCP. |
-| Laser (ILDA) | Sem placa ILDA no PC: o engine gera frames ILDA e envia para DACs de rede/USB: Ether Dream (UDP/TCP aberto), IDN-Stream (padrão ILDA Digital Network, Ethernet), Helios (USB, via `libusb`/`pyusb`). Arquivos `.ild` como clipes. | São os protocolos abertos; cobrem os DACs que a Feitiçaria usa e o que um Pi consegue alimentar. Saída ILDA analógica só via DAC. |
-| Modo CLI | `spell` funciona 100 % por terminal: `play`, `net`, `patch`, `tui` (monitor `curses`) | No Pi por SSH não há GUI; tudo que a GUI faz tem verbo de CLI porque ambos chamam o registry. |
-| Dependências | `pywebview`, `mcp` (SDK oficial), opcionais `pyusb` (Helios), `python-rtmidi`, `numpy` | Só o que uma linha de stdlib não faz. |
+| Language | Python 3.13, stdlib first | Reuses what exists; runs natively on the Raspberry Pi; the team already works in Python. |
+| GUI | Web (vanilla HTML/CSS/JS) served by the process itself; window via `pywebview` (WebView2, already present on Windows 10/11) | One GUI serves the desktop, the Pi Lite (reached through a browser) and the tablet on the console. Skins = CSS. Zero JS framework. |
+| Timeline | Our own `<canvas>` editor | No off-the-shelf library covers a show timeline (heterogeneous tracks, curves, cues, video markers). |
+| Windows packaging | PyInstaller **onedir** in a folder on the USB stick + `Spellcaster.exe` | Onefile extracts into `%TEMP%` on every start (slow, sets off antivirus). Onedir opens in < 1 s and writes nothing outside the USB stick. |
+| Lite (Pi) | Same package without `pywebview`; `pip install` or tarball; `systemd` service | Same code, same GUI (through the browser), with no screen on the Pi. |
+| Show file | Readable JSON (`.spell`) | Git-friendly; the MCP and the human read the same file. |
+| MCP | Generated automatically from the engine's command registry | AI-native by construction: each command exists once and shows up in CLI, GUI, OSC-API and MCP. |
+| Laser (ILDA) | No ILDA board in the PC: the engine generates ILDA frames and sends them to network/USB DACs: Ether Dream (open UDP/TCP), IDN-Stream (ILDA Digital Network standard, Ethernet), Helios (USB, via `libusb`/`pyusb`). `.ild` files as clips. | These are the open protocols; they cover the DACs Feitiçaria uses and what a Pi can feed. Analogue ILDA output only through a DAC. |
+| CLI mode | `spell` works 100 % from a terminal: `play`, `net`, `patch`, `tui` (`curses` monitor) | On the Pi over SSH there is no GUI; everything the GUI does has a CLI verb because both call the registry. |
+| Dependencies | `pywebview`, `mcp` (official SDK), optional `pyusb` (Helios), `python-rtmidi`, `numpy` | Only what a line of stdlib cannot do. |
 
-## 2. Arquitetura
+## 2. Architecture
 
 ```
 spellcaster/
   core/
-    clock.py        relógio único (perf_counter), tick 30/60 Hz, transporte play/pause/stop/locate
-    registry.py     @command: nome, args tipados, doc → CLI + OSC-API + MCP + GUI
-    universe.py     buffers DMX (N universos), merge HTP/LTP por fonte
-    engine.py       loop: timeline → parâmetros → fixtures → universos → saídas
+    clock.py        single clock (perf_counter), 30/60 Hz tick, play/pause/stop/locate transport
+    registry.py     @command: name, typed args, doc → CLI + OSC-API + MCP + GUI
+    universe.py     DMX buffers (N universes), HTP/LTP merge per source
+    engine.py       loop: timeline → parameters → fixtures → universes → outputs
   protocols/
-    sacn.py         E1.31 out/in, discovery (239.255.250.214), prioridade, sync
+    sacn.py         E1.31 out/in, discovery (239.255.250.214), priority, sync
     artnet.py       ArtDmx out/in, ArtPoll/ArtPollReply, ArtSync
     osc.py          OSC 1.0 out/in (UDP), bundles, timetag, pattern matching
-    netscan.py      interfaces, ArtPoll, sACN discovery, mDNS _osc._udp, Ether Dream/IDN discovery, sugestão de IP/subrede
+    netscan.py      interfaces, ArtPoll, sACN discovery, mDNS _osc._udp, Ether Dream/IDN discovery, IP/subnet suggestion
     ilda/
-      frame.py      ponto ILDA (x, y, r, g, b, blank), frame, otimização (blanking, dwell, interpolação, limite de scan)
-      ild.py        leitura/escrita .ild (formatos 0/1/2/4/5) — migra de ilda_gen.py
-      etherdream.py Ether Dream: broadcast de descoberta, TCP stream de pontos, buffer
-      idn.py        IDN-Stream (ILDA Digital Network) sobre UDP
-      helios.py     Helios USB (opcional, pyusb)
+      frame.py      ILDA point (x, y, r, g, b, blank), frame, optimization (blanking, dwell, interpolation, scan limit)
+      ild.py        .ild read/write (formats 0/1/2/4/5) — migrated from ilda_gen.py
+      etherdream.py Ether Dream: discovery broadcast, TCP point stream, buffer
+      idn.py        IDN-Stream (ILDA Digital Network) over UDP
+      helios.py     Helios USB (optional, pyusb)
   fixtures/
-    profile.py      perfil por nome de canal (pan16, tilt16, color, shutter…), faixas e rodas
-    fixture.py      Fixture(perfil, universo, addr).set(dimmer=…, color="amarelo", pan_deg=…)
-    group.py        Group + geometria (reto, sinal lateral, amplitude), histerese de pan, rampa
-    library/        BSW, Sharpy, BX-402, BX-940, WLED bar, laser Butrym… (JSON)
+    profile.py      profile by channel name (pan16, tilt16, color, shutter…), ranges and wheels
+    fixture.py      Fixture(profile, universe, addr).set(dimmer=…, color="amarelo", pan_deg=…)
+    group.py        Group + geometry (straight, side signal, amplitude), pan hysteresis, ramp
+    library/        BSW, Sharpy, BX-402, BX-940, WLED bar, Butrym laser… (JSON)
   timeline/
-    model.py        Sequence → Track → Clip/Keyframe; curvas (linear, ease, hold, bezier); markers
-    tracks.py       tipos: fixture-param, dmx-raw, osc, artnet-raw, laser (clipe .ild ou gerador), cue-trigger, media-control, python-fx
+    model.py        Sequence → Track → Clip/Keyframe; curves (linear, ease, hold, bezier); markers
+    tracks.py       types: fixture-param, dmx-raw, osc, artnet-raw, laser (.ild clip or generator), cue-trigger, media-control, python-fx
     cues.py         cue list (GO / follow / wait), snapshots, fades
-    render.py       avalia a timeline em t → dicionário de parâmetros
+    render.py       evaluates the timeline at t → parameter dictionary
   player/
-    player.py       modo standalone/headless: carrega .spell, roda, aceita OSC/HTTP para transporte
+    player.py       standalone/headless mode: loads a .spell, runs it, accepts OSC/HTTP for transport
   gui/
-    server.py       HTTP + WebSocket (stdlib `http.server` + handshake WS manual ou `websockets`)
+    server.py       HTTP + WebSocket (stdlib `http.server` + manual WS handshake or `websockets`)
     web/            index.html, timeline.js, patch.js, monitor.js, skins/
-    window.py       pywebview (só desktop)
+    window.py       pywebview (desktop only)
   mcp/
-    server.py       MCP stdio + HTTP streamable, tools/resources/prompts gerados do registry
-  cli.py            spell play|stop|net|patch|calib|laser|serve|tui|mcp|export — cada verbo é um comando do registry
-  tui.py            monitor curses: transporte, universos, fontes, laser, log — para SSH no Pi
-  show.py           load/save .spell, migrações de versão
+    server.py       MCP stdio + streamable HTTP, tools/resources/prompts generated from the registry
+  cli.py            spell play|stop|net|patch|calib|laser|serve|tui|mcp|export — every verb is a registry command
+  tui.py            curses monitor: transport, universes, sources, laser, log — for SSH on the Pi
+  show.py           .spell load/save, version migrations
 ```
 
-Princípio: **o engine não sabe que existe GUI**. GUI, CLI, OSC-API e MCP são clientes do mesmo registro de comandos via WebSocket/stdio. Isso é o que torna o Lite e o MCP baratos.
+Principle: **the engine does not know a GUI exists**. GUI, CLI, OSC-API and MCP are clients of the same command registry over WebSocket/stdio. That is what makes Lite and MCP cheap.
 
-## 3. Fases
+## 3. Phases
 
-Cada fase termina com algo usável em trabalho real. Ordem fixa; prazos são estimativa para uma pessoa em dedicação parcial.
+Each phase ends with something usable in real work. Fixed order; the timings are an estimate for one person working part time.
 
-### F0 — Fundação e protocolos (semana 1–2)
-- Migrar `sacn` de `show_medgrupo.py` para `protocols/sacn.py` com N universos e entrada.
+### F0 — Foundation and protocols (week 1–2)
+- Migrate `sacn` from `show_medgrupo.py` into `protocols/sacn.py` with N universes and input.
 - `artnet.py` out/in + ArtPoll; `osc.py` out/in.
-- `clock.py`, `registry.py`, `engine.py` com uma `look(t)` Python como track (compatibilidade com o show do MED GRUPO).
-- CLI: `spell play shows/medgrupo.py` reproduz o show atual sem GUI.
-- Aceite: Capture recebe sACN e Art-Net idênticos; `ffmpeg`-style loopback test compara pacotes byte a byte com fixtures gravadas.
+- `clock.py`, `registry.py`, `engine.py` with a Python `look(t)` as a track (compatible with the MED GRUPO show).
+- CLI: `spell play shows/medgrupo.py` plays the current show without a GUI.
+- Acceptance: Capture receives identical sACN and Art-Net; an `ffmpeg`-style loopback test compares packets byte for byte against recorded fixtures.
 
-### F1 — Análise de rede (semana 2)
-- `spell net`: interfaces, IP/máscara, nós Art-Net (ArtPollReply), fontes sACN (discovery + escuta), dispositivos OSC (mDNS), latência.
-- Sugestão automática: "Art-Net exige 2.x.x.x ou 10.x.x.x; sua placa está em 192.168…" com comando `netsh` pronto (não executa sozinho).
-- Aceite: relatório em texto e JSON na GUI e no MCP.
+### F1 — Network scan (week 2)
+- `spell net`: interfaces, IP/mask, Art-Net nodes (ArtPollReply), sACN sources (discovery + listening), OSC devices (mDNS), latency.
+- Automatic suggestion: "Art-Net requires 2.x.x.x or 10.x.x.x; your board is on 192.168…" with a ready `netsh` command (it does not run by itself).
+- Acceptance: report in text and JSON in the GUI and in the MCP.
 
-### F2 — Perfis e patch (semana 3)
-- Formato de perfil JSON por nome de canal, com faixas (zoom 80–255 = 13–36°), rodas nomeadas, 16 bit.
-- Importar os perfis já calibrados; importador GDTF fica no backlog.
-- Patch: universo/endereço, detecção de sobreposição (o bug dos 17 ch em espaçamento de 16 vira erro na hora).
-- `Group` com geometria calibrável e ferramenta `spell calib hold|sweep` (o `bsw_hold`/`bsw_multi` de hoje).
-- Aceite: show MED GRUPO reescrito em fixtures nomeadas, sem índice de canal no código.
+### F2 — Profiles and patch (week 3)
+- JSON profile format by channel name, with ranges (zoom 80–255 = 13–36°), named wheels, 16 bit.
+- Import the already-calibrated profiles; a GDTF importer stays in the backlog.
+- Patch: universe/address, overlap detection (the 17 ch bug on a 16-channel spacing becomes an error right away).
+- `Group` with calibratable geometry and the `spell calib hold|sweep` tool (today's `bsw_hold`/`bsw_multi`).
+- Acceptance: the MED GRUPO show rewritten with named fixtures, no channel index in the code.
 
-### F3 — Timeline engine + arquivo de show + Player (semana 4–5)
-- Modelo Sequence/Track/Keyframe, curvas, markers importados de vídeo (`ffmpeg` scene detect) e de áudio (beats).
-- Tracks: parâmetro de fixture, DMX cru, OSC, Art-Net cru, cue-trigger, media-control (Capture media player, VLC via OSC), python-fx (função `f(t)` embutida para efeitos gerativos).
-- Cue list com GO/follow/wait e fades entre snapshots.
-- Laser: track `laser` com clipes `.ild` e geradores (formas, texto, scanner de figuras como o do MED GRUPO), transformações (posição, escala, rotação, cor), safety (limite de tamanho mínimo, zona proibida, intensidade máxima) e saída para Ether Dream / IDN / Helios em thread própria a 20–30 kpps.
-- `spell play show.spell` headless = **Player standalone** pronto; transporte por OSC (`/spellcaster/play`), HTTP e teclado.
-- Aceite: o show MED GRUPO expresso 100 % em `.spell`, saída idêntica à versão Python; `medgrupo_laser.ild` tocando num Ether Dream (ou no emulador de rede) sincronizado à timeline.
+### F3 — Timeline engine + show file + Player (week 4–5)
+- Sequence/Track/Keyframe model, curves, markers imported from video (`ffmpeg` scene detect) and from audio (beats).
+- Tracks: fixture parameter, raw DMX, OSC, raw Art-Net, cue-trigger, media-control (Capture media player, VLC over OSC), python-fx (an embedded `f(t)` function for generative effects).
+- Cue list with GO/follow/wait and fades between snapshots.
+- Laser: `laser` track with `.ild` clips and generators (shapes, text, figure scanner like the MED GRUPO one), transforms (position, scale, rotation, colour), safety (minimum size limit, forbidden zone, maximum intensity) and output to Ether Dream / IDN / Helios in its own thread at 20–30 kpps.
+- `spell play show.spell` headless = **standalone Player** ready; transport over OSC (`/spellcaster/play`), HTTP and keyboard.
+- Acceptance: the MED GRUPO show expressed 100 % in `.spell`, output identical to the Python version; `medgrupo_laser.ild` playing on an Ether Dream (or on the network emulator) synced to the timeline.
 
-### F4 — GUI (semana 6–9)
-- Layout inspirado em Chataigne (painéis dockáveis: Patch, Timeline, Outputs, Network, Inspector, Log) e Adobe (timeline com tracks, keyframes, curvas, snapping em markers, scrub, zoom, in/out, loop, régua de tempo/timecode).
-- Timeline em canvas: seleção múltipla, arrastar, copiar/colar, easing por keyframe, solo/mute por track, gravação ao vivo de parâmetros (record arm).
-- Monitor de saída: universos como grade, VU de canais, fontes de entrada.
-- Skins estilo Windows Media Player: pasta `skins/<nome>/` com `skin.json` + `skin.css` + imagens; cromo customizável (bordas, botões de transporte, visualizador); tema claro/escuro; skin padrão Feitiçaria (design system).
-- Aceite: montar do zero, na GUI, um show de 3 minutos com 8 movings, 2 universos, OSC para um player de vídeo, e gravar/reproduzir.
+### F4 — GUI (week 6–9)
+- Layout inspired by Chataigne (dockable panels: Patch, Timeline, Outputs, Network, Inspector, Log) and Adobe (timeline with tracks, keyframes, curves, snapping to markers, scrub, zoom, in/out, loop, time/timecode ruler).
+- Canvas timeline: multiple selection, dragging, copy/paste, per-keyframe easing, solo/mute per track, live parameter recording (record arm).
+- Output monitor: universes as a grid, channel VU, input sources.
+- Windows Media Player-style skins: `skins/<name>/` folder with `skin.json` + `skin.css` + images; customizable chrome (borders, transport buttons, visualizer); light/dark theme; default Feitiçaria skin (design system).
+- Acceptance: build a 3-minute show from scratch in the GUI, with 8 moving lights, 2 universes, OSC to a video player, and record/play it back.
 
-### F5 — MCP e AI-nativo (semana 9–10)
-- Gerador: percorre `registry` e emite tools MCP com schema JSON tipado a partir das assinaturas; resources: show atual, patch, rede, log; prompts: "monte um show a partir deste vídeo", "calibre este grupo".
-- Transportes: stdio (Claude Desktop/Code) e HTTP streamable (remoto, Pi Lite).
-- Comando `spell mcp install` grava a entrada em `claude_desktop_config.json` / `.mcp.json` (pede confirmação).
-- Eventos do engine (frame, cue, erro) como notificações MCP.
-- Aceite: de uma sessão Claude, sem tocar na GUI: escanear rede, patchear, criar timeline com cues nos cortes de um vídeo, dar play e ler o monitor de saída.
+### F5 — MCP and AI-native (week 9–10)
+- Generator: walks the `registry` and emits MCP tools with a typed JSON schema from the signatures; resources: current show, patch, network, log; prompts: "build a show from this video", "calibrate this group".
+- Transports: stdio (Claude Desktop/Code) and streamable HTTP (remote, Pi Lite).
+- The `spell mcp install` command writes the entry into `claude_desktop_config.json` / `.mcp.json` (asks for confirmation).
+- Engine events (frame, cue, error) as MCP notifications.
+- Acceptance: from a Claude session, without touching the GUI: scan the network, patch, build a timeline with cues on a video's cuts, hit play and read the output monitor.
 
-### F6 — Empacotamento portátil e Lite (semana 10–11)
-- Windows: PyInstaller onedir → `Spellcaster/` no pendrive com `Spellcaster.exe`, `shows/`, `skins/`, `profiles/`, `config.json`. Tudo relativo ao executável; nada em `%APPDATA%`. Primeiro boot mostra a análise de rede.
-- Assinatura de código (certificado) para reduzir alarme de antivírus; sem ela, documentar exceção.
-- Lite: `pip install spellcaster[lite]` ou tarball `spellcaster-lite-aarch64.tar.gz`; `spell serve --headless` como serviço `systemd`; GUI pelo navegador em `http://spellcaster.local:8000` **ou só CLI por SSH**: `spell play show.spell`, `spell tui` (monitor curses), `spell net`, `spell laser test`. Sem GUI instalada, sem X, sem navegador. Imagem de cartão SD opcional via `pi-gen`.
-- CI (GitHub Actions): build Windows x64, Linux x64, Linux aarch64; testes de protocolo em loopback.
-- Aceite: pendrive em PC limpo → duplo clique → show rodando em < 10 s. Pi Zero 2 W entregando 8 universos sACN + Art-Net + OSC a 40 Hz e um laser Ether Dream a 20 kpps, operado só por SSH.
+### F6 — Portable packaging and Lite (week 10–11)
+- Windows: PyInstaller onedir → `Spellcaster/` on the USB stick with `Spellcaster.exe`, `shows/`, `skins/`, `profiles/`, `config.json`. Everything relative to the executable; nothing in `%APPDATA%`. The first boot shows the network scan.
+- Code signing (certificate) to reduce antivirus alarm; without it, document the exception.
+- Lite: `pip install spellcaster[lite]` or the `spellcaster-lite-aarch64.tar.gz` tarball; `spell serve --headless` as a `systemd` service; GUI through the browser at `http://spellcaster.local:8000` **or CLI only over SSH**: `spell play show.spell`, `spell tui` (curses monitor), `spell net`, `spell laser test`. No GUI installed, no X, no browser. Optional SD card image via `pi-gen`.
+- CI (GitHub Actions): build Windows x64, Linux x64, Linux aarch64; protocol tests on loopback.
+- Acceptance: USB stick in a clean PC → double click → show running in < 10 s. A Pi Zero 2 W delivering 8 sACN universes + Art-Net + OSC at 40 Hz and an Ether Dream laser at 20 kpps, operated over SSH alone.
 
-### F7 — Backlog (depois de usar em obra)
-Timecode LTC/MTC in, MIDI in/out, GDTF/MVR import, LaserCube/outros DACs proprietários, editor gráfico de frames laser, entrada Art-Net/sACN com merge para "passthrough + overlay", NDI/vídeo nativo no player, macOS build, sincronização multi-máquina (master/slave por clock UDP), scripting Lua/Python ao vivo, undo ilimitado com histórico visual.
+### F7 — Backlog (after using it on a job)
+LTC/MTC timecode in, MIDI in/out, GDTF/MVR import, LaserCube and other proprietary DACs, graphical laser frame editor, Art-Net/sACN input with merge for "passthrough + overlay", native NDI/video in the player, macOS build, multi-machine sync (master/slave over a UDP clock), live Lua/Python scripting, unlimited undo with visual history.
 
-## 4. O que não fazer agora
-- Framework JS (React/Electron): dobra o tamanho e o tempo de boot do pendrive; o canvas próprio dá o controle que uma timeline exige.
-- Banco de dados: o show é um JSON.
-- Plugins binários: tudo Python; efeitos custom são tracks `python-fx`.
-- Vídeo dentro do engine: no F3 o player controla players externos (Capture, VLC, Resolume) por DMX/OSC. Vídeo nativo é F7.
+## 4. What not to do now
+- A JS framework (React/Electron): it doubles the size and the boot time from the USB stick; our own canvas gives the control a timeline demands.
+- A database: the show is a JSON file.
+- Binary plugins: all Python; custom effects are `python-fx` tracks.
+- Video inside the engine: in F3 the player controls external players (Capture, VLC, Resolume) over DMX/OSC. Native video is F7.
 
-## 5. Riscos
-| Risco | Mitigação |
+## 5. Risks
+| Risk | Mitigation |
 |---|---|
-| Jitter do loop Python a 60 Hz com muitos universos | Loop em thread própria com `perf_counter` e compensação de deriva; envio em lote por universo; medido em F0 antes de escolher 30 ou 60 Hz padrão. |
-| WebView2 ausente em PC muito antigo | Fallback: abre no navegador padrão (`spell serve --browser`). |
-| Antivírus no pendrive | Onedir + assinatura; instruções de exceção no `LEIA-ME`. |
-| Timeline em canvas virar um projeto em si | Escopo do F4 travado nos verbos listados; o resto vai para F7. |
-| Laser: ponto parado ou figura pequena demais queima/ofusca | Safety no engine, não na GUI: limite de kpps, tamanho mínimo de figura, zona de exclusão por DAC, shutter por software; testes em loopback antes de F3 fechar. |
-| MCP gerar tools demais e confundir o modelo | Registry marca `mcp=True` só nos comandos de alto nível; os de baixo nível ficam em um tool genérico `run_command`. |
+| Jitter of the Python loop at 60 Hz with many universes | Loop in its own thread with `perf_counter` and drift compensation; batched sending per universe; measured in F0 before choosing 30 or 60 Hz as the default. |
+| WebView2 missing on a very old PC | Fallback: it opens in the default browser (`spell serve --browser`). |
+| Antivirus on the USB stick | Onedir + signing; exception instructions in the `LEIA-ME`. |
+| The canvas timeline turning into a project of its own | The F4 scope is locked to the listed verbs; the rest goes to F7. |
+| Laser: a stopped point or too small a figure burns or dazzles | Safety in the engine, not in the GUI: kpps limit, minimum figure size, exclusion zone per DAC, software shutter; loopback tests before F3 closes. |
+| The MCP generating too many tools and confusing the model | The registry marks `mcp=True` only on the high-level commands; the low-level ones sit in a generic `run_command` tool. |
 
-## 6. Primeiro passo
-F0 começa extraindo `protocols/sacn.py` e `core/clock.py` de `show_medgrupo.py`, com o show do MED GRUPO como teste de regressão: mesma saída, byte a byte.
+## 6. First step
+F0 starts by extracting `protocols/sacn.py` and `core/clock.py` from `show_medgrupo.py`, with the MED GRUPO show as the regression test: same output, byte for byte.
 
-## 7. Fases Rust (PRD v1.1) — estado em 10/09/2026
+## 7. Rust phases (PRD v1.1) — state on 10/09/2026
 
-O plano acima (F0–F7) foi o do protótipo Python e está concluído até F6. O produto segue o
-`PRD.md`: core em Rust, previz em Godot, GUI Tauri com Theme/Face/Graph.
+The plan above (F0–F7) was the Python prototype's and is done up to F6. The product follows
+`PRD.md`: core in Rust, previz in Godot, Tauri GUI with Theme/Face/Graph.
 
-| Fase | Aceite (PRD §6) | Estado | Bloqueio |
+| Phase | Acceptance (PRD §6) | State | Blocker |
 |---|---|---|---|
-| R0 core e protocolos | fixtures byte a byte, `bench/jitter` no alvo, CLI `net` | concluída | — |
-| R1 timeline, cues, .spell, fx, Graph, OSC | graph de 500 nós < 0,1 ms/frame; player headless | concluída (8,4 µs) | — |
-| R2 mídia (GStreamer, NDI, RTSP, Spout) | 1080p60 no alvo de CPU | pendente | SDKs não instalados (GStreamer, NDI) |
-| R3 pixel mapping (rayon; wgpu depois) | 100 000 px a 60 Hz < 2 ms | concluída (0,105 ms p50 / 0,316 ms p99 por frame; bilinear 0,196 / 0,493) | crate autônomo: ligar a fonte de frame ao player espera a R2 |
-| R4 laser multi-feed | Ether Dream, IDN; safety no engine; 4 feeds | concluída (0,83 % cpu) | — |
-| R5 GUI (janela própria) | show de 3 min do zero; Face em modo performance | em uso desde a v0.1.0: `spellcaster.exe` (crate `spellcore/gui`, `tao` + `wry`/WebView2, sem Tauri) sobe o barramento em processo e abre em `spellgui/web/laser3d/app.html` — o projetor laser em 3D (modelo PBR completo, câmera SolidWorks por vista, HUD com LEDs, gaveta de abas, Pino na câmera, bindings tecla+MIDI, menu de VÍDEO com predefinições, parede em WebGL), ligado ao registry por `bus.js`, sem rede; as outras páginas ligadas pela barra `nav.js`; falta Theme e os editores (R9) | inglês da UI e seletor de idioma; passada de usabilidade |
-| R6 previz Godot | 60 fps, 64 fixtures, 2 LED walls | pendente | Godot não instalado |
-| R7 MCP com rmcp | sessão de IA monta e toca um show sem GUI | concluída em stdio; edição de show (patch, track, key, cue) no registry (`engine::edit`) | `spell://face`/`spell://graph` pendentes; transporte HTTP streamable em `/mcp` entregue pela F1 (`serve`) |
-| R8 empacotamento | onedir, Linux, Pi estático; CI com bench como gate | concluída | — |
-| R9 editores de Face/Graph + painel Agent | operador monta uma Face em 10 min | pendente | depende de R5 |
+| R0 core and protocols | fixtures byte for byte, `bench/jitter` on target, CLI `net` | done | — |
+| R1 timeline, cues, .spell, fx, Graph, OSC | 500-node graph < 0.1 ms/frame; headless player | done (8.4 µs) | — |
+| R2 media (GStreamer, NDI, RTSP, Spout) | 1080p60 within the CPU target | pending | SDKs not installed (GStreamer, NDI) |
+| R3 pixel mapping (rayon; wgpu later) | 100,000 px at 60 Hz < 2 ms | done (0.105 ms p50 / 0.316 ms p99 per frame; bilinear 0.196 / 0.493) | standalone crate: wiring the frame source to the player waits on R2 |
+| R4 multi-feed laser | Ether Dream, IDN; safety in the engine; 4 feeds | done (0.83 % cpu) | — |
+| R5 GUI (own window) | 3-min show from scratch; Face in performance mode | in use since v0.1.0: `spellcaster.exe` (crate `spellcore/gui`, `tao` + `wry`/WebView2, no Tauri) starts the bus in process and opens at `spellgui/web/laser3d/app.html` — the 3D laser projector (full PBR model, SolidWorks camera per view, HUD with LEDs, tabbed drawer, Pino on the camera, key+MIDI bindings, VIDEO menu with presets, wall in WebGL), wired to the registry by `bus.js`, without a network; the other pages wired by the `nav.js` bar; Theme and the editors (R9) missing | language selector (UI is English now); usability pass |
+| R6 Godot previz | 60 fps, 64 fixtures, 2 LED walls | pending | Godot not installed |
+| R7 MCP with rmcp | an AI session builds and plays a show without a GUI | done over stdio; show editing (patch, track, key, cue) in the registry (`engine::edit`) | `spell://face`/`spell://graph` pending; streamable HTTP transport at `/mcp` delivered by F1 (`serve`) |
+| R8 packaging | onedir, Linux, static Pi; CI with the bench as a gate | done | — |
+| R9 Face/Graph editors + Agent panel | an operator builds a Face in 10 min | pending | depends on R5 |
 
-## 8. Design — rodadas e branches (10/09/2026)
+## 8. Design — rounds and branches (10/09/2026)
 
-O departamento de design trabalha em branches próprias e publica cada rodada como protótipo
-HTML (three.js) num artifact; o voto do dono decide o que entra. Regra: função antes de UI, e
-o programa é o modelo 3D fotorrealista do aparelho que ele controla.
+The design department works in its own branches and publishes each round as an HTML prototype
+(three.js) in an artifact; the owner's vote decides what goes in. Rule: function before UI, and
+the program is the photorealistic 3D model of the device it controls.
 
-| Rodada | O quê | Branch | Estado |
+| Round | What | Branch | State |
 |---|---|---|---|
-| 1 | moodboard estático | `design/0.1.2` | reprovada |
-| 2 | vidro em GLSL, cubo raymarched, splash, skins `.wmz`, tema GELO | `design/0.1.2` | votada |
-| 3 | ILDA player em tema LASER, Aprendiz como menu, `TEMAS.md` mapa função→tema | `design/0.1.2` | votada; virada para o aparelho |
-| 4 | o programa é o projetor 3D (PBR), traseira = menu, tampa = preferências, Pino no lugar do Aprendiz | `design/0.1.2` | votada |
-| 5 | traseira real, mesa óptica e feixe em GLSL, splash na parede, câmera SolidWorks, bindings tecla + MIDI, Pino 3D, design system do laser (`design/laser/SISTEMA.md`) | `design/0.1.2` | publicada, aguardando voto |
-| 6 | o laser como módulo `laser/1` do orquestrador: endereços, `module.json`, `graph.json`, painel ORQUESTRADOR, teste em `tests/test_laser_graph.py` | `design/0.1.3` | publicada, aguardando voto |
-| FUNCOES | funções por referência (Blender, TouchDesigner, Resolume, MadMapper, Capture, Chataigne): `ilda-player`, `ndi-ilda`, `orquestrador`, `cenas-cues-dmx`, `cenario-interativo`, `aprendiz-menu` | `design/funcoes-referencia` | em uso pelas rodadas |
-| 0.1.4 | base única: merge de `funcoes-referencia` + `0.1.3`, `INTEGRACAO` virou `design/FUNCOES/integracao-laser.md`, rodadas 2–4 e o Pino 2D fora da árvore | `design/0.1.4`, em `main` | feita |
+| 1 | static moodboard | `design/0.1.2` | rejected |
+| 2 | glass in GLSL, raymarched cube, splash, `.wmz` skins, ICE theme | `design/0.1.2` | voted |
+| 3 | ILDA player in the LASER theme, Aprendiz as the menu, `TEMAS.md` function→theme map | `design/0.1.2` | voted; turned towards the device |
+| 4 | the program is the 3D projector (PBR), rear panel = menu, lid = preferences, Pino in place of Aprendiz | `design/0.1.2` | voted |
+| 5 | real rear panel, optical bench and beam in GLSL, splash on the wall, SolidWorks camera, key + MIDI bindings, 3D Pino, laser design system (`design/laser/SISTEMA.md`) | `design/0.1.2` | published, awaiting vote |
+| 6 | the laser as the orchestrator module `laser/1`: addresses, `module.json`, `graph.json`, ORCHESTRATOR panel, test in `tests/test_laser_graph.py` | `design/0.1.3` | published, awaiting vote |
+| FUNCOES | functions by reference (Blender, TouchDesigner, Resolume, MadMapper, Capture, Chataigne): `ilda-player`, `ndi-ilda`, `orquestrador`, `cenas-cues-dmx`, `cenario-interativo`, `aprendiz-menu` | `design/funcoes-referencia` | in use by the rounds |
+| 0.1.4 | single base: merge of `funcoes-referencia` + `0.1.3`, `INTEGRACAO` became `design/FUNCOES/integracao-laser.md`, rounds 2–4 and the 2D Pino out of the tree | `design/0.1.4`, in `main` | done |
 
-Edição por JSON Patch (frente `patch`): `show_patch` (`add`, `remove`, `replace`, `test`,
-tudo-ou-nada, devolve as ops de `undo` e a revisão `rev`), `graph_get`/`face_get` no registry,
-`graph_check` na CLI e os resources `spell://graph` e `spell://face` no MCP. O graph passa a ser
-editável por IA antes de existir canvas.
+Editing by JSON Patch (workstream `patch`): `show_patch` (`add`, `remove`, `replace`, `test`,
+all-or-nothing, returns the `undo` ops and the revision `rev`), `graph_get`/`face_get` in the registry,
+`graph_check` in the CLI and the resources `spell://graph` and `spell://face` in the MCP. The graph
+becomes AI-editable before any canvas exists.
 
-Rodadas de integração em `main` (branches `integracao-2`, `integracao-4`, 09–10/09/2026): as
-rodadas 5 e 6 viraram código de produto em `spellgui/web/laser3d/`, frente por frente (câmera, chassi,
-óptica, HUD, Pino, DAC, desempenho do `.ild`, charset, vídeo), cada uma com portão headless nas três
-vistas e testes `node --test`. Detalhe por release em `CHANGELOG.md`.
+Integration rounds in `main` (branches `integracao-2`, `integracao-4`, 09–10/09/2026): rounds 5 and 6
+became product code in `spellgui/web/laser3d/`, workstream by workstream (camera, chassis, optics,
+HUD, Pino, DAC, `.ild` performance, charset, video), each with a headless gate on the three views and
+`node --test` tests. Detail per release in `CHANGELOG.md`.
 
-Pendência de design: rodada 7 = FÓSFORO (conversor NDI/Spout → ILDA na porta NET) e PATCHBAY
-(UI do orquestrador).
+Design pending: round 7 = FÓSFORO (NDI/Spout → ILDA converter on the NET port) and PATCHBAY
+(orchestrator UI).
 
-## 9. O que falta, e o que roda em paralelo agora
+## 9. What is missing, and what runs in parallel right now
 
-Sem bloqueio externo, cada linha é um agente independente (código novo em crate próprio ou em
-CI, sem tocar no que já está conforme):
+With no external blocker, each line is an independent agent (new code in its own crate or in CI,
+without touching what is already conformant):
 
-| Frente | Entrega | Aceite | Depende de |
+| Workstream | Delivery | Acceptance | Depends on |
 |---|---|---|---|
-| Design | rodada 7 (FÓSFORO, PATCHBAY) | voto do dono | voto das rodadas 5 e 6 |
-| F1 serve | crate `spellcore/serve` e `spellcore serve`: HTTP (`/commands`, `/show`, estático), WebSocket JSON-RPC com eventos `show`/`transport`/`log`/`widget`, monitor DMX binário a 40 Hz, MCP streamable em `/mcp`, comandos `input` e `resume`; `--dir` = raiz do repo | feita: `cli/tests/serve.rs` sobe o binário e fecha o contrato ponta a ponta | — |
-| F2 patch | perfis e patch de fixtures no engine (`patch_add`, `patch_del`, `patch_check`, `profiles`, `profile_get`) e `show_patch`: JSON Patch (RFC 6902) sobre o show aberto, com `rev` e `undo` | feita: `engine/tests/patch.rs` e `engine/tests/edit.rs` verdes | — |
-| F4 module | `module.json`: `engine::module` (Module/Param/Cmd, `load`, `check`), comandos `module_add/del/list/get`, `modules/laser.json` | `engine/tests/module.rs` verde | — |
-| Graph runtime | nós `state` e `module` e as chaves `mute`/`state` em qualquer nó (`script/graph.rs`) | 500 nós continuam < 0,1 ms/frame (8,7 µs); semântica em `design/DECISOES.md` | voto do dono; formato do `module.json` combinado com a frente `module` |
-| F9 LASER app | `laser_*` no registry (dacs, open, play, stop, close, param, stats, files) + página `spellgui/web/laser.html` | `cli/tests/laser.rs` verde contra o `Emulator` Ether Dream | contrato do barramento (F1) para a página |
-| F8 TEATRO DE PAPEL | programmer no engine (`level_set`, `level_clear`, `level_get`, `cue_capture`, `fixture_set`, `profile_get`) e a página `spellgui/web/teatro.*`: patch, cues com GO e cenário clicável | `engine/tests/programmer.rs` e `node --test spellgui/web/test/teatro.test.js` verdes | a página espera o barramento da F1 e o `show_patch` da F2 |
-| FÓSFORO núcleo | `laser::trace`: RGBA → contornos → frame ILDA (`paths`, `trace`, bin `trace`) | quadro 1080p em < 8 ms em release; quadrado/círculo/dois objetos/max_points nos testes | — (feita: 4,4 ms com 20 objetos; falta o NDI da R2 para alimentar) |
-| F5 face | `spellgui/web/bus.js` (cliente do barramento), `widgets.js` (parâmetro tipado → widget: regras 1 e 3 de `design/FUNCOES/README.md`), `face.js`/`face.html` e `faces/quatro.face.json` | a Face de 4 botões abre em kiosk e opera o show só pelo registry | comando `input` e o barramento (F1) |
-| F7 sequencer | `spellgui/web/timeline.js` ligado ao engine: edição por `key_set`/`key_del`/`show_patch`, transporte e monitor DMX pelo barramento, modo offline intacto | arrastar um keyframe muda o show no engine e o playhead segue o player | contrato do `serve` (F1) |
-| patchbay | editor do graph em `spellgui/web` (`catalog.js`, `graph.js`, `patchbay.html`), edição por `show_patch` com undo | abrir `shows/patchbay_demo.spell`, criar nó, cabear, agrupar, desfazer | `serve` (barramento) e `show_patch`/`graph_check` para sair do modo offline |
+| Design | round 7 (FÓSFORO, PATCHBAY) | owner's vote | vote on rounds 5 and 6 |
+| F1 serve | crate `spellcore/serve` and `spellcore serve`: HTTP (`/commands`, `/show`, static), JSON-RPC WebSocket with `show`/`transport`/`log`/`widget` events, binary DMX monitor at 40 Hz, streamable MCP at `/mcp`, `input` and `resume` commands; `--dir` = repo root | done: `cli/tests/serve.rs` starts the binary and closes the contract end to end | — |
+| F2 patch | fixture profiles and patch in the engine (`patch_add`, `patch_del`, `patch_check`, `profiles`, `profile_get`) and `show_patch`: JSON Patch (RFC 6902) over the open show, with `rev` and `undo` | done: `engine/tests/patch.rs` and `engine/tests/edit.rs` green | — |
+| F4 module | `module.json`: `engine::module` (Module/Param/Cmd, `load`, `check`), commands `module_add/del/list/get`, `modules/laser.json` | `engine/tests/module.rs` green | — |
+| Graph runtime | `state` and `module` nodes and the `mute`/`state` keys on any node (`script/graph.rs`) | 500 nodes still < 0.1 ms/frame (8.7 µs); semantics in `design/DECISOES.md` | owner's vote; `module.json` format agreed with the `module` workstream |
+| F9 LASER app | `laser_*` in the registry (dacs, open, play, stop, close, param, stats, files) + page `spellgui/web/laser.html` | `cli/tests/laser.rs` green against the Ether Dream `Emulator` | bus contract (F1) for the page |
+| F8 PAPER THEATER | programmer in the engine (`level_set`, `level_clear`, `level_get`, `cue_capture`, `fixture_set`, `profile_get`) and the page `spellgui/web/teatro.*`: patch, cues with GO and a clickable set | `engine/tests/programmer.rs` and `node --test spellgui/web/test/teatro.test.js` green | the page waits on the F1 bus and the F2 `show_patch` |
+| FÓSFORO core | `laser::trace`: RGBA → outlines → ILDA frame (`paths`, `trace`, bin `trace`) | a 1080p frame in < 8 ms in release; square/circle/two objects/max_points in the tests | — (done: 4.4 ms with 20 objects; the R2 NDI is still missing to feed it) |
+| F5 face | `spellgui/web/bus.js` (bus client), `widgets.js` (typed parameter → widget: rules 1 and 3 of `design/FUNCOES/README.md`), `face.js`/`face.html` and `faces/quatro.face.json` | the 4-button Face opens in kiosk mode and operates the show through the registry alone | the `input` command and the bus (F1) |
+| F7 sequencer | `spellgui/web/timeline.js` wired to the engine: editing via `key_set`/`key_del`/`show_patch`, transport and DMX monitor over the bus, offline mode intact | dragging a keyframe changes the show in the engine and the playhead follows the player | the `serve` contract (F1) |
+| patchbay | graph editor in `spellgui/web` (`catalog.js`, `graph.js`, `patchbay.html`), editing via `show_patch` with undo | open `shows/patchbay_demo.spell`, create a node, wire, group, undo | `serve` (bus) and `show_patch`/`graph_check` to leave offline mode |
 
-Bloqueadas até instalar SDK (decisão do dono, não de agente): R2 (GStreamer + NDI SDK),
-R6 (Godot 4). R9 espera R5.
+Blocked until an SDK is installed (owner's decision, not an agent's): R2 (GStreamer + NDI SDK),
+R6 (Godot 4). R9 waits on R5.
 
-Já feito: F0–F6, R0, R1, R3, R4, R5 base, R7 (stdio), R8, merge de design em `0.1.4`, auditoria
-ponytail (−2 900 linhas), CI com release por tag, docs (README, INSTALL, LICENSE, ARCHITECTURE, PRD).
+Already done: F0–F6, R0, R1, R3, R4, R5 base, R7 (stdio), R8, design merge into `0.1.4`, ponytail
+audit (−2,900 lines), CI with release by tag, docs (README, INSTALL, LICENSE, ARCHITECTURE, PRD).
 
-R7 entregou o crate `mcp` (rmcp 3.2, stdio), uma tool por comando do registry, os resources
-`spell://show` e `spell://commands` e `spellcore mcp install`. Do aceite do PRD §6 — "escanear
-rede, patchear, criar timeline e dar play" — o core Rust tem **escanear** (`net`), **play**
-(`play_show` + transporte) e, desde `engine::edit`, **patchear** (`patch_add`/`patch_del`/
-`patch_check`/`profiles`) e **editar timeline** (`show_new`/`show_set`/`show_save`, `track_add`/
-`track_del`, `key_set`/`key_del`, `cue_set`/`cue_del`); o Python deixa de ser o único editor.
-Theme/Face/Graph ainda não têm estrutura serializada no `engine::show` para `face_patch`/
-`graph_patch` operarem. Faltam, nesta ordem: `spell://face`/`spell://graph` e o transporte HTTP
-streamable.
+R7 delivered the `mcp` crate (rmcp 3.2, stdio), one tool per registry command, the resources
+`spell://show` and `spell://commands` and `spellcore mcp install`. Of the PRD §6 acceptance — "scan
+the network, patch, build a timeline and hit play" — the Rust core has **scan** (`net`), **play**
+(`play_show` + transport) and, since `engine::edit`, **patch** (`patch_add`/`patch_del`/
+`patch_check`/`profiles`) and **timeline editing** (`show_new`/`show_set`/`show_save`, `track_add`/
+`track_del`, `key_set`/`key_del`, `cue_set`/`cue_del`); Python is no longer the only editor.
+Theme/Face/Graph still have no serialized structure in `engine::show` for `face_patch`/`graph_patch`
+to operate on. Missing, in this order: `spell://face`/`spell://graph` and the streamable HTTP
+transport.

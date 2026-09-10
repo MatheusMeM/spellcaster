@@ -1,72 +1,73 @@
 # Changelog
 
-Uma entrada por release. Datas em ISO. A tag `v*` no `main` dispara o workflow `build`, que
-anexa à GitHub Release o onedir do Windows, o tarball Lite e os binários `spellcore`.
+One entry per release. Dates in ISO. A `v*` tag on `main` fires the `build` workflow, which
+attaches the Windows onedir, the Lite tarball and the `spellcore` binaries to the GitHub Release.
 
 ## v0.1.0 — 2026-09-10
 
-Primeira release numerada. Reúne o core Rust (R0, R1, R3, R4, R7, R8), o barramento `serve`,
-as páginas de `spellgui/web` e a página principal do programa: o projetor laser em 3D.
+First numbered release. It brings together the Rust core (R0, R1, R3, R4, R7, R8), the `serve` bus,
+the `spellgui/web` pages and the program's main page: the 3D laser projector.
 
-### O programa é o projetor (`spellgui/web/laser3d/`)
+### The program is the projector (`spellgui/web/laser3d/`)
 
-- Modelo PBR do projetor 10 W: chassi com dobradiça, knob estriado, XLR-3 DMX, LED de ARMED,
-  ventoinha em textura, etiquetas medidas, firmware gravado na placa, marca vetorial da
-  Feitiçaria Industrial (`brand/`), sem USB.
-- Interior: mesa óptica de alumínio com furação M4 a 12,5 mm, bloco de galvos X/Y no padrão
-  6215H, placas com componentes soldados e espaçadores, fonte, DAC, cabos com rota real,
-  abraçadeiras, par trançado ILDA e fio de terra. Nada atravessa o feixe.
-- Câmera no padrão SolidWorks, uma lei por vista: SHOW livre, TRASEIRA fixa, DENTRO restrita;
-  mola criticamente amortecida; `Z`/`Shift+Z`, setas, `F`; manual da fonte em
-  `design/FUNCOES/camera-solidworks.md`. Knob com gesto do TouchDesigner.
-- HUD só com título e fatos ao vivo (ENGINE, DAC/feed, entradas sACN/Art-Net, MIDI) com LEDs;
-  gaveta à direita (`Tab`) com as abas LASER, DMX, NET, INTERLOCK, BINDINGS, VÍDEO e INFO no
-  lugar do painel flutuante.
-- Pino preso à câmera no canto esquerdo, cabo DMX com corda de Verlet (`rope.js`), balão à
-  direita, dispensar. Fala só no clique.
-- Aba VÍDEO no formato de menu de vídeo de jogo: predefinições BAIXO/MÉDIO/ALTO/ULTRA,
-  27 opções ligadas de verdade no render (escala, FOV, limite de fps, FXAA/MSAA 4×, sombras e
-  filtro, anisotropia, reflexos, bloom, tone mapping, exposição, resolução da parede, rastro,
-  halo, feixes, poeira, névoa, corda do Pino, movimento), bloco DESEMPENHO lido do `renderer.info`,
-  persistência em `localStorage`. Tabela única em `video.js`.
-- Parede do laser em `WebGLRenderTarget` com `LineSegments` e esmaecimento por tempo, no lugar do
-  canvas 2D com `shadowBlur`: 2,9 → 45–60 fps com um `.ild` denso. Parse do `.ild` com
-  `Uint8Array` e vetor pré-dimensionado (142 → 6 ms).
-- Bindings de tecla e MIDI com learn, reset e manifesto (`bind.js`); mapa de entrada e
-  interlock na gaveta.
-- `bench.html`: grade de vistas do modelo sem `app.js`, para conferir cada peça.
-- `<!doctype html>` e `<meta charset="utf-8">` em todas as páginas; `charset.test.js` vigia.
+- PBR model of the 10 W projector: chassis with hinge, knurled knob, XLR-3 DMX, ARMED LED,
+  fan as a texture, measured labels, firmware printed on the board, Feitiçaria Industrial vector
+  brand (`brand/`), no USB.
+- Interior: aluminium optical bench with M4 holes at 12.5 mm, X/Y galvo block in the 6215H
+  standard, boards with soldered components and standoffs, PSU, DAC, cables on a real route,
+  cable ties, ILDA twisted pair and earth wire. Nothing crosses the beam.
+- SolidWorks-style camera, one law per view: SHOW free, REAR fixed, INSIDE restricted;
+  critically damped spring; `Z`/`Shift+Z`, arrows, `F`; source manual in
+  `design/FUNCOES/camera-solidworks.md`. Knob with the TouchDesigner gesture.
+- HUD with title and live facts only (ENGINE, DAC/feed, sACN/Art-Net inputs, MIDI) with LEDs;
+  drawer on the right (`Tab`) with the LASER, DMX, NET, INTERLOCK, BINDINGS, VIDEO and INFO tabs
+  replacing the floating panel.
+- Pino attached to the camera in the left corner, DMX cable with a Verlet rope (`rope.js`), balloon
+  on the right, dismiss. It speaks only on click.
+- VIDEO tab shaped like a game video menu: LOW/MEDIUM/HIGH/ULTRA presets,
+  27 options actually wired into the render (scale, FOV, fps cap, FXAA/MSAA 4×, shadows and
+  filter, anisotropy, reflections, bloom, tone mapping, exposure, wall resolution, trail,
+  halo, beams, dust, haze, Pino rope, motion), PERFORMANCE block read from `renderer.info`,
+  persistence in `localStorage`. Single table in `video.js`.
+- Laser wall in a `WebGLRenderTarget` with `LineSegments` and time-based fading, replacing the 2D
+  canvas with `shadowBlur`: 2.9 → 45–60 fps with a dense `.ild`. `.ild` parsing with
+  `Uint8Array` and a pre-sized vector (142 → 6 ms).
+- Key and MIDI bindings with learn, reset and manifest (`bind.js`); input map and
+  interlock in the drawer.
+- `bench.html`: grid of model views without `app.js`, to check each part.
+- `<!doctype html>` and `<meta charset="utf-8">` on every page; `charset.test.js` watches over it.
 
-### Engine, CLI e protocolos (`spellcore/`)
+### Engine, CLI and protocols (`spellcore/`)
 
-- `netscan`: beacon do Ether Dream escutado no IP de cada placa (o `bind` em `0.0.0.0:7654`
-  falha no Windows com o Ether Dream Sitter aberto), loopback incluído; sem beacon, o DAC é
-  achado por status TCP 7765 nos vizinhos da ARP. `laser_dacs` devolve `via: beacon|tcp`.
-- Entrada DMX (sACN e Art-Net), gravação de keyframes (`rec_arm`/`rec_state`) e importação de
-  `.ild` como track.
-- Entrada MIDI e mapa tecla → comando no `.spell` (`midi_*`), com página de mapeamento.
-- Loop como estado do transporte no intervalo In-Out (`loop_set`).
-- `serve`: HTTP estático com `charset=utf-8` e mime de fonte e mídia, WebSocket JSON-RPC,
-  monitor DMX binário, MCP streamable em `/mcp`.
-- `spellcaster.exe` (crate `gui`, `tao` + `wry`/WebView2): janela nativa com o barramento em
-  processo, abrindo na página 3D do laser.
-- Registry: um nome só para caminho do show e nome do track, descrição em todo argumento,
-  `spellcore commands <nome>`. Tabela de comandos do README regerada do registry (59).
+- `netscan`: Ether Dream beacon listened for on each board's IP (the `bind` on `0.0.0.0:7654`
+  fails on Windows with Ether Dream Sitter open), loopback included; with no beacon, the DAC is
+  found by TCP 7765 status on the ARP neighbours. `laser_dacs` returns `via: beacon|tcp`.
+- DMX input (sACN and Art-Net), keyframe recording (`rec_arm`/`rec_state`) and `.ild` import
+  as a track.
+- MIDI input and a key → command map in the `.spell` (`midi_*`), with a mapping page.
+- Loop as a transport state over the In-Out range (`loop_set`).
+- `serve`: static HTTP with `charset=utf-8` and font and media mime types, JSON-RPC WebSocket,
+  binary DMX monitor, streamable MCP at `/mcp`.
+- `spellcaster.exe` (crate `gui`, `tao` + `wry`/WebView2): native window with the bus in process,
+  opening on the 3D laser page.
+- Registry: a single name for the show path and the track name, a description on every argument,
+  `spellcore commands <name>`. The README command table regenerated from the registry (59).
 
-### Páginas web (`spellgui/web/`)
+### Web pages (`spellgui/web/`)
 
-- `nav.js`: barra das páginas TIMELINE, PATCHBAY, TEATRO, FACE, LASER e AJUDA
-  (`Shift+1`…`Shift+6`), indicador ENGINE/OFFLINE, nome do show editável.
-- `help.html`: atalhos de `design/SHORTCUTS.md` e o registry vivo, um formulário por comando.
-- Timeline: atalhos que faltavam, desfazer local, In-Out que não colapsa, roda do mouse rola as
-  tracks, previz 2D na faixa de baixo (`viewer.js`: DMX, quadro ILDA em `t`, planta do patch).
-- Patchbay: criar nó pela busca, editar `cfg` no Inspector, roda pura rola com `ymax`.
-- three.js r128 e as fontes Michroma e Share Tech Mono vendorizados: roda sem rede.
+- `nav.js`: page bar for TIMELINE, PATCHBAY, THEATER, FACE, LASER and HELP
+  (`Shift+1`…`Shift+6`), ENGINE/OFFLINE indicator, editable show name.
+- `help.html`: shortcuts from `design/SHORTCUTS.md` and the live registry, one form per command.
+- Timeline: the missing shortcuts, local undo, In-Out that does not collapse, mouse wheel scrolls
+  the tracks, 2D previz in the bottom strip (`viewer.js`: DMX, ILDA frame at `t`, patch plan).
+- Patchbay: create a node from search, edit `cfg` in the Inspector, plain wheel scrolls with `ymax`.
+- three.js r128 and the Michroma and Share Tech Mono fonts vendored: it runs without a network.
 
-### Design e documentação
+### Design and documentation
 
-- `design/FUNCOES/`: timeline como DAW (Ableton, Resolve), interface DAW, digests das fontes,
-  câmera SolidWorks.
-- Auditoria ponytail das frentes: referências corrigidas, asserções tautológicas removidas,
-  licença e custo das crates de janela no README.
-- `MANUAL.md`: manual de uso e capacidades do operador. `CHANGELOG.md`: este arquivo.
+- `design/FUNCOES/`: timeline as a DAW (Ableton, Resolve), DAW interface, source digests,
+  SolidWorks camera.
+- ponytail audit of the workstreams: references fixed, tautological assertions removed,
+  license and cost of the window crates in the README.
+- `MANUAL.md`: usage and capability manual for the operator. `CHANGELOG.md`: this file.
+- Whole project in English: UI, Pino lines, CLI/registry/MCP descriptions, docs, comments.

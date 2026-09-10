@@ -1,6 +1,7 @@
-# CI e deploy. Push em main / PR: testes Python em loopback nas tres plataformas, testes + clippy do
-# spellcore, artefatos (onedir Windows, tarball Lite, binario spellcore). Tag v*: GitHub Release com
-# os mesmos artefatos anexados. Bench de jitter/throughput e' gate (falha se sair do alvo do PRD).
+# CI and deploy. Push to main / PR: Python tests on loopback across the three platforms, spellcore
+# tests + clippy, artifacts (Windows onedir, Lite tarball, spellcore binary). Tag v*: GitHub Release
+# with the same artifacts attached. The jitter/throughput bench is a gate (it fails if it leaves the
+# PRD target).
 name: build
 
 on:
@@ -14,8 +15,8 @@ jobs:
   python:
     strategy:
       fail-fast: false
-      # ponytail: sem leg arm ; build_lite.sh empacota so .py + shows + profiles, o tarball do
-      # arm sai byte a byte igual ao do x64 (e colidia no merge do release)
+      # ponytail: no arm leg ; build_lite.sh packages only .py + shows + profiles, so the arm tarball
+      # comes out byte for byte the same as the x64 one (and collided in the release merge)
       matrix:
         os: [windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
@@ -25,24 +26,24 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: testes
+      - name: tests
         run: python -m unittest discover -s tests
 
       - name: onedir (Windows)
         if: runner.os == 'Windows'
         run: pwsh -File packaging/build_win.ps1 -Out "${{ runner.temp }}/spellcaster_build"
 
-      - name: fumaca do exe congelado
+      - name: smoke test of the frozen exe
         if: runner.os == 'Windows'
         run: |
           & "${{ runner.temp }}/spellcaster_build/dist/Spellcaster/spell.exe" --version
           & "${{ runner.temp }}/spellcaster_build/dist/Spellcaster/spell.exe" tui --seconds 2
 
-      - name: zip do onedir (Windows)
+      - name: zip the onedir (Windows)
         if: runner.os == 'Windows'
         run: Compress-Archive -Path "${{ runner.temp }}/spellcaster_build/dist/Spellcaster" -DestinationPath "${{ runner.temp }}/spellcaster-windows-x64.zip"
 
-      - name: tarball Lite (Linux)
+      - name: Lite tarball (Linux)
         if: runner.os == 'Linux'
         run: sh packaging/build_lite.sh "${{ runner.temp }}"
 
@@ -68,9 +69,9 @@ jobs:
           - os: ubuntu-24.04-arm
             bin: spellcore
             name: spellcore-linux-aarch64
-          # Pi aarch64 estatico (PRD 6). O runner ja e' aarch64: musl e' so mais um target do
-          # rustup, sem cross nem zigbuild. A unica dep com codigo C e' o midir (ALSA), que o
-          # protocols so liga fora do musl; o musl-libc que vem com o std basta.
+          # Static Pi aarch64 (PRD 6). The runner is already aarch64: musl is just one more rustup
+          # target, no cross and no zigbuild. The only dep with C code is midir (ALSA), which
+          # protocols only links outside musl; the musl-libc that ships with std is enough.
           - os: ubuntu-24.04-arm
             bin: spellcore
             name: spellcore-linux-aarch64-static
@@ -85,10 +86,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
-      - name: target musl
+      - name: musl target
         if: matrix.target
         run: rustup target add ${{ matrix.target }}
-      - name: ALSA para o midir
+      - name: ALSA for midir
         if: runner.os == 'Linux' && !matrix.target
         run: sudo apt-get install -y --no-install-recommends libasound2-dev
       - uses: Swatinem/rust-cache@v2
@@ -100,7 +101,7 @@ jobs:
         working-directory: spellcore
         run: cargo clippy --workspace --all-targets ${{ env.T }} -- -D warnings
 
-      - name: testes (inclui conformidade byte a byte com os fixtures)
+      - name: tests (including byte-for-byte conformance with the fixtures)
         working-directory: spellcore
         run: cargo test --workspace ${{ env.T }}
 
@@ -108,7 +109,7 @@ jobs:
         working-directory: spellcore
         run: cargo build --release --workspace ${{ env.T }}
 
-      - name: confirma que o binario e' estatico
+      - name: confirm the binary is static
         if: matrix.target
         shell: bash
         working-directory: spellcore
@@ -116,17 +117,17 @@ jobs:
           B="${{ env.REL }}/${{ matrix.bin }}"
           file "$B"
           ls -l "$B"
-          if readelf -d "$B" | grep -q NEEDED; then echo "tem dependencia dinamica"; exit 1; fi
+          if readelf -d "$B" | grep -q NEEDED; then echo "has a dynamic dependency"; exit 1; fi
 
-      - name: bench como gate (jitter e throughput)
-        # ponytail: runner compartilhado tem ruido, aqui so reporta ; tirar continue-on-error em runner self-hosted
+      - name: bench as a gate (jitter and throughput)
+        # ponytail: a shared runner is noisy, this only reports ; drop continue-on-error on a self-hosted runner
         continue-on-error: true
         working-directory: spellcore
         run: |
           ./${{ env.REL }}/jitter --secs 5
           ./${{ env.REL }}/throughput
 
-      - name: renomeia o binario
+      - name: rename the binary
         shell: bash
         run: cp "spellcore/${{ env.REL }}/${{ matrix.bin }}" "${{ runner.temp }}/${{ matrix.name }}"
 

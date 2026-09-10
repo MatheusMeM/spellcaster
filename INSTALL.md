@@ -1,116 +1,117 @@
-# Instalação
+# Installation
 
-Três jeitos de rodar o Spellcaster: pendrive no Windows, Lite no Raspberry Pi, e a partir do
-código-fonte (desenvolvimento). O binário Rust `spellcore` sai pronto do CI para os três alvos.
+Three ways to run Spellcaster: USB stick on Windows, Lite on the Raspberry Pi, and from source
+(development). The Rust binary `spellcore` comes ready from CI for all three targets.
 
-## 1. Windows · pendrive (operador)
+## 1. Windows · USB stick (operator)
 
-1. Baixe `spellcaster-windows-latest.zip` da última [release](https://github.com/MatheusMeM/spellcaster/releases)
-   (ou do artefato do workflow `build` em Actions).
-2. Descompacte na raiz do pendrive: fica `Spellcaster\Spellcaster.exe`, `spell.exe`, `shows\`, `profiles\`.
-3. Duplo clique em `Spellcaster.exe`. A janela abre com a análise de rede; sem WebView2 ela abre no navegador padrão.
-4. Antivírus reclamando do onedir sem assinatura: adicione a pasta `Spellcaster\` como exceção.
+1. Download `spellcaster-windows-latest.zip` from the latest [release](https://github.com/MatheusMeM/spellcaster/releases)
+   (or from the `build` workflow artifact in Actions).
+2. Unzip it at the root of the USB stick: you get `Spellcaster\Spellcaster.exe`, `spell.exe`, `shows\`, `profiles\`.
+3. Double-click `Spellcaster.exe`. The window opens with the network scan; without WebView2 it opens in the default browser.
+4. Antivirus complaining about the unsigned onedir: add the `Spellcaster\` folder as an exception.
 
-Nada é gravado fora do pendrive: `shows/`, `profiles/` e `config.json` ficam ao lado do exe.
+Nothing is written outside the USB stick: `shows/`, `profiles/` and `config.json` sit next to the exe.
 
 ```
 Spellcaster\spell.exe net --timeout 2
 Spellcaster\spell.exe play_show medgrupo.spell
 ```
 
-Para o core Rust, o mesmo release traz `spellcore-windows-x64.exe`:
+For the Rust core, the same release ships `spellcore-windows-x64.exe`:
 
 ```
 spellcore-windows-x64.exe play shows\medgrupo.spell --osc-port 9000
 ```
 
-## 2. Raspberry Pi · Lite (SSH, sem GUI)
+## 2. Raspberry Pi · Lite (SSH, no GUI)
 
-Precisa só do `python3` do Raspberry Pi OS (3.11+). Sem pip, sem venv, sem dependência.
+All it needs is the `python3` from Raspberry Pi OS (3.11+). No pip, no venv, no dependency.
 
 ```bash
-tar xzf spellcaster-lite-<versão>.tar.gz
-cd spellcaster-lite-<versão>
-sudo ./install.sh              # copia para /opt/spellcaster, cria `spell`, liga o serviço systemd
+tar xzf spellcaster-lite-<version>.tar.gz
+cd spellcaster-lite-<version>
+sudo ./install.sh              # copies to /opt/spellcaster, creates `spell`, enables the systemd service
 spell net
 spell tui
 spell play_show medgrupo.spell
 ```
 
-O serviço `spellcaster` sobe `spell serve`; a GUI fica em `http://<hostname>.local:8000`
-para quem tiver navegador na rede. `install.sh <destino>` muda a pasta.
+The `spellcaster` service starts `spell serve`; the GUI sits at `http://<hostname>.local:8000`
+for anyone with a browser on the network. `install.sh <destination>` changes the folder.
 
-Binário Rust para o Pi, dois no release:
+Rust binary for the Pi, two of them in the release:
 
-- `spellcore-linux-aarch64-static` — musl, sem `NEEDED` no ELF: roda em qualquer Raspberry Pi OS
-  aarch64 (ou Alpine, ou container `scratch`) sem depender da versão do glibc. Use este por padrão.
-- `spellcore-linux-aarch64` — glibc, para o caso de precisar de algo do sistema em runtime.
+- `spellcore-linux-aarch64-static` — musl, no `NEEDED` in the ELF: runs on any aarch64 Raspberry Pi
+  OS (or Alpine, or a `scratch` container) without depending on the glibc version. Use this one by
+  default.
+- `spellcore-linux-aarch64` — glibc, in case you need something from the system at runtime.
 
 ```bash
 chmod +x spellcore-linux-aarch64-static
 ./spellcore-linux-aarch64-static play shows/medgrupo.spell --osc-port 9000
 ```
 
-Fora do binário estático: o Helios (USB) já é stub no `laser` em qualquer build — não é limitação
-do musl.
+Not the static binary's fault: Helios (USB) is already a stub in `laser` in every build — it is not
+a musl limitation.
 
-## 3. A partir do código-fonte (desenvolvimento)
+## 3. From source (development)
 
-### Python (protótipo de referência, congelado)
+### Python (reference prototype, frozen)
 
-Windows: Python 3.13 global, sem venv.
+Windows: global Python 3.13, no venv.
 
 ```
 C:\Python313\python.exe -m spellcaster.cli --version
 C:\Python313\python.exe -m unittest discover -s tests -v
 ```
 
-`pip install -e .` instala o comando `spell`. Extra `gui` traz `pywebview` (janela nativa).
+`pip install -e .` installs the `spell` command. The `gui` extra brings `pywebview` (native window).
 
 ### Rust (spellcore)
 
-Toolchain via rustup (`rustc` ≥ 1.88, exigência do `rmcp`). A pasta do repo mora no Google Drive: o `target/`
-NUNCA fica dentro dela.
+Toolchain via rustup (`rustc` ≥ 1.88, required by `rmcp`). The repo folder lives on Google Drive: the
+`target/` NEVER stays inside it.
 
 ```powershell
 $env:CARGO_TARGET_DIR = "$env:TEMP\spellcore_target"
 cd spellcore
 cargo test --workspace
 cargo build --release --workspace
-# binário em %TEMP%\spellcore_target\release\spellcore.exe
+# binary at %TEMP%\spellcore_target\release\spellcore.exe
 ```
 
-Para abrir o programa a partir do código: `spellcore serve --port 8000 --dir . --show shows/medgrupo.spell`
-na raiz do repo e `http://127.0.0.1:8000/spellgui/web/laser3d/app.html` no navegador
-(uso em `MANUAL.md`).
+To open the program from source: `spellcore serve --port 8000 --dir . --show shows/medgrupo.spell`
+at the repo root and `http://127.0.0.1:8000/spellgui/web/laser3d/app.html` in the browser
+(usage in `MANUAL.md`).
 
-Detalhes, bench e conformidade: `spellcore/README.md` e `ARCHITECTURE.md`.
+Details, bench and conformance: `spellcore/README.md` and `ARCHITECTURE.md`.
 
-### Empacotar
+### Packaging
 
 ```powershell
-pwsh -File packaging\build_win.ps1            # onedir em %TEMP%\spellcaster_build\dist\Spellcaster
-sh packaging/build_lite.sh [saída]           # tarball Lite (default /tmp)
+pwsh -File packaging\build_win.ps1            # onedir at %TEMP%\spellcaster_build\dist\Spellcaster
+sh packaging/build_lite.sh [output]          # Lite tarball (default /tmp)
 ```
 
-### MCP (sessão de IA)
+### MCP (AI session)
 
-Rust (`spellcore`, é o que o produto usa):
-
-```
-spellcore mcp                              # servidor MCP em stdio, para Claude Desktop / Claude Code
-spellcore mcp install --target desktop     # grava a entrada em %APPDATA%\Claude\claude_desktop_config.json
-spellcore mcp install --target code        # grava .mcp.json no diretório corrente (projeto)
-spellcore mcp install --target code --yes  # sem perguntar
-```
-
-`install` mostra a entrada que vai gravar, faz backup `.bak` e só escreve depois de um `s` no
-console. Sem console (pipe), aborta. As tools são os comandos do `spellcore commands`; os
-resources são `spell://show` e `spell://commands`.
-
-Python (protótipo, só stdio):
+Rust (`spellcore`, this is what the product uses):
 
 ```
-spell mcp                      # stdio, para Claude Desktop / Claude Code
-spell mcp_install --target desktop       # grava a entrada em claude_desktop_config.json (--target code = .mcp.json); pede confirmação
+spellcore mcp                              # MCP server over stdio, for Claude Desktop / Claude Code
+spellcore mcp install --target desktop     # writes the entry to %APPDATA%\Claude\claude_desktop_config.json
+spellcore mcp install --target code        # writes .mcp.json in the current directory (project)
+spellcore mcp install --target code --yes  # without asking
+```
+
+`install` shows the entry it is about to write, makes a `.bak` backup and only writes after a
+confirmation in the console. With no console (pipe), it aborts. The tools are the commands from `spellcore commands`;
+the resources are `spell://show` and `spell://commands`.
+
+Python (prototype, stdio only):
+
+```
+spell mcp                      # stdio, for Claude Desktop / Claude Code
+spell mcp_install --target desktop       # writes the entry to claude_desktop_config.json (--target code = .mcp.json); asks for confirmation
 ```
