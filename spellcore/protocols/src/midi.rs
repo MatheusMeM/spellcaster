@@ -16,6 +16,7 @@ use std::sync::mpsc::Receiver;
 /// o driver nunca bloqueia.
 // ponytail: 256 eventos e' fundo de sobra para um pump por frame (16 ms) ; so' subiria se alguem
 // mandasse SysEx grande — que o `Ignore::All` ja' descarta antes.
+#[cfg(not(target_env = "musl"))]
 const DEPTH: usize = 256;
 
 /// Nomes das portas de entrada, na ordem do driver. Maquina sem MIDI (ou sem servico) devolve
@@ -45,17 +46,10 @@ pub struct MidiIn {
     _conn: MidiInputConnection<()>,
 }
 
-#[cfg(target_env = "musl")]
-impl MidiIn {
-    pub fn open(_port: &str) -> Result<MidiIn, String> {
-        Err("MIDI indisponivel neste binario (estatico, sem ALSA)".into())
-    }
-}
-
-#[cfg(not(target_env = "musl"))]
 impl MidiIn {
     /// `port` = indice em texto ("0"), trecho do nome (sem diferenca de caixa) ou vazio = a
     /// primeira porta.
+    #[cfg(not(target_env = "musl"))]
     pub fn open(port: &str) -> Result<MidiIn, String> {
         let mut mi = MidiInput::new("spellcaster").map_err(|e| e.to_string())?;
         mi.ignore(Ignore::All); // sysex, clock e active sensing nao viram evento
@@ -89,6 +83,11 @@ impl MidiIn {
         })
     }
 
+    #[cfg(target_env = "musl")]
+    pub fn open(_port: &str) -> Result<MidiIn, String> {
+        Err("MIDI indisponivel neste binario (estatico, sem ALSA)".into())
+    }
+
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -100,6 +99,7 @@ impl MidiIn {
 }
 
 /// Indice da porta pedida: vazio = a primeira, numero = indice, resto = trecho do nome.
+#[cfg_attr(target_env = "musl", allow(dead_code))]
 fn escolhe(nomes: &[String], port: &str) -> Result<usize, String> {
     let p = port.trim();
     if p.is_empty() {

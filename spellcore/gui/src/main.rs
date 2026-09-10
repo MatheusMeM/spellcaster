@@ -1,3 +1,6 @@
+// ponytail: fora do Windows a janela nao existe e os helpers do caminho ficam sem uso ; tirar
+// quando a janela ganhar Linux/mac
+#![cfg_attr(not(windows), allow(dead_code))]
 //! `spellcaster.exe` — o Spellcaster como programa, nao como aba do navegador.
 //!
 //!   spellcaster [show.spell] [--dir RAIZ]
