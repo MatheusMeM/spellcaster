@@ -284,7 +284,7 @@
   var ACT = { power: function () { Bind.run("power.toggle"); }, keyswitch: function () { Bind.run("key.toggle"); }, interlock: function () { Bind.run("lock.toggle"); },
     enc: oledOk, back: oledBack, lid: function () { setCam("inside"); }, pino: function () { pinoMenu(); } };
   function cursorFor(k) { return LaserEngine.kindOf(k) === "conector" ? "default" : "pointer"; }
-  gl.addEventListener("pointermove", function (e) { var p = ptr(e); if (CAM.dragging() || S.mode === "splash") { tip.style.display = "none"; return; } var h = hitOf(e), o = h ? h.o : null; if (o !== hot) { glow(hot, false); hot = o; if (hot && cursorFor(hot.userData.key) === "pointer") glow(hot, true); if (hot && /^pino\./.test(hot.userData.key)) pino.say(hot.userData.label, null, false); }
+  gl.addEventListener("pointermove", function (e) { var p = ptr(e); if (CAM.dragging() || S.mode === "splash") { tip.style.display = "none"; return; } var h = hitOf(e), o = h ? h.o : null; if (o !== hot) { glow(hot, false); hot = o; if (hot && cursorFor(hot.userData.key) === "pointer") glow(hot, true); }
     if (hot) { tip.style.display = "block"; tip.textContent = hot.userData.label; tip.style.left = (p[0] + 14) + "px"; tip.style.top = (p[1] + 14) + "px"; gl.style.cursor = cursorFor(hot.userData.key); } else { tip.style.display = "none"; gl.style.cursor = "grab"; } });
   gl.addEventListener("pointerleave", unhover);
   gl.addEventListener("pointerdown", function (e) { pressed = e.button === 0; });
