@@ -15,6 +15,8 @@ o `spellcore serve` (ou qualquer servidor estático) entrega. Cor e tipografia v
 | `help.js` + `help.html` | ajuda: a tabela "Mapa padrão" de `design/SHORTCUTS.md` (parser de tabela em `HELP.tabela`, sem biblioteca de markdown) e o registry vivo de `bus.commands()`, um `WG.form` por comando para executar. `HELP.bindKey()` liga a tecla `?` em qualquer página que carregue `help.js` |
 | `viewer.js` | previz 2D na faixa de baixo da timeline (`Alt+M`): barras DMX do universo da lane focada — o de ENTRADA quando ela está armada —, o quadro ILDA de cada track laser em `t` (`clip_frame` do engine, com `scale`/`rot` do track) e a planta do patch em grade por endereço, com a cor da fixture saindo da parte pura de `teatro.js` (a mesma conta nas duas plantas). Coluna sem dado escreve “sem laser” / “sem patch” |
 | `midi.js` + `midi.html` | MIDI mapping: portas, abrir/fechar, tabela `tecla -> comando` do `.spell`, LEARN e a última tecla ao vivo. Só cliente dos comandos `midi_*` |
+| `laser3d/` | **a página principal do programa**: o projetor laser 10 W em 3D (three.js r128 + PBR, feixe em GLSL com bloom, mesa óptica, câmera no padrão SolidWorks, splash na parede, bindings tecla+MIDI com learn, Pino como menu das telas). `engine.js` é o mapa estado → comando (`cmdFor`); `bind.js` guarda as bindings e expõe `Bind.manifest()`; `tokens.css` é o design system só desta ferramenta. O modelo, o feixe, a câmera e o Pino vêm do protótipo de design votado, copiados sem mexer |
+| `vendor/` | three.js r128 (`build` + os passes de post-processing) e as duas fontes `.woff2` (Michroma, Share Tech Mono). Vendorizado de propósito: o programa roda em evento, **sem rede** — nenhuma página pede CDN |
 | `dev/commands.json` | `Registry::schema()` congelado, usado no modo offline |
 | `test/*.test.js` | `node --test spellgui/web/test/*.test.js` |
 
@@ -27,8 +29,12 @@ Com engine (o normal — é o único processo que toca hardware):
 
 ```
 spellcore serve --port 8000 --dir . --show shows/medgrupo.spell
+# http://127.0.0.1:8000/spellgui/web/laser3d/app.html      <- a página principal
 # http://127.0.0.1:8000/spellgui/web/face.html?face=quatro
 ```
+
+`laser3d/app.html` abre pela splash; os hashes `#tras`, `#dentro` e `#laser` pulam direto para o
+menu, as preferências e a vista do show. A navegação entre as telas é o Pino: clique nele.
 
 Sem engine (só para desenhar a página; nada de saída DMX):
 
