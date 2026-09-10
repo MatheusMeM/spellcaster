@@ -1,0 +1,79 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>laser3d · bench de vistas</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  html, body { height:100%; overflow:hidden; margin:0; background:#020306; }
+  #gl { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #lbl { position:fixed; left:8px; top:6px; font:12px 'Share Tech Mono', monospace; color:#9FF5D0; pointer-events:none; white-space:pre; }
+</style>
+<!-- Bench de vistas do modelo 3D: só o aparelho, sem app.js, sem splash, sem Pino, sem bus.
+     `bench.html`            grade com todas as vistas (uma passada de olho no modelo inteiro)
+     `bench.html?v=knob`     uma vista só, tela cheia (close-up para ver a peça)
+     `bench.html?v=a,b,c`    grade só dessas
+     `bench.html?list`       escreve os nomes no #lbl
+     Vista nova = uma linha em VIEWS: [pos, alvo, tampa aberta?]. Coordenadas de mundo em metros
+     (o corpo começa em y = .314; a traseira está em z = .15; a frente em z = −.15). -->
+<canvas id="gl"></canvas><div id="lbl"></div>
+<script src="../vendor/three/three.min.js"></script>
+<script src="engine.js"></script>
+<script src="mat.js"></script>
+<script src="body.js"></script>
+<script src="optics.js"></script>
+<script>
+(function () {
+  "use strict";
+  var VIEWS = {
+    iso:    [[.75, .78, .72], [0, .38, 0], false],
+    rear:   [[.015, .445, .60], [0, .40, .04], false],
+    front:  [[.05, .52, -.75], [0, .38, 0], false],
+    left:   [[-.85, .5, .05], [0, .38, 0], false],
+    right:  [[.85, .5, .05], [0, .38, 0], false],
+    top:    [[.02, 1.25, .06], [0, .38, 0], false],
+    inside: [[.09, .80, .27], [-.02, .38, -.03], true],
+    knob:   [[.17, .47, .27], [.108, .442, .15], false],
+    dmx:    [[.07, .37, .27], [.02, .338, .15], false],
+    power:  [[-.15, .40, .27], [-.165, .36, .15], false],
+    oled:   [[-.012, .43, .42], [-.012, .412, .15], false],
+    fan:    [[.17, .43, .29], [.158, .416, .15], false],
+    labels: [[.16, .36, .27], [.152, .34, .15], false],
+    galvo:  [[.22, .52, -.22], [.083, .394, -.09], true],
+    optica: [[-.02, .62, -.20], [-.03, .38, -.03], true],
+    pcbL:   [[-.03, .50, -.02], [-.19, .404, -.03], true],
+    pcbR:   [[.03, .50, -.02], [.19, .404, -.03], true],
+    psu:    [[-.02, .52, .22], [-.12, .35, .105], true],
+    dac:    [[-.03, .50, .0], [-.03, .404, .142], true]
+  };
+  var q = new URLSearchParams(location.search), names = Object.keys(VIEWS), lbl = document.getElementById("lbl");
+  if (q.has("list")) { lbl.textContent = names.join("\n"); }
+  var want = q.get("v") ? q.get("v").split(",").filter(function (k) { return VIEWS[k]; }) : names;
+  if (!want.length) { lbl.textContent = "vista desconhecida; use ?list"; return; }
+  document.fonts.ready.then(function () {
+  var gl = document.getElementById("gl"), R = new THREE.WebGLRenderer({ canvas: gl, antialias: true }), scene = new THREE.Scene(), pick = [];
+  R.setPixelRatio(Math.min(2, devicePixelRatio)); scene.background = new THREE.Color(0x020306);
+  var X = MAT(THREE, R); scene.environment = X.env();
+  var sun = new THREE.SpotLight(0xfff4e6, 50, 9, .42, .7, 1.4); sun.position.set(1.4, 3.2, 1.2); sun.target.position.set(0, .35, 0); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -.0004; scene.add(sun, sun.target);
+  var fill = new THREE.PointLight(0x38ff5c, 4, 4, 2); fill.position.set(-.9, .9, .5); scene.add(fill);
+  var rim = new THREE.PointLight(0xa0c0ff, 8, 5, 2); rim.position.set(.4, 1.2, -1.6); scene.add(rim);
+  var inLight = new THREE.PointLight(0xfff0dc, 0, 1.2, 2); inLight.position.set(.05, .62, 0); scene.add(inLight);
+  var B = BODY(THREE, X, scene, pick); OPTICS(THREE, X, B.body, pick); B.rearLight.intensity = 14; B.wallLight.intensity = 14 * .55;
+  // display aceso com um texto fixo, para a vista `oled` mostrar a moldura com conteúdo
+  var oc = B.oled.c; oc.fillStyle = "#000"; oc.fillRect(0, 0, B.oled.w, B.oled.h); oc.fillStyle = "#9FF5D0"; oc.font = "700 120px 'Share Tech Mono'"; oc.fillText("BENCH", 40, 200); oc.font = "56px 'Share Tech Mono'"; oc.fillText("vistas do modelo", 40, 300); B.oled.tex.needsUpdate = true;
+  function lid(open) { var sT = open ? 1 : 0; B.screws.forEach(function (s, i) { s.position.y = .004 + sT * .05; s.rotation.y = sT * 12 + i; }); B.lid.rotation.x = open ? -1.9 : 0; inLight.intensity = open ? .35 : 0; }
+  var cam = new THREE.PerspectiveCamera(42, 1, .01, 60);
+  function draw() {
+    var W = innerWidth, H = innerHeight; R.setSize(W, H, false);
+    var n = want.length, cols = Math.ceil(Math.sqrt(n)), rows = Math.ceil(n / cols), cw = Math.floor(W / cols), ch = Math.floor(H / rows);
+    R.setScissorTest(n > 1);
+    want.forEach(function (k, i) {
+      var v = VIEWS[k], x = (i % cols) * cw, y = H - (Math.floor(i / cols) + 1) * ch;
+      lid(v[2]); cam.aspect = cw / ch; cam.updateProjectionMatrix(); cam.position.fromArray(v[0]); cam.lookAt(new THREE.Vector3().fromArray(v[1]));
+      R.setViewport(x, y, cw, ch); R.setScissor(x, y, cw, ch); R.render(scene, cam);
+    });
+    if (!q.has("list")) lbl.textContent = want.join(" · ");
+  }
+  draw(); addEventListener("resize", draw);
+  window.BENCH = { VIEWS: VIEWS, draw: draw, scene: scene, B: B };
+  });
+})();
+</script>
