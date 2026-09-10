@@ -233,3 +233,21 @@ Seis documentos novos em `design/FUNCOES/` (`daw-arranjo`, `daw-sessao`, `browse
 - O bloco de estatísticas do HUD só escreve **fato do engine**. A linha de uma entrada Art-Net ou sACN aparece **se, e só se**, `show_get {full:true}` devolver essa entrada em `show.inputs`; o LED dela acende **só quando chega frame de verdade** (tópico binário 2 do barramento), e apaga sozinho quando o frame para.
 - `shows/medgrupo.spell` não declara `inputs`: por isso hoje **não existe linha de Art-Net/sACN na tela** — e é assim que tem que ser. Um LED apagado ao lado de um protocolo que ninguém configurou é ruído; um protocolo inventado é mentira.
 - Mesma regra na plaqueta do chassi: a versão de firmware vem do engine, e sem engine a plaqueta escreve `FIRMWARE OFFLINE` em vez de um número.
+
+## 10/09/2026 · A luz do interior estoura qualquer material — aguarda voto
+
+- Medido no bench (`bench.html?v=optica`, spot `sun` com intensidade 50) e conferido em `app.js`
+  (mesmo spot com intensidade **90**, sem `physicallyCorrectLights`): toda superfície difusa virada
+  para cima satura. Um alumínio preto anodizado com albedo 0x0d1013 (0,012 linear) sai do render
+  cinza-claro; um fio vermelho 0x4d130e sai rosa; uma placa com máscara de solda 0x05130c sai verde
+  berrante. Com esse ganho não existe albedo escuro: o material só volta a escurecer se for
+  metálico (`metalness >= .85`), porque aí não há difusa para estourar.
+- **O que isso já custou em `optics.js`:** o palette inteiro teve de virar metal (mesa, suportes,
+  motores, dissipadores) e as cores dos fios e das placas tiveram de ser escurecidas duas vezes só
+  para não brilhar mais que a mesa óptica. É contorno, não conserto — a peça está compensando a luz.
+- **O que o voto decide:** (a) baixar o spot e subir a `toneMappingExposure` em `app.js`/`bench.html`
+  até que albedo escuro leia escuro (é uma linha em cada arquivo, mas muda o visual de todas as
+  frentes de uma vez), ou (b) ligar `renderer.physicallyCorrectLights = true` e recalibrar as três
+  luzes em candela, ou (c) manter como está e assumir que todo material do interior é metálico.
+- Motivo: `app.js` e `bench.html` não são desta frente, e mexer na luz muda o corpo, o Pino e a
+  parede de uma vez. Fica registrado com número medido para quem for calibrar.
