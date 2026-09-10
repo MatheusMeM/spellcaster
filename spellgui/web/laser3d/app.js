@@ -66,6 +66,8 @@
 
   /* ---------- parede ---------- */
   var WC = document.createElement("canvas"); WC.width = 1024; WC.height = 640; var wx = WC.getContext("2d"), WW = 1024, WH = 640, galvo = null, lit = [], gpos = [0, 0];
+  // ponytail: medida do portao numa linha, so com ?perf=1 ; sai quando houver um HUD de perf de verdade
+  var PERF = /(\?|&)perf=1/.test(location.search) ? (window.__perf = { frames: 0, wallMs: 0 }) : null;
   function toScreen(p) { var sc = S.size * WH * .3 / 32767; return [WW * .5 + p.x * sc, WH * .5 - p.y * sc]; }
   function cc(p) { var g = S.gam, l = S.lim; return [Math.round(255 * l.r * Math.pow(p.r / 255, g.r)), Math.round(255 * l.g * Math.pow(p.g / 255, g.g)), Math.round(255 * l.b * Math.pow(p.b / 255, g.b))]; }
   function col(c, a) { return "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + a + ")"; }
@@ -343,7 +345,7 @@
      cada quadro até a posição voltar a subir, com a tarja vermelha de erro por cima da tela de quem
      abre `app.html#laser`. Era também a animação inteira (câmera, tampa, ventoinha) andando de ré. */
   function tick(now) { size(); var dt = Math.min(.1, Math.max(0, (now - last) / 1000)); last = now; var t = (now - T0) / 1000;
-    if (S.mode === "splash") wallSplash(now, dt); else wallTick(now, dt); wallTex.needsUpdate = true;
+    var wt0 = PERF && performance.now(); if (S.mode === "splash") wallSplash(now, dt); else wallTick(now, dt); wallTex.needsUpdate = true; if (PERF) { PERF.wallMs += performance.now() - wt0; PERF.frames++; }
     var want = S.cam === "inside" ? 1 : 0; lidT += (want - lidT) * Math.min(1, dt * 3); var sT = Math.min(1, lidT / .45), lT = Math.max(0, (lidT - .4) / .6); B.screws.forEach(function (s, i) { s.position.y = .004 + sT * .05; s.rotation.y = sT * 12 + i; }); B.lid.rotation.x = -lT * 1.9;
     CAM.update(dt * camSpeed / 5); rearI += (((S.cam === "rear" && S.mode === "play") ? 14 : 0) - rearI) * Math.min(1, dt * 3); B.rearLight.intensity = rearI; inLight.intensity = .35 * lidT; sun.intensity = 90 * S.dim; B.wallLight.intensity = 14 * S.dim;
     // feixes externos: abertura → pontos acesos da parede
