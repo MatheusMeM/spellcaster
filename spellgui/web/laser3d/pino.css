@@ -1,0 +1,24 @@
+/* O Pino mudou de lado: ele mora no canto inferior ESQUERDO da tela, então o balão abre para a
+   DIREITA (o `tokens.css` desenha a versão antiga, virada para a esquerda, e este arquivo entra
+   depois só para virar o balão e vestir o ícone minimizado). Cores e fontes continuam sendo as do
+   `tokens.css`; aqui só há o que é do Pino. */
+
+/* balão para a direita: sem o translate que jogava a caixa toda para a esquerda da âncora, e o
+   rabinho passa para a borda esquerda, apontando de volta para a cabeça, que fica embaixo. */
+.bal { transform:none; }
+.bal::after { right:auto; left:-11px; top:auto; bottom:16px; border-left-color:transparent; border-right-color:#000; }
+/* dois botões, um ao lado do outro: `–` manda o Pino embora (a física do cabo para), `×` só fecha a fala */
+.bal .m { position:absolute; right:23px; top:2px; font-weight:bold; font-size:15px; line-height:1; cursor:pointer; }
+.bal .m:hover, .bal .x:hover { color:#0A246A; }
+.bal b { padding-right:42px; }
+
+/* Ícone minimizado: fica no MESMO canto de onde o Pino sai, e é o que o traz de volta. */
+#pino-min { position:absolute; left:90px; bottom:48px; width:32px; height:32px; padding:4px; display:none;
+  z-index:6; background:rgba(10,12,16,.72); border:1px solid var(--line); border-radius:6px; cursor:pointer; }
+#pino-min.on { display:block; }
+#pino-min:hover { border-color:var(--las); box-shadow:0 0 10px var(--las); }
+/* o desenho: aro do conector e tres pinos a 120 graus, so' com box-shadow */
+#pino-min::before { content:''; position:absolute; inset:4px; border-radius:50%; border:1.5px solid var(--fg); opacity:.85; }
+#pino-min i { position:absolute; left:50%; top:50%; width:4px; height:4px; margin:-2px 0 0 -2px; border-radius:50%;
+  box-shadow:0 -6px 0 var(--fg), -5px 3px 0 var(--fg), 5px 3px 0 var(--fg); opacity:.85; }
+#pino-min:hover::before, #pino-min:hover i { opacity:1; }
