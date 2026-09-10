@@ -1,6 +1,6 @@
-//! `show_patch` (JSON Patch), `graph_get`, `face_get` e o contador `rev`. Binario
-//! proprio porque `OPEN` e `REV` sao um por processo; e um `#[test]` so' porque os testes de um
-//! mesmo binario rodam em paralelo e todos aqui mexem nesse estado.
+//! `show_patch` (JSON Patch), `graph_get`, `face_get` and the `rev` counter. Its own binary
+//! because `OPEN` and `REV` are one per process; and a single `#[test]` because the tests of one
+//! binary run in parallel and every one here touches that state.
 
 use engine::edit::rev;
 use engine::registry::base;
@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 const SPELL: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../shows/medgrupo.spell");
 const OUTRO: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../shows/medgrupo_r0.spell");
 
-/// `show_patch` com uma lista de ops, sem checagem de revisao.
+/// `show_patch` with a list of ops, with no revision check.
 fn ops(r: &Registry, o: Value) -> Result<Value, String> {
     r.call("show_patch", json!({ "ops": o }))
 }
@@ -20,28 +20,28 @@ fn full(r: &Registry) -> Value {
 }
 
 #[test]
-fn patch_graph_e_face() {
+fn patch_graph_and_face() {
     let r = base();
-    tudo_ou_nada(&r);
-    show_continua_show(&r);
-    rev_velha_e_recusada(&r);
-    trocar_de_show_sobe_rev(&r);
-    graph_e_face(&r);
+    all_or_nothing(&r);
+    show_stays_a_show(&r);
+    stale_rev_is_refused(&r);
+    swapping_show_bumps_rev(&r);
+    graph_and_face(&r);
 }
 
-fn tudo_ou_nada(r: &Registry) {
+fn all_or_nothing(r: &Registry) {
     r.call("show_get", json!({ "file": SPELL })).unwrap();
     let antes = full(r);
     let rev0 = rev();
 
-    // add em /tracks/-, replace em /fps, add de uma chave de `extra`
+    // add at /tracks/-, replace at /fps, add of an `extra` key
     let out = ops(
         r,
         json!([
             {"op": "add", "path": "/tracks/-", "value": {"type": "dmx", "universe": 9,
                                                          "address": 1, "keys": []}},
             {"op": "replace", "path": "/fps", "value": 25},
-            {"op": "add", "path": "/markers", "value": [{"t": 1.0, "name": "um"}]},
+            {"op": "add", "path": "/markers", "value": [{"t": 1.0, "name": "one"}]},
         ]),
     )
     .unwrap();
@@ -49,19 +49,19 @@ fn tudo_ou_nada(r: &Registry) {
     assert_eq!(rev(), rev0 + 1);
     let d = full(r);
     assert_eq!(d["fps"], json!(25));
-    assert_eq!(d["markers"][0]["name"], json!("um"));
+    assert_eq!(d["markers"][0]["name"], json!("one"));
     let n = d["tracks"].as_array().unwrap().len();
     assert_eq!(n, antes["tracks"].as_array().unwrap().len() + 1);
 
-    // o undo ja' vem na ordem de aplicacao: mandar de volta como veio restaura byte a byte.
-    // "/tracks/-" virou "/tracks/<indice>" no inverso: "-" nao serve para remover.
+    // the undo already comes in application order: sending it back as it came restores it byte
+    // for byte. "/tracks/-" became "/tracks/<index>" in the inverse: "-" is no good for removing.
     let u = out["undo"].clone();
     assert_eq!(u[2]["path"], json!(format!("/tracks/{}", n - 1)));
     ops(r, u).unwrap();
-    assert_eq!(full(r), antes, "undo devolve o show identico");
-    assert_eq!(rev(), rev0 + 2, "desfazer tambem e' edicao");
+    assert_eq!(full(r), antes, "undo gives back an identical show");
+    assert_eq!(rev(), rev0 + 2, "an undo is an edit too");
 
-    // reordenar e' remove + add (nao ha' op `move`)
+    // reordering is remove + add (there is no `move` op)
     let out = ops(
         r,
         json!([
@@ -73,27 +73,27 @@ fn tudo_ou_nada(r: &Registry) {
     .unwrap();
     let d = full(r);
     assert_eq!(d["tracks"].as_array().unwrap().len(), n - 2);
-    assert_eq!(d["tracks"][0], antes["tracks"][2], "remove + add reordena");
+    assert_eq!(d["tracks"][0], antes["tracks"][2], "remove + add reorders");
     ops(r, out["undo"].clone()).unwrap();
-    assert_eq!(full(r), antes, "undo de remove + add");
+    assert_eq!(full(r), antes, "undo of remove + add");
 
-    // test que falha: a op anterior, que ja' tinha passado, nao fica
+    // a failing test: the previous op, which had already passed, does not stay
     let e = ops(
         r,
         json!([
-            {"op": "replace", "path": "/name", "value": "nao devia ficar"},
+            {"op": "replace", "path": "/name", "value": "should not stay"},
             {"op": "test", "path": "/fps", "value": 999},
         ]),
     )
     .unwrap_err();
     assert!(e.contains("test") && e.contains("999"), "{}", e);
-    assert_eq!(full(r), antes, "op que falha cancela as anteriores");
+    assert_eq!(full(r), antes, "a failing op cancels the previous ones");
 
-    // op fora do subconjunto, no meio da lista
+    // an op outside the subset, in the middle of the list
     let e = ops(
         r,
         json!([
-            {"op": "replace", "path": "/name", "value": "nem esta"},
+            {"op": "replace", "path": "/name", "value": "not this one either"},
             {"op": "move", "path": "/fps", "from": "/version"},
             {"op": "replace", "path": "/fps", "value": 1},
         ]),
@@ -102,28 +102,28 @@ fn tudo_ou_nada(r: &Registry) {
     assert!(e.contains("move"), "{}", e);
     assert_eq!(full(r), antes);
 
-    // path que nao existe, indice fora da lista, pointer sem a barra
+    // a path that does not exist, an index outside the list, a pointer with no slash
     for (o, txt) in [
         (
-            json!([{"op": "remove", "path": "/nao_existe"}]),
-            "nao existe",
+            json!([{"op": "remove", "path": "/does_not_exist"}]),
+            "does not exist",
         ),
-        (json!([{"op": "remove", "path": "/tracks/99"}]), "indice 99"),
+        (json!([{"op": "remove", "path": "/tracks/99"}]), "index 99"),
         (
             json!([{"op": "add", "path": "fps", "value": 1}]),
             "JSON Pointer",
         ),
         (
             json!([{"op": "replace", "path": "/tracks/0/x/y", "value": 1}]),
-            "nao existe",
+            "does not exist",
         ),
     ] {
         let e = ops(r, o).unwrap_err();
-        assert!(e.contains(txt), "esperava {:?} em {:?}", txt, e);
+        assert!(e.contains(txt), "expected {:?} in {:?}", txt, e);
     }
     assert_eq!(full(r), antes);
 
-    // um `test` que passa nao entra no undo
+    // a `test` that passes does not enter the undo
     let out = ops(
         r,
         json!([{"op": "test", "path": "/fps", "value": 30},
@@ -135,31 +135,32 @@ fn tudo_ou_nada(r: &Registry) {
     assert_eq!(full(r), antes);
 }
 
-/// O patch passa pela mesma porta do `show_set`: o resultado ainda tem que ser um Show.
-fn show_continua_show(r: &Registry) {
+/// The patch goes through the same door as `show_set`: the result still has to be a Show.
+fn show_stays_a_show(r: &Registry) {
     let antes = full(r);
     for (o, txt) in [
         (
             json!([{"op": "replace", "path": "/version", "value": 9}]),
-            "versao 9",
+            "version 9",
         ),
         (
             json!([{"op": "replace", "path": "/tracks", "value": 3}]),
             "show_patch",
         ),
         (
-            json!([{"op": "replace", "path": "/fps", "value": "trinta"}]),
+            json!([{"op": "replace", "path": "/fps", "value": "thirty"}]),
             "show_patch",
         ),
     ] {
         let e = ops(r, o).unwrap_err();
-        assert!(e.contains(txt), "esperava {:?} em {:?}", txt, e);
+        assert!(e.contains(txt), "expected {:?} in {:?}", txt, e);
         assert_eq!(full(r), antes);
     }
 }
 
-/// Duas GUIs no mesmo show: quem manda com a revisao velha leva erro em vez de sobrescrever.
-fn rev_velha_e_recusada(r: &Registry) {
+/// Two GUIs on the same show: whoever sends with the stale revision gets an error instead of
+/// overwriting.
+fn stale_rev_is_refused(r: &Registry) {
     let v = rev();
     r.call(
         "show_patch",
@@ -173,17 +174,17 @@ fn rev_velha_e_recusada(r: &Registry) {
         )
         .unwrap_err();
     assert_eq!(e, format!("rev {} != {}", v, v + 1));
-    assert_eq!(full(r)["fps"], json!(24), "a edicao recusada nao entrou");
+    assert_eq!(full(r)["fps"], json!(24), "the refused edit did not land");
 }
 
-/// `load` e `show_get {file}` trocam o show inteiro: a revisao que o cliente segurava nao pode
-/// valer no show novo, senao o patch dele entra no arquivo errado.
-fn trocar_de_show_sobe_rev(r: &Registry) {
+/// `load` and `show_get {file}` swap the whole show: the revision the client was holding cannot
+/// stay valid on the new show, or its patch lands on the wrong file.
+fn swapping_show_bumps_rev(r: &Registry) {
     for (cmd, arg) in [("load", "file"), ("show_get", "file")] {
         r.call("show_get", json!({ "file": SPELL })).unwrap();
         let v = rev();
         r.call(cmd, json!({ arg: OUTRO })).unwrap();
-        assert_ne!(rev(), v, "{} deixou a rev parada", cmd);
+        assert_ne!(rev(), v, "{} left the rev where it was", cmd);
         let e = r
             .call(
                 "show_patch",
@@ -194,7 +195,7 @@ fn trocar_de_show_sobe_rev(r: &Registry) {
     }
 }
 
-fn graph_e_face(r: &Registry) {
+fn graph_and_face(r: &Registry) {
     r.call("show_new", json!({})).unwrap();
     assert_eq!(
         r.call("graph_get", json!({})).unwrap(),
@@ -202,7 +203,7 @@ fn graph_e_face(r: &Registry) {
     );
     assert_eq!(r.call("face_get", json!({})).unwrap(), Value::Null);
 
-    // o graph se edita por show_patch: inteiro de uma vez, ou um no' de cada vez
+    // the graph is edited by show_patch: whole in one go, or one node at a time
     let g = json!({"nodes": [{"id": "k", "type": "in.key", "key": "Space"},
                              {"id": "c", "type": "cmd", "cmd": "cue_go"}],
                    "edges": [["k.down", "c.trigger"]]});
@@ -210,7 +211,11 @@ fn graph_e_face(r: &Registry) {
     ops(r, json!([{"op": "add", "path": "/graph", "value": g}])).unwrap();
     assert_eq!(rev(), v0 + 1);
     assert_eq!(r.call("graph_get", json!({})).unwrap(), g);
-    assert_eq!(full(r)["graph"], g, "o graph mora no show, nao ao lado");
+    assert_eq!(
+        full(r)["graph"],
+        g,
+        "the graph lives in the show, not beside it"
+    );
 
     ops(
         r,
@@ -223,7 +228,7 @@ fn graph_e_face(r: &Registry) {
         json!("t")
     );
 
-    // face inline sai como veio
+    // an inline face comes out as it came in
     ops(
         r,
         json!([{"op": "add", "path": "/face", "value": {"widgets": [{"id": "go"}]}}]),
@@ -234,12 +239,12 @@ fn graph_e_face(r: &Registry) {
         json!("go")
     );
 
-    // face por nome vira faces/<nome>.face.json; sem o arquivo, o erro diz qual e'
+    // a face by name becomes faces/<name>.face.json; with no file, the error says which one
     ops(
         r,
-        json!([{"op": "replace", "path": "/face", "value": "nao_existe"}]),
+        json!([{"op": "replace", "path": "/face", "value": "does_not_exist"}]),
     )
     .unwrap();
     let e = r.call("face_get", json!({})).unwrap_err();
-    assert!(e.contains("nao_existe.face.json"), "{}", e);
+    assert!(e.contains("does_not_exist.face.json"), "{}", e);
 }

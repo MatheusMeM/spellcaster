@@ -1,12 +1,13 @@
-//! Servidor MCP do Spellcaster sobre o SDK oficial `rmcp`. Porte do
-//! `spellcaster/mcp/server.py`: as tools SAEM DO REGISTRY — nada de logica de produto aqui.
+//! Spellcaster MCP server over the official `rmcp` SDK. A port of
+//! `spellcaster/mcp/server.py`: the tools COME FROM THE REGISTRY — no product logic here.
 //!
-//! Transporte: stdio (`spellcore mcp`) e HTTP streamable em `/mcp`, montado pelo crate `serve`
-//! (`StreamableHttpService` do rmcp e' um `tower::Service`; quem tem o axum e' o `serve`).
+//! Transport: stdio (`spellcore mcp`) and streamable HTTP at `/mcp`, mounted by the `serve`
+//! crate (the rmcp `StreamableHttpService` is a `tower::Service`; the one with the axum is
+//! `serve`).
 //
-//! Resources: `spell://show` (o .spell aberto), `spell://commands` (o registry inteiro em
-//! JSON), `spell://graph` (o graph da secao 10) e `spell://face` (a superficie de operacao).
-//! Quem monta o `Registry` e' a CLI: e' ela que conhece `play_show` e `net`.
+//! Resources: `spell://show` (the open .spell), `spell://commands` (the whole registry as JSON),
+//! `spell://graph` (the graph of section 10) and `spell://face` (the control surface).
+//! The one that builds the `Registry` is the CLI: it is the one that knows `play_show` and `net`.
 
 use engine::Registry;
 use rmcp::model::{
@@ -35,8 +36,9 @@ const INSTRUCTIONS: &str = concat!(
     "valida com `graph_check`."
 );
 
-/// Comando que bloqueia ate o fim do show ou ate Ctrl+C: roda em thread e a tool volta na hora
-/// (o `BACKGROUND` do `spellcaster/mcp/server.py`). O `serve` pergunta o mesmo.
+/// A command that blocks until the end of the show or until Ctrl+C: it runs in a thread and the
+/// tool comes back at once (the `BACKGROUND` of `spellcaster/mcp/server.py`). `serve` asks the
+/// same.
 pub fn background(name: &str) -> bool {
     name == "play_show"
 }
@@ -51,13 +53,13 @@ pub struct Spell {
 }
 
 impl Spell {
-    /// Aceita `Registry` (stdio: um servidor por processo) ou `Arc<Registry>` (o `serve`: um
-    /// `Spell` por sessao HTTP, todos sobre o mesmo registry).
+    /// It takes a `Registry` (stdio: one server per process) or an `Arc<Registry>` (`serve`: one
+    /// `Spell` per HTTP session, all over the same registry).
     pub fn new(reg: impl Into<Arc<Registry>>) -> Spell {
         Spell { reg: reg.into() }
     }
 
-    /// Uma tool por comando do registry: nome, doc e o schema JSON que o `schemars` gerou.
+    /// One tool per registry command: name, doc and the JSON schema `schemars` generated.
     fn tools(&self) -> Vec<Tool> {
         self.reg
             .iter()
@@ -68,7 +70,7 @@ impl Spell {
             .collect()
     }
 
-    /// Resource que e' so' um comando do registry (nenhuma logica de produto mora aqui).
+    /// A resource that is just a registry command (no product logic lives here).
     fn leia(&self, cmd: &str) -> Result<String, McpError> {
         self.reg
             .call(cmd, Value::Object(Map::new()))
@@ -77,17 +79,18 @@ impl Spell {
     }
 
     fn run(&self, name: &str, args: Value) -> CallToolResult {
-        // Comando desconhecido cai no `Registry::call` la' embaixo, que ja' devolve a mensagem;
-        // a checagem aqui existe so' para nao mandar um nome invalido para a thread.
+        // An unknown command falls through to the `Registry::call` down below, which already
+        // returns the message; the check here exists only so an invalid name is not sent to the
+        // thread.
         if background(name) && self.reg.get(name).is_some() {
             let (reg, n) = (self.reg.clone(), name.to_string());
             std::thread::spawn(move || {
                 if let Err(e) = reg.call(&n, args) {
-                    eprintln!("{}: {}", n, e); // stdout e' o canal JSON-RPC
+                    eprintln!("{}: {}", n, e); // the stdout is the JSON-RPC channel
                 }
             });
             return CallToolResult::success(vec![ContentBlock::text(format!(
-                "{} iniciado em background; use transport_state, pause ou stop para acompanhar",
+                "{} started in the background; use transport_state, pause or stop to follow it",
                 name
             ))]);
         }
@@ -98,8 +101,8 @@ impl Spell {
     }
 }
 
-/// String do comando sai crua (e' relatorio pronto, como o `net` sem `--json`); o resto sai como
-/// JSON indentado. Mesma regra da CLI.
+/// A string from the command goes out raw (it is a finished report, like `net` without
+/// `--json`); the rest goes out as indented JSON. The same rule as the CLI.
 fn texto(v: &Value) -> String {
     match v {
         Value::String(s) => s.clone(),
@@ -146,24 +149,24 @@ impl ServerHandler for Spell {
     ) -> Result<ListResourcesResult, McpError> {
         Ok(ListResourcesResult::with_all_items(vec![
             Resource::new(SHOW, "show")
-                .with_title("Show aberto")
-                .with_description("Resumo do .spell aberto: fps, duracao, saidas, tracks, cues.")
+                .with_title("Open show")
+                .with_description(
+                    "Summary of the open .spell: fps, duration, outputs, tracks, cues.",
+                )
                 .with_mime_type("application/json"),
             Resource::new(COMMANDS, "commands")
                 .with_title("Registry")
                 .with_description(
-                    "Todo comando do produto: nome, doc e schema JSON dos parametros.",
+                    "Every product command: name, doc and JSON schema of the parameters.",
                 )
                 .with_mime_type("application/json"),
             Resource::new(GRAPH, "graph")
-                .with_title("Graph do show")
-                .with_description("Comportamento do show: nodes e edges da secao 10 do PRD.")
+                .with_title("Show graph")
+                .with_description("Behavior of the show: nodes and edges of section 10 of the PRD.")
                 .with_mime_type("application/json"),
             Resource::new(FACE, "face")
-                .with_title("Face do show")
-                .with_description(
-                    "Superficie de operacao: faces/<nome>.face.json ou o objeto inline.",
-                )
+                .with_title("Show face")
+                .with_description("Control surface: faces/<name>.face.json or the inline object.")
                 .with_mime_type("application/json"),
         ]))
     }
@@ -197,11 +200,11 @@ impl ServerHandler for Spell {
     }
 }
 
-/// Servidor MCP em stdio: uma mensagem JSON-RPC por linha em stdin/stdout, log em stderr.
-/// Bloqueia ate o cliente fechar o canal.
+/// MCP server over stdio: one JSON-RPC message per line on stdin/stdout, log on stderr.
+/// It blocks until the client closes the channel.
 pub fn serve_stdio(reg: Registry) -> Result<(), String> {
-    // ponytail: runtime current_thread montado aqui ; o rmcp e' async e o resto do spellcore nao —
-    // trocar por multi_thread se algum dia uma tool precisar de concorrencia real dentro do MCP.
+    // ponytail: a current_thread runtime built here ; rmcp is async and the rest of spellcore is
+    // not — swap it for multi_thread if some day a tool needs real concurrency inside the MCP.
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -211,7 +214,7 @@ pub fn serve_stdio(reg: Registry) -> Result<(), String> {
             .serve(stdio())
             .await
             .map_err(|e| e.to_string())?;
-        eprintln!("MCP stdio pronto");
+        eprintln!("MCP stdio ready");
         s.waiting().await.map_err(|e| e.to_string())?;
         Ok(())
     })
@@ -223,7 +226,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn tools_saem_do_registry() {
+    fn tools_come_from_the_registry() {
         let s = Spell::new(engine::registry::base());
         let t = s.tools();
         for n in [
@@ -234,7 +237,7 @@ mod tests {
             "locate",
             "transport_state",
         ] {
-            assert!(t.iter().any(|x| x.name == n), "tool {} ausente", n);
+            assert!(t.iter().any(|x| x.name == n), "tool {} missing", n);
         }
         let locate = t.iter().find(|x| x.name == "locate").unwrap();
         assert_eq!(locate.input_schema["type"], json!("object"));
@@ -243,15 +246,16 @@ mod tests {
             .description
             .as_deref()
             .unwrap_or("")
-            .contains("instante"));
+            .contains("instant"));
     }
 
     #[test]
-    fn call_tool_devolve_erro_do_registry_sem_derrubar_o_servidor() {
+    fn call_tool_returns_the_registry_error_without_taking_the_server_down() {
         let s = Spell::new(engine::registry::base());
-        let r = s.run("nao_existe", json!({}));
+        let r = s.run("does_not_exist", json!({}));
         assert_eq!(r.is_error, Some(true));
-        // sem player vivo, o transporte responde erro de tool (o cliente le o texto), nao JSON-RPC
+        // with no live player, the transport answers with a tool error (the client reads the
+        // text), not JSON-RPC
         let r = s.run("pause", json!({}));
         assert_eq!(r.is_error, Some(true));
         let r = s.run("show_get", json!({}));
@@ -259,8 +263,8 @@ mod tests {
     }
 
     #[test]
-    fn texto_cru_para_string() {
-        assert_eq!(texto(&json!("relatorio")), "relatorio");
+    fn raw_text_for_a_string() {
+        assert_eq!(texto(&json!("report")), "report");
         assert_eq!(texto(&json!({"a": 1})), "{\n  \"a\": 1\n}");
     }
 }

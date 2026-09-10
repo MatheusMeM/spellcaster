@@ -1,6 +1,6 @@
-//! Player: show curto em loopback sACN, transporte remoto por OSC e `locate` zerando cues e
-//! ganchos. Tudo em 127.0.0.1; quando o socket nao sobe (firewall, porta ocupada), o teste
-//! avisa e passa — igual aos testes de loopback do crate `protocols`.
+//! Player: short show over sACN loopback, remote transport over OSC and `locate` clearing cues
+//! and hooks. All on 127.0.0.1; when the socket does not come up (firewall, busy port), the test
+//! reports it and passes — same as the loopback tests of the `protocols` crate.
 
 use engine::hook::FrameHook;
 use engine::{Player, Show, Universes};
@@ -10,10 +10,10 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 fn show(v: serde_json::Value) -> Show {
-    serde_json::from_value(v).expect("show de teste invalido")
+    serde_json::from_value(v).expect("invalid test show")
 }
 
-/// Espera a condicao por ate `secs`, checando a cada 5 ms.
+/// Waits for the condition for up to `secs`, checking every 5 ms.
 fn espera(secs: f64, mut cond: impl FnMut() -> bool) -> bool {
     let fim = Instant::now() + Duration::from_secs_f64(secs);
     while Instant::now() < fim {
@@ -26,13 +26,13 @@ fn espera(secs: f64, mut cond: impl FnMut() -> bool) -> bool {
 }
 
 #[test]
-fn show_de_dois_tracks_em_loopback_sacn() {
+fn two_track_show_over_sacn_loopback() {
     let mut rx = match protocols::sacn::SacnIn::new(&[1]) {
         Ok(r) => r,
-        Err(e) => return println!("pulado: bind 5568 falhou: {:?}", e.kind()),
+        Err(e) => return println!("skipped: bind 5568 failed: {:?}", e.kind()),
     };
     let sh = show(json!({
-        "name": "teste", "fps": 30, "duration": 0.5, "version": 1,
+        "name": "test", "fps": 30, "duration": 0.5, "version": 1,
         "outputs": [{"type": "sacn", "universes": [1], "interfaces": ["127.0.0.1"]}],
         "tracks": [
             {"type": "dmx", "universe": 1, "address": 1, "keys": [[0, 200], [9, 200]]},
@@ -43,14 +43,14 @@ fn show_de_dois_tracks_em_loopback_sacn() {
     }));
     let mut p = match Player::new(sh, false) {
         Ok(p) => p,
-        Err(e) => return println!("pulado: saida sACN nao subiu: {}", e),
+        Err(e) => return println!("skipped: sACN output did not come up: {}", e),
     };
     p.start(None).expect("start");
     let h = p.handle();
     h.play();
     assert!(
         p.wait(Some(Duration::from_secs(5))),
-        "o show de 0,5 s nao terminou"
+        "the 0.5 s show did not finish"
     );
 
     let ok = espera(2.0, || rx.get(1).is_some_and(|d| d[0] == 200 && d[9] == 11));
@@ -59,74 +59,78 @@ fn show_de_dois_tracks_em_loopback_sacn() {
     p.close();
     rx.close();
     match got {
-        None => println!("pulado: UDP em loopback nao entregou (firewall?)"),
+        None => println!("skipped: loopback UDP did not deliver (firewall?)"),
         Some(d) => {
-            assert!(ok, "frame recebido nao bate: {:?}", &d[..12]);
-            assert_eq!(&d[..1], &[200], "track 1: canal 1");
-            assert_eq!(&d[9..12], &[11, 22, 33], "track 2: canais 10..12");
+            assert!(ok, "the received frame does not match: {:?}", &d[..12]);
+            assert_eq!(&d[..1], &[200], "track 1: channel 1");
+            assert_eq!(&d[9..12], &[11, 22, 33], "track 2: channels 10..12");
             assert_eq!(
                 &d[19..21],
                 &[10, 5],
-                "media Capture: ch1 play = 10, ch2 clipe = 5"
+                "Capture media: ch1 play = 10, ch2 clip = 5"
             );
-            assert_eq!(d[1], 0, "canal nao escrito continua zero");
+            assert_eq!(d[1], 0, "an unwritten channel stays zero");
         }
     }
-    assert_eq!(st.state, "stop", "fim do show para o transporte");
-    assert!(st.frames >= 10, "frames em 0,5 s a 30 fps: {}", st.frames);
+    assert_eq!(st.state, "stop", "the end of the show stops the transport");
+    assert!(st.frames >= 10, "frames in 0.5 s at 30 fps: {}", st.frames);
     assert_eq!(st.universes, vec![1]);
-    assert!(engine::player::current().is_none(), "close limpa o CURRENT");
+    assert!(
+        engine::player::current().is_none(),
+        "close clears the CURRENT"
+    );
 }
 
 #[test]
-fn transporte_remoto_por_osc() {
+fn remote_transport_over_osc() {
     const PORTA: u16 = 19100;
     let sh = show(json!({
         "name": "osc", "fps": 30, "version": 1, "outputs": [], "tracks": [],
         "transport": {"osc_port": PORTA}
     }));
-    let mut p = Player::new(sh, false).expect("player sem saida");
+    let mut p = Player::new(sh, false).expect("player with no output");
     if let Err(e) = p.start(None) {
-        return println!("pulado: OscIn na porta {} nao subiu: {}", PORTA, e);
+        return println!("skipped: OscIn on port {} did not come up: {}", PORTA, e);
     }
     let h = p.handle();
     let tx = match protocols::osc::OscOut::new("127.0.0.1", PORTA) {
         Ok(t) => t,
-        Err(e) => return println!("pulado: OscOut falhou: {:?}", e.kind()),
+        Err(e) => return println!("skipped: OscOut failed: {:?}", e.kind()),
     };
 
     tx.send("/spellcaster/play", &[]);
     if !espera(2.0, || h.state().state == "play") {
         p.close();
-        return println!("pulado: OSC em loopback nao chegou (firewall?)");
+        return println!("skipped: loopback OSC did not arrive (firewall?)");
     }
     tx.send("/spellcaster/pause", &[]);
-    assert!(espera(2.0, || h.state().state == "pause"), "pause remoto");
+    assert!(espera(2.0, || h.state().state == "pause"), "remote pause");
     tx.send("/spellcaster/locate", &[protocols::osc::Arg::Float(2.5)]);
     assert!(
         espera(2.0, || (h.state().t - 2.5).abs() < 0.05),
-        "locate remoto: t = {}",
+        "remote locate: t = {}",
         h.state().t
     );
     tx.send("/spellcaster/stop", &[]);
-    assert!(espera(2.0, || h.state().state == "stop"), "stop remoto");
+    assert!(espera(2.0, || h.state().state == "stop"), "remote stop");
     assert!(
         p.wait(Some(Duration::from_secs(2))),
-        "stop remoto acorda o wait"
+        "a remote stop wakes the wait"
     );
     p.close();
 }
 
-/// Tracks `osc` e `media` nao-Capture saem pela saida "osc" do show, so' quando o valor muda.
+/// `osc` tracks and non-Capture `media` go out through the show "osc" output, only when the
+/// value changes.
 #[test]
-fn tracks_de_efeito_colateral_saem_por_osc() {
+fn side_effect_tracks_go_out_over_osc() {
     const PORTA: u16 = 19101;
     let mut rx = match protocols::osc::OscIn::new(PORTA) {
         Ok(r) => r,
-        Err(e) => return println!("pulado: OscIn {} nao subiu: {:?}", PORTA, e.kind()),
+        Err(e) => return println!("skipped: OscIn {} did not come up: {:?}", PORTA, e.kind()),
     };
     let vistos = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
-    // o `*` do OSC nao atravessa "/": um padrao por nivel
+    // the OSC `*` does not cross "/": one pattern per level
     for pat in ["/spell/*", "/spell/clip/*"] {
         let v = vistos.clone();
         rx.on(pat, move |a, _g| {
@@ -145,13 +149,13 @@ fn tracks_de_efeito_colateral_saem_por_osc() {
     }));
     let mut p = match Player::new(sh, false) {
         Ok(p) => p,
-        Err(e) => return println!("pulado: saida OSC nao subiu: {}", e),
+        Err(e) => return println!("skipped: OSC output did not come up: {}", e),
     };
     p.start(None).expect("start");
     p.handle().play();
     assert!(
         p.wait(Some(Duration::from_secs(5))),
-        "o show de 0,4 s nao terminou"
+        "the 0.4 s show did not finish"
     );
     let ok = espera(2.0, || vistos.lock().unwrap().len() >= 2);
     let msgs = vistos.lock().unwrap().clone();
@@ -159,29 +163,29 @@ fn tracks_de_efeito_colateral_saem_por_osc() {
     rx.close();
     if !ok {
         return println!(
-            "pulado: OSC em loopback nao entregou (firewall?): {:?}",
+            "skipped: loopback OSC did not deliver (firewall?): {:?}",
             msgs
         );
     }
     assert!(
         msgs.contains(&"/spell/dim".to_string()),
-        "track osc: {:?}",
+        "osc track: {:?}",
         msgs
     );
     assert!(
         msgs.contains(&"/spell/clip/play".to_string()),
-        "media nao-Capture vira endereco/valor: {:?}",
+        "non-Capture media becomes address/value: {:?}",
         msgs
     );
     assert_eq!(
         msgs.len(),
         2,
-        "valor constante manda uma vez so': {:?}",
+        "a constant value is sent just once: {:?}",
         msgs
     );
 }
 
-/// Gancho de teste: conta frames e resets, e escreve um canal para provar que roda no frame.
+/// Test hook: it counts frames and resets, and writes a channel to prove it runs in the frame.
 struct Conta {
     frames: Arc<AtomicUsize>,
     resets: Arc<AtomicUsize>,
@@ -199,12 +203,12 @@ impl FrameHook for Conta {
 }
 
 #[test]
-fn locate_zera_cues_e_ganchos() {
+fn locate_clears_cues_and_hooks() {
     let sh = show(json!({
         "name": "cues", "fps": 60, "version": 1, "outputs": [],
         "tracks": [{"type": "dmx", "universe": 1, "address": 1, "keys": [[0, 1]]}],
-        "cues": [{"name": "um", "fade": 0.0, "values": {"1/20": [255]}},
-                 {"name": "dois", "fade": 0.0, "values": {"1/20": [10]}}]
+        "cues": [{"name": "one", "fade": 0.0, "values": {"1/20": [255]}},
+                 {"name": "two", "fade": 0.0, "values": {"1/20": [10]}}]
     }));
     let (frames, resets) = (Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0)));
     let mut p = Player::new(sh, false).expect("player");
@@ -217,34 +221,31 @@ fn locate_zera_cues_e_ganchos() {
     h.play();
     assert!(
         espera(2.0, || frames.load(Ordering::Relaxed) > 2),
-        "o gancho nao rodou"
+        "the hook did not run"
     );
     assert_eq!(h.state().cue, -1);
 
     h.cue_go(None);
-    assert!(
-        espera(2.0, || h.state().cue == 0),
-        "GO nao disparou a cue 0"
-    );
+    assert!(espera(2.0, || h.state().cue == 0), "GO did not fire cue 0");
     h.cue_go(None);
     assert!(
         espera(2.0, || h.state().cue == 1),
-        "GO nao andou para a cue 1"
+        "GO did not move on to cue 1"
     );
 
     let antes = resets.load(Ordering::Relaxed);
     h.locate(3.0);
     assert!(
         espera(2.0, || h.state().cue == -1),
-        "locate nao zerou as cues"
+        "locate did not clear the cues"
     );
     assert!(
         espera(2.0, || resets.load(Ordering::Relaxed) > antes),
-        "locate nao chamou reset() no gancho"
+        "locate did not call reset() on the hook"
     );
-    assert!((h.state().t - 3.0).abs() < 0.5, "locate move o relogio");
+    assert!((h.state().t - 3.0).abs() < 0.5, "locate moves the clock");
 
-    // stop tambem zera: a cue volta para -1 depois de um GO
+    // stop clears it too: the cue goes back to -1 after a GO
     h.play();
     h.cue_go(Some(1));
     assert!(espera(2.0, || h.state().cue == 1));
@@ -252,46 +253,58 @@ fn locate_zera_cues_e_ganchos() {
     h.stop();
     assert!(
         espera(2.0, || h.state().cue == -1),
-        "stop nao zerou as cues"
+        "stop did not clear the cues"
     );
     assert!(
         espera(2.0, || resets.load(Ordering::Relaxed) > antes),
-        "stop nao resetou o gancho"
+        "stop did not reset the hook"
     );
-    assert!(p.wait(Some(Duration::from_secs(2))), "stop acorda o wait");
+    assert!(p.wait(Some(Duration::from_secs(2))), "stop wakes the wait");
     p.close();
 }
 
-/// Loop e' estado do ENGINE, no intervalo In-Out do show: com In=1 e Out=2 o transporte volta
-/// sozinho para o In, e desligar o loop com o player andando solta o tempo no mesmo segundo.
+/// The loop is ENGINE state, over the In-Out range of the show: with In=1 and Out=2 the
+/// transport jumps back to the In on its own, and turning the loop off with the player running
+/// releases the time in the same second.
 #[test]
-fn loop_repete_o_intervalo_in_out() {
+fn loop_repeats_the_in_out_range() {
     let sh = show(json!({
         "name": "loop", "fps": 60, "duration": 10.0, "version": 1,
         "outputs": [], "tracks": [], "in": 1.0, "out": 2.0
     }));
-    let mut p = Player::new(sh, true).expect("player sem saida");
+    let mut p = Player::new(sh, true).expect("player with no output");
     p.start(None).expect("start");
     let h = p.handle();
     let st = h.state();
-    assert!(st.looping, "o player nasceu com o loop pedido no play_show");
+    assert!(
+        st.looping,
+        "the player was born with the loop asked for in play_show"
+    );
     assert_eq!(
         (st.loop_in, st.loop_out),
         (1.0, 2.0),
-        "o intervalo do loop e' o In-Out do show"
+        "the loop range is the In-Out of the show"
     );
 
     h.locate(1.5);
     h.play();
     let voltou = espera(4.0, || h.state().t < 1.4);
     let t = h.state().t;
-    assert!(voltou, "o transporte nao voltou para o In: t = {}", t);
-    assert!(t > 0.9, "voltou para antes do In: t = {}", t);
+    assert!(
+        voltou,
+        "the transport did not jump back to the In: t = {}",
+        t
+    );
+    assert!(t > 0.9, "it jumped back to before the In: t = {}", t);
 
-    // desligado com o player andando (o `loop_set` do registry), o tempo passa do Out
+    // turned off with the player running (the registry `loop_set`), time runs past the Out
     h.set_loop(false, 1.0, 2.0);
     let passou = espera(4.0, || h.state().t > 2.3);
     let t = h.state().t;
     p.close();
-    assert!(passou, "loop desligado ainda prendia o transporte em {}", t);
+    assert!(
+        passou,
+        "the loop turned off still held the transport at {}",
+        t
+    );
 }

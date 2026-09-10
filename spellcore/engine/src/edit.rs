@@ -1,6 +1,6 @@
-//! Edicao do show aberto neste processo (o `OPEN` do registry): show, tracks, keyframes, cues e
-//! patch. Porte de `spellcaster/gui/api.py` mais a checagem de footprint de `fixtures/patch.py`.
-//! GUI e MCP editam por aqui; nenhuma logica de edicao vive fora do registry.
+//! Editing of the show open in this process (the registry `OPEN`): show, tracks, keyframes,
+//! cues and patch. Port of `spellcaster/gui/api.py` plus the footprint check of
+//! `fixtures/patch.py`. GUI and MCP edit through here; no edit logic lives outside the registry.
 
 use crate::cues;
 use crate::registry::{lock, vivo, NoArgs, Registry, OPEN};
@@ -14,10 +14,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 pub const CURVES: [&str; 6] = ["linear", "hold", "in", "out", "inout", "bezier"];
 
-/// Show vazio (o `NEW` do `gui/api.py`): sACN no universo 1, 60 s.
+/// Empty show (the `NEW` of `gui/api.py`): sACN on universe 1, 60 s.
 pub fn novo() -> Show {
     Show {
-        name: "novo show".into(),
+        name: "new show".into(),
         duration: Some(60.0),
         outputs: vec![OutputCfg::Sacn(show::Sacn {
             universes: vec![1],
@@ -33,15 +33,15 @@ pub fn novo() -> Show {
     }
 }
 
-/// Roda `f` no show aberto (caminho, show). Sem show aberto, abre um novo — o Python nasce com
-/// `SHOW = NEW`, e a IA pode chamar `track_add` antes de qualquer `show_get`.
+/// Runs `f` on the open show (path, show). With no open show, it opens a new one — Python is
+/// born with `SHOW = NEW`, and the AI may call `track_add` before any `show_get`.
 fn com_ro<T>(f: impl FnOnce(&mut String, &mut Show) -> Result<T, String>) -> Result<T, String> {
     let mut g = lock(&OPEN);
     let (p, sh) = g.get_or_insert_with(|| (String::new(), novo()));
     f(p, sh)
 }
 
-/// `com_ro` mais o contador: toda edicao bem-sucedida sobe `rev`.
+/// `com_ro` plus the counter: every successful edit bumps `rev`.
 pub(crate) fn com<T>(
     f: impl FnOnce(&mut String, &mut Show) -> Result<T, String>,
 ) -> Result<T, String> {
@@ -50,20 +50,20 @@ pub(crate) fn com<T>(
     Ok(v)
 }
 
-/// Revisao do show aberto: sobe a cada edicao. O barramento faz broadcast dela; quem manda
-/// `show_patch` com uma revisao velha leva erro em vez de sobrescrever a edicao do outro.
-// ponytail: contador do processo, nao do arquivo ; virar hash do show se dois processos
-// passarem a editar o mesmo .spell.
+/// Revision of the open show: it bumps on every edit. The bus broadcasts it; whoever sends
+/// `show_patch` with a stale revision gets an error instead of overwriting someone else's edit.
+// ponytail: a process counter, not a file one ; make it a hash of the show if two processes come
+// to edit the same .spell.
 static REV: AtomicU64 = AtomicU64::new(0);
 
 pub fn rev() -> u64 {
     REV.load(Ordering::Relaxed)
 }
 
-/// Troca o show aberto por inteiro (`load`, `show_get {file}`, `show_new`): grava `OPEN` e sobe
-/// `rev`. E' quem TROCA de show; o `get_or_insert_with` do `com_ro` tambem escreve em `OPEN`,
-/// mas so' para encher o slot vazio com `novo()`. Sem isso a `rev` que o cliente segurava
-/// continuaria valendo em OUTRO show, e o `show_patch` dele entraria sem erro no arquivo errado.
+/// Swaps the whole open show (`load`, `show_get {file}`, `show_new`): writes `OPEN` and bumps
+/// `rev`. This is what CHANGES show; the `get_or_insert_with` of `com_ro` also writes `OPEN`, but
+/// only to fill the empty slot with `novo()`. Without it the `rev` the client was holding would
+/// still be valid on ANOTHER show, and its `show_patch` would land error-free on the wrong file.
 pub(crate) fn abre(path: String, sh: Show) {
     *lock(&OPEN) = Some((path, sh));
     REV.fetch_add(1, Ordering::Relaxed);
@@ -73,8 +73,8 @@ fn json(sh: &Show) -> Result<Value, String> {
     serde_json::to_value(sh).map_err(|e| e.to_string())
 }
 
-/// Texto que e' JSON vira JSON (`"255"`, `"[255,0,0]"`); o resto fica texto (`"amarelo"`).
-/// E' o `_value` do Python, para clientes que so' mandam string (CLI, campo de formulario).
+/// Text that is JSON becomes JSON (`"255"`, `"[255,0,0]"`); the rest stays text (`"yellow"`).
+/// It is Python's `_value`, for clients that only send strings (CLI, form field).
 fn valor(v: Value) -> Value {
     match v {
         Value::String(s) => serde_json::from_str(&s).unwrap_or(Value::String(s)),
@@ -86,39 +86,40 @@ fn track(sh: &mut Show, i: usize) -> Result<&mut Value, String> {
     let n = sh.tracks.len();
     sh.tracks
         .get_mut(i)
-        .ok_or_else(|| format!("track {}: o show tem {}", i, n))
+        .ok_or_else(|| format!("track {}: the show has {}", i, n))
 }
 
 fn keys(tr: &mut Value) -> Result<&mut Vec<Value>, String> {
     let o = tr
         .as_object_mut()
-        .ok_or_else(|| "track nao e' objeto JSON".to_string())?;
+        .ok_or_else(|| "track is not a JSON object".to_string())?;
     let k = o.entry("keys").or_insert_with(|| json!([]));
     if !k.is_array() {
         *k = json!([]);
     }
-    Ok(k.as_array_mut().expect("lista"))
+    Ok(k.as_array_mut().expect("array"))
 }
 
 fn tempo(k: &Value) -> f64 {
     k.get(0).and_then(|v| v.as_f64()).unwrap_or(f64::NAN)
 }
 
-/// Lista em `extra` ("cues", "patch"), criada vazia quando falta.
+/// List in `extra` ("cues", "patch"), created empty when missing.
 fn lista<'a>(sh: &'a mut Show, k: &str) -> &'a mut Vec<Value> {
     let v = sh.extra.entry(k.to_string()).or_insert_with(|| json!([]));
     if !v.is_array() {
         *v = json!([]);
     }
-    v.as_array_mut().expect("lista")
+    v.as_array_mut().expect("array")
 }
 
-/// Cria ou substitui o keyframe do track em `t` (`|dt| < 1 us`), com a lista ordenada. Funil
-/// unico da escrita de keyframe: o comando `key_set` e a gravacao (`rec.rs`) passam por aqui, e
-/// os dois sobem `rev` — sem isso a gravacao editaria o show por fora e nenhum cliente saberia.
+/// Creates or replaces the keyframe of the track at `t` (`|dt| < 1 us`), keeping the list
+/// sorted. The one funnel of keyframe writing: the `key_set` command and the recording (`rec.rs`)
+/// both go through here, and both bump `rev` — without it the recording would edit the show from
+/// the outside and no client would know.
 pub fn key_put(indice: usize, t: f64, value: Value, curve: &str) -> Result<Value, String> {
     if !CURVES.contains(&curve) {
-        return Err(format!("curva {:?}: use {:?}", curve, CURVES));
+        return Err(format!("curve {:?}: use {:?}", curve, CURVES));
     }
     com(|_, sh| {
         let ks = keys(track(sh, indice)?)?;
@@ -136,21 +137,22 @@ pub fn key_put(indice: usize, t: f64, value: Value, curve: &str) -> Result<Value
     })
 }
 
-/// Universo, endereco e largura (quantos canais o keyframe cobre) de um track `dmx`/`artnet` do
-/// show aberto. A largura vem do primeiro keyframe em lista; sem lista, um canal so'.
-// ponytail: largura pelo keyframe existente, nao por campo do track ; virar campo `channels` se
-// gravar um track vazio de 4 canais passar a ser o caso comum.
+/// Universe, address and width (how many channels the keyframe covers) of a `dmx`/`artnet`
+/// track of the open show. The width comes from the first keyframe held in a list; with no list,
+/// a single channel.
+// ponytail: width taken from the existing keyframe, not from a track field ; make it a `channels`
+// field if recording into an empty 4-channel track becomes the common case.
 pub fn track_dmx(indice: usize) -> Result<(u16, u16, usize), String> {
     com_ro(|_, sh| {
         let tr = track(sh, indice)?;
         let tipo = tr.get("type").and_then(|v| v.as_str()).unwrap_or("");
         if tipo != "dmx" && tipo != "artnet" {
-            return Err(format!("track {}: tipo {:?} nao e' dmx", indice, tipo));
+            return Err(format!("track {}: type {:?} is not dmx", indice, tipo));
         }
         let u = tr.get("universe").and_then(|v| v.as_u64()).unwrap_or(1) as u16;
         let a = tr.get("address").and_then(|v| v.as_u64()).unwrap_or(1) as u16;
         if a == 0 || a > 512 {
-            return Err(format!("track {}: endereco {} fora de 1..512", indice, a));
+            return Err(format!("track {}: address {} outside 1..512", indice, a));
         }
         let w = tr
             .get("keys")
@@ -170,9 +172,9 @@ struct Perfil {
     json: Value,
 }
 
-/// Perfil por nome em `dir` (sem .json) ou por caminho.
-// ponytail: faixas (`ranges`) e roda (`wheel`) so' viajam no `json` cru, para o cliente
-// desenhar ; viram tipo aqui quando o fade por tipo de canal existir.
+/// Profile by name in `dir` (without .json) or by path.
+// ponytail: ranges (`ranges`) and wheel (`wheel`) travel only in the raw `json`, for the client
+// to draw ; they become a type here once per-channel-type fade exists.
 fn perfil(dir: &Path, p: &str) -> Result<Perfil, String> {
     let f = if Path::new(p).extension().is_some() {
         PathBuf::from(p)
@@ -180,7 +182,7 @@ fn perfil(dir: &Path, p: &str) -> Result<Perfil, String> {
         dir.join(format!("{}.json", p))
     };
     let txt = std::fs::read_to_string(&f)
-        .map_err(|_| format!("perfil {:?} nao encontrado ({})", p, f.display()))?;
+        .map_err(|_| format!("profile {:?} not found ({})", p, f.display()))?;
     let v: Value = serde_json::from_str(&txt).map_err(|e| format!("{}: {}", f.display(), e))?;
     let name = v["name"].as_str().unwrap_or("?").to_string();
     let mut max: Option<u64> = None;
@@ -191,9 +193,9 @@ fn perfil(dir: &Path, p: &str) -> Result<Perfil, String> {
             }
         }
     }
-    let m = max.ok_or_else(|| format!("{}: sem canais", name))?;
+    let m = max.ok_or_else(|| format!("{}: no channels", name))?;
     if m > 511 {
-        return Err(format!("{}: offset {} fora de 0..511", name, m));
+        return Err(format!("{}: offset {} outside 0..511", name, m));
     }
     Ok(Perfil {
         name,
@@ -202,9 +204,9 @@ fn perfil(dir: &Path, p: &str) -> Result<Perfil, String> {
     })
 }
 
-/// Pasta de recurso do show (`profiles/`, `faces/`, `modules/`): ao lado do .spell, um nivel
-/// acima (`shows/` e `profiles/` irmaos, como no repo e no pendrive), no cwd ou ao lado do
-/// executavel — a primeira que existir.
+/// Resource folder of the show (`profiles/`, `faces/`, `modules/`): next to the .spell, one
+/// level up (`shows/` and `profiles/` as siblings, as in the repo and on the USB stick), in the
+/// cwd or next to the executable — the first one that exists.
 pub fn recurso_dir(spell: &str, nome: &str) -> PathBuf {
     let mut c = Vec::new();
     if !spell.is_empty() {
@@ -224,11 +226,11 @@ pub fn recurso_dir(spell: &str, nome: &str) -> PathBuf {
         .unwrap_or_else(|| PathBuf::from(nome))
 }
 
-/// Uma linha da grade por fixture; para no primeiro erro (perfil ausente, fora de 512,
-/// sobreposicao — o bug dos 17 ch em espacamento de 16 acusa aqui).
+/// One grid row per fixture; it stops at the first error (missing profile, past 512, overlap —
+/// the 17 ch on a 16 spacing bug shows up here).
 fn checar(sh: &Show, dir: &Path) -> (Vec<Value>, Option<String>) {
     let mut rows: Vec<Value> = Vec::new();
-    let mut busy: HashMap<(u16, u16), usize> = HashMap::new(); // (universo, canal) -> linha
+    let mut busy: HashMap<(u16, u16), usize> = HashMap::new(); // (universe, channel) -> row
     let vazio = Vec::new();
     let patch = sh
         .extra
@@ -252,21 +254,21 @@ fn linha(
 ) -> Result<Value, String> {
     let name = f["name"]
         .as_str()
-        .ok_or_else(|| "fixture sem name".to_string())?;
+        .ok_or_else(|| "fixture without name".to_string())?;
     if rows.iter().any(|r| r["name"] == name) {
-        return Err(format!("fixture {:?} ja esta no patch", name));
+        return Err(format!("fixture {:?} is already in the patch", name));
     }
     let prof = f["profile"]
         .as_str()
-        .ok_or_else(|| format!("{}: sem profile", name))?;
+        .ok_or_else(|| format!("{}: no profile", name))?;
     let p = perfil(dir, prof)?;
     let u = f["universe"].as_u64().unwrap_or(1) as u16;
     let a = f["address"]
         .as_u64()
-        .ok_or_else(|| format!("{}: sem address", name))? as u16;
+        .ok_or_else(|| format!("{}: no address", name))? as u16;
     if a < 1 || a as u32 + p.size as u32 - 1 > 512 {
         return Err(format!(
-            "{} [{}]: endereco {} + {} ch passa de 512 (universo {})",
+            "{} [{}]: address {} + {} ch runs past 512 (universe {})",
             name, p.name, a, p.size, u
         ));
     }
@@ -274,7 +276,7 @@ fn linha(
         if let Some(&i) = busy.get(&(u, ch)) {
             let o = &rows[i];
             return Err(format!(
-                "sobreposicao no universo {} canal {}: {:?} [{}, {} ch em {}] e {:?} [{}, {} ch em {}]",
+                "overlap on universe {} channel {}: {:?} [{}, {} ch at {}] and {:?} [{}, {} ch at {}]",
                 u,
                 ch,
                 o["name"].as_str().unwrap_or(""),
@@ -295,11 +297,11 @@ fn linha(
 
 // ------------------------------------------------------------- json patch (RFC 6902)
 
-/// Divide "/a/b/c" em ("/a/b", "c"), com o token final sem os escapes do RFC 6901.
+/// Splits "/a/b/c" into ("/a/b", "c"), with the last token free of the RFC 6901 escapes.
 fn dividir(path: &str) -> Result<(&str, String), String> {
     let i = path
         .rfind('/')
-        .ok_or_else(|| format!("path {:?}: um JSON Pointer comeca com /", path))?;
+        .ok_or_else(|| format!("path {:?}: a JSON Pointer starts with /", path))?;
     Ok((
         &path[..i],
         path[i + 1..].replace("~1", "/").replace("~0", "~"),
@@ -311,11 +313,11 @@ fn indice(n: usize, tok: &str, path: &str, inserindo: bool) -> Result<usize, Str
         n
     } else {
         tok.parse::<usize>()
-            .map_err(|_| format!("path {:?}: {:?} nao e' indice de lista", path, tok))?
+            .map_err(|_| format!("path {:?}: {:?} is not a list index", path, tok))?
     };
     if i > n || (!inserindo && i == n) {
         return Err(format!(
-            "path {:?}: indice {} fora da lista de {}",
+            "path {:?}: index {} outside the list of {}",
             path, i, n
         ));
     }
@@ -324,11 +326,11 @@ fn indice(n: usize, tok: &str, path: &str, inserindo: bool) -> Result<usize, Str
 
 fn pai<'a>(doc: &'a mut Value, path: &str, p: &str) -> Result<&'a mut Value, String> {
     doc.pointer_mut(p)
-        .ok_or_else(|| format!("path {:?}: {:?} nao existe", path, p))
+        .ok_or_else(|| format!("path {:?}: {:?} does not exist", path, p))
 }
 
-/// `add`: insere na lista ("-" = fim) ou grava a chave do objeto. Devolve o path com o indice
-/// ja' resolvido (o inverso nao pode dizer "-") e o valor que estava la', se havia.
+/// `add`: inserts into the list ("-" = end) or writes the object key. Returns the path with the
+/// index already resolved (the inverse cannot say "-") and the value that was there, if any.
 fn add(doc: &mut Value, path: &str, v: Value) -> Result<(String, Option<Value>), String> {
     let (p, tok) = dividir(path)?;
     match pai(doc, path, p)? {
@@ -341,7 +343,10 @@ fn add(doc: &mut Value, path: &str, v: Value) -> Result<(String, Option<Value>),
             let velho = o.insert(tok, v);
             Ok((path.to_string(), velho))
         }
-        _ => Err(format!("path {:?}: {:?} nao e' objeto nem lista", path, p)),
+        _ => Err(format!(
+            "path {:?}: {:?} is neither object nor list",
+            path, p
+        )),
     }
 }
 
@@ -354,17 +359,20 @@ fn remove(doc: &mut Value, path: &str) -> Result<Value, String> {
         }
         Value::Object(o) => o
             .remove(&tok)
-            .ok_or_else(|| format!("path {:?} nao existe", path)),
-        _ => Err(format!("path {:?}: {:?} nao e' objeto nem lista", path, p)),
+            .ok_or_else(|| format!("path {:?} does not exist", path)),
+        _ => Err(format!(
+            "path {:?}: {:?} is neither object nor list",
+            path, p
+        )),
     }
 }
 
-/// Uma operacao; devolve a operacao que a desfaz (`test` nao desfaz nada).
+/// One operation; returns the operation that undoes it (`test` undoes nothing).
 fn operar(doc: &mut Value, o: &PatchOp) -> Result<Option<Value>, String> {
     let valor = || {
         o.value
             .clone()
-            .ok_or_else(|| format!("op {:?} em {:?}: falta value", o.op, o.path))
+            .ok_or_else(|| format!("op {:?} at {:?}: value is missing", o.op, o.path))
     };
     Ok(Some(match o.op.as_str() {
         "add" => match add(doc, &o.path, valor()?)? {
@@ -378,29 +386,29 @@ fn operar(doc: &mut Value, o: &PatchOp) -> Result<Option<Value>, String> {
         "replace" => {
             let alvo = doc
                 .pointer_mut(&o.path)
-                .ok_or_else(|| format!("path {:?} nao existe", o.path))?;
+                .ok_or_else(|| format!("path {:?} does not exist", o.path))?;
             let v = std::mem::replace(alvo, valor()?);
             json!({"op": "replace", "path": o.path, "value": v})
         }
         "test" => {
             let v = doc
                 .pointer(&o.path)
-                .ok_or_else(|| format!("test: path {:?} nao existe", o.path))?;
+                .ok_or_else(|| format!("test: path {:?} does not exist", o.path))?;
             let esperado = valor()?;
             if *v != esperado {
-                return Err(format!("test: {} e' {} e nao {}", o.path, v, esperado));
+                return Err(format!("test: {} is {} and not {}", o.path, v, esperado));
             }
             return Ok(None);
         }
-        x => return Err(format!("op {:?}: use add, remove, replace ou test", x)),
+        x => return Err(format!("op {:?}: use add, remove, replace or test", x)),
     }))
 }
 
-/// Aplica a lista inteira a uma COPIA do show; so' comita se todas passarem e se o resultado
-/// ainda for um Show valido (mesma via do `show_set`: deserializa e checa a versao).
+/// Applies the whole list to a COPY of the show; it only commits if all of them pass and if the
+/// result is still a valid Show (the same path as `show_set`: deserialize and check the version).
 fn patch(a: &ShowPatchArgs) -> Result<Value, String> {
     com_ro(|_, sh| {
-        // dentro do lock de `OPEN`: entre a checagem e a gravacao ninguem troca o show.
+        // inside the `OPEN` lock: between the check and the write nobody swaps the show.
         if let Some(r) = a.rev {
             if r != rev() {
                 return Err(format!("rev {} != {}", r, rev()));
@@ -417,13 +425,13 @@ fn patch(a: &ShowPatchArgs) -> Result<Value, String> {
         let mut novo = show::migrate(novo)?;
         novo.extra.retain(|k, _| !k.starts_with('_'));
         *sh = novo;
-        undo.reverse(); // ja' na ordem de aplicacao: o cliente manda de volta como veio
+        undo.reverse(); // already in application order: the client sends it back as it came
         Ok(json!({"rev": REV.fetch_add(1, Ordering::Relaxed) + 1, "undo": undo}))
     })
 }
 
-/// Intervalo In-Out do show aberto (`in`/`out`); sem eles, 0..duration. E' o intervalo do loop:
-/// o player guarda so' o par de numeros, e quem sabe onde ele esta' e' o show aberto.
+/// In-Out range of the open show (`in`/`out`); without them, 0..duration. It is the loop range:
+/// the player keeps only the pair of numbers, and what knows where it is is the open show.
 pub fn intervalo() -> (f64, f64) {
     com_ro(|_, sh| {
         let n = |k: &str| sh.extra.get(k).and_then(Value::as_f64);
@@ -435,10 +443,10 @@ pub fn intervalo() -> (f64, f64) {
     .unwrap_or((0.0, 0.0))
 }
 
-// ------------------------------------------------------------------ graph e face
+// --------------------------------------------------------------- graph and face
 
-/// O graph do show aberto (`extra.graph`), vazio quando falta. A CLI le daqui para o
-/// `graph_check`: o engine nao conhece o crate `script` e por isso nao compila graph nenhum.
+/// The graph of the open show (`extra.graph`), empty when missing. The CLI reads it from here for
+/// `graph_check`: the engine does not know the `script` crate and so compiles no graph at all.
 pub fn graph() -> Value {
     com_ro(|_, sh| Ok(sh.extra.get("graph").cloned()))
         .ok()
@@ -446,8 +454,8 @@ pub fn graph() -> Value {
         .unwrap_or_else(|| json!({"nodes": [], "edges": []}))
 }
 
-/// A face do show: o objeto inline de `extra.face`, ou `faces/<nome>.face.json` quando e' texto
-/// (nome sem extensao, ou caminho). `null` quando o show nao tem face.
+/// The face of the show: the inline object of `extra.face`, or `faces/<name>.face.json` when it
+/// is text (name without extension, or path). `null` when the show has no face.
 fn face() -> Result<Value, String> {
     let (spell, f) = com_ro(|p, sh| Ok((p.clone(), sh.extra.get("face").cloned())))?;
     match f {
@@ -462,9 +470,9 @@ fn face() -> Result<Value, String> {
     }
 }
 
-// ------------------------------------------------- cues e programmer (mesa)
+// --------------------------------------------- cues and programmer (console)
 
-/// Objeto cue do .spell, com as chaves validadas. Uma so' via para `cue_set` e `cue_capture`.
+/// The .spell cue object, with the keys validated. One single path for `cue_set` and `cue_capture`.
 fn cue(
     name: &str,
     fade: f64,
@@ -473,12 +481,12 @@ fn cue(
     values: &Map<String, Value>,
 ) -> Result<Value, String> {
     if let Some(k) = values.keys().find(|k| cues::key(k).is_none()) {
-        return Err(format!("cue: chave {:?} nao e' \"universo/endereco\"", k));
+        return Err(format!("cue: key {:?} is not \"universe/address\"", k));
     }
     Ok(json!({"name": name, "fade": fade, "wait": wait, "follow": follow, "values": values}))
 }
 
-/// Poe a cue no show aberto: `index` substitui, sem `index` acrescenta. Devolve o indice.
+/// Puts the cue into the open show: `index` replaces, without `index` it appends. Returns the index.
 fn cue_put(index: Option<usize>, c: Value) -> Result<Value, String> {
     com(|_, sh| {
         let cs = lista(sh, "cues");
@@ -487,7 +495,7 @@ fn cue_put(index: Option<usize>, c: Value) -> Result<Value, String> {
                 cs[i] = c;
                 i
             }
-            Some(i) => return Err(format!("cue {}: o show tem {}", i, cs.len())),
+            Some(i) => return Err(format!("cue {}: the show has {}", i, cs.len())),
             None => {
                 cs.push(c);
                 cs.len() - 1
@@ -497,7 +505,7 @@ fn cue_put(index: Option<usize>, c: Value) -> Result<Value, String> {
     })
 }
 
-/// Fixture do patch pelo nome, com o perfil ja carregado.
+/// Fixture of the patch by name, with the profile already loaded.
 fn fixture(nome: &str) -> Result<(u16, u16, Perfil), String> {
     com(|p, sh| {
         let dir = recurso_dir(p, "profiles");
@@ -508,12 +516,12 @@ fn fixture(nome: &str) -> Result<(u16, u16, Perfil), String> {
             .into_iter()
             .flatten()
             .find(|f| f["name"] == nome)
-            .ok_or_else(|| format!("fixture {:?} nao esta no patch", nome))?;
+            .ok_or_else(|| format!("fixture {:?} is not in the patch", nome))?;
         let pr = perfil(&dir, f["profile"].as_str().unwrap_or_default())?;
         let u = f["universe"].as_u64().unwrap_or(1) as u16;
         let a = f["address"]
             .as_u64()
-            .ok_or_else(|| format!("{}: sem address", nome))? as u16;
+            .ok_or_else(|| format!("{}: no address", nome))? as u16;
         Ok((u, a, pr))
     })
 }
@@ -532,13 +540,13 @@ fn linear() -> String {
 
 #[derive(Deserialize, JsonSchema)]
 pub struct ShowSetArgs {
-    /// O show inteiro: objeto JSON (ou texto JSON).
+    /// The whole show: JSON object (or JSON text).
     pub data: Value,
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct ShowSaveArgs {
-    /// Caminho do .spell; vazio = o do ultimo load/show_get/show_save.
+    /// Path of the .spell; empty = the one from the last load/show_get/show_save.
     #[serde(default)]
     pub file: String,
 }
@@ -549,99 +557,99 @@ pub struct TrackAddArgs {
     #[serde(default = "dmx", rename = "type")]
     #[schemars(rename = "type")]
     pub kind: String,
-    /// Universo de saida, a partir de 1.
+    /// Output universe, from 1 on.
     #[serde(default = "um")]
     pub universe: u16,
-    /// Endereco DMX 1..512 (tracks osc usam texto: passe pelo show_set).
+    /// DMX address 1..512 (osc tracks use text: go through show_set).
     #[serde(default = "um")]
     pub address: u16,
-    /// Nome do track (campo `name` do .spell). O argumento `label` e' o nome velho deste
-    /// (deprecated, sai na proxima rodada).
-    // ponytail: alias `label` por uma rodada, por script e sessao MCP ja' escritos (no repo nao
-    // sobrou chamador) ; tirar na rodada 3.
+    /// Track name (the .spell `name` field). The `label` argument is the old name of this one
+    /// (deprecated, gone next round).
+    // ponytail: `label` alias for one round, for scripts and MCP sessions already written (no
+    // caller left in the repo) ; drop it in round 3.
     #[serde(default, alias = "label")]
     pub name: String,
-    /// Clipe `.ild` do track `laser` (campo `clip`).
+    /// `.ild` clip of the `laser` track (the `clip` field).
     #[serde(default)]
     pub clip: String,
-    /// Script `.rhai` do track `fx` (campo `script`).
+    /// `.rhai` script of the `fx` track (the `script` field).
     #[serde(default)]
     pub script: String,
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct TrackDelArgs {
-    /// Indice do track em `tracks`.
+    /// Index of the track in `tracks`.
     pub index: usize,
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct KeySetArgs {
-    /// Indice do track.
+    /// Index of the track.
     pub track: usize,
-    /// Instante em segundos.
+    /// Instant in seconds.
     pub t: f64,
-    /// 255, [255, 0, 0] ou texto ("play"); ausente = 0.
+    /// 255, [255, 0, 0] or text ("play"); absent = 0.
     #[serde(default)]
     pub value: Value,
-    /// linear | hold | in | out | inout | bezier (curva do segmento que CHEGA neste keyframe).
+    /// linear | hold | in | out | inout | bezier (curve of the segment that ARRIVES at this keyframe).
     #[serde(default = "linear")]
     pub curve: String,
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct KeyDelArgs {
-    /// Indice do track em `tracks`.
+    /// Index of the track in `tracks`.
     pub track: usize,
-    /// Instante do keyframe (tolerancia 1 ms).
+    /// Instant of the keyframe (1 ms tolerance).
     pub t: f64,
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct CueSetArgs {
-    /// Indice da cue a substituir; ausente = acrescenta no fim.
+    /// Index of the cue to replace; absent = appended at the end.
     #[serde(default)]
     pub index: Option<usize>,
-    /// Nome da cue, como aparece na lista.
+    /// Cue name, as it shows in the list.
     #[serde(default)]
     pub name: String,
-    /// Segundos de fade linear ate os valores.
+    /// Seconds of linear fade to the values.
     #[serde(default)]
     pub fade: f64,
-    /// Segundos entre o GO e o inicio do fade.
+    /// Seconds between the GO and the start of the fade.
     #[serde(default)]
     pub wait: f64,
-    /// Ao terminar, dispara a proxima.
+    /// When it ends, it fires the next one.
     #[serde(default)]
     pub follow: bool,
-    /// {"universo/endereco": valor ou [valores]}; "100" = universo 1.
+    /// {"universe/address": value or [values]}; "100" = universe 1.
     #[serde(default)]
     pub values: Map<String, Value>,
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct CueDelArgs {
-    /// Indice da cue em `cues`.
+    /// Index of the cue in `cues`.
     pub index: usize,
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct PatchAddArgs {
-    /// Nome unico da fixture no show.
+    /// Unique fixture name in the show.
     pub name: String,
-    /// Perfil em profiles/ (sem .json) ou caminho de um .json.
+    /// Profile in profiles/ (without .json) or path of a .json.
     pub profile: String,
-    /// Universo de saida, a partir de 1.
+    /// Output universe, from 1 on.
     #[serde(default = "um")]
     pub universe: u16,
-    /// Primeiro canal DMX (1..512).
+    /// First DMX channel (1..512).
     #[serde(default = "um")]
     pub address: u16,
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct PatchDelArgs {
-    /// Nome da fixture no patch.
+    /// Fixture name in the patch.
     pub name: String,
 }
 
@@ -649,80 +657,80 @@ pub struct PatchDelArgs {
 pub struct PatchOp {
     /// add | remove | replace | test.
     pub op: String,
-    /// JSON Pointer (RFC 6901) dentro do show: "/fps", "/tracks/-", "/tracks/0/keys/2",
-    /// "/graph/nodes". O documento inteiro ("") nao e' alvo: para isso ha' show_set.
+    /// JSON Pointer (RFC 6901) inside the show: "/fps", "/tracks/-", "/tracks/0/keys/2",
+    /// "/graph/nodes". The whole document ("") is not a target: show_set is there for that.
     pub path: String,
-    /// Valor de add, replace e test; `remove` nao usa. Ausente nos tres primeiros = erro.
+    /// Value of add, replace and test; `remove` does not use it. Absent on the first three = error.
     #[serde(default)]
     pub value: Option<Value>,
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct ShowPatchArgs {
-    /// As operacoes, em ordem; a primeira que falhar cancela todas.
+    /// The operations, in order; the first one that fails cancels them all.
     pub ops: Vec<PatchOp>,
-    /// A revisao que o cliente tinha; diferente da atual = recusa ("rev 3 != 5").
+    /// The revision the client held; different from the current one = refused ("rev 3 != 5").
     #[serde(default)]
     pub rev: Option<u64>,
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct ProfileGetArgs {
-    /// Perfil em profiles/ (sem .json) ou caminho de um .json.
+    /// Profile in profiles/ (without .json) or path of a .json.
     pub name: String,
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct LevelSetArgs {
-    /// Universo de saida, a partir de 1.
+    /// Output universe, from 1 on.
     #[serde(default = "um")]
     pub universe: u16,
-    /// Primeiro canal DMX (1..512).
+    /// First DMX channel (1..512).
     pub address: u16,
-    /// Valores 0..255 a partir de `address`; lista vazia escreve zero no canal.
+    /// Values 0..255 from `address` on; an empty list writes zero on the channel.
     #[serde(default)]
     pub values: Vec<f64>,
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct LevelArgs {
-    /// Universo; ausente = todos.
+    /// Universe; absent = all of them.
     #[serde(default)]
     pub universe: Option<u16>,
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct CueCaptureArgs {
-    /// Nome da cue nova.
+    /// Name of the new cue.
     #[serde(default)]
     pub name: String,
-    /// Segundos de fade linear ate os valores.
+    /// Seconds of linear fade to the values.
     #[serde(default)]
     pub fade: f64,
-    /// Segundos entre o GO e o inicio do fade.
+    /// Seconds between the GO and the start of the fade.
     #[serde(default)]
     pub wait: f64,
-    /// Ao terminar, dispara a proxima.
+    /// When it ends, it fires the next one.
     #[serde(default)]
     pub follow: bool,
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct FixtureSetArgs {
-    /// Nome da fixture no patch.
+    /// Fixture name in the patch.
     pub name: String,
-    /// Nome do canal no perfil ("dim", "r"); numero nao resolve.
+    /// Channel name in the profile ("dim", "r"); a number does not resolve.
     pub channel: String,
     /// 0..255.
     pub value: f64,
 }
 
-// ------------------------------------------------------------------ comandos
+// ------------------------------------------------------------------ commands
 
 pub fn register(r: &mut Registry) {
     r.add::<NoArgs>(
         "show_new",
-        "Zera o show aberto: novo show, sACN no universo 1, 60 s. Devolve o show inteiro.",
+        "Clears the open show: new show, sACN on universe 1, 60 s. Returns the whole show.",
         |_| {
             let sh = novo();
             let v = json(&sh)?;
@@ -732,11 +740,11 @@ pub fn register(r: &mut Registry) {
     );
     r.add::<ShowSetArgs>(
         "show_set",
-        "Substitui o show aberto pelo JSON dado (para IMPORTAR um show inteiro; para editar, prefira show_patch). Devolve o show inteiro.",
+        "Replaces the open show with the given JSON (to IMPORT a whole show; to edit, prefer show_patch). Returns the whole show.",
         |a| {
             let v = valor(a.data);
             if !v.is_object() {
-                return Err("show_set: esperava um objeto JSON".into());
+                return Err("show_set: expected a JSON object".into());
             }
             let sh: Show = serde_json::from_value(v).map_err(|e| format!("show_set: {}", e))?;
             let mut sh = show::migrate(sh)?;
@@ -749,7 +757,7 @@ pub fn register(r: &mut Registry) {
     );
     r.add::<ShowSaveArgs>(
         "show_save",
-        "Grava o show aberto (sem file, no caminho do ultimo aberto). Devolve o caminho.",
+        "Saves the open show (without file, at the path of the last one opened). Returns the path.",
         |a| {
             com_ro(|p, sh| {
                 let f = if a.file.is_empty() {
@@ -758,7 +766,7 @@ pub fn register(r: &mut Registry) {
                     a.file.clone()
                 };
                 if f.is_empty() {
-                    return Err("show_save: sem caminho (passe file=)".into());
+                    return Err("show_save: no path (pass file=)".into());
                 }
                 show::save(Path::new(&f), sh)?;
                 *p = f.clone();
@@ -768,7 +776,7 @@ pub fn register(r: &mut Registry) {
     );
     r.add::<TrackAddArgs>(
         "track_add",
-        "Acrescenta um track vazio ao show aberto (type dmx|artnet|osc|media|cue|fx|laser; clip para laser, script para fx). Devolve o indice do track. O argumento `label` e' o nome velho de `name` (deprecated, sai na proxima rodada).",
+        "Appends an empty track to the open show (type dmx|artnet|osc|media|cue|fx|laser; clip for laser, script for fx). Returns the index of the track. The `label` argument is the old name of `name` (deprecated, gone next round).",
         |a| {
             com(|_, sh| {
                 let mut tr = json!({"type": a.kind, "universe": a.universe,
@@ -789,7 +797,7 @@ pub fn register(r: &mut Registry) {
     );
     r.add::<TrackDelArgs>(
         "track_del",
-        "Remove o track de indice dado. Devolve o track removido.",
+        "Removes the track at the given index. Returns the removed track.",
         |a| {
             com(|_, sh| {
                 track(sh, a.index)?;
@@ -799,12 +807,12 @@ pub fn register(r: &mut Registry) {
     );
     r.add::<KeySetArgs>(
         "key_set",
-        "Cria ou substitui o keyframe do track em t. Devolve os keyframes do track.",
+        "Creates or replaces the keyframe of the track at t. Returns the keyframes of the track.",
         |a| key_put(a.track, a.t, a.value, &a.curve),
     );
     r.add::<KeyDelArgs>(
         "key_del",
-        "Apaga o keyframe do track em t (tolerancia 1 ms). Devolve quantos sairam.",
+        "Deletes the keyframe of the track at t (1 ms tolerance). Returns how many were removed.",
         |a| {
             com(|_, sh| {
                 let ks = keys(track(sh, a.track)?)?;
@@ -816,17 +824,17 @@ pub fn register(r: &mut Registry) {
     );
     r.add::<CueSetArgs>(
         "cue_set",
-        "Cria (sem index) ou substitui uma cue: nome, fade, wait, follow e valores DMX. Devolve o indice.",
+        "Creates (without index) or replaces a cue: name, fade, wait, follow and DMX values. Returns the index.",
         |a| cue_put(a.index, cue(&a.name, a.fade, a.wait, a.follow, &a.values)?),
     );
     r.add::<CueDelArgs>(
         "cue_del",
-        "Remove a cue de indice dado. Devolve a cue removida.",
+        "Removes the cue at the given index. Returns the removed cue.",
         |a| {
             com(|_, sh| {
                 let cs = lista(sh, "cues");
                 if a.index >= cs.len() {
-                    return Err(format!("cue {}: o show tem {}", a.index, cs.len()));
+                    return Err(format!("cue {}: the show has {}", a.index, cs.len()));
                 }
                 Ok(cs.remove(a.index))
             })
@@ -834,7 +842,7 @@ pub fn register(r: &mut Registry) {
     );
     r.add::<PatchAddArgs>(
         "patch_add",
-        "Patcheia uma fixture (perfil, universo, endereco); recusa sobreposicao e estouro de 512. Devolve a grade do patch.",
+        "Patches a fixture (profile, universe, address); refuses overlap and running past 512. Returns the patch grid.",
         |a| {
             com(|p, sh| {
                 let dir = recurso_dir(p, "profiles");
@@ -852,20 +860,20 @@ pub fn register(r: &mut Registry) {
     );
     r.add::<PatchDelArgs>(
         "patch_del",
-        "Tira a fixture do patch pelo nome. Devolve a entrada removida.",
+        "Removes the fixture from the patch by name. Returns the removed entry.",
         |a| {
             com(|_, sh| {
                 let ps = lista(sh, "patch");
                 match ps.iter().position(|f| f["name"] == a.name) {
                     Some(i) => Ok(ps.remove(i)),
-                    None => Err(format!("fixture {:?} nao esta no patch", a.name)),
+                    None => Err(format!("fixture {:?} is not in the patch", a.name)),
                 }
             })
         },
     );
     r.add::<NoArgs>(
         "patch_check",
-        "Grade do patch do show aberto (nome, perfil, universo, endereco, canais) e o erro de sobreposicao, se houver.",
+        "Patch grid of the open show (name, profile, universe, address, channels) and the overlap error, if there is one.",
         |_| {
             com_ro(|p, sh| {
                 let (rows, error) = checar(sh, &recurso_dir(p, "profiles"));
@@ -875,7 +883,7 @@ pub fn register(r: &mut Registry) {
     );
     r.add::<NoArgs>(
         "profiles",
-        "Nomes dos perfis disponiveis em profiles/.",
+        "Names of the profiles available in profiles/.",
         |_| {
             let dir = com_ro(|p, _| Ok(recurso_dir(p, "profiles")))?;
             let mut v: Vec<String> = std::fs::read_dir(&dir)
@@ -895,32 +903,32 @@ pub fn register(r: &mut Registry) {
     );
     r.add::<ShowPatchArgs>(
         "show_patch",
-        "Edita o show aberto por JSON Patch (RFC 6902: add, remove, replace, test). Uma op que falha cancela todas. Devolve {rev, undo}: `undo` e' a lista de ops que volta ao estado anterior, ja' na ordem de aplicacao.",
+        "Edits the open show by JSON Patch (RFC 6902: add, remove, replace, test). One failing op cancels them all. Returns {rev, undo}: `undo` is the list of ops that goes back to the previous state, already in application order.",
         |a| patch(&a),
     );
     r.add::<NoArgs>(
         "graph_get",
-        "O graph do show aberto (secao 10 do PRD: nodes e edges); vazio quando o show nao tem graph.",
+        "The graph of the open show (PRD section 10: nodes and edges); empty when the show has no graph.",
         |_| Ok(graph()),
     );
     r.add::<NoArgs>(
         "face_get",
-        "A face do show aberto: o objeto inline de `face`, ou faces/<nome>.face.json quando `face` e' texto. null quando o show nao tem face.",
+        "The face of the open show: the inline object of `face`, or faces/<name>.face.json when `face` is text. null when the show has no face.",
         |_| face(),
     );
 
     r.add::<ProfileGetArgs>(
         "profile_get",
-        "O perfil inteiro (nome, canais com offset, ranges e wheel) para o cliente montar os widgets.",
+        "The whole profile (name, channels with offset, ranges and wheel) for the client to build the widgets.",
         |a| {
-            // leitura: `com_ro` para nao subir `rev` (o barramento so' avisa a GUI em edicao)
+            // read: `com_ro` so it does not bump `rev` (the bus only tells the GUI on an edit)
             let dir = com_ro(|p, _| Ok(recurso_dir(p, "profiles")))?;
             Ok(perfil(&dir, &a.name)?.json)
         },
     );
     r.add::<LevelSetArgs>(
         "level_set",
-        "Programmer: escreve valores no override manual, por cima da timeline (HTP). Exige player em execucao.",
+        "Programmer: writes values into the manual override, on top of the timeline (HTP). Requires a running player.",
         |a| {
             let v = if a.values.is_empty() {
                 vec![0.0]
@@ -934,22 +942,22 @@ pub fn register(r: &mut Registry) {
     );
     r.add::<LevelArgs>(
         "level_clear",
-        "Solta o override do programmer (um universo, ou todos sem universe). Devolve quantos canais sairam.",
+        "Releases the programmer override (one universe, or all of them without universe). Returns how many channels were freed.",
         |a| Ok(json!(vivo()?.level_clear(a.universe))),
     );
     r.add::<LevelArgs>(
         "level_get",
-        "Override do programmer como {\"universo/endereco\": valor}.",
+        "Programmer override as {\"universe/address\": value}.",
         |a| Ok(Value::Object(niveis(&vivo()?, a.universe))),
     );
     r.add::<CueCaptureArgs>(
         "cue_capture",
-        "Grava o override do programmer como uma cue nova no fim da lista e solta o override. Devolve o indice.",
+        "Stores the programmer override as a new cue at the end of the list and releases the override. Returns the index.",
         |a| {
             let h = vivo()?;
             let vals = niveis(&h, None);
             if vals.is_empty() {
-                return Err("cue_capture: o programmer esta vazio".into());
+                return Err("cue_capture: the programmer is empty".into());
             }
             let i = cue_put(None, cue(&a.name, a.fade, a.wait, a.follow, &vals)?)?;
             h.level_clear(None);
@@ -958,7 +966,7 @@ pub fn register(r: &mut Registry) {
     );
     r.add::<FixtureSetArgs>(
         "fixture_set",
-        "Escreve num canal de uma fixture do patch pelo nome do canal no perfil (via level_set).",
+        "Writes into a channel of a patched fixture by the channel name in the profile (via level_set).",
         |a| {
             let (u, base, pr) = fixture(&a.name)?;
             let chans = pr.json["channels"].as_array().into_iter().flatten();
@@ -968,7 +976,7 @@ pub fn register(r: &mut Registry) {
                 .and_then(|c| c["offset"].as_u64())
                 .ok_or_else(|| {
                     format!(
-                        "{}: o perfil {:?} nao tem canal {:?}; tem {:?}",
+                        "{}: profile {:?} has no channel {:?}; it has {:?}",
                         a.name,
                         pr.name,
                         a.channel,
@@ -982,7 +990,7 @@ pub fn register(r: &mut Registry) {
     );
 }
 
-/// Override do programmer no formato de `values` de cue: {"universo/endereco": valor}.
+/// Programmer override in the cue `values` format: {"universe/address": value}.
 fn niveis(h: &crate::player::Handle, u: Option<u16>) -> Map<String, Value> {
     h.levels(u)
         .into_iter()

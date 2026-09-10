@@ -1,10 +1,10 @@
-//! Barramento do Spellcaster: um processo toca o hardware, e toda pagina e toda IA falam com
-//! ele. HTTP para o registry, o show e os arquivos da GUI; WebSocket JSON-RPC para comando e
-//! evento; frame binario para o monitor DMX; MCP streamable em `/mcp`.
+//! Spellcaster bus: one process touches the hardware, and every page and every AI talk to it.
+//! HTTP for the registry, the show and the GUI files; WebSocket JSON-RPC for command and event;
+//! binary frame for the DMX monitor; streamable MCP at `/mcp`.
 //!
-//! Contrato palavra por palavra em `spellcore/README.md`, secao "`serve` — barramento". Aqui so'
-//! ha transporte: quem tem logica e' o `Registry`, e este crate nunca chama o engine por fora
-//! dele (a unica excecao e' `player::current()`, que so' e' lido para publicar o transporte).
+//! Word-for-word contract in `spellcore/README.md`, section "`serve` — bus". There is only
+//! transport here: the logic belongs to the `Registry`, and this crate never calls the engine
+//! outside it (the only exception is `player::current()`, read only to publish the transport).
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
@@ -23,13 +23,13 @@ use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 use tokio::sync::broadcast;
 
-/// Frame binario do monitor: `topic:u8 | universe:u16 LE | 512 bytes`.
+/// Binary monitor frame: `topic:u8 | universe:u16 LE | 512 bytes`.
 const TOPIC_DMX: u8 = 1;
-/// Mesmo formato, mas o universo de ENTRADA (`show.inputs`), antes de qualquer edicao.
+/// Same format, but the INPUT universe (`show.inputs`), before any edit.
 const TOPIC_IN: u8 = 2;
 const FRAME: usize = 1 + 2 + 512;
 
-/// Teto do monitor: 40 Hz (um show a 60 fps nao manda 60 frames por universo para a GUI).
+/// Monitor ceiling: 40 Hz (a show at 60 fps does not send 60 frames per universe to the GUI).
 const MONITOR_MS: u64 = 25;
 
 #[derive(Clone)]
@@ -42,8 +42,9 @@ struct St {
     reg: Arc<Registry>,
     tx: broadcast::Sender<Out>,
     dir: PathBuf,
-    /// Ultima `rev` que ja' saiu como evento `show`. Impede o evento em dobro: o comando do WS
-    /// avisa na hora, e a sondagem de `revisao` so' cobre o que muda FORA de um comando.
+    /// Last `rev` that already went out as a `show` event. It stops the doubled event: the WS
+    /// command announces it right away, and the `revisao` poll only covers what changes OUTSIDE
+    /// a command.
     visto: std::sync::atomic::AtomicU64,
 }
 
@@ -52,9 +53,9 @@ impl St {
         let _ = self.tx.send(Out::Text(texto(event, data)));
     }
 
-    /// `{"event":"show","data":{"rev":n}}`, uma vez por revisao. O `swap` e' o que garante a
-    /// unicidade: sem ele a sondagem e a resposta do comando anunciam a MESMA revisao quando o
-    /// `revisao` acorda entre a edicao e a resposta, e o cliente recarrega duas vezes.
+    /// `{"event":"show","data":{"rev":n}}`, once per revision. The `swap` is what guarantees
+    /// uniqueness: without it the poll and the command response announce the SAME revision when
+    /// `revisao` wakes up between the edit and the response, and the client reloads twice.
     fn show_ev(&self, rev: u64) {
         if self.visto.swap(rev, std::sync::atomic::Ordering::Relaxed) != rev {
             self.evento("show", json!({ "rev": rev }));
@@ -66,14 +67,14 @@ fn texto(event: &str, data: Value) -> String {
     json!({"event": event, "data": data}).to_string()
 }
 
-/// O sink de evento do graph vive na CLI e nao tem `St`: `out.widget` chega ao WS por aqui.
-/// Sem `serve` no ar, nao faz nada.
-// ponytail: um `serve()` por processo ; um segundo `serve()` no mesmo processo fica com o sender
-// do primeiro (OnceLock nao troca) e seus widgets saem no barramento errado. Passar o `St` ate' o
-// sink da CLI quando houver dois barramentos vivos.
+/// The graph event sink lives in the CLI and has no `St`: `out.widget` reaches the WS through
+/// here. With no `serve` running, it does nothing.
+// ponytail: one `serve()` per process ; a second `serve()` in the same process keeps the sender
+// of the first (OnceLock does not swap) and its widgets go out on the wrong bus. Pass the `St`
+// down to the CLI sink when there are two live buses.
 static TX: OnceLock<broadcast::Sender<Out>> = OnceLock::new();
 
-/// `{"event":"widget","data":{"id","prop","value"}}` para todo cliente do barramento.
+/// `{"event":"widget","data":{"id","prop","value"}}` to every client of the bus.
 pub fn widget(id: &str, prop: &str, value: f64) {
     if let Some(tx) = TX.get() {
         let _ = tx.send(Out::Text(texto(
@@ -96,15 +97,15 @@ async fn show_get(State(st): State<Arc<St>>) -> Response {
     }
 }
 
-// ponytail: lista fechada ; o `--dir` tem as paginas, o .spell, a fonte e a midia do laser3d —
-// tipo novo entra quando alguma pagina trouxer um.
+// ponytail: closed list ; `--dir` holds the pages, the .spell, the font and the laser3d media —
+// a new type comes in when some page brings one.
 fn mime(p: &str) -> &'static str {
     match p.rsplit('.').next().unwrap_or("") {
         "html" => "text/html; charset=utf-8",
         "js" => "text/javascript; charset=utf-8",
         "css" => "text/css; charset=utf-8",
         "json" | "spell" => "application/json",
-        "md" => "text/markdown; charset=utf-8", // design/SHORTCUTS.md, que a help.html le
+        "md" => "text/markdown; charset=utf-8", // design/SHORTCUTS.md, which help.html reads
         "woff2" => "font/woff2",
         "svg" => "image/svg+xml",
         "png" => "image/png",
@@ -114,11 +115,11 @@ fn mime(p: &str) -> &'static str {
     }
 }
 
-/// Arquivo de `--dir`. Limite de confianca: so' segmentos simples relativos. `..`, segmento
-/// vazio, `\` e `:` (unidade, ADS do Windows) sao recusados ANTES de tocar o disco, e o caminho
-/// nao e' percent-decodificado — `%2e%2e` fica literal e vira 404, nao subida de diretorio.
-// ponytail: `--dir` padrao e' a raiz do repo, entao tudo que esta nela (`.git` inclusive) e'
-// legivel em 127.0.0.1 ; filtrar por lista quando o `--host` e o token existirem.
+/// File from `--dir`. Trust boundary: plain relative segments only. `..`, an empty segment, `\`
+/// and `:` (drive, Windows ADS) are refused BEFORE touching the disk, and the path is not
+/// percent-decoded — `%2e%2e` stays literal and becomes a 404, not a directory climb.
+// ponytail: the default `--dir` is the repo root, so everything in it (`.git` included) is
+// readable on 127.0.0.1 ; filter by list once `--host` and the token exist.
 async fn estatico(State(st): State<Arc<St>>, uri: Uri) -> Response {
     let p = uri.path().trim_start_matches('/');
     let p = if p.is_empty() { "index.html" } else { p };
@@ -126,15 +127,15 @@ async fn estatico(State(st): State<Arc<St>>, uri: Uri) -> Response {
         || p.contains('\\')
         || p.split('/').any(|s| s.is_empty() || s == "." || s == "..");
     if ruim {
-        return (StatusCode::FORBIDDEN, "caminho recusado").into_response();
+        return (StatusCode::FORBIDDEN, "path refused").into_response();
     }
     match tokio::fs::read(st.dir.join(p)).await {
         Ok(b) => ([(header::CONTENT_TYPE, mime(p))], b).into_response(),
-        Err(_) => (StatusCode::NOT_FOUND, format!("nao ha {}", p)).into_response(),
+        Err(_) => (StatusCode::NOT_FOUND, format!("no {}", p)).into_response(),
     }
 }
 
-/// A GUI recarrega do servidor, sempre: um `.js` velho em cache e' uma noite de depuracao.
+/// The GUI always reloads from the server: a stale `.js` in the cache is a night of debugging.
 async fn no_store(req: axum::extract::Request, next: axum::middleware::Next) -> Response {
     let mut r = next.run(req).await;
     r.headers_mut()
@@ -144,15 +145,15 @@ async fn no_store(req: axum::extract::Request, next: axum::middleware::Next) -> 
 
 // ----------------------------------------------------------------- WebSocket
 
-/// Uma request do WS. `{"id":7,"cmd":"locate","args":{...}}` responde
-/// `{"id":7,"result":...,"rev":n}` ou `{"id":7,"error":"texto","rev":n}`; TODA resposta carrega a
-/// revisao do show, e' por ela que a pagina sabe se o `show` que chegar e' eco proprio ou de
-/// outro cliente. Erro de comando NAO derruba a conexao.
+/// One WS request. `{"id":7,"cmd":"locate","args":{...}}` answers
+/// `{"id":7,"result":...,"rev":n}` or `{"id":7,"error":"text","rev":n}`; EVERY response carries
+/// the show revision, it is how the page knows whether the `show` that arrives is its own echo
+/// or another client's. A command error does NOT drop the connection.
 async fn request(st: &Arc<St>, txt: &str) -> String {
     let v: Value = match serde_json::from_str(txt) {
         Ok(v) => v,
         Err(e) => {
-            return json!({"id": null, "error": format!("json invalido: {}", e),
+            return json!({"id": null, "error": format!("invalid json: {}", e),
                           "rev": engine::edit::rev()})
             .to_string()
         }
@@ -165,12 +166,13 @@ async fn request(st: &Arc<St>, txt: &str) -> String {
         .to_string();
     let args = v.get("args").cloned().unwrap_or_else(|| json!({}));
     if st.reg.get(&cmd).is_none() {
-        return json!({"id": id, "error": format!("comando desconhecido: {}", cmd),
+        return json!({"id": id, "error": format!("unknown command: {}", cmd),
                       "rev": engine::edit::rev()})
         .to_string();
     }
-    // `play_show` bloqueia ate o fim do show: roda em thread e a resposta volta na hora (a mesma
-    // lista BACKGROUND do MCP; um so' lugar decide o que e' comando de longa duracao).
+    // `play_show` blocks until the show ends: it runs on a thread and the response comes back at
+    // once (the same BACKGROUND list as the MCP; a single place decides what is a long-running
+    // command).
     if mcp::background(&cmd) {
         let (reg, nome, s) = (st.reg.clone(), cmd.clone(), st.clone());
         std::thread::spawn(move || {
@@ -178,15 +180,15 @@ async fn request(st: &Arc<St>, txt: &str) -> String {
                 s.evento("log", json!({ "text": format!("{}: {}", nome, e) }));
             }
         });
-        let t = format!("{} iniciado em background", cmd);
+        let t = format!("{} started in the background", cmd);
         return json!({"id": id, "result": t, "rev": engine::edit::rev()}).to_string();
     }
-    // comando do registry e' sincrono e pode bloquear (arquivo, varredura de rede)
+    // a registry command is synchronous and may block (file, network scan)
     let (reg, nome) = (st.reg.clone(), cmd.clone());
-    // Nao ha' lista de comandos de leitura: quem diz se o show mudou e' o proprio contador do
-    // engine. Comando que edita sobe `edit::rev()`; comando que so' le, nao.
-    // ponytail: antes/depois de rev em volta de chamada concorrente: edicao de B durante leitura
-    // de A sai como eco de A ; fila unica de comandos quando duas paginas editarem junto.
+    // There is no list of read commands: what tells whether the show changed is the engine's own
+    // counter. A command that edits bumps `edit::rev()`; a command that only reads does not.
+    // ponytail: before/after rev around a concurrent call: an edit of B during a read of A goes
+    // out as an echo of A ; single command queue when two pages edit at the same time.
     let antes = engine::edit::rev();
     let r = tokio::task::spawn_blocking(move || reg.call(&nome, args)).await;
     let depois = engine::edit::rev();
@@ -199,7 +201,7 @@ async fn request(st: &Arc<St>, txt: &str) -> String {
         }
         Ok(Err(e)) => json!({"id": id, "error": e, "rev": depois}).to_string(),
         Err(e) => {
-            json!({"id": id, "error": format!("{} caiu: {}", cmd, e), "rev": depois}).to_string()
+            json!({"id": id, "error": format!("{} crashed: {}", cmd, e), "rev": depois}).to_string()
         }
     }
 }
@@ -219,7 +221,7 @@ async fn cliente(mut sock: WebSocket, st: Arc<St>) {
                         break;
                     }
                 }
-                Some(Ok(_)) => {} // ping/pong/binario do cliente: o contrato nao usa
+                Some(Ok(_)) => {} // ping/pong/binary from the client: the contract does not use it
                 _ => break,
             },
             o = rx.recv() => match o {
@@ -233,8 +235,8 @@ async fn cliente(mut sock: WebSocket, st: Arc<St>) {
                         break;
                     }
                 }
-                // ponytail: cliente lento perde frame de monitor e segue ; o dado e' o proximo
-                // frame, nao o historico — nada a reenviar.
+                // ponytail: a slow client drops a monitor frame and moves on ; the data is the
+                // next frame, not the history — nothing to resend.
                 Err(broadcast::error::RecvError::Lagged(_)) => {}
                 Err(broadcast::error::RecvError::Closed) => break,
             },
@@ -242,12 +244,12 @@ async fn cliente(mut sock: WebSocket, st: Arc<St>) {
     }
 }
 
-/// `show {rev}` de edicao que NAO veio de um comando do WS — hoje so' a gravacao (`rec.rs`),
-/// que escreve keyframe dentro do frame do player. Sem isto a timeline nunca recarregaria
-/// enquanto grava.
-// ponytail: 4 eventos por segundo, nao um por keyframe ; um fader gravando a 60 fps sobe `rev`
-// 60 vezes por segundo e cada evento custa um GET /show inteiro na pagina. Baixar o periodo so'
-// se a lane em gravacao parecer atrasada.
+/// `show {rev}` for an edit that did NOT come from a WS command — today only the recording
+/// (`rec.rs`), which writes a keyframe inside the player frame. Without this the timeline would
+/// never reload while recording.
+// ponytail: 4 events per second, not one per keyframe ; a fader recording at 60 fps bumps `rev`
+// 60 times per second and each event costs a whole GET /show on the page. Lower the period only
+// if the lane being recorded looks late.
 async fn revisao(st: Arc<St>) {
     loop {
         tokio::time::sleep(Duration::from_millis(250)).await;
@@ -258,9 +260,10 @@ async fn revisao(st: Arc<St>) {
     }
 }
 
-/// Transporte no WS: a cada mudanca, e a 10 Hz enquanto o player anda (tocando, o `t` muda todo
-/// frame, entao comparar o ultimo JSON ja' da' as duas coisas).
-// ponytail: sondagem a 10 Hz ; virar aviso do proprio player se a GUI pedir menos latencia.
+/// Transport on the WS: on every change, and at 10 Hz while the player runs (while playing, `t`
+/// changes every frame, so comparing the last JSON already gives both things).
+// ponytail: 10 Hz polling ; turn it into a notice from the player itself if the GUI asks for
+// less latency.
 async fn transporte(st: Arc<St>) {
     let mut last = String::new();
     loop {
@@ -283,13 +286,13 @@ async fn transporte(st: Arc<St>) {
 
 // ------------------------------------------------------------------ monitor
 
-/// Copia para o WS os universos do frame. Instalado como gancho global, roda depois dos ganchos
-/// do show: e' o frame que de fato sai na rede.
+/// Copies the universes of the frame to the WS. Installed as a global hook, it runs after the
+/// show hooks: it is the frame that actually goes out on the network.
 struct Monitor {
     tx: broadcast::Sender<Out>,
     at: Instant,
-    /// Handle do player deste frame, achado no primeiro frame (o `start()` publica o CURRENT
-    /// depois de subir a thread, entao no frame 1 ele ainda pode estar vazio).
+    /// Player handle of this frame, found on the first frame (`start()` publishes the CURRENT
+    /// after spawning the thread, so on frame 1 it may still be empty).
     h: Option<engine::player::Handle>,
 }
 
@@ -302,9 +305,9 @@ fn bin(topic: u8, universe: u16, data: &[u8; 512]) -> Vec<u8> {
 }
 
 impl FrameHook for Monitor {
-    // ponytail: manda todo universo do frame, sem cache do ultimo enviado ; o teto de 40 Hz em
-    // loopback ja' segura a banda — cachear entra se um show com dezenas de universos parados
-    // aparecer no perfil.
+    // ponytail: sends every universe of the frame, with no cache of the last one sent ; the
+    // 40 Hz ceiling on loopback already holds the bandwidth — caching comes in if a show with
+    // dozens of idle universes shows up in the profile.
     fn frame(&mut self, _t: f64, uni: &mut Universes) {
         if self.tx.receiver_count() == 0 || self.at.elapsed() < Duration::from_millis(MONITOR_MS) {
             return;
@@ -326,8 +329,8 @@ impl FrameHook for Monitor {
 
 // -------------------------------------------------------------------- boot
 
-/// `--show`: abre o arquivo no registry (e' o que `GET /show` le) e sobe o player parado em
-/// t=0, para monitor e transporte ja' terem o que mostrar.
+/// `--show`: opens the file in the registry (it is what `GET /show` reads) and brings the player
+/// up stopped at t=0, so that the monitor and the transport already have something to show.
 fn abre(reg: Arc<Registry>, file: String) {
     if let Err(e) = reg.call("load", json!({ "file": file })) {
         return eprintln!("--show {}: {}", file, e);
@@ -339,8 +342,8 @@ fn abre(reg: Arc<Registry>, file: String) {
         }
     });
     std::thread::spawn(move || {
-        // `play_show` da' play assim que o player sobe: pausar antes disso perde a corrida,
-        // entao a pausa espera o estado "play" aparecer.
+        // `play_show` plays as soon as the player comes up: pausing before that loses the race,
+        // so the pause waits for the "play" state to appear.
         for _ in 0..200 {
             match engine::player::current() {
                 Some(h) if h.state().state == "play" => {
@@ -351,19 +354,19 @@ fn abre(reg: Arc<Registry>, file: String) {
                 _ => std::thread::sleep(Duration::from_millis(10)),
             }
         }
-        eprintln!("--show {}: player nao subiu em 2 s", file);
+        eprintln!("--show {}: player did not come up within 2 s", file);
     });
 }
 
-/// Sobe o barramento e bloqueia ate o processo morrer. `reg` e' o registry completo da CLI:
-/// e' ele que o WS, o `GET /commands` e as tools do MCP expoem.
+/// Brings the bus up and blocks until the process dies. `reg` is the full CLI registry: it is
+/// what the WS, the `GET /commands` and the MCP tools expose.
 ///
-/// `port` 0 = porta aleatoria (a linha `serve http://127.0.0.1:<porta>` no stderr diz qual);
-/// `dir` = raiz do estatico; `show` = .spell aberto no boot, com o player parado em t=0.
+/// `port` 0 = random port (the `serve http://127.0.0.1:<port>` line on stderr says which one);
+/// `dir` = static root; `show` = .spell opened at boot, with the player stopped at t=0.
 ///
-/// `ligou` recebe uma vez o endereco de fato ligado, antes do primeiro request: e' por ele que a
-/// janela (`spellcaster.exe`) descobre a porta quando pede `port` 0 e roda isto numa thread. A
-/// CLI, que imprime a linha do stderr e nao precisa do numero, passa `|_| {}`.
+/// `ligou` receives once the address actually bound, before the first request: it is how the
+/// window (`spellcaster.exe`) finds out the port when it asks for `port` 0 and runs this on a
+/// thread. The CLI, which prints the stderr line and does not need the number, passes `|_| {}`.
 pub fn serve(
     reg: Registry,
     port: u16,
@@ -391,8 +394,8 @@ pub fn serve(
     let mcp_http = StreamableHttpService::new(
         move || Ok(mcp::Spell::new(reg_mcp.clone())),
         Arc::new(LocalSessionManager::default()),
-        // sem sessao e com resposta JSON: o barramento nao guarda estado de cliente, e o
-        // POST /mcp responde um JSON-RPC direto em vez de um fluxo SSE.
+        // no session and with a JSON response: the bus keeps no client state, and POST /mcp
+        // answers a plain JSON-RPC instead of an SSE stream.
         StreamableHttpServerConfig::default()
             .with_legacy_session_mode(false)
             .with_json_response(true),
@@ -412,11 +415,12 @@ pub fn serve(
         .build()
         .map_err(|e| e.to_string())?;
     rt.block_on(async move {
-        // ponytail: so' loopback ; autenticacao esta fora de escopo, e sem ela abrir a LAN
-        // entrega o hardware a quem estiver no wifi — `--host` entra junto com o token.
+        // ponytail: loopback only ; authentication is out of scope, and without it opening the
+        // LAN hands the hardware to whoever is on the wifi — `--host` comes in together with the
+        // token.
         let l = tokio::net::TcpListener::bind(("127.0.0.1", port))
             .await
-            .map_err(|e| format!("porta {}: {}", port, e))?;
+            .map_err(|e| format!("port {}: {}", port, e))?;
         let addr = l.local_addr().map_err(|e| e.to_string())?;
         eprintln!("serve http://127.0.0.1:{}", addr.port());
         ligou(addr);
@@ -443,58 +447,65 @@ mod tests {
         })
     }
 
-    /// A mesma revisao anunciada duas vezes (sondagem + resposta) vira um evento so'.
+    /// The same revision announced twice (poll + response) becomes a single event.
     #[test]
-    fn show_ev_nao_repete_a_mesma_rev() {
+    fn show_ev_does_not_repeat_the_same_rev() {
         let st = st();
         let mut rx = st.tx.subscribe();
         let r = engine::edit::rev() + 1;
         st.show_ev(r);
         st.show_ev(r);
-        assert!(rx.try_recv().is_ok(), "primeiro anuncio sai");
+        assert!(rx.try_recv().is_ok(), "the first announcement goes out");
         assert!(
             rx.try_recv().is_err(),
-            "segundo anuncio da mesma rev e' engolido"
+            "the second announcement of the same rev is swallowed"
         );
     }
 
-    /// A forma da resposta e o contador unico do engine: leitura nao mexe nele, edicao mexe.
+    /// The shape of the response and the single engine counter: a read does not touch it, an
+    /// edit does.
     #[tokio::test]
-    async fn request_responde_por_id_e_conta_rev() {
+    async fn request_answers_by_id_and_counts_rev() {
         let st = st();
         let r: Value =
             serde_json::from_str(&request(&st, r#"{"id":7,"cmd":"show_new","args":{}}"#).await)
                 .unwrap();
         assert_eq!(r["id"], json!(7));
         assert!(r["result"]["name"].is_string(), "{}", r);
-        let apos_edicao = r["rev"].as_u64().expect("resposta carrega rev");
-        assert_eq!(apos_edicao, engine::edit::rev(), "show_new e' edicao");
+        let apos_edicao = r["rev"].as_u64().expect("the response carries rev");
+        assert_eq!(apos_edicao, engine::edit::rev(), "show_new is an edit");
 
         let r: Value =
             serde_json::from_str(&request(&st, r#"{"id":8,"cmd":"show_get"}"#).await).unwrap();
         assert_eq!(r["id"], json!(8));
-        assert_eq!(r["rev"], json!(apos_edicao), "show_get e' leitura");
+        assert_eq!(r["rev"], json!(apos_edicao), "show_get is a read");
 
-        // erro de comando volta como {"id","error"}, nao como panico nem conexao fechada
+        // a command error comes back as {"id","error"}, not as a panic nor a closed connection
         let r: Value =
             serde_json::from_str(&request(&st, r#"{"id":9,"cmd":"pause"}"#).await).unwrap();
-        assert_eq!(r["error"], json!("sem player em execucao"));
+        assert_eq!(r["error"], json!("no player running"));
         let r: Value =
-            serde_json::from_str(&request(&st, r#"{"id":9,"cmd":"nao_existe"}"#).await).unwrap();
-        assert_eq!(r["error"], json!("comando desconhecido: nao_existe"));
-        let r: Value = serde_json::from_str(&request(&st, "isso nao e json").await).unwrap();
-        assert!(r["error"].as_str().unwrap().starts_with("json invalido"));
-        assert_eq!(engine::edit::rev(), apos_edicao, "erro nao conta rev");
+            serde_json::from_str(&request(&st, r#"{"id":9,"cmd":"no_such_command"}"#).await)
+                .unwrap();
+        assert_eq!(r["error"], json!("unknown command: no_such_command"));
+        let r: Value = serde_json::from_str(&request(&st, "this is not json").await).unwrap();
+        assert!(r["error"].as_str().unwrap().starts_with("invalid json"));
+        assert_eq!(
+            engine::edit::rev(),
+            apos_edicao,
+            "an error does not count rev"
+        );
     }
 
-    /// `out.widget` do graph, vindo do sink da CLI, sai no WS com a forma do contrato.
+    /// `out.widget` from the graph, coming from the CLI sink, goes out on the WS in the shape of
+    /// the contract.
     #[test]
-    fn widget_vira_evento() {
+    fn widget_becomes_an_event() {
         let (tx, mut rx) = broadcast::channel(4);
-        TX.set(tx).expect("TX ainda livre neste binario de teste");
+        TX.set(tx).expect("TX still free in this test binary");
         widget("go", "hold", 1.0);
         let Ok(Out::Text(t)) = rx.try_recv() else {
-            panic!("nada no barramento");
+            panic!("nothing on the bus");
         };
         let v: Value = serde_json::from_str(&t).unwrap();
         assert_eq!(
@@ -504,12 +515,12 @@ mod tests {
     }
 
     #[test]
-    fn mime_por_extensao() {
+    fn mime_by_extension() {
         assert_eq!(mime("index.html"), "text/html; charset=utf-8");
         assert_eq!(mime("a/b/quatro.face.json"), "application/json");
         assert_eq!(mime("design/SHORTCUTS.md"), "text/markdown; charset=utf-8");
-        assert_eq!(mime("sem_extensao"), "application/octet-stream");
-        // fonte e midia das paginas 3D
+        assert_eq!(mime("no_extension"), "application/octet-stream");
+        // font and media of the 3D pages
         assert_eq!(mime("laser3d/michroma.woff2"), "font/woff2");
         assert_eq!(mime("a.svg"), "image/svg+xml");
         assert_eq!(mime("a.png"), "image/png");

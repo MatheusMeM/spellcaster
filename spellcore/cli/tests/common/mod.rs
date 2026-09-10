@@ -1,9 +1,9 @@
-//! Harness dos testes da CLI: subir o binario de verdade e falar com ele.
+//! Harness of the CLI tests: bring the real binary up and talk to it.
 //!
-//! Os quatro testes de integracao (`mcp.rs`, `laser.rs`, `serve.rs`, `commands_json.rs`) sobem
-//! `spellcore` como processo — e' o empacotamento que quebra na pratica, nao o `Spell` em memoria.
-//! Cada binario de teste compila este modulo por conta propria; por isso o `allow(dead_code)`:
-//! quem usa so' `bin()` nao usa o `Mcp` inteiro.
+//! The four integration tests (`mcp.rs`, `laser.rs`, `serve.rs`, `commands_json.rs`) bring
+//! `spellcore` up as a process — what breaks in practice is the packaging, not the `Spell` in
+//! memory. Each test binary compiles this module on its own; hence the `allow(dead_code)`:
+//! whoever uses only `bin()` does not use the whole `Mcp`.
 
 #![allow(dead_code)]
 
@@ -11,12 +11,12 @@ use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
-/// O binario `spellcore` recem compilado, pronto para receber subcomando e argumentos.
+/// The freshly compiled `spellcore` binary, ready to take a subcommand and arguments.
 pub fn bin() -> Command {
     Command::new(env!("CARGO_BIN_EXE_spellcore"))
 }
 
-/// `spellcore mcp` em stdio: uma mensagem JSON-RPC por linha, o id contado aqui.
+/// `spellcore mcp` over stdio: one JSON-RPC message per line, the id counted here.
 pub struct Mcp {
     p: Child,
     inp: ChildStdin,
@@ -25,7 +25,8 @@ pub struct Mcp {
 }
 
 impl Mcp {
-    /// Sobe o servidor SEM handshake: quem quer conferir a resposta do `initialize` chama `rpc`.
+    /// Brings the server up WITHOUT a handshake: whoever wants to check the `initialize` answer
+    /// calls `rpc`.
     pub fn cru() -> Mcp {
         let mut p = bin()
             .arg("mcp")
@@ -39,26 +40,27 @@ impl Mcp {
         Mcp { p, inp, out, id: 0 }
     }
 
-    /// Sobe o servidor e faz o handshake (initialize + notifications/initialized).
+    /// Brings the server up and does the handshake (initialize + notifications/initialized).
     pub fn start() -> Mcp {
         let mut m = Mcp::cru();
         m.rpc(
             "initialize",
             json!({"protocolVersion": "2025-06-18", "capabilities": {},
-                   "clientInfo": {"name": "teste", "version": "0"}}),
+                   "clientInfo": {"name": "test", "version": "0"}}),
         );
         m.notifica("notifications/initialized");
         m
     }
 
-    /// Notificacao (sem id, sem resposta).
+    /// A notification (no id, no answer).
     pub fn notifica(&mut self, method: &str) {
         writeln!(self.inp, "{}", json!({"jsonrpc": "2.0", "method": method}))
-            .expect("escrever no servidor");
+            .expect("write to the server");
         self.inp.flush().expect("flush");
     }
 
-    /// Request e a resposta com o mesmo id (pulando notificacoes). Falha em erro JSON-RPC.
+    /// A request and the answer with the same id (skipping notifications). It fails on a JSON-RPC
+    /// error.
     pub fn rpc(&mut self, method: &str, params: Value) -> Value {
         self.id += 1;
         let id = self.id;
@@ -67,14 +69,18 @@ impl Mcp {
             "{}",
             json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params})
         )
-        .expect("escrever no servidor");
+        .expect("write to the server");
         self.inp.flush().expect("flush");
         loop {
             let mut l = String::new();
-            let n = self.out.read_line(&mut l).expect("ler do servidor");
-            assert!(n > 0, "servidor fechou o stdout esperando {}", method);
+            let n = self.out.read_line(&mut l).expect("read from the server");
+            assert!(
+                n > 0,
+                "the server closed the stdout while waiting for {}",
+                method
+            );
             let v: Value = serde_json::from_str(&l)
-                .unwrap_or_else(|e| panic!("stdout nao e' JSON-RPC ({}): {:?}", e, l));
+                .unwrap_or_else(|e| panic!("the stdout is not JSON-RPC ({}): {:?}", e, l));
             if v["id"] == json!(id) {
                 assert!(v["error"].is_null(), "{}: {}", method, v["error"]);
                 return v["result"].clone();
@@ -82,12 +88,12 @@ impl Mcp {
         }
     }
 
-    /// `tools/call` cru: o teste decide o que fazer com `isError`.
+    /// A raw `tools/call`: the test decides what to do with `isError`.
     pub fn tool(&mut self, name: &str, args: Value) -> Value {
         self.rpc("tools/call", json!({"name": name, "arguments": args}))
     }
 
-    /// Chama o comando e devolve o JSON que ele retornou. Falha se o comando errou.
+    /// Calls the command and returns the JSON it gave back. It fails if the command errored.
     pub fn cmd(&mut self, name: &str, args: Value) -> Value {
         let r = self.tool(name, args);
         let t = texto(&r);
@@ -95,10 +101,10 @@ impl Mcp {
         serde_json::from_str(&t).unwrap_or(Value::String(t))
     }
 
-    /// Chama o comando esperando erro; devolve o texto do erro.
+    /// Calls the command expecting an error; it returns the error text.
     pub fn erro(&mut self, name: &str, args: Value) -> String {
         let r = self.tool(name, args);
-        assert_eq!(r["isError"], json!(true), "{} devia ter falhado", name);
+        assert_eq!(r["isError"], json!(true), "{} should have failed", name);
         texto(&r)
     }
 }
@@ -110,7 +116,7 @@ impl Drop for Mcp {
     }
 }
 
-/// Texto da primeira parte de um `tools/call` (ou de um `resources/read`).
+/// Text of the first part of a `tools/call` (or of a `resources/read`).
 pub fn texto(r: &Value) -> String {
     let v = if r["content"].is_array() {
         &r["content"]

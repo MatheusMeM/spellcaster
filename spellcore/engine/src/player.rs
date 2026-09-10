@@ -1,20 +1,21 @@
-//! Player standalone: transporte (play/pause/stop/locate/loop) em thread propria sobre o Clock,
-//! timeline -> sACN / Art-Net / OSC, cues e ganchos de frame. Porte de
-//! `spellcaster/player/player.py` sem a parte de laser (o crate `laser` a resolve).
+//! Standalone player: transport (play/pause/stop/locate/loop) on its own thread over the Clock,
+//! timeline -> sACN / Art-Net / OSC, cues and frame hooks. Port of
+//! `spellcaster/player/player.py` without the laser part (the `laser` crate handles that).
 //!
-//! Ordem de avaliacao de um frame (contrato do README, secao "R1"):
-//!   1. `Timeline::apply` (tracks `dmx` e `artnet`) e os tracks `media` do Capture;
-//!   2. cada `FrameHook` na ordem em que foi registrado;
-//!   3. tracks de efeito colateral: `osc`, `media` nao-Capture e `cue`;
-//!   4. `CueList::update` escreve o snapshot corrente;
-//!   5. o programmer (`Prog`): o override manual do operador, HTP por canal, POR CIMA da cue
-//!      viva (o operador sobrepoe o que a cue esta segurando);
-//!   6. os ganchos GLOBAIS (`hook_global`, o monitor do `serve`): o frame ja' completo, com o
-//!      programmer dentro, antes de sair na rede;
-//!   7. I/O: cada universo escrito vai para todas as saidas.
+//! Evaluation order of one frame (README contract, section "R1"):
+//!   1. `Timeline::apply` (`dmx` and `artnet` tracks) and the Capture `media` tracks;
+//!   2. each `FrameHook` in the order it was registered;
+//!   3. side-effect tracks: `osc`, non-Capture `media` and `cue`;
+//!   4. `CueList::update` writes the current snapshot;
+//!   5. the programmer (`Prog`): the operator manual override, HTP per channel, ON TOP of the
+//!      live cue (the operator overrides whatever the cue is holding);
+//!   6. the GLOBAL hooks (`hook_global`, the `serve` monitor): the frame already complete, with
+//!      the programmer inside, before it goes out on the network;
+//!   7. I/O: every written universe goes to every output.
 //!
-//! O transporte remoto por OSC (`/spellcaster/play|pause|stop|locate f`) nunca toca nos
-//! Universes: ele so' age no `Handle`, e a thread de transporte faz o resto no proximo frame.
+//! Remote transport over OSC (`/spellcaster/play|pause|stop|locate f`) never touches the
+//! Universes: it only acts on the `Handle`, and the transport thread does the rest on the next
+//! frame.
 
 use crate::clock::{Clock, State};
 use crate::cues::CueList;
@@ -33,18 +34,19 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-/// Player vivo neste processo (o `CURRENT` do Python): quem os comandos do registry operam.
+/// Live player in this process (Python's `CURRENT`): what the registry commands drive.
 static CURRENT: Mutex<Option<Handle>> = Mutex::new(None);
 
-/// Ganchos instalados em TODO player que subir neste processo, na posicao 6 do frame (depois do
-/// programmer, antes do I/O): e' assim que o monitor do `serve` ve o frame que realmente sai —
-/// com o override do operador dentro — sem o engine conhecer GUI.
+/// Hooks installed on EVERY player started in this process, at position 6 of the frame (after
+/// the programmer, before the I/O): this is how the `serve` monitor sees the frame that really
+/// goes out — with the operator override inside — without the engine knowing any GUI.
 type Global = Box<dyn Fn() -> Box<dyn FrameHook> + Send + Sync>;
 static GLOBAL: Mutex<Vec<Global>> = Mutex::new(Vec::new());
 
-/// Cadastra uma fabrica de gancho global; vale para os proximos `start()`, nao para o player que
-/// ja esta rodando.
-// ponytail: so' cadastra, nao remove ; o unico cliente e' o `serve`, que vive o processo inteiro.
+/// Registers a global hook factory; it applies to the next `start()` calls, not to the player
+/// already running.
+// ponytail: it only registers, never removes ; the one client is `serve`, which lives for the
+// whole process.
 pub fn hook_global(f: impl Fn() -> Box<dyn FrameHook> + Send + Sync + 'static) {
     lock(&GLOBAL).push(Box::new(f));
 }
@@ -53,10 +55,10 @@ fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-// ------------------------------------------------------------------- saidas
+// ------------------------------------------------------------------ outputs
 
-/// Abre as saidas DMX declaradas em `outputs`. Tipo desconhecido vira aviso, nao erro.
-/// (Veio da CLI da R0 sem mudanca de comportamento: o Player e' quem abre as saidas agora.)
+/// Opens the DMX outputs declared in `outputs`. An unknown type becomes a warning, not an error.
+/// (Moved here from the R0 CLI with no behavior change: the Player is what opens the outputs now.)
 pub fn open_outputs(sh: &Show) -> Result<Vec<Box<dyn Output>>, String> {
     let mut outs: Vec<Box<dyn Output>> = Vec::new();
     for c in &sh.outputs {
@@ -76,24 +78,24 @@ pub fn open_outputs(sh: &Show) -> Result<Vec<Box<dyn Output>>, String> {
                     .map_err(|e| format!("artnet: {}", e))?;
                 outs.push(Box::new(o));
             }
-            OutputCfg::Osc(_) => {} // saida de mensagem, nao de universo: vai no `osc_out`
-            OutputCfg::Unknown { tipo } => eprintln!("aviso: saida \"{}\" ignorada", tipo),
+            OutputCfg::Osc(_) => {} // a message output, not a universe one: it goes in `osc_out`
+            OutputCfg::Unknown { tipo } => eprintln!("warning: output \"{}\" ignored", tipo),
         }
     }
     Ok(outs)
 }
 
-/// Numero solto do .spell (`in`, `out`): o que nao for numero vale como ausente.
+/// Bare number from the .spell (`in`, `out`): anything that is not a number counts as absent.
 fn num(sh: &Show, k: &str) -> Option<f64> {
     sh.extra.get(k).and_then(|v| v.as_f64())
 }
 
-/// Primeira saida `osc` do show (o Python tambem guarda so' uma).
+/// First `osc` output of the show (Python also keeps only one).
 fn open_osc(sh: &Show) -> Result<Option<OscOut>, String> {
     for c in &sh.outputs {
         if let OutputCfg::Osc(o) = c {
             if o.port == 0 {
-                eprintln!("aviso: saida osc sem \"port\" ignorada");
+                eprintln!("warning: osc output without \"port\" ignored");
                 continue;
             }
             return OscOut::new(&o.host, o.port)
@@ -104,7 +106,7 @@ fn open_osc(sh: &Show) -> Result<Option<OscOut>, String> {
     Ok(None)
 }
 
-// ------------------------------------------------------------------ estado
+// ------------------------------------------------------------------- state
 
 #[derive(Serialize, Clone, Debug)]
 pub struct TransportState {
@@ -115,16 +117,16 @@ pub struct TransportState {
     pub fps: u32,
     pub duration: Option<f64>,
     pub universes: Vec<u16>,
-    /// Loop ligado, e o intervalo em que repete. E' estado do ENGINE: a GUI so' o reflete.
+    /// Loop on, and the range it repeats over. It is ENGINE state: the GUI only mirrors it.
     #[serde(rename = "loop")]
     pub looping: bool,
     pub loop_in: f64,
     pub loop_out: f64,
 }
 
-/// Loop do transporte: ligado/desligado e o intervalo In-Out onde repete. Mora aqui, e nao no
-/// cliente, porque quem anda no tempo e' a thread de transporte — a GUI simulando o loop por
-/// conta propria voltava para o In enquanto o player seguia tocando ate o fim do show.
+/// Transport loop: on/off and the In-Out range it repeats over. It lives here, not in the
+/// client, because what walks in time is the transport thread — a GUI faking the loop on its own
+/// jumped back to the In while the player kept playing to the end of the show.
 #[derive(Clone, Copy, Debug)]
 struct Loop {
     on: bool,
@@ -133,7 +135,7 @@ struct Loop {
 }
 
 impl Loop {
-    /// Instante para onde voltar quando `t` passou do fim do intervalo; None quando nao ha volta.
+    /// Instant to jump back to when `t` ran past the end of the range; None when there is no jump.
     fn wrap(&self, t: f64) -> Option<f64> {
         if self.on && self.b > self.a && t >= self.b {
             Some(self.a)
@@ -143,29 +145,29 @@ impl Loop {
     }
 }
 
-/// Pedido de outra thread para a thread de transporte, consumido no inicio do frame.
+/// A request from another thread to the transport thread, consumed at the start of the frame.
 enum Ctl {
     Go(Option<usize>),
-    /// locate/stop: zera cues e ganchos e reancora o `prev` do disparo por borda.
+    /// locate/stop: clears cues and hooks and re-anchors the `prev` of the edge trigger.
     Reset(f64),
-    /// Evento de entrada para os ganchos ("widget:go", "key:Space", "module:laser/stat/fps").
+    /// Input event for the hooks ("widget:go", "key:Space", "module:laser/stat/fps").
     Input(String, f64),
 }
 
-/// Programmer: a camada manual do operador, por cima da timeline. Um `Option<u8>` por canal =
-/// valor e mascara de "tocado" na mesma estrutura.
-// ponytail: um bloco de 1 KB por universo ; um show tem poucos universos, e um
-// `BTreeMap<(u16,u16),u8>` alocaria por canal dentro do frame.
+/// Programmer: the operator manual layer, on top of the timeline. One `Option<u8>` per channel =
+/// value and "touched" mask in the same structure.
+// ponytail: a 1 KB block per universe ; a show has few universes, and a `BTreeMap<(u16,u16),u8>`
+// would allocate per channel inside the frame.
 #[derive(Default)]
 pub struct Prog {
     v: BTreeMap<u16, [Option<u8>; 512]>,
-    /// Canais soltos desde o ultimo frame: zerados ANTES da timeline, senao o ultimo valor do
-    /// override fica preso no buffer (ninguem mais escreve aquele canal).
+    /// Channels released since the last frame: zeroed BEFORE the timeline, otherwise the last
+    /// override value stays stuck in the buffer (nobody else writes that channel).
     freed: Vec<(u16, u16)>,
 }
 
 impl Prog {
-    /// Escreve `values` a partir de `addr` (1-based); clamp 0..255, ignora o que passa de 512.
+    /// Writes `values` from `addr` on (1-based); clamps to 0..255, ignores whatever runs past 512.
     pub fn set(&mut self, u: u16, addr: u16, values: &[f64]) {
         if addr == 0 || addr > 512 {
             return;
@@ -177,7 +179,7 @@ impl Prog {
         }
     }
 
-    /// Solta o override de um universo (ou de todos); devolve quantos canais sairam.
+    /// Releases the override of one universe (or of all); returns how many channels were freed.
     pub fn clear(&mut self, u: Option<u16>) -> usize {
         let mut n = 0;
         for (num, s) in self.v.iter_mut() {
@@ -194,7 +196,7 @@ impl Prog {
         n
     }
 
-    /// Canais tocados, em ordem: (universo, endereco 1-based, valor).
+    /// Touched channels, in order: (universe, 1-based address, value).
     pub fn levels(&self, u: Option<u16>) -> Vec<(u16, u16, u8)> {
         let mut out = Vec::new();
         for (n, s) in self.v.iter() {
@@ -210,15 +212,15 @@ impl Prog {
         out
     }
 
-    /// Zera no buffer os canais soltos desde o ultimo frame. Roda ANTES de `Timeline::apply`,
-    /// para o que a timeline possui voltar a valer no mesmo frame.
+    /// Zeroes in the buffer the channels released since the last frame. It runs BEFORE
+    /// `Timeline::apply`, so whatever the timeline owns takes over again on the same frame.
     fn release(&mut self, uni: &mut Universes) {
         for (n, a) in self.freed.drain(..) {
             uni.get_or_create(n).set_bytes(a, &[0]);
         }
     }
 
-    /// HTP por canal sobre o que ja esta no buffer.
+    /// HTP per channel over whatever is already in the buffer.
     fn apply(&self, uni: &mut Universes) {
         for (n, s) in self.v.iter() {
             let d = &mut uni.get_or_create(*n).data;
@@ -233,7 +235,7 @@ impl Prog {
 
 struct Shared {
     clock: Clock,
-    /// Entradas DMX do show (`show.inputs`): o ultimo frame recebido de cada universo.
+    /// DMX inputs of the show (`show.inputs`): the last frame received on each universe.
     inputs: Arc<Inputs>,
     ctl: Mutex<Vec<Ctl>>,
     lp: Mutex<Loop>,
@@ -252,14 +254,14 @@ impl Shared {
         lock(&self.ctl).push(c);
     }
 
-    /// Acorda quem esta em `wait()`.
+    /// Wakes whoever is in `wait()`.
     fn finish(&self) {
         *lock(&self.done) = true;
         self.cv.notify_all();
     }
 }
 
-/// Transporte de fora da thread do player. Clonavel; o registry guarda um.
+/// Transport from outside the player thread. Cloneable; the registry keeps one.
 #[derive(Clone)]
 pub struct Handle {
     s: Arc<Shared>,
@@ -275,7 +277,7 @@ impl Handle {
         self.s.clock.pause();
     }
 
-    /// Para e volta para o zero (o `stop()` do Python: clock.stop + cues.reset + done).
+    /// Stops and returns to zero (Python's `stop()`: clock.stop + cues.reset + done).
     pub fn stop(&self) {
         self.s.clock.stop();
         self.s.push(Ctl::Reset(0.0));
@@ -291,33 +293,34 @@ impl Handle {
         self.s.push(Ctl::Go(index));
     }
 
-    /// Entrega `FrameHook::input` a todos os ganchos no proximo frame: e' o comando `input` do
-    /// registry, por onde a GUI e o barramento alimentam o Graph.
+    /// Delivers `FrameHook::input` to every hook on the next frame: it is the registry `input`
+    /// command, through which the GUI and the bus feed the Graph.
     pub fn input(&self, key: &str, value: f64) {
         self.s.push(Ctl::Input(key.to_string(), value));
     }
 
-    /// Programmer: escreve no override manual (vale no proximo frame). Endereco fora de 1..512
-    /// e' erro, e nao silencio: e' o unico funil dos comandos `level_set` e `fixture_set`.
+    /// Programmer: writes into the manual override (it takes effect on the next frame). An
+    /// address outside 1..512 is an error, not silence: this is the one funnel of the `level_set`
+    /// and `fixture_set` commands.
     pub fn level_set(&self, u: u16, addr: u16, values: &[f64]) -> Result<(), String> {
         if addr == 0 || addr > 512 {
-            return Err(format!("endereco {} fora de 1..512", addr));
+            return Err(format!("address {} outside 1..512", addr));
         }
         lock(&self.s.prog).set(u, addr, values);
         Ok(())
     }
 
-    /// Solta o override de um universo, ou de todos; devolve quantos canais sairam.
+    /// Releases the override of one universe, or of all; returns how many channels were freed.
     pub fn level_clear(&self, u: Option<u16>) -> usize {
         lock(&self.s.prog).clear(u)
     }
 
-    /// (universo, endereco, valor) de cada canal tocado pelo operador.
+    /// (universe, address, value) of each channel touched by the operator.
     pub fn levels(&self, u: Option<u16>) -> Vec<(u16, u16, u8)> {
         lock(&self.s.prog).levels(u)
     }
 
-    /// Liga/desliga o loop e grava o intervalo (o In-Out do show). Vale no proximo frame.
+    /// Turns the loop on/off and stores the range (the show In-Out). It takes effect next frame.
     pub fn set_loop(&self, on: bool, a: f64, b: f64) {
         *lock(&self.s.lp) = Loop {
             on,
@@ -326,13 +329,13 @@ impl Handle {
         };
     }
 
-    /// Ultimo frame recebido no universo de ENTRADA, ou `None` (universo nao declarado em
-    /// `show.inputs`, ou nada chegou ainda). Nao ha merge com a saida.
+    /// Last frame received on the INPUT universe, or `None` (universe not declared in
+    /// `show.inputs`, or nothing has arrived yet). There is no merge with the output.
     pub fn input_get(&self, universe: u16) -> Option<[u8; 512]> {
         self.s.inputs.get(universe)
     }
 
-    /// (universo, frame) de cada entrada que ja' recebeu algo — o monitor do `serve`.
+    /// (universe, frame) of each input that has already received something — the `serve` monitor.
     pub fn input_frames(&self) -> Vec<(u16, [u8; 512])> {
         self.s.inputs.frames()
     }
@@ -358,30 +361,30 @@ impl Handle {
     }
 }
 
-// --------------------------------------------------------- runtime do frame
+// ------------------------------------------------------------ frame runtime
 
-/// A parte do player que so' a thread de transporte toca.
+/// The part of the player that only the transport thread touches.
 struct Rt {
     tl: Timeline,
     cues: CueList,
     hooks: Vec<Box<dyn FrameHook>>,
-    /// Ganchos globais (`hook_global`): rodam DEPOIS do programmer, na posicao 6, para ver o
-    /// frame que de fato sai — inclusive o override manual do operador.
+    /// Global hooks (`hook_global`): they run AFTER the programmer, at position 6, so they see
+    /// the frame that actually goes out — the operator manual override included.
     globais: Vec<Box<dyn FrameHook>>,
     uni: Universes,
     outs: Vec<Box<dyn Output>>,
     osc_out: Option<OscOut>,
     inputs: Arc<Inputs>,
     prev: f64,
-    nuni: usize, // quantos universos sairam no ultimo frame (so' a thread de transporte le)
-    pend: Vec<Ctl>, // fila drenada por swap: zero alocacao por frame
+    nuni: usize, // how many universes went out on the last frame (only the transport thread reads it)
+    pend: Vec<Ctl>, // queue drained by swap: zero allocation per frame
 }
 
 impl Rt {
     fn drain(&mut self, s: &Shared, t: f64) {
-        // MIDI: cada evento vira `input {key: "midi:<chave>"}` na fila abaixo (e o comando do
-        // mapa, se houver). Consumido AQUI, onde o `input` ja' e' consumido: a ordem do frame
-        // documentada no cabecalho nao muda.
+        // MIDI: each event becomes `input {key: "midi:<key>"}` in the queue below (plus the map
+        // command, if there is one). Consumed HERE, where `input` is already consumed: the frame
+        // order documented in the header does not change.
         crate::midi::pump();
         {
             let mut q = lock(&s.ctl);
@@ -404,11 +407,11 @@ impl Rt {
                 }
             }
         }
-        self.pend = pend; // devolve o Vec vazio com a capacidade ja alocada
+        self.pend = pend; // hands back the empty Vec with its capacity already allocated
         s.cue.store(self.cues.index(), Ordering::Relaxed);
     }
 
-    /// Volta cues, ganchos e o `prev` do frame para o instante `t`: locate, loop e stop.
+    /// Rewinds cues, hooks and the frame `prev` to instant `t`: locate, loop and stop.
     fn reset(&mut self, t: f64) {
         self.cues.reset();
         for h in self.hooks.iter_mut() {
@@ -419,15 +422,15 @@ impl Rt {
 
     fn tick(&mut self, s: &Shared, t: f64) {
         self.drain(s, t);
-        // Loop no intervalo In-Out: lido a cada frame, entao ligar/desligar durante o play vale na
-        // hora. O relogio volta para o In e o frame do wrap sai no proximo tick, ja' dentro do
-        // intervalo — nada de escrever um frame de fora dele na rede.
+        // Loop over the In-Out range: read every frame, so turning it on/off during play takes
+        // effect at once. The clock jumps back to the In and the wrap frame goes out on the next
+        // tick, already inside the range — no writing a frame from outside it onto the network.
         if let Some(a) = lock(&s.lp).wrap(t) {
             s.clock.locate(a);
             self.reset(a);
             return;
         }
-        // 1. timeline (dmx/artnet) e media do Capture
+        // 1. timeline (dmx/artnet) and Capture media
         lock(&s.prog).release(&mut self.uni);
         self.tl.apply(&mut self.uni, t);
         let Rt {
@@ -458,14 +461,14 @@ impl Rt {
                 }
             }
         }
-        // 2. ganchos de frame (tracks fx e Graph), na ordem de registro
+        // 2. frame hooks (fx tracks and Graph), in registration order
         for h in hooks.iter_mut() {
             h.frame(t, uni);
         }
-        // 3. efeito colateral: gravacao (le a ENTRADA e escreve keyframe no show aberto), OSC,
-        // media nao-Capture e cue. So' TOCANDO se grava: em pausa o `Clock::run` continua
-        // chamando o frame com o `t` congelado, e gravar ali reescreveria o mesmo keyframe a
-        // cada mudanca da mesa (o `rec_arm` promete "com o transporte tocando").
+        // 3. side effects: recording (it reads the INPUT and writes a keyframe into the open
+        // show), OSC, non-Capture media and cue. It only records while PLAYING: when paused
+        // `Clock::run` keeps calling the frame with `t` frozen, and recording there would rewrite
+        // the same keyframe on every console change (`rec_arm` promises "with transport playing").
         if s.clock.state() == State::Play {
             crate::rec::tick(t, inputs);
         }
@@ -493,18 +496,18 @@ impl Rt {
                 cues.go(t, idx);
             }
         }
-        // 4. snapshot das cues
+        // 4. cue snapshot
         cues.update(t, uni);
         s.cue.store(cues.index(), Ordering::Relaxed);
-        // 5. programmer: o override manual do operador, HTP sobre timeline E cue viva
+        // 5. programmer: the operator manual override, HTP over the timeline AND the live cue
         lock(&s.prog).apply(uni);
-        // 6. ganchos globais (o monitor do serve): o frame ja' completo, antes de sair na rede
+        // 6. global hooks (the serve monitor): the frame already complete, before it hits the network
         for h in globais.iter_mut() {
             h.frame(t, uni);
         }
         // 7. I/O
-        // ponytail: todo universo escrito vai para TODAS as saidas do show (igual a R0)
-        // ; separar por saida quando um show misturar "dmx" e "artnet" no mesmo universo.
+        // ponytail: every written universe goes to EVERY output of the show (same as R0)
+        // ; split per output once a show mixes "dmx" and "artnet" on the same universe.
         for u in uni.iter() {
             for o in outs.iter_mut() {
                 o.send(u.number, &u.data);
@@ -528,14 +531,14 @@ impl Rt {
     }
 }
 
-/// Envia o valor corrente de um track de efeito colateral quando ele muda.
-// ponytail: monta `Vec<Arg>` e `String` so' na MUDANCA de valor, nao por frame ; virar buffer
-// reaproveitado se algum show passar a ter track OSC que muda todo frame com muitos argumentos.
+/// Sends the current value of a side-effect track when it changes.
+// ponytail: it builds `Vec<Arg>` and `String` only on a value CHANGE, not per frame ; make it a
+// reused buffer if some show comes to have an OSC track that changes every frame with many args.
 fn send_osc(tr: &mut crate::timeline::Track, t: f64, out: &OscOut, media: bool) {
     match tr.changed(t) {
         Side::Same => {}
-        // ponytail: numero vai como float OSC ('f'); o Python manda 'i' quando o keyframe e'
-        // inteiro ; casar o tipo se algum aparelho recusar float.
+        // ponytail: a number goes out as OSC float ('f'); Python sends 'i' when the keyframe is
+        // an integer ; match the type if some device refuses float.
         Side::Nums => {
             if media {
                 let v = tr.nums().first().copied().unwrap_or(0.0);
@@ -555,7 +558,7 @@ fn send_osc(tr: &mut crate::timeline::Track, t: f64, out: &OscOut, media: bool) 
     }
 }
 
-/// media nao-Capture: "endereco/valor" (o `rstrip("/") + "/" + str(v)` do Python).
+/// non-Capture media: "address/value" (Python's `rstrip("/") + "/" + str(v)`).
 fn media_address(address: &str, v: &str) -> String {
     format!("{}/{}", address.trim_end_matches('/'), v)
 }
@@ -571,7 +574,7 @@ fn fmt(v: f64) -> String {
 // ------------------------------------------------------------------- Player
 
 pub struct Player {
-    rt: Option<Rt>, // vai para a thread no start()
+    rt: Option<Rt>, // goes to the thread on start()
     s: Arc<Shared>,
     th: Option<JoinHandle<()>>,
     osc_in: Option<OscIn>,
@@ -579,12 +582,12 @@ pub struct Player {
 }
 
 impl Player {
-    /// Carrega timeline + cues e abre as saidas de `show.outputs` (sacn, artnet, osc).
+    /// Loads timeline + cues and opens the outputs of `show.outputs` (sacn, artnet, osc).
     pub fn new(show: Show, looping: bool) -> Result<Player, String> {
         let tl = Timeline::new(&show)?;
         let ign = tl.ignored().join(", ");
         if !ign.is_empty() {
-            eprintln!("aviso: tracks ignorados: {}", ign);
+            eprintln!("warning: tracks ignored: {}", ign);
         }
         let cues = CueList::new(
             show.extra
@@ -593,7 +596,7 @@ impl Player {
                 .map(|a| a.as_slice())
                 .unwrap_or(&[]),
         );
-        crate::midi::auto(&show); // "midi_port" do .spell: religa a superficie ao subir o show
+        crate::midi::auto(&show); // .spell "midi_port": reconnects the control surface when the show starts
         let outs = open_outputs(&show)?;
         let osc_out = open_osc(&show)?;
         let inputs = Arc::new(Inputs::open(&show)?);
@@ -603,8 +606,8 @@ impl Player {
             .and_then(|v| v.get("osc_port"))
             .and_then(|v| v.as_u64())
             .map(|p| p as u16);
-        // Intervalo do loop = o In-Out do show; sem eles, 0..duration (o `--loop` da CLI, que
-        // repetia o show inteiro, continua igual). `loop_set` reescreve isto com o player vivo.
+        // Loop range = the show In-Out; without them, 0..duration (the CLI `--loop`, which
+        // repeated the whole show, stays the same). `loop_set` rewrites this with the player live.
         let a = num(&show, "in").unwrap_or(0.0).max(0.0);
         let b = num(&show, "out").or(show.duration).unwrap_or(0.0);
         Ok(Player {
@@ -641,14 +644,14 @@ impl Player {
         })
     }
 
-    /// Ganchos de script/graph, antes de `start()`, na ordem em que devem rodar.
+    /// Script/graph hooks, before `start()`, in the order they must run.
     pub fn hook(&mut self, h: Box<dyn FrameHook>) {
         if let Some(rt) = self.rt.as_mut() {
             rt.hooks.push(h);
         }
     }
 
-    /// Saida extra alem das declaradas no show, antes de `start()`.
+    /// An extra output beyond the ones declared in the show, before `start()`.
     pub fn output(&mut self, o: Box<dyn Output>) {
         if let Some(rt) = self.rt.as_mut() {
             rt.outs.push(o);
@@ -663,13 +666,13 @@ impl Player {
         self.s.clock.clone()
     }
 
-    /// Sobe a thread de transporte e, se `osc_port` (argumento ou `transport.osc_port`), o
-    /// OscIn do transporte remoto. Registra este player como o `current()`.
+    /// Starts the transport thread and, if `osc_port` (argument or `transport.osc_port`), the
+    /// OscIn of the remote transport. Registers this player as the `current()`.
     pub fn start(&mut self, osc_port: Option<u16>) -> Result<(), String> {
         if self.th.is_some() {
             return Ok(());
         }
-        let mut rt = self.rt.take().ok_or("player ja encerrado")?;
+        let mut rt = self.rt.take().ok_or("player already closed")?;
         for f in lock(&GLOBAL).iter() {
             rt.globais.push(f());
         }
@@ -678,7 +681,7 @@ impl Player {
         let th = std::thread::Builder::new()
             .name("spell-transport".into())
             .spawn(move || transport(rt, s))
-            .map_err(|e| format!("thread de transporte: {}", e))?;
+            .map_err(|e| format!("transport thread: {}", e))?;
         self.th = Some(th);
         if let Some(p) = osc_port.or(self.osc_port).filter(|p| *p > 0) {
             let mut i = OscIn::new(p).map_err(|e| format!("osc {}: {}", p, e))?;
@@ -695,7 +698,7 @@ impl Player {
         Ok(())
     }
 
-    /// Bloqueia ate stop() ou o fim do show. `false` = estourou o timeout.
+    /// Blocks until stop() or the end of the show. `false` = the timeout ran out.
     pub fn wait(&self, timeout: Option<Duration>) -> bool {
         let d = lock(&self.s.done);
         match timeout {
@@ -719,11 +722,11 @@ impl Player {
         }
     }
 
-    /// Idempotente: para a thread, fecha as saidas e limpa o `current()`.
+    /// Idempotent: stops the thread, closes the outputs and clears the `current()`.
     pub fn close(&mut self) {
-        // Sem player nao ha gravacao. E' aqui e nao so' no ramo Stop da thread porque `close()`
-        // zera `run` antes do proximo frame: o `play_show` fecha o player no `stop` do operador,
-        // e a thread sai sem passar por aquele ramo.
+        // With no player there is no recording. It is here and not only in the thread Stop branch
+        // because `close()` clears `run` before the next frame: `play_show` closes the player on
+        // the operator `stop`, and the thread exits without going through that branch.
         crate::rec::disarm();
         self.s.run.store(false, Ordering::Relaxed);
         self.s.clock.stop();
@@ -735,7 +738,7 @@ impl Player {
             i.close();
         }
         if let Some(mut rt) = self.rt.take() {
-            rt.close(); // start() nunca foi chamado: as saidas ainda estao aqui
+            rt.close(); // start() was never called: the outputs are still here
         }
         let mut c = lock(&CURRENT);
         if c.as_ref().is_some_and(|h| Arc::ptr_eq(&h.s, &self.s)) {
@@ -762,21 +765,21 @@ fn argf(a: &Arg) -> f64 {
     }
 }
 
-/// Thread de transporte: o `_loop` do Python.
+/// Transport thread: Python's `_loop`.
 fn transport(mut rt: Rt, s: Arc<Shared>) {
-    // O relogio nasce em Stop: comeca `parado` para que armar ANTES do primeiro play sobreviva.
+    // The clock is born in Stop: it starts `parado` so arming BEFORE the first play survives.
     let mut parado = true;
     while s.run.load(Ordering::Relaxed) {
         if s.clock.state() == State::Stop {
-            // Parar desarma a gravacao, na BORDA de entrada no stop e nao enquanto parado:
-            // armar com o transporte parado e so' depois dar play e' o caminho do operador.
-            // (O outro ponto de desarme e' `Player::close`.)
+            // Stopping disarms the recording, on the EDGE into stop and not while stopped:
+            // arming with the transport stopped and only then hitting play is the operator path.
+            // (The other disarm point is `Player::close`.)
             if !parado {
                 crate::rec::disarm();
                 parado = true;
             }
             let t = s.clock.time();
-            rt.drain(&s, t); // locate/stop com o relogio parado tambem zera cues e ganchos
+            rt.drain(&s, t); // locate/stop with the clock stopped also clears cues and hooks
             std::thread::sleep(Duration::from_millis(5));
             continue;
         }
@@ -789,9 +792,9 @@ fn transport(mut rt: Rt, s: Arc<Shared>) {
             break;
         }
         if s.clock.state() != State::Stop {
-            // chegou na duracao: volta para o In do loop, ou para
-            // ponytail: `loop` sem `duration` so' repete quando ha um Out — sem fim nem Out, o run
-            // so' volta no stop.
+            // it reached the duration: back to the loop In, or stop
+            // ponytail: `loop` with no `duration` only repeats when there is an Out — with neither
+            // end nor Out, the run only returns on stop.
             let lp = *lock(&s.lp);
             if lp.on && s.duration.is_some() {
                 s.clock.locate(lp.a);
@@ -807,7 +810,7 @@ fn transport(mut rt: Rt, s: Arc<Shared>) {
     rt.close();
 }
 
-/// Player vivo neste processo (o `CURRENT` do Python). Usado pelos comandos do registry.
+/// Live player in this process (Python's `CURRENT`). Used by the registry commands.
 pub fn current() -> Option<Handle> {
     lock(&CURRENT).clone()
 }

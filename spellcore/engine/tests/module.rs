@@ -1,6 +1,6 @@
-//! Modulos vivos pelo registry: carregar `modules/laser.json`, add/list/get/del, manifesto
-//! reprovado e a resolucao de `modules/`. Binario proprio porque `MODULES` e `OPEN` sao um por
-//! processo e os testes da lib rodam em paralelo no mesmo binario.
+//! Live modules through the registry: loading `modules/laser.json`, add/list/get/del, a rejected
+//! manifest and the resolution of `modules/`. Its own binary because `MODULES` and `OPEN` are one
+//! per process and the lib tests run in parallel in the same binary.
 
 use engine::module::{self, Module};
 use engine::registry::base;
@@ -15,14 +15,14 @@ fn laser() -> PathBuf {
 }
 
 #[test]
-fn laser_json_passa_no_check() {
+fn laser_json_passes_the_check() {
     let m: Module = module::load(&laser()).expect("modules/laser.json");
     assert_eq!(m.name, "laser");
     assert!(module::check(&m).is_empty(), "{:?}", module::check(&m));
     assert!(m.parameters.contains_key("geo/scale"));
     assert!(m.values.contains_key("stat/fps"));
     assert!(m.commands.contains_key("play"));
-    // ordem estavel ao gravar: BTreeMap, entao o JSON volta ordenado por endereco
+    // stable order on write: BTreeMap, so the JSON comes back sorted by address
     let v = serde_json::to_value(&m).unwrap();
     let ks: Vec<&str> = v["parameters"]
         .as_object()
@@ -35,10 +35,10 @@ fn laser_json_passa_no_check() {
     assert_eq!(ks, ord);
 }
 
-/// Um teste so' para tudo que mexe em `MODULES` e `OPEN`: os testes de um binario rodam em
-/// paralelo, e as duas tabelas sao uma por processo.
+/// A single test for everything that touches `MODULES` and `OPEN`: the tests of one binary run
+/// in parallel, and both tables are one per process.
 #[test]
-fn registro_de_modulos_vivos() {
+fn registry_of_live_modules() {
     let r = base();
     let c = |n: &str, a: Value| r.call(n, a);
 
@@ -54,9 +54,9 @@ fn registro_de_modulos_vivos() {
     let g = c("module_get", json!({"name": "laser"})).unwrap();
     assert_eq!(g["parameters"]["geo/scale"]["max"], json!(4.0));
     assert_eq!(g["commands"]["shutter"]["context"], json!("both"));
-    assert!(c("module_get", json!({"name": "nao_existe"})).is_err());
+    assert!(c("module_get", json!({"name": "does_not_exist"})).is_err());
 
-    // mesmo nome substitui, nao duplica
+    // the same name replaces, it does not duplicate
     c(
         "module_add",
         json!({"data": {"name": "laser", "version": "9.9.9",
@@ -75,59 +75,63 @@ fn registro_de_modulos_vivos() {
     assert_eq!(d["version"], json!("9.9.9"));
     assert_eq!(c("module_list", json!({})).unwrap(), json!([]));
     assert!(c("module_del", json!({"name": "laser"})).is_err());
-    assert!(c("module_add", json!({})).is_err(), "sem file nem data");
+    assert!(c("module_add", json!({})).is_err(), "no file and no data");
 
-    // ---- manifesto errado: os erros vem todos juntos e citam o path
-    let ruim: Module = serde_json::from_value(json!({"name": "ruim", "parameters": {
+    // ---- a wrong manifest: the errors come all together and name the path
+    let ruim: Module = serde_json::from_value(json!({"name": "bad", "parameters": {
         "geo/scale": {"type": "float", "min": 2, "max": 1},
-        "sem espaco/x": {"type": "int"},
-        "modo": {"type": "enum"},
-        "fora/faixa": {"type": "float", "min": 0, "max": 1, "default": 5},
-        "fora/options": {"type": "enum", "options": ["x", "y"], "default": "z"},
-        "tipo/errado": {"type": "quaternion"},
+        "with space/x": {"type": "int"},
+        "mode": {"type": "enum"},
+        "out/of_range": {"type": "float", "min": 0, "max": 1, "default": 5},
+        "out/of_options": {"type": "enum", "options": ["x", "y"], "default": "z"},
+        "wrong/type": {"type": "quaternion"},
         "geo//scale": {"type": "float"},
         "/scale": {"type": "float"}
     }}))
-    .expect("manifesto ruim");
+    .expect("bad manifest");
 
     let e = module::check(&ruim);
     assert_eq!(e.len(), 8, "{:?}", e);
     let tem = |t: &str| e.iter().any(|s| s.contains(t));
     assert!(tem("parameters/geo/scale") && tem("min 2"), "{:?}", e);
-    assert!(tem("sem espaco/x"), "{:?}", e);
-    // segmento vazio no meio e no comeco: `endereco_ok` recusa os dois
+    assert!(tem("with space/x"), "{:?}", e);
+    // an empty segment in the middle and at the start: `endereco_ok` refuses both
     assert!(tem("parameters/geo//scale"), "{:?}", e);
     assert!(tem("parameters//scale"), "{:?}", e);
-    assert!(tem("parameters/modo"), "{:?}", e);
-    assert!(tem("parameters/fora/faixa") && tem("default 5"), "{:?}", e);
+    assert!(tem("parameters/mode"), "{:?}", e);
     assert!(
-        tem("parameters/fora/options") && tem("nao esta em options"),
+        tem("parameters/out/of_range") && tem("default 5"),
         "{:?}",
         e
     );
     assert!(
-        tem("parameters/tipo/errado") && tem("\"quaternion\""),
+        tem("parameters/out/of_options") && tem("is not in options"),
+        "{:?}",
+        e
+    );
+    assert!(
+        tem("parameters/wrong/type") && tem("\"quaternion\""),
         "{:?}",
         e
     );
 
     let err = r
         .call("module_add", json!({ "data": ruim }))
-        .expect_err("reprovado nao entra");
+        .expect_err("a rejected one does not get in");
     assert!(err.contains("parameters/geo/scale"), "{}", err);
     assert_eq!(
         r.call("module_list", json!({})).unwrap(),
         json!([]),
-        "reprovado nao entra"
+        "a rejected one does not get in"
     );
 
-    // ---- modules_dir: `shows/` e `modules/` sao irmaos no repo: a regra do nivel acima acha a pasta
+    // ---- modules_dir: `shows/` and `modules/` are siblings in the repo: the one-level-up rule finds the folder
     assert_eq!(
         module::modules_dir(SPELL).canonicalize().ok(),
         laser().parent().unwrap().canonicalize().ok()
     );
 
-    // pasta ao lado do .spell ganha da de cima
+    // a folder next to the .spell beats the one above
     let d = std::env::temp_dir().join("spellcaster_test_modules");
     std::fs::create_dir_all(d.join("modules")).expect("temp");
     let spell = d.join("x.spell");
@@ -136,7 +140,7 @@ fn registro_de_modulos_vivos() {
         d.join("modules")
     );
 
-    // com show aberto, `file` sem extensao resolve pela pasta do show
+    // with a show open, `file` without an extension resolves through the show folder
     r.call("show_get", json!({ "file": SPELL })).unwrap();
     assert_eq!(
         r.call("module_add", json!({"file": "laser"})).unwrap()["name"],

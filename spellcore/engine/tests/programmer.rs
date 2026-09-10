@@ -1,11 +1,11 @@
-//! Programmer (a camada manual do operador) num player vivo: `level_set` por cima da timeline
-//! E da cue viva com HTP, `level_clear` devolvendo o canal, `cue_capture` virando cue e
-//! `fixture_set` resolvendo nome de fixture + nome de canal do perfil. Binario proprio porque
-//! mexe no `CURRENT` do player e no `OPEN` do registry, que sao globais do processo.
+//! Programmer (the operator manual layer) on a live player: `level_set` on top of the timeline
+//! AND of the live cue with HTP, `level_clear` handing the channel back, `cue_capture` becoming a
+//! cue and `fixture_set` resolving fixture name + profile channel name. Its own binary because it
+//! touches the player `CURRENT` and the registry `OPEN`, which are process globals.
 //!
-//! O que o teste observa e' a SAIDA do frame, nao o buffer no meio dele: o `Espelho` e' um
-//! `Output` de teste, o ultimo passo do tick. Show sem `outputs` de rede: nada de socket, o
-//! teste roda em maquina com firewall fechado.
+//! What the test watches is the frame OUTPUT, not the buffer halfway through it: `Espelho` is a
+//! test `Output`, the last step of the tick. A show with no network `outputs`: no socket, the
+//! test runs on a machine with the firewall shut.
 
 use engine::registry::{base, Registry};
 use engine::{Player, Show};
@@ -14,13 +14,13 @@ use serde_json::{json, Value};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-/// Saida de teste que guarda o universo 1 como foi enviado (timeline + cues + programmer).
+/// Test output that keeps universe 1 as it was sent (timeline + cues + programmer).
 struct Espelho(Arc<Mutex<[u8; 512]>>);
 
 impl Output for Espelho {
     fn send(&mut self, universe: u16, data: &[u8; 512]) {
         if universe == 1 {
-            *self.0.lock().expect("espelho") = *data;
+            *self.0.lock().expect("mirror") = *data;
         }
     }
 
@@ -28,10 +28,10 @@ impl Output for Espelho {
 }
 
 fn lock(m: &Arc<Mutex<[u8; 512]>>) -> [u8; 512] {
-    *m.lock().expect("espelho")
+    *m.lock().expect("mirror")
 }
 
-/// Espera ate `secs` por um frame que satisfaca `cond`; devolve o ultimo visto.
+/// Waits up to `secs` for a frame that satisfies `cond`; returns the last one seen.
 fn espera(m: &Arc<Mutex<[u8; 512]>>, secs: f64, cond: impl Fn(&[u8; 512]) -> bool) -> [u8; 512] {
     let fim = Instant::now() + Duration::from_secs_f64(secs);
     loop {
@@ -48,77 +48,80 @@ fn ok(r: &Registry, cmd: &str, args: Value) -> Value {
         .unwrap_or_else(|e| panic!("{}: {}", cmd, e))
 }
 
-/// Um teste so': `CURRENT` (player) e `OPEN` (show do registry) sao globais do processo, e os
-/// testes de um binario rodam em paralelo.
+/// A single test: `CURRENT` (player) and `OPEN` (registry show) are process globals, and the
+/// tests of one binary run in parallel.
 #[test]
-fn programmer_htp_clear_captura_e_fixture_set() {
+fn programmer_htp_clear_capture_and_fixture_set() {
     let r = base();
-    // sem player, todo comando do programmer devolve o erro padrao
+    // with no player, every programmer command returns the standard error
     for (c, a) in [
         ("level_set", json!({"address": 1, "values": [10]})),
         ("level_clear", json!({})),
         ("level_get", json!({})),
         ("cue_capture", json!({})),
     ] {
-        assert_eq!(r.call(c, a).unwrap_err(), "sem player em execucao", "{}", c);
+        assert_eq!(r.call(c, a).unwrap_err(), "no player running", "{}", c);
     }
 
     let sh: Show = serde_json::from_value(json!({
         "name": "programmer", "fps": 60, "version": 1, "outputs": [],
         "tracks": [{"type": "dmx", "universe": 1, "address": 1, "keys": [[0, 100], [60, 100]]}],
-        "cues": [{"name": "viva", "fade": 0, "values": {"1/30": [60]}}]
+        "cues": [{"name": "live", "fade": 0, "values": {"1/30": [60]}}]
     }))
-    .expect("show de teste");
+    .expect("test show");
     let esp = Arc::new(Mutex::new([0u8; 512]));
-    let mut p = Player::new(sh, false).expect("player sem saidas");
+    let mut p = Player::new(sh, false).expect("player with no outputs");
     p.output(Box::new(Espelho(esp.clone())));
     p.start(None).expect("start");
     p.handle().play();
 
     let d = espera(&esp, 2.0, |d| d[0] == 100);
-    assert_eq!(d[0], 100, "a timeline nao chegou a escrever o canal 1");
+    assert_eq!(d[0], 100, "the timeline never got to write channel 1");
 
-    // 1. override acima da timeline: o programmer ganha
+    // 1. override above the timeline: the programmer wins
     assert_eq!(
         ok(&r, "level_set", json!({"address": 1, "values": [200]})),
         json!(1)
     );
     let d = espera(&esp, 2.0, |d| d[0] == 200);
-    assert_eq!(d[0], 200, "level_set nao subiu o canal 1");
+    assert_eq!(d[0], 200, "level_set did not raise channel 1");
 
-    // endereco fora de 1..512 e' erro, e nao silencio
+    // an address outside 1..512 is an error, not silence
     for a in [0, 513] {
         let e = r
             .call("level_set", json!({"address": a, "values": [1]}))
-            .expect_err("endereco fora da faixa tem que recusar");
-        assert!(e.contains("fora de 1..512"), "{}", e);
+            .expect_err("an out-of-range address has to be refused");
+        assert!(e.contains("outside 1..512"), "{}", e);
     }
 
-    // 2. HTP: override abaixo da timeline nao derruba o canal
+    // 2. HTP: an override below the timeline does not pull the channel down
     ok(&r, "level_set", json!({"address": 1, "values": [50]}));
     let d = espera(&esp, 0.3, |_| false);
-    assert_eq!(d[0], 100, "HTP: 50 do programmer sob 100 da timeline");
+    assert_eq!(
+        d[0], 100,
+        "HTP: 50 from the programmer under 100 from the timeline"
+    );
 
-    // 3. varios canais de uma vez, num endereco que a timeline nao toca
+    // 3. several channels at once, at an address the timeline does not touch
     ok(
         &r,
         "level_set",
         json!({"universe": 1, "address": 5, "values": [11, 22, 33]}),
     );
     let d = espera(&esp, 2.0, |d| d[4] == 11);
-    assert_eq!(&d[4..7], &[11, 22, 33], "level_set com values");
+    assert_eq!(&d[4..7], &[11, 22, 33], "level_set with values");
 
-    // 4. level_get no formato de values de cue
+    // 4. level_get in the cue values format
     assert_eq!(
         ok(&r, "level_get", json!({})),
         json!({"1/1": 50, "1/5": 11, "1/6": 22, "1/7": 33})
     );
 
-    // 5. captura: vira cue no show aberto e solta o override
-    let i = ok(&r, "cue_capture", json!({"name": "cena 1", "fade": 2.0}));
+    // 5. capture: it becomes a cue in the open show and releases the override
+    let i = ok(&r, "cue_capture", json!({"name": "scene 1", "fade": 2.0}));
     assert_eq!(i, json!(0));
     let cue = &ok(&r, "show_get", json!({"full": true}))["cues"][0];
-    assert_eq!(cue["name"], "cena 1");
+    assert_eq!(cue["name"], "scene 1");
     assert_eq!(cue["fade"], json!(2.0));
     assert_eq!(
         cue["values"],
@@ -127,24 +130,28 @@ fn programmer_htp_clear_captura_e_fixture_set() {
     assert_eq!(
         ok(&r, "level_get", json!({})),
         json!({}),
-        "captura solta o override"
+        "the capture releases the override"
     );
 
-    // 6. soltar o override devolve o canal: a timeline volta a mandar, o resto zera
+    // 6. releasing the override hands the channel back: the timeline rules again, the rest zeroes
     let d = espera(&esp, 2.0, |d| d[4] == 0);
-    assert_eq!(d[0], 100, "canal da timeline volta ao valor dela");
-    assert_eq!(&d[4..7], &[0, 0, 0], "canal so' do programmer volta a zero");
+    assert_eq!(d[0], 100, "a timeline channel goes back to its value");
+    assert_eq!(
+        &d[4..7],
+        &[0, 0, 0],
+        "a programmer-only channel goes back to zero"
+    );
 
-    // 7. level_clear devolve quantos canais soltou
+    // 7. level_clear returns how many channels it released
     ok(&r, "level_set", json!({"address": 20, "values": [1, 2]}));
     assert_eq!(ok(&r, "level_clear", json!({"universe": 1})), json!(2));
     assert_eq!(ok(&r, "level_clear", json!({})), json!(0));
     assert!(
         r.call("cue_capture", json!({})).is_err(),
-        "programmer vazio nao vira cue"
+        "an empty programmer does not become a cue"
     );
 
-    // 8. fixture_set: nome da fixture + nome do canal do perfil viram universo/endereco
+    // 8. fixture_set: fixture name + profile channel name become universe/address
     let prof = concat!(env!("CARGO_MANIFEST_DIR"), "/../../profiles/par_rgb_3.json");
     ok(&r, "show_new", json!({}));
     ok(
@@ -160,19 +167,19 @@ fn programmer_htp_clear_captura_e_fixture_set() {
             json!({"name": "par 1", "channel": "g", "value": 180})
         ),
         json!({"universe": 1, "address": 11, "value": 180.0}),
-        "offset 1 do perfil RGB sobre o endereco 10"
+        "offset 1 of the RGB profile over address 10"
     );
     let d = espera(&esp, 2.0, |d| d[10] == 180);
     assert_eq!(&d[9..12], &[0, 180, 0]);
 
-    // canal so' por nome: numero nao resolve, e o erro explica o que o perfil tem
+    // channel by name only: a number does not resolve, and the error explains what the profile has
     assert!(r
         .call(
             "fixture_set",
             json!({"name": "par 1", "channel": "2", "value": 90})
         )
         .unwrap_err()
-        .contains("nao tem canal"));
+        .contains("has no channel"));
     let e = r
         .call(
             "fixture_set",
@@ -181,25 +188,25 @@ fn programmer_htp_clear_captura_e_fixture_set() {
         .unwrap_err();
     assert!(
         e.contains("\"tilt\"") && e.contains("\"r\""),
-        "erro sem os canais do perfil: {}",
+        "error without the profile channels: {}",
         e
     );
     assert!(r
         .call(
             "fixture_set",
-            json!({"name": "nao existe", "channel": "r", "value": 1})
+            json!({"name": "does not exist", "channel": "r", "value": 1})
         )
         .unwrap_err()
-        .contains("nao esta no patch"));
+        .contains("is not in the patch"));
 
-    // 9. o operador sobrepoe a cue viva: o programmer roda DEPOIS de `CueList::update`.
-    // HTP, entao o valor do operador tem que ser maior que o da cue para vencer.
+    // 9. the operator overrides the live cue: the programmer runs AFTER `CueList::update`.
+    // HTP, so the operator value has to be higher than the cue one to win.
     p.handle().cue_go(Some(0));
     let d = espera(&esp, 2.0, |d| d[29] == 60);
-    assert_eq!(d[29], 60, "a cue nao chegou a escrever o canal 30");
+    assert_eq!(d[29], 60, "the cue never got to write channel 30");
     ok(&r, "level_set", json!({"address": 30, "values": [200]}));
     let d = espera(&esp, 2.0, |d| d[29] == 200);
-    assert_eq!(d[29], 200, "cue viva reescreveu o canal do operador");
+    assert_eq!(d[29], 200, "the live cue rewrote the operator channel");
 
     p.close();
 }

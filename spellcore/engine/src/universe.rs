@@ -1,5 +1,5 @@
-//! Buffers DMX: um Universe por numero, 512 canais, endereco 1-based.
-//! Igual a `spellcaster/core/universe.py`.
+//! DMX buffers: one Universe per number, 512 channels, 1-based address.
+//! Same as `spellcaster/core/universe.py`.
 
 pub struct Universe {
     pub number: u16,
@@ -14,10 +14,11 @@ impl Universe {
         }
     }
 
-    /// Escreve values a partir de addr (1-based); clamp 0..255; ignora o que passar de 512.
-    /// `v as u8` no Rust trunca para zero e satura — mesmo resultado de `max(0, min(255, int(v)))`.
+    /// Writes values from addr on (1-based); clamps to 0..255; ignores whatever runs past 512.
+    /// `v as u8` in Rust truncates toward zero and saturates — the same result as
+    /// `max(0, min(255, int(v)))`.
     pub fn set(&mut self, addr: u16, values: &[f64]) {
-        // ponytail: addr 0 e' descartado ; o Python indexa com -1 e escreve lixo, nao vale copiar.
+        // ponytail: addr 0 is dropped ; Python indexes with -1 and writes garbage, not worth copying.
         if addr == 0 {
             return;
         }
@@ -44,7 +45,7 @@ impl Universe {
     }
 }
 
-/// Vec ordenado por numero + busca binaria: zero alocacao depois do primeiro frame.
+/// Vec sorted by number + binary search: zero allocation after the first frame.
 pub struct Universes {
     v: Vec<Universe>,
 }
@@ -99,14 +100,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn set_clamp_base_1_e_transbordo() {
+    fn set_clamp_base_1_and_overflow() {
         let mut u = Universe::new(1);
         u.set(1, &[10.0, -5.0, 300.0, 255.9, -0.5]);
         assert_eq!(&u.data[0..5], &[10, 0, 255, 255, 0]);
-        // addr 1-based: canal 512 e' o indice 511
+        // 1-based addr: channel 512 is index 511
         u.set(512, &[7.0, 9.0, 11.0]);
         assert_eq!(u.data[511], 7);
-        // transbordo: nada escrito, nada estoura
+        // overflow: nothing written, nothing panics
         u.set(513, &[42.0]);
         u.set(0, &[42.0]);
         assert_eq!(u.data[511], 7);
@@ -115,7 +116,7 @@ mod tests {
     }
 
     #[test]
-    fn set_bytes_igual_ao_set() {
+    fn set_bytes_same_as_set() {
         let mut a = Universe::new(1);
         let mut b = Universe::new(1);
         a.set(5, &[1.0, 2.0, 3.0]);
@@ -124,7 +125,7 @@ mod tests {
     }
 
     #[test]
-    fn universes_ordenado_e_estavel() {
+    fn universes_sorted_and_stable() {
         let mut us = Universes::new();
         us.get_or_create(5).set(1, &[1.0]);
         us.get_or_create(1).set(1, &[2.0]);

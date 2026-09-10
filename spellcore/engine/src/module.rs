@@ -1,8 +1,8 @@
-//! Modulo = app declarado em texto. Cada app (o laser, o player de midia, um Pi na rede) publica
-//! um `module.json` com os seus `parameters`, `values` e `commands`; o core so' guarda a tabela
-//! dos modulos vivos, e o PATCHBAY monta o no' sem conhecer o app. Formato de
-//! `design/FUNCOES/orquestrador.md` secao 5 (o `module.json` do Chataigne), enxuto:
-//! endereco textual e' a identidade (regra 2) e o tipo do parametro gera o widget (regra 1).
+//! Module = an app declared in text. Each app (the laser, the media player, a Pi on the network)
+//! publishes a `module.json` with its `parameters`, `values` and `commands`; the core only keeps
+//! the table of live modules, and the PATCHBAY builds the node without knowing the app. Format of
+//! `design/FUNCOES/orquestrador.md` section 5 (the Chataigne `module.json`), trimmed down: the
+//! text address is the identity (rule 2) and the parameter type generates the widget (rule 1).
 //!
 //! ```json
 //! { "name": "laser", "type": "laser", "version": "0.1.0",
@@ -19,11 +19,11 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-/// Tipos de parametro aceitos: e' o que decide o widget (regra 1) e se ele dispara, liga ou
-/// vale (regra 3): `trigger` dispara, `bool` liga, o resto vale.
+/// Accepted parameter types: this is what decides the widget (rule 1) and whether it fires,
+/// toggles or holds a value (rule 3): `trigger` fires, `bool` toggles, the rest holds a value.
 const TIPOS: [&str; 7] = ["float", "int", "bool", "trigger", "color", "string", "enum"];
 
-/// Contexto do comando (o `CommandContext` do Chataigne): so' disparo, so' valor, ou os dois.
+/// Command context (the Chataigne `CommandContext`): trigger only, value only, or both.
 const CONTEXTOS: [&str; 3] = ["action", "mapping", "both"];
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -32,14 +32,14 @@ pub struct Param {
     pub r#type: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default: Option<Value>,
-    /// Faixa util do slider, separada do clamp fisico `min`/`max` (regra 1).
+    /// Useful slider range, separate from the physical `min`/`max` clamp (rule 1).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub norm: Option<[f64; 2]>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub min: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max: Option<f64>,
-    /// Valores do `type: enum`.
+    /// Values of `type: enum`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub options: Option<Vec<Value>>,
 }
@@ -49,8 +49,8 @@ pub struct Cmd {
     pub context: String,
 }
 
-// ponytail: campos alheios do manifesto do Chataigne (`hasInput`, `dependency`, `label`, `unit`, `args`)
-// sao ignorados na leitura e nao voltam na gravacao ; entram quando algum cliente usar.
+// ponytail: foreign fields of the Chataigne manifest (`hasInput`, `dependency`, `label`, `unit`,
+// `args`) are ignored on read and do not come back on write ; they land when some client uses them.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Module {
     pub name: String,
@@ -58,19 +58,19 @@ pub struct Module {
     pub r#type: String,
     #[serde(default)]
     pub version: String,
-    /// Endereco `a/b` -> parametro de configuracao (entrada).
+    /// Address `a/b` -> configuration parameter (input).
     #[serde(default)]
     pub parameters: BTreeMap<String, Param>,
-    /// Endereco `a/b` -> valor so' de leitura (saida).
+    /// Address `a/b` -> read-only value (output).
     #[serde(default)]
     pub values: BTreeMap<String, Param>,
     #[serde(default)]
     pub commands: BTreeMap<String, Cmd>,
 }
 
-/// Modulos vivos neste processo, na ordem em que entraram.
-// ponytail: tabela por processo, como o `OPEN` do registry ; vira tabela por sessao quando a GUI
-// abrir dois shows ao mesmo tempo.
+/// Live modules in this process, in the order they arrived.
+// ponytail: a per-process table, like the registry `OPEN` ; it becomes a per-session table once
+// the GUI opens two shows at the same time.
 static MODULES: Mutex<Vec<Module>> = Mutex::new(Vec::new());
 
 pub fn load(path: &Path) -> Result<Module, String> {
@@ -78,21 +78,21 @@ pub fn load(path: &Path) -> Result<Module, String> {
     serde_json::from_str(&txt).map_err(|e| format!("{}: {}", path.display(), e))
 }
 
-/// Pasta `modules/`, pela mesma regra dos outros recursos do show.
+/// The `modules/` folder, by the same rule as the other show resources.
 pub fn modules_dir(spell: &str) -> PathBuf {
     crate::edit::recurso_dir(spell, "modules")
 }
 
-/// Endereco textual: `a/b`, sem espaco e sem segmento vazio (regra 2).
+/// Text address: `a/b`, no whitespace and no empty segment (rule 2).
 fn endereco_ok(s: &str) -> bool {
     !s.is_empty() && !s.contains(char::is_whitespace) && !s.split('/').any(str::is_empty)
 }
 
-/// Erros do manifesto, todos de uma vez (erro e' dado, regra 5). Vazio = passou.
+/// Manifest errors, all at once (an error is data, rule 5). Empty = it passed.
 pub fn check(m: &Module) -> Vec<String> {
     let mut e = Vec::new();
     if m.name.trim().is_empty() {
-        e.push("name vazio".to_string());
+        e.push("empty name".to_string());
     }
     for (grupo, tab) in [("parameters", &m.parameters), ("values", &m.values)] {
         for (path, p) in tab {
@@ -102,13 +102,13 @@ pub fn check(m: &Module) -> Vec<String> {
     for (name, c) in &m.commands {
         if !endereco_ok(name) {
             e.push(format!(
-                "commands/{}: endereco precisa ser a/b, sem espaco",
+                "commands/{}: the address must be a/b, with no whitespace",
                 name
             ));
         }
         if !CONTEXTOS.contains(&c.context.as_str()) {
             e.push(format!(
-                "commands/{}: context {:?} nao e' um de {:?}",
+                "commands/{}: context {:?} is not one of {:?}",
                 name, c.context, CONTEXTOS
             ));
         }
@@ -119,60 +119,60 @@ pub fn check(m: &Module) -> Vec<String> {
 fn param(grupo: &str, path: &str, p: &Param, e: &mut Vec<String>) {
     let em = |t: String| format!("{}/{}: {}", grupo, path, t);
     if !endereco_ok(path) {
-        e.push(em("endereco precisa ser a/b, sem espaco".into()));
+        e.push(em("the address must be a/b, with no whitespace".into()));
     }
     if let (Some(a), Some(b)) = (p.min, p.max) {
         if a >= b {
-            e.push(em(format!("min {} nao e' menor que max {}", a, b)));
+            e.push(em(format!("min {} is not lower than max {}", a, b)));
         }
     }
     if let Some(n) = p.norm {
         if n[0] >= n[1] {
-            e.push(em(format!("norm [{}, {}] invertida", n[0], n[1])));
+            e.push(em(format!("norm [{}, {}] is inverted", n[0], n[1])));
         }
     }
     if let Some(d) = p.default.as_ref().and_then(Value::as_f64) {
         if p.min.is_some_and(|a| d < a) || p.max.is_some_and(|b| d > b) {
-            e.push(em(format!("default {} fora de min/max", d)));
+            e.push(em(format!("default {} outside min/max", d)));
         }
     }
     if !TIPOS.contains(&p.r#type.as_str()) {
-        e.push(em(format!("type {:?} nao e' um de {:?}", p.r#type, TIPOS)));
+        e.push(em(format!("type {:?} is not one of {:?}", p.r#type, TIPOS)));
     }
     match (p.r#type == "enum", &p.options) {
-        (true, None) => e.push(em("type enum sem options".into())),
-        (true, Some(o)) if o.is_empty() => e.push(em("options vazio".into())),
+        (true, None) => e.push(em("type enum without options".into())),
+        (true, Some(o)) if o.is_empty() => e.push(em("empty options".into())),
         (true, Some(o)) => {
             if let Some(d) = &p.default {
                 if !o.contains(d) {
-                    e.push(em(format!("default {} nao esta em options", d)));
+                    e.push(em(format!("default {} is not in options", d)));
                 }
             }
         }
-        (false, Some(_)) => e.push(em("options so' vale com type enum".into())),
+        (false, Some(_)) => e.push(em("options only counts with type enum".into())),
         _ => {}
     }
 }
 
-// ------------------------------------------------------------------ comandos
+// ------------------------------------------------------------------ commands
 
 #[derive(Deserialize, JsonSchema)]
 pub struct ModuleArgs {
-    /// Nome em modules/ (sem .json) ou caminho de um .json.
+    /// Name in modules/ (without .json) or path of a .json.
     #[serde(default)]
     pub file: String,
-    /// O manifesto inteiro, quando nao vem de arquivo.
+    /// The whole manifest, when it does not come from a file.
     #[serde(default)]
     pub data: Value,
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct NameArgs {
-    /// Nome do modulo (o campo `name` do manifesto).
+    /// Module name (the `name` field of the manifest).
     pub name: String,
 }
 
-/// Caminho do manifesto: com extensao e' caminho; sem, e' nome em `modules/` (como o perfil).
+/// Path of the manifest: with an extension it is a path; without, a name in `modules/` (like the profile).
 fn arquivo(f: &str) -> PathBuf {
     if Path::new(f).extension().is_some() {
         return PathBuf::from(f);
@@ -190,19 +190,19 @@ fn manifesto(a: &ModuleArgs) -> Result<Module, String> {
     } else if a.data.is_object() {
         serde_json::from_value(a.data.clone()).map_err(|e| e.to_string())
     } else {
-        Err("module: passe file= (nome ou caminho) ou data= (o manifesto)".to_string())
+        Err("module: pass file= (name or path) or data= (the manifest)".to_string())
     }
 }
 
 pub fn register(r: &mut Registry) {
     r.add::<ModuleArgs>(
         "module_add",
-        "Carrega um module.json (file=) ou o manifesto (data=), valida e poe na tabela de modulos vivos; mesmo nome substitui. Devolve nome e versao.",
+        "Loads a module.json (file=) or the manifest (data=), validates it and puts it in the table of live modules; the same name replaces. Returns name and version.",
         |a| {
             let m = manifesto(&a)?;
             let e = check(&m);
             if !e.is_empty() {
-                return Err(format!("modulo {:?}: {}", m.name, e.join("; ")));
+                return Err(format!("module {:?}: {}", m.name, e.join("; ")));
             }
             let out = json!({"name": m.name, "version": m.version});
             let mut g = lock(&MODULES);
@@ -215,29 +215,33 @@ pub fn register(r: &mut Registry) {
     );
     r.add::<NameArgs>(
         "module_del",
-        "Tira o modulo da tabela pelo nome. Devolve o manifesto removido.",
+        "Removes the module from the table by name. Returns the removed manifest.",
         |a| {
             let mut g = lock(&MODULES);
             match g.iter().position(|x| x.name == a.name) {
                 Some(i) => serde_json::to_value(g.remove(i)).map_err(|e| e.to_string()),
-                None => Err(format!("modulo {:?} nao esta carregado", a.name)),
+                None => Err(format!("module {:?} is not loaded", a.name)),
             }
         },
     );
-    r.add::<NoArgs>("module_list", "Modulos vivos: nome, tipo e versao.", |_| {
-        Ok(Value::Array(
-            lock(&MODULES)
-                .iter()
-                .map(|m| json!({"name": m.name, "type": m.r#type, "version": m.version}))
-                .collect(),
-        ))
-    });
+    r.add::<NoArgs>(
+        "module_list",
+        "Live modules: name, type and version.",
+        |_| {
+            Ok(Value::Array(
+                lock(&MODULES)
+                    .iter()
+                    .map(|m| json!({"name": m.name, "type": m.r#type, "version": m.version}))
+                    .collect(),
+            ))
+        },
+    );
     r.add::<NameArgs>(
         "module_get",
-        "Manifesto inteiro do modulo carregado (parameters, values, commands).",
+        "The whole manifest of the loaded module (parameters, values, commands).",
         |a| match lock(&MODULES).iter().find(|x| x.name == a.name) {
             Some(m) => serde_json::to_value(m).map_err(|e| e.to_string()),
-            None => Err(format!("modulo {:?} nao esta carregado", a.name)),
+            None => Err(format!("module {:?} is not loaded", a.name)),
         },
     );
 }

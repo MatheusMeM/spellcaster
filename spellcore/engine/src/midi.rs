@@ -1,18 +1,18 @@
-//! MIDI mapping: uma porta de entrada aberta, um mapa `tecla -> comando` que vive no `.spell`,
-//! e o evento entregue ao graph pela MESMA fila do comando `input`.
+//! MIDI mapping: one open input port, a `key -> command` map that lives in the `.spell`, and the
+//! event delivered to the graph through the SAME queue as the `input` command.
 //!
-//! Chave do evento: `"<status>/<data1>"` (`144/60` = note on canal 1 nota 60, `176/1` = CC 1),
-//! igual a' do no' `in.midi` do graph. Cada evento recebido:
+//! Event key: `"<status>/<data1>"` (`144/60` = note on channel 1 note 60, `176/1` = CC 1), the
+//! same one as the graph `in.midi` node. Each event received:
 //!
-//!   1. vira `input {key: "midi:<chave>", value}` nos ganchos do player vivo (o `in.midi`);
-//!   2. se a chave estiver no mapa, chama o comando pelo registry — o mesmo caminho do WS.
+//!   1. becomes `input {key: "midi:<key>", value}` on the hooks of the live player (the `in.midi`);
+//!   2. if the key is in the map, it calls the command through the registry — the same path as WS.
 //!
-//! `value` e' `data2 / 127` (0..1). Nos `args` do mapa, `"$"` vira esse valor e `"$<n>"` vira
-//! `round(valor * n)`: `"$127"` e' o byte cru do MIDI e `"$255"` e' o nivel DMX.
+//! `value` is `data2 / 127` (0..1). In the map `args`, `"$"` becomes that value and `"$<n>"`
+//! becomes `round(value * n)`: `"$127"` is the raw MIDI byte and `"$255"` is the DMX level.
 //!
-//! Quem drena a fila e' o `pump()`, chamado no lugar do frame onde o `input` ja' e' consumido
-//! (`player::Rt::drain`) — a ordem do frame nao muda. `midi_last` e `midi_learn` tambem drenam,
-//! para o LEARN da GUI funcionar sem show tocando.
+//! What drains the queue is `pump()`, called at the point of the frame where `input` is already
+//! consumed (`player::Rt::drain`) — the frame order does not change. `midi_last` and `midi_learn`
+//! also drain, so the GUI LEARN works with no show playing.
 
 use crate::registry::{lock, NoArgs, Registry, OPEN};
 use crate::show::Show;
@@ -24,24 +24,24 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-/// A porta aberta neste processo.
-// ponytail: uma porta por processo ; virar tabela como a `FEEDS` do laser quando alguem ligar
-// teclado e surface ao mesmo tempo (a chave nao distingue a porta).
+/// The port open in this process.
+// ponytail: one port per process ; make it a table like the laser `FEEDS` once someone plugs a
+// keyboard and a control surface at the same time (the key does not tell the ports apart).
 static IN: Mutex<Option<MidiIn>> = Mutex::new(None);
 
-/// Ultimo evento recebido: (chave, valor 0..1, byte cru). E' o que o LEARN da GUI le.
+/// Last event received: (key, value 0..1, raw byte). It is what the GUI LEARN reads.
 static LAST: Mutex<Option<(String, f64, u8)>> = Mutex::new(None);
 
-/// Conta eventos: `midi_learn` espera este numero mudar em vez de disputar a fila com o frame.
+/// Event counter: `midi_learn` waits for this number to change instead of fighting the frame for the queue.
 static SEQ: AtomicU64 = AtomicU64::new(0);
 
-/// Segundos que o `midi_learn` espera pela proxima tecla.
+/// How long `midi_learn` waits for the next key.
 const LEARN_MS: u64 = 5000;
 
-// ------------------------------------------------------------------- registry do mapa
+// ---------------------------------------------------------------- registry of the map
 
-/// Como montar o registry que o mapa chama. A CLI instala o dela (com `play_show`, `net` e os
-/// `laser_*`); sem instalacao, `registry::base()`.
+/// How to build the registry the map calls. The CLI installs its own (with `play_show`, `net` and
+/// the `laser_*`); with nothing installed, `registry::base()`.
 static BUILD: Mutex<Option<fn() -> Registry>> = Mutex::new(None);
 
 pub fn builder(f: fn() -> Registry) {
@@ -56,9 +56,9 @@ fn reg() -> &'static Registry {
     })
 }
 
-// ------------------------------------------------------------------------ mapa
+// ------------------------------------------------------------------------- map
 
-/// O mapa do show aberto, ou vazio.
+/// The map of the open show, or empty.
 fn mapa() -> Map<String, Value> {
     lock(&OPEN)
         .as_ref()
@@ -68,9 +68,9 @@ fn mapa() -> Map<String, Value> {
         .unwrap_or_default()
 }
 
-/// O que a chave dispara: (comando, args crus). Le e SOLTA o show antes de qualquer chamada —
-/// o comando do mapa pode ser um que edita o show. Publica para `tests/midi.rs` provar que o
-/// que `midi_map` grava e' o que o evento le.
+/// What the key fires: (command, raw args). It reads and RELEASES the show before any call —
+/// the mapped command may be one that edits the show. Public so `tests/midi.rs` can prove that
+/// what `midi_map` writes is what the event reads.
 pub fn liga(key: &str) -> Option<(String, Value)> {
     let e = lock(&OPEN)
         .as_ref()
@@ -82,11 +82,12 @@ pub fn liga(key: &str) -> Option<(String, Value)> {
     Some((cmd, args))
 }
 
-/// `"$"` vira o valor 0..1; `"$<n>"` vira `round(valor * n)` (`"$127"` = o byte cru do MIDI,
-/// `"$255"` = nivel DMX). Recursivo: vale dentro de lista e de objeto.
+/// `"$"` becomes the value 0..1; `"$<n>"` becomes `round(value * n)` (`"$127"` = the raw MIDI
+/// byte, `"$255"` = DMX level). Recursive: it holds inside a list and inside an object.
 ///
-/// `"$<n>"` sai INTEIRO, nao float: `address` e `index` de comando sao `u16`/`usize`, e o serde
-/// recusa `100.0` onde espera inteiro (float entra em `f64` sem reclamar, o contrario nao).
+/// `"$<n>"` comes out as an INTEGER, not a float: command `address` and `index` are `u16`/`usize`,
+/// and serde refuses `100.0` where it wants an integer (a float goes into `f64` without a
+/// complaint, the other way round it does not).
 pub fn expande(v: &Value, valor: f64) -> Value {
     match v {
         Value::String(s) => match s.strip_prefix('$') {
@@ -107,11 +108,11 @@ pub fn expande(v: &Value, valor: f64) -> Value {
     }
 }
 
-/// Chave valida: `<status 128..239>/<data1 0..127>`. O teto e' 239 (0xEF) porque so' mensagem de
-/// CANAL vira evento (`protocols::midi::canal` recusa 0xF0..0xFF, que e' system common e realtime):
-/// aceitar `240/0` seria aceitar uma chave que nunca dispara.
+/// Valid key: `<status 128..239>/<data1 0..127>`. The ceiling is 239 (0xEF) because only a
+/// CHANNEL message becomes an event (`protocols::midi::canal` refuses 0xF0..0xFF, which is system
+/// common and realtime): accepting `240/0` would accept a key that never fires.
 fn chave_ok(k: &str) -> Result<(), String> {
-    let erro = || format!("chave \"{}\": esperava <status>/<data1>, ex. 144/60", k);
+    let erro = || format!("key \"{}\": expected <status>/<data1>, e.g. 144/60", k);
     let (s, d) = k.split_once('/').ok_or_else(erro)?;
     let s: u16 = s.parse().map_err(|_| erro())?;
     let d: u16 = d.parse().map_err(|_| erro())?;
@@ -123,13 +124,14 @@ fn chave_ok(k: &str) -> Result<(), String> {
 
 // ------------------------------------------------------------------------ pump
 
-/// Drena a fila do driver. Cada evento vai para os ganchos do player vivo e, se estiver no mapa,
-/// para o registry.
-// ponytail: o comando do mapa roda na thread que chamou o pump (o frame, no caso normal) ; virar
-// thread se alguem mapear comando lento (`net` varre a rede, `play_show` toca o show inteiro).
+/// Drains the driver queue. Each event goes to the hooks of the live player and, if it is in the
+/// map, to the registry.
+// ponytail: the mapped command runs on the thread that called the pump (the frame, in the normal
+// case) ; make it a thread if someone maps a slow command (`net` scans the network, `play_show`
+// plays the whole show).
 pub fn pump() {
     loop {
-        // pega UM evento e solta a porta: `midi_close` tambem quer este lock.
+        // take ONE event and release the port: `midi_close` wants this lock too.
         let e = {
             let g = lock(&IN);
             match g.as_ref() {
@@ -144,9 +146,9 @@ pub fn pump() {
     }
 }
 
-/// Um evento: vira `input {key: "midi:<chave>"}` nos ganchos do player vivo e, se a chave estiver
-/// no mapa, chamada do comando pelo registry. Publica porque e' o caminho inteiro do MIDI e o
-/// teste precisa dele sem hardware (no Windows nao ha porta virtual para injetar nota).
+/// One event: it becomes `input {key: "midi:<key>"}` on the hooks of the live player and, if the
+/// key is in the map, a command call through the registry. Public because it is the whole MIDI
+/// path and the test needs it with no hardware (on Windows there is no virtual port to inject a note).
 pub fn entrega(status: u8, d1: u8, d2: u8) {
     let key = format!("{}/{}", status, d1);
     let valor = d2 as f64 / 127.0;
@@ -162,7 +164,7 @@ pub fn entrega(status: u8, d1: u8, d2: u8) {
     }
 }
 
-/// Abre a porta (nome, trecho do nome ou indice em texto) e devolve o nome de verdade.
+/// Opens the port (name, part of the name or index as text) and returns the real name.
 fn abrir(port: &str) -> Result<String, String> {
     let m = MidiIn::open(port)?;
     let n = m.name().to_string();
@@ -170,8 +172,9 @@ fn abrir(port: &str) -> Result<String, String> {
     Ok(n)
 }
 
-/// `"midi_port": "<nome>"` no `.spell`: religa a superficie quando o show sobe. Falha vira aviso
-/// — show nao para porque o controlador ficou no estojo.
+/// `"midi_port": "<name>"` in the `.spell`: it reconnects the control surface when the show
+/// starts. A failure becomes a warning — a show does not stop because the controller stayed in
+/// its case.
 pub fn auto(sh: &Show) {
     let Some(p) = sh
         .extra
@@ -182,11 +185,11 @@ pub fn auto(sh: &Show) {
         return;
     };
     if lock(&IN).as_ref().is_some_and(|m| m.name() == p) {
-        return; // ja' aberta nesta porta
+        return; // already open on this port
     }
     match abrir(p) {
         Ok(n) => eprintln!("midi: {}", n),
-        Err(e) => eprintln!("aviso: midi_port \"{}\": {}", p, e),
+        Err(e) => eprintln!("warning: midi_port \"{}\": {}", p, e),
     }
 }
 
@@ -206,41 +209,41 @@ fn ultima() -> Value {
     }
 }
 
-// ---------------------------------------------------------------------- comandos
+// ---------------------------------------------------------------------- commands
 
 #[derive(Deserialize, JsonSchema)]
 pub struct PortArgs {
-    /// Nome da porta (ou um trecho dele), indice em texto ("0"), ou vazio = a primeira.
+    /// Port name (or part of it), index as text ("0"), or empty = the first one.
     #[serde(default)]
     pub port: String,
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct MapArgs {
-    /// Chave do evento: "<status>/<data1>" (144/60 = note on nota 60, 176/1 = CC 1).
+    /// Event key: "<status>/<data1>" (144/60 = note on note 60, 176/1 = CC 1).
     pub key: String,
-    /// Nome do comando do registry.
+    /// Name of the registry command.
     pub cmd: String,
-    /// Argumentos do comando. "$" vira o valor 0..1 e "$<n>" vira round(valor * n).
+    /// Arguments of the command. "$" becomes the value 0..1 and "$<n>" becomes round(value * n).
     #[serde(default)]
     pub args: Value,
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct KeyArgs {
-    /// Chave do evento a remover.
+    /// Event key to remove.
     pub key: String,
 }
 
 pub fn register(r: &mut Registry) {
     r.add::<NoArgs>(
         "midi_ports",
-        "Lista as portas MIDI de entrada da maquina e qual esta' aberta.",
+        "Lists the MIDI input ports of the machine and which one is open.",
         |_| Ok(json!({"ports": protocols::midi::ports(), "open": aberta()})),
     );
     r.add::<PortArgs>(
         "midi_open",
-        "Abre uma porta MIDI de entrada (nome, trecho do nome ou indice) e grava midi_port no show aberto.",
+        "Opens a MIDI input port (name, part of the name or index) and writes midi_port into the open show.",
         |a| {
             let n = abrir(&a.port)?;
             crate::edit::com(|_, sh| {
@@ -251,7 +254,7 @@ pub fn register(r: &mut Registry) {
     );
     r.add::<NoArgs>(
         "midi_close",
-        "Fecha a porta MIDI e tira o midi_port do show aberto.",
+        "Closes the MIDI port and removes midi_port from the open show.",
         |_| {
             *lock(&IN) = None;
             crate::edit::com(|_, sh| {
@@ -262,20 +265,20 @@ pub fn register(r: &mut Registry) {
     );
     r.add::<MapArgs>(
         "midi_map",
-        "Liga uma tecla/CC a um comando no show aberto. Devolve o mapa.",
+        "Binds a key/CC to a command in the open show. Returns the map.",
         |a| {
             chave_ok(&a.key)?;
             if reg().get(&a.cmd).is_none() {
-                return Err(format!("comando desconhecido: {}", a.cmd));
+                return Err(format!("unknown command: {}", a.cmd));
             }
             let args = match a.args {
                 Value::Null => json!({}),
-                // texto que e' JSON vira JSON (campo de formulario, CLI), como o `valor` do edit
+                // text that is JSON becomes JSON (form field, CLI), like `valor` in edit
                 Value::String(s) => serde_json::from_str(&s).map_err(|e| format!("args: {}", e))?,
                 v => v,
             };
             if !args.is_object() {
-                return Err("args: esperava um objeto JSON".into());
+                return Err("args: expected a JSON object".into());
             }
             crate::edit::com(|_, sh| {
                 let m = sh
@@ -283,32 +286,32 @@ pub fn register(r: &mut Registry) {
                     .entry("midi")
                     .or_insert_with(|| json!({}))
                     .as_object_mut()
-                    .ok_or("midi: a chave \"midi\" do show nao e' um objeto")?;
+                    .ok_or("midi: the show key \"midi\" is not an object")?;
                 m.insert(a.key.clone(), json!({"cmd": a.cmd, "args": args}));
                 Ok(Value::Object(m.clone()))
             })
         },
     );
-    r.add::<KeyArgs>("midi_unmap", "Desliga uma tecla do show aberto.", |a| {
+    r.add::<KeyArgs>("midi_unmap", "Unbinds a key from the open show.", |a| {
         crate::edit::com(|_, sh| {
             let m = sh
                 .extra
                 .get_mut("midi")
                 .and_then(Value::as_object_mut)
-                .ok_or("midi: o show nao tem mapa")?;
+                .ok_or("midi: the show has no map")?;
             m.remove(&a.key)
-                .ok_or_else(|| format!("chave {} nao esta' no mapa", a.key))?;
+                .ok_or_else(|| format!("key {} is not in the map", a.key))?;
             Ok(Value::Object(m.clone()))
         })
     });
     r.add::<NoArgs>(
         "midi_maps",
-        "O mapa tecla -> comando do show aberto.",
+        "The key -> command map of the open show.",
         |_| Ok(Value::Object(mapa())),
     );
     r.add::<NoArgs>(
         "midi_last",
-        "Ultima tecla MIDI recebida: {key, value, raw, seq}. E' com ela que a GUI mostra ao vivo.",
+        "Last MIDI key received: {key, value, raw, seq}. It is what the GUI shows live.",
         |_| {
             pump();
             Ok(ultima())
@@ -316,18 +319,18 @@ pub fn register(r: &mut Registry) {
     );
     r.add::<NoArgs>(
         "midi_learn",
-        "Espera ate' 5 s pela proxima tecla MIDI e devolve a chave dela.",
+        "Waits up to 5 s for the next MIDI key and returns its key.",
         |_| {
             let base = SEQ.load(Ordering::Relaxed);
             let fim = Instant::now() + Duration::from_millis(LEARN_MS);
             while Instant::now() < fim {
-                pump(); // sem player tocando, ninguem mais drena a fila
+                pump(); // with no player running, nobody else drains the queue
                 if SEQ.load(Ordering::Relaxed) != base {
                     return Ok(ultima());
                 }
                 std::thread::sleep(Duration::from_millis(5));
             }
-            Err(format!("nenhum evento MIDI em {} s", LEARN_MS / 1000))
+            Err(format!("no MIDI event in {} s", LEARN_MS / 1000))
         },
     );
 }
@@ -337,30 +340,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn expande_cifrao() {
+    fn expands_dollar() {
         let v = json!({"universe": 1, "address": 3, "values": ["$255"], "u": "$", "n": "$127"});
         let e = expande(&v, 100.0 / 127.0);
-        assert_eq!(e["universe"], json!(1), "numero passa igual");
-        assert_eq!(e["values"], json!([201]), "$255 = nivel DMX");
-        assert_eq!(e["n"], json!(100), "$127 = o byte cru do MIDI");
-        assert!(e["n"].is_i64(), "$<n> sai inteiro, senao `u16` recusa");
+        assert_eq!(e["universe"], json!(1), "a number passes through unchanged");
+        assert_eq!(e["values"], json!([201]), "$255 = DMX level");
+        assert_eq!(e["n"], json!(100), "$127 = the raw MIDI byte");
+        assert!(
+            e["n"].is_i64(),
+            "$<n> comes out integer, or `u16` refuses it"
+        );
         assert!((e["u"].as_f64().unwrap() - 100.0 / 127.0).abs() < 1e-12);
-        // zero e cheio nas duas pontas
+        // zero and full at both ends
         assert_eq!(expande(&json!("$255"), 0.0), json!(0));
         assert_eq!(expande(&json!("$255"), 1.0), json!(255));
         assert_eq!(expande(&json!("$127"), 1.0), json!(127));
-        // texto que nao e' cifrao fica como esta'
+        // text that is not a dollar stays as it is
         assert_eq!(expande(&json!("$x"), 0.5), json!("$x"));
         assert_eq!(expande(&json!("go"), 0.5), json!("go"));
         assert_eq!(expande(&json!(true), 0.5), json!(true));
     }
 
     #[test]
-    fn chave_valida() {
+    fn valid_key() {
         for k in ["144/60", "128/0", "176/1", "239/127"] {
             assert!(chave_ok(k).is_ok(), "{}", k);
         }
-        // 240 (0xF0) para cima e' system common/realtime: `protocols::midi::canal` nao emite
+        // 240 (0xF0) and up is system common/realtime: `protocols::midi::canal` does not emit it
         for k in [
             "", "144", "60/144", "144/128", "x/1", "144/", "-1/1", "240/0", "255/127", "256/1",
         ] {
