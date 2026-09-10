@@ -71,7 +71,7 @@ def bake(src, dst, fps, fr):
     sh["tracks"] = tracks
     sh["outputs"] = [o for o in sh.get("outputs", ()) if o.get("type") in ("sacn", "artnet")]
     # kept in Portuguese on purpose: this string goes into the bytes of the generated fixture
-    sh["name"] = sh.get("name", "") + " (R0 assado)"
+    sh["name"] = sh.get("name", "") + " (R0 baked)"
     out = {k: v for k, v in sh.items() if not k.startswith("_")}
     with open(dst, "w", encoding="utf-8", newline="\n") as f:
         json.dump(out, f, separators=(",", ":"), ensure_ascii=False)

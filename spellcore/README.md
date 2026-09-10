@@ -609,20 +609,20 @@ struct, the same one that comes out in `GET /commands`, in the MCP tools and in
 The sections below are still the explanation; this table is the index.
 
 Reading rules: `arg:type` is required, `arg:type?` is optional with no default, `arg:type=v` has
-default `v`. "Fires in the GUI" names the page (`index.html` = TIMELINE, `teatro.html` = TEATRO,
+default `v`. "Fires in the GUI" names the page (`index.html` = TIMELINE, `teatro.html` = THEATER,
 `patchbay.html` = PATCHBAY, `laser.html` = LASER, `face.html` = FACE, `midi.html` = MIDI,
-`help.html` = AJUDA) and the key from `design/SHORTCUTS.md` when there is one; `—` is a command
+`help.html` = HELP) and the key from `design/SHORTCUTS.md` when there is one; `—` is a command
 that today only the AI (MCP), OSC and `help.html` call.
 
 | Command | Arguments | Does | Returns | Fires in the GUI |
 |---|---|---|---|---|
-| `load` | `file:string` | opens the `.spell` **and validates the timeline** | `{name, fps, duration, tracks, ignored}` | PATCHBAY: path field + `Abrir`; `serve --show` |
-| `show_get` | `file:string=""`, `full:boolean=false` | opens (or reuses) and summarizes; `full` returns the whole `.spell` | summary or the show | TIMELINE, PATCHBAY and TEATRO at boot; `GET /show` |
+| `load` | `file:string` | opens the `.spell` **and validates the timeline** | `{name, fps, duration, tracks, ignored}` | PATCHBAY: path field + `Open`; `serve --show` |
+| `show_get` | `file:string=""`, `full:boolean=false` | opens (or reuses) and summarizes; `full` returns the whole `.spell` | summary or the show | TIMELINE, PATCHBAY and THEATER at boot; `GET /show` |
 | `resume` | — | releases the paused player | transport state | TIMELINE: `Play`, `Space`, `L` |
 | `pause` | — | pauses the player | transport state | TIMELINE: `Pause`, `Space`, `K` |
 | `stop` | — | stops the player | transport state | TIMELINE: `Stop` |
 | `locate` | `t:number` | jumps to `t` seconds | transport state | TIMELINE: ruler, `←`/`→`, `Home`/`End` |
-| `cue_go` | `index:integer?` | fires the next cue, or the one at the given index | transport state | TEATRO: `GO` (`Enter`) |
+| `cue_go` | `index:integer?` | fires the next cue, or the one at the given index | transport state | THEATER: `GO` (`Enter`) |
 | `transport_state` | — | reads the transport without touching anything | `{t, state, cue, frames, fps, duration, universes}` | — (the GUI receives the `transport` event) |
 | `loop_set` | `on:boolean` | turns the player loop on/off over the In-Out range of the open show | transport state | TIMELINE: `Loop` (`Ctrl+L`) |
 | `input` | `key:string`, `value:number=0` | delivers an event to the hooks of the player (the Graph) | `{key, value}` | FACE: every widget |
@@ -631,33 +631,33 @@ that today only the AI (MCP), OSC and `help.html` call.
 | `rec_state` | — | tracks armed in this process | `{recording, tracks}` | TIMELINE: at boot and on every `show` event |
 | `show_new` | — | clears the open show (sACN on universe 1, 60 s) | the whole show | — |
 | `show_set` | `data:any` | **imports** a whole show (object or JSON text) | the whole show | — |
-| `show_save` | `file:string=""` | saves; with no `file`, at the path of the last one opened | the path | TIMELINE: `Salvar`, `Ctrl+S` |
+| `show_save` | `file:string=""` | saves; with no `file`, at the path of the last one opened | the path | TIMELINE: `Save`, `Ctrl+S` |
 | `track_add` | `type:string="dmx"`, `universe:integer=1`, `address:integer=1`, `name:string=""` | appends an empty track | the index | TIMELINE: `+Track` |
 | `track_del` | `index:integer` | removes the track | the removed track | TIMELINE: `-Track` |
 | `key_set` | `track:integer`, `t:number`, `value:any=null`, `curve:string="linear"` | creates or replaces the keyframe at `t` | the keys of the track | TIMELINE: `Ctrl+K`, drag, `Ctrl+V` |
 | `key_del` | `track:integer`, `t:number` | deletes the keyframe at `t` (1 ms tolerance) | how many were removed | TIMELINE: `Delete`, `Ctrl+X` |
-| `cue_set` | `index:integer?`, `name:string=""`, `fade:number=0`, `wait:number=0`, `follow:boolean=false`, `values:object={}` | creates (with no `index`) or replaces a cue | the index | TEATRO: scene list |
-| `cue_del` | `index:integer` | removes the cue | the removed cue | TEATRO: delete scene |
-| `patch_add` | `name:string`, `profile:string`, `universe:integer=1`, `address:integer=1` | patches and revalidates the whole patch | the patch grid | TEATRO: `Adicionar` |
-| `patch_del` | `name:string` | takes the fixture out of the patch | the removed entry | TEATRO: delete fixture |
-| `patch_check` | — | patch grid + the first error | `{rows, error}` | TEATRO: the grid |
-| `profiles` | — | names of the `.json` in `profiles/` | list of names | TEATRO: profile select |
-| `show_patch` | `ops:array`, `rev:integer?` | JSON Patch (RFC 6902) on the open show; all or nothing | `{rev, undo}` | TIMELINE, PATCHBAY and TEATRO: **every** edit |
+| `cue_set` | `index:integer?`, `name:string=""`, `fade:number=0`, `wait:number=0`, `follow:boolean=false`, `values:object={}` | creates (with no `index`) or replaces a cue | the index | THEATER: scene list |
+| `cue_del` | `index:integer` | removes the cue | the removed cue | THEATER: delete scene |
+| `patch_add` | `name:string`, `profile:string`, `universe:integer=1`, `address:integer=1` | patches and revalidates the whole patch | the patch grid | THEATER: `Patch it` |
+| `patch_del` | `name:string` | takes the fixture out of the patch | the removed entry | THEATER: delete fixture |
+| `patch_check` | — | patch grid + the first error | `{rows, error}` | THEATER: the grid |
+| `profiles` | — | names of the `.json` in `profiles/` | list of names | THEATER: profile select |
+| `show_patch` | `ops:array`, `rev:integer?` | JSON Patch (RFC 6902) on the open show; all or nothing | `{rev, undo}` | TIMELINE, PATCHBAY and THEATER: **every** edit |
 | `graph_get` | — | the `graph` of the show | `{nodes, edges}` | — (the PATCHBAY reads the graph through `show_get full`) |
 | `face_get` | — | the inline face, or `faces/<name>.face.json` | the face or `null` | — (the FACE today fetches the `.face.json` directly) |
-| `profile_get` | `name:string` | the whole profile (channels, `ranges`, `wheel`) | the JSON of the profile | TEATRO: fixture widgets |
-| `level_set` | `universe:integer=1`, `address:integer`, `values:array=[]` | writes into the programmer override (HTP) | how many channels | — (the TEATRO writes through `fixture_set`) |
-| `level_clear` | `universe:integer?` | releases the override of one universe, or of all | how many channels were freed | TEATRO: `Solta` |
+| `profile_get` | `name:string` | the whole profile (channels, `ranges`, `wheel`) | the JSON of the profile | THEATER: fixture widgets |
+| `level_set` | `universe:integer=1`, `address:integer`, `values:array=[]` | writes into the programmer override (HTP) | how many channels | — (the THEATER writes through `fixture_set`) |
+| `level_clear` | `universe:integer?` | releases the override of one universe, or of all | how many channels were freed | THEATER: `Release programmer` |
 | `level_get` | `universe:integer?` | the current override | `{"u/end": v}` | — |
-| `cue_capture` | `name:string=""`, `fade:number=0`, `wait:number=0`, `follow:boolean=false` | the override becomes a new cue and the override is released | the index | TEATRO: `Capturar` |
-| `fixture_set` | `name:string`, `channel:string`, `value:number` | resolves fixture + profile channel and calls `level_set` | `{universe, address, value}` | TEATRO: fixture sliders |
+| `cue_capture` | `name:string=""`, `fade:number=0`, `wait:number=0`, `follow:boolean=false` | the override becomes a new cue and the override is released | the index | THEATER: `Capture scene` |
+| `fixture_set` | `name:string`, `channel:string`, `value:number` | resolves fixture + profile channel and calls `level_set` | `{universe, address, value}` | THEATER: fixture sliders |
 | `module_add` | `file:string=""`, `data:any=null` | validates a `module.json` and puts it in the table of live modules | `{name, version}` | — |
 | `module_del` | `name:string` | takes the module out of the table | the removed manifest | — |
 | `module_list` | — | live modules | `[{name, type, version}]` | PATCHBAY: catalog of the `module` node |
 | `module_get` | `name:string` | the whole manifest | `{name, type, version, parameters, values, commands}` | PATCHBAY: the `module` node |
-| `midi_ports` | — | MIDI input ports of the machine and which one is open | `{ports, open}` | MIDI: `Portas` |
-| `midi_open` | `port:string=""` | opens by name, part of the name or index; writes `midi_port` into the open show | `{open}` | MIDI: `Abrir` |
-| `midi_close` | — | closes the port and removes `midi_port` from the open show | `{open:null}` | MIDI: `Fechar` |
+| `midi_ports` | — | MIDI input ports of the machine and which one is open | `{ports, open}` | MIDI: `Refresh` |
+| `midi_open` | `port:string=""` | opens by name, part of the name or index; writes `midi_port` into the open show | `{open}` | MIDI: `Open` |
+| `midi_close` | — | closes the port and removes `midi_port` from the open show | `{open:null}` | MIDI: `Close` |
 | `midi_map` | `key:string`, `cmd:string`, `args:any?` | binds a key/CC to a command in the open show | the map | MIDI: `LEARN` and the table row |
 | `midi_unmap` | `key:string` | unbinds the key in the open show | the map | MIDI: delete the row |
 | `midi_maps` | — | the `key -> command` map of the open show | the map | MIDI: the table |
@@ -666,14 +666,14 @@ that today only the AI (MCP), OSC and `help.html` call.
 | `play_show` | `file:string`, `loop:boolean=false`, `osc_port:integer?` | **brings up** a player and plays to the end or Ctrl+C | `{name, frames, jitter_p99_ms, jitter_max_ms, drift}` | TIMELINE: `Play` with no live player; CLI `spellcore play` |
 | `net` | `timeout:number=2`, `json:boolean=false` | scans the network (interfaces, Art-Net, sACN, Ether Dream) | text report, or the raw scan | CLI `spellcore net` |
 | `graph_check` | — | compiles the graph of the open show without running it | `{nodes, error}` | PATCHBAY: on every graph edit |
-| `laser_dacs` | `timeout:number=2` | looks for DACs (Ether Dream by UDP beacon and, with no beacon, by TCP status; IDN by scan) | `[{type, id, host, via}]` | LASER: `Procurar` |
-| `laser_open` | `dac:string`, `host:string=""`, `kpps:number=30`, `safety:any=null` | opens the DAC and brings the feed up (the safety never switches off) | `{feed, dac, pps}` | LASER: `Abrir` |
+| `laser_dacs` | `timeout:number=2` | looks for DACs (Ether Dream by UDP beacon and, with no beacon, by TCP status; IDN by scan) | `[{type, id, host, via}]` | LASER: `Scan` |
+| `laser_open` | `dac:string`, `host:string=""`, `kpps:number=30`, `safety:any=null` | opens the DAC and brings the feed up (the safety never switches off) | `{feed, dac, pps}` | LASER: `Open` |
 | `laser_play` | `feed:integer`, `file:string`, `fps:number=30`, `loop:boolean=false` | pushes the frames of the `.ild` to the DAC | `{feed, file, frames, fps, loop}` | LASER: `Play` |
 | `laser_stop` | `feed:integer` | stops the playback; the DAC stays open | `{feed, playing:false}` | LASER: `Stop` |
-| `laser_close` | `feed:integer` | stops and closes (shuts the DAC down) | `{feed, dac, closed}` | LASER: `Fechar` |
+| `laser_close` | `feed:integer` | stops and closes (shuts the DAC down) | `{feed, dac, closed}` | LASER: `Close` |
 | `laser_param` | `feed:integer`, `path:string`, `value:number` | one parameter of the feed (geo, limit, safe, shutter) | `{feed, path, value, shutter}` | LASER: sliders and `Shutter` |
 | `laser_stats` | `feed:integer` | state of the feed | `{playing, file, stat/*, jitter, cpu, safety}` | LASER: stats panel (4 Hz) |
-| `laser_files` | `dir:string=""` | lists the `.ild` of the directory (empty = `shows/`) | `{dir, files:[{name, path, bytes}]}` | LASER: `Listar` |
+| `laser_files` | `dir:string=""` | lists the `.ild` of the directory (empty = `shows/`) | `{dir, files:[{name, path, bytes}]}` | LASER: `List` |
 | `clip_frame` | `clip:string`, `index:integer?`, `t:number=0`, `fps:number=30` | one frame of the `.ild` to draw, by `index` or by `t` at `fps` | points `[x, y, r, g, b, blank]`, `x`/`y` in -1..1 | TIMELINE: playhead previz (`Alt+M`) |
 
 ### What the audit fixed, and what stood
@@ -735,7 +735,7 @@ one (the `SHOW = NEW` of Python), so the AI can call `track_add` before any file
 
 | Command | Does | Returns |
 |---|---|---|
-| `show_new` | clears: "novo show", sACN on universe 1, 60 s, empty `patch`/`cues`/`markers` | the whole show |
+| `show_new` | clears: "new show", sACN on universe 1, 60 s, empty `patch`/`cues`/`markers` | the whole show |
 | `show_set(data)` | replaces it with the given JSON (object or JSON text); `migrate`; `_x` keys are dropped | the whole show |
 | `show_save(file="")` | saves (with no `file`, at the path of the last `load`/`show_get`/`show_save`) | the path |
 | `track_add(type="dmx", universe=1, address=1, label="", clip="", script="")` | empty track at the end; `clip` is the `.ild` of the `laser` track, `script` the `.rhai` of the `fx` track | index |
@@ -852,7 +852,7 @@ sliders, shutter button, stats by polling at 4 Hz). Test: `spellcore/cli/tests/l
 binary, brings the Ether Dream `Emulator` of the `laser` crate up and talks to the registry through
 the MCP server in another process (the `FEEDS` table is one per process).
 
-### Programmer — the manual operator layer (TEATRO DE PAPEL theme)
+### Programmer — the manual operator layer (PAPER THEATER theme)
 
 `Prog`, in `player.rs`: one `Option<u8>` per channel (value and "touched" mask in the same
 structure), applied **after `CueList::update` and before the I/O**, HTP per channel: the operator

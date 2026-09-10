@@ -6,7 +6,8 @@ attaches the Windows onedir, the Lite tarball and the `spellcore` binaries to th
 ## v0.1.0 — 2026-09-10
 
 First numbered release. It brings together the Rust core (R0, R1, R3, R4, R7, R8), the `serve` bus,
-the `spellgui/web` pages and the program's main page: the 3D laser projector.
+the `spellgui/web` pages and the program's main page: the 3D laser projector. The whole project is in
+English: UI, Pino lines, registry and MCP descriptions, docs, comments and commit messages.
 
 ### The program is the projector (`spellgui/web/laser3d/`)
 

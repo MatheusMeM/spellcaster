@@ -81,7 +81,7 @@ With the package installed (`pip install -e .`), `spell` replaces `C:\Python313\
 C:\Python313\python.exe -m unittest discover -s tests -v
 ```
 
-102 Python tests, 168 Rust (`cargo test --workspace`) and 118 from the web pages
+102 Python tests, 168 Rust (`cargo test --workspace`) and 119 from the web pages
 (`node --test spellgui/web/test/*.test.js`). Do not run Python and Rust at the same time: both
 use sACN on loopback port 5568 and one steals the other's packets. UDP loopback on 127.0.0.1 plays the part of the mock. The tests do not print characters outside ASCII.
 

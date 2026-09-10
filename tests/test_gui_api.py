@@ -19,7 +19,7 @@ class TestGuiApi(unittest.TestCase):
 
     def test_show_open_brings_medgrupo(self):
         sh = registry.call("show_open", file=SPELL)
-        self.assertEqual(sh["name"], "MED GRUPO RJ - plenaria 09/2026")
+        self.assertEqual(sh["name"], "MED GRUPO RJ - plenary 09/2026")
         self.assertEqual(sh["fps"], 30)
         self.assertEqual(len(sh["tracks"]), 3)
         self.assertNotIn("_dir", sh)                      # internal keys do not leak into the GUI
