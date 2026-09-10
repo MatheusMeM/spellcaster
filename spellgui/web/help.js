@@ -1,44 +1,53 @@
 "use strict";
-// help.js — a pagina de ajuda (help.html): ATALHOS, lidos de `design/SHORTCUTS.md`, e COMANDOS,
-// lidos do registry vivo por `bus.commands()`. Nenhuma lista de atalho e nenhuma lista de
-// comando mora aqui: os dois textos tem uma fonte so', e esta pagina os desenha.
+// help.js — the help page (help.html): SHORTCUTS, read from `design/SHORTCUTS.md`, and COMMANDS,
+// read from the live registry through `bus.commands()`. No shortcut list and no command list lives
+// here: the two texts have a single source, and this page draws them.
 //
-// Duas regras testaveis (test/help.test.js): o parser da tabela markdown e a assinatura curta
-// de um comando. O resto e' DOM.
+// Two testable rules (test/help.test.js): the markdown table parser and the short signature of a
+// command. The rest is DOM.
 
 const HELP = {};
 
-HELP.MD = "../../design/SHORTCUTS.md";   // relativo: vale no `serve --dir .` e em file://
-HELP.TABELA = "Mapa padrão";        // o titulo da tabela de atalhos em SHORTCUTS.md
+HELP.MD = "../../design/SHORTCUTS.md";   // relative: works under `serve --dir .` and under file://
+// Heading of the shortcut table in SHORTCUTS.md. A list because the file exists in two languages:
+// whichever heading is there, the parser finds the table.
+HELP.TABLE = ["Default map", "Mapa padrão"];
 
-/// Linhas `| a | b | c |` da PRIMEIRA tabela depois do titulo dado (sem titulo, a primeira do
-/// texto). Devolve [[celula, ...], ...] com o cabecalho na posicao 0, sem a linha `|---|` e sem
-/// exigir numero fixo de colunas.
-// ponytail: parser de tabela, nao de markdown (nem enfase, nem link, nem celula com `|` dentro)
-// ; se a ajuda precisar de mais que a tabela, gerar HTML no build — nao trazer biblioteca.
-HELP.tabela = function (md, titulo) {
+// Status word of SHORTCUTS.md -> CSS class of help.html. In both languages, for the same reason
+// as HELP.TABLE; the classes themselves do not change.
+HELP.ST = { "feito": "st-feito", "done": "st-feito", "falta": "st-falta", "missing": "st-falta",
+            "n.a.": "st-na", "n/a": "st-na" };
+
+/// `| a | b | c |` lines of the FIRST table after the given heading (with no heading, the first of
+/// the text). `title` takes one heading or a list of accepted headings. Returns
+/// [[cell, ...], ...] with the header row at position 0, without the `|---|` line and without
+/// requiring a fixed number of columns.
+// ponytail: a table parser, not a markdown one (no emphasis, no link, no cell with a `|` inside)
+// ; if the help needs more than the table, generate HTML at build time — do not bring in a library.
+HELP.table = function (md, title) {
   const ls = String(md == null ? "" : md).split(/\r?\n/);
   let i = 0;
-  if (titulo) {
-    i = ls.findIndex(l => /^#{1,6}\s+/.test(l) && l.replace(/^#+\s+/, "").trim() === titulo);
+  if (title) {
+    const titles = Array.isArray(title) ? title : [title];
+    i = ls.findIndex(l => /^#{1,6}\s+/.test(l) && titles.indexOf(l.replace(/^#+\s+/, "").trim()) >= 0);
     if (i < 0) return [];
   }
   const rows = [];
   for (; i < ls.length; i++) {
     const l = ls[i].trim();
     if (l[0] !== "|") {
-      if (rows.length) break;   // a tabela acabou; o resto do arquivo nao interessa
+      if (rows.length) break;   // the table ended; the rest of the file does not matter
       continue;
     }
     const cs = l.replace(/^\|/, "").replace(/\|$/, "").split("|").map(s => s.trim());
-    if (cs.length && cs.every(c => /^:?-{2,}:?$/.test(c))) continue;   // separador
+    if (cs.length && cs.every(c => /^:?-{2,}:?$/.test(c))) continue;   // separator
     rows.push(cs);
   }
   return rows;
 };
 
-/// Assinatura curta de um comando de `GET /commands`: os argumentos na ordem do schema, com `?`
-/// no que nao e' obrigatorio. Comando sem argumento devolve lista vazia (e' um botao).
+/// Short signature of a command from `GET /commands`: the arguments in schema order, with `?` on
+/// what is not required. A command with no argument returns an empty list (it is a button).
 HELP.args = function (c) {
   const p = (c && c.params && c.params.properties) || {};
   const req = (c && c.params && c.params.required) || [];
@@ -54,26 +63,27 @@ function el(tag, cls, txt) {
   return e;
 }
 
-/// A tabela de atalhos dentro de `alvo`. Primeira linha vira <th>.
-HELP.desenhaAtalhos = function (alvo, rows) {
-  alvo.textContent = "";
-  if (!rows.length) return void alvo.appendChild(el("p", "vazio", "sem " + HELP.MD));
+/// The shortcut table inside `target`. The first row becomes <th>.
+HELP.drawShortcuts = function (target, rows) {
+  target.textContent = "";
+  if (!rows.length) return void target.appendChild(el("p", "vazio", "no " + HELP.MD));
   const t = el("table", "grade");
   rows.forEach((r, i) => {
     const tr = el("tr");
     for (const c of r) {
       const td = el(i ? "td" : "th", null, c.replace(/`/g, ""));
-      if (i && /^(feito|falta|n\.a\.)$/.test(c)) td.className = "st-" + c.replace(/\./g, "");
+      const st = HELP.ST[c.toLowerCase()];
+      if (i && st) td.className = st;
       tr.appendChild(td);
     }
     t.appendChild(tr);
   });
-  alvo.appendChild(t);
+  target.appendChild(t);
 };
 
-/// Um <details> por comando: resumo (nome, args, doc) e, aberto, o formulario que executa.
-HELP.desenhaComandos = function (alvo, cmds, bus) {
-  alvo.textContent = "";
+/// One <details> per command: summary (name, args, doc) and, when open, the form that runs it.
+HELP.drawCommands = function (target, cmds, bus) {
+  target.textContent = "";
   for (const c of cmds) {
     const d = el("details", "cmd");
     d.dataset.busca = (c.name + " " + (c.doc || "")).toLowerCase();
@@ -83,22 +93,22 @@ HELP.desenhaComandos = function (alvo, cmds, bus) {
     s.appendChild(el("span", "args", a.length ? "{" + a.join(", ") + "}" : "{}"));
     s.appendChild(el("span", "doc", c.doc || ""));
     d.appendChild(s);
-    // o formulario so' nasce quando o comando e' aberto: 46 formularios de uma vez e' desenho
-    // que ninguem pediu
+    // the form is only born when the command is opened: 46 forms at once is drawing nobody asked
+    // for
     d.ontoggle = () => {
       if (d.open && !d.dataset.pronto) {
         d.dataset.pronto = "1";
         d.appendChild(WG.form(c, bus));
       }
     };
-    alvo.appendChild(d);
+    target.appendChild(d);
   }
 };
 
-/// `?` abre a ajuda de qualquer pagina que carregue este arquivo. Nao age em campo de texto e
-/// nao recarrega a propria help.html.
-// ponytail: quem carrega help.js hoje e' so' a help.html ; a frente gui-janela poe o `nav.js`
-// em todas as paginas — e' de la' que este bind passa a valer em todas.
+/// `?` opens the help from any page that loads this file. It does not act inside a text field and
+/// does not reload help.html itself.
+// ponytail: what loads help.js today is only help.html ; the gui-window frente puts `nav.js` on
+// every page — from there this bind starts to hold everywhere.
 HELP.bindKey = function () {
   addEventListener("keydown", e => {
     if (e.key !== "?" || e.ctrlKey || e.altKey) return;
@@ -116,14 +126,14 @@ HELP.mount = function (doc) {
 
   fetch(HELP.MD)
     .then(r => r.text())
-    .then(md => HELP.desenhaAtalhos(q("atalhos"), HELP.tabela(md, HELP.TABELA)))
+    .then(md => HELP.drawShortcuts(q("atalhos"), HELP.table(md, HELP.TABLE)))
     .catch(e => (q("atalhos").textContent = HELP.MD + ": " + e.message));
 
   bus
     .commands()
     .then(cs => {
-      HELP.desenhaComandos(q("comandos"), cs, bus);
-      q("n").textContent = cs.length + " comandos";
+      HELP.drawCommands(q("comandos"), cs, bus);
+      q("n").textContent = cs.length + " commands";
     })
     .catch(e => (q("comandos").textContent = "GET /commands: " + e.message));
 

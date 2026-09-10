@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <title>Spellcaster — laser</title>
@@ -47,16 +47,16 @@
 <script src="nav.js"></script>
 <div class="bar">
   <span class="over">laser</span>
-  <select id="dacs"><option value="">(procure DACs)</option></select>
-  <button id="scan">Procurar</button>
-  <input type="text" id="host" size="20" placeholder="ip:porta">
+  <select id="dacs"><option value="">(scan for DACs)</option></select>
+  <button id="scan">Scan</button>
+  <input type="text" id="host" size="20" placeholder="ip:port">
   <label class="over">kpps</label><input type="number" id="kpps" value="30" min="1" max="200" style="width:64px">
-  <button id="open">Abrir</button>
-  <button id="close" disabled>Fechar</button>
+  <button id="open">Open</button>
+  <button id="close" disabled>Close</button>
   <span class="sep"></span>
-  <select id="files"><option value="">(arquivos .ild)</option></select>
+  <select id="files"><option value="">(.ild files)</option></select>
   <input type="text" id="dir" size="12" value="shows">
-  <button id="ls">Listar</button>
+  <button id="ls">List</button>
   <button id="play" disabled>Play</button>
   <button id="stop" disabled>Stop</button>
   <button id="shutter" disabled>Shutter</button>
@@ -65,12 +65,12 @@
 </div>
 <main>
   <section class="panel">
-    <h2>geometria</h2>
+    <h2>geometry</h2>
     <div class="row"><label>geo/scale</label><input type="range" id="p_geo_scale" min="0" max="2" step="0.01" value="1"><span class="v">1.00</span></div>
     <div class="row"><label>geo/rot</label><input type="range" id="p_geo_rot" min="-180" max="180" step="1" value="0"><span class="v">0</span></div>
     <div class="row"><label>geo/x</label><input type="range" id="p_geo_x" min="-16000" max="16000" step="100" value="0"><span class="v">0</span></div>
     <div class="row"><label>geo/y</label><input type="range" id="p_geo_y" min="-16000" max="16000" step="100" value="0"><span class="v">0</span></div>
-    <h2>limites de cor</h2>
+    <h2>color limits</h2>
     <div class="row"><label>limit/r</label><input type="range" id="p_limit_r" min="0" max="1" step="0.01" value="1"><span class="v">1.00</span></div>
     <div class="row"><label>limit/g</label><input type="range" id="p_limit_g" min="0" max="1" step="0.01" value="1"><span class="v">1.00</span></div>
     <div class="row"><label>limit/b</label><input type="range" id="p_limit_b" min="0" max="1" step="0.01" value="1"><span class="v">1.00</span></div>
@@ -80,10 +80,10 @@
   </section>
   <section class="stats">
     <h2 class="over">stats</h2>
-    <table id="st"><tbody><tr><td>feed</td><td>sem feed aberto</td></tr></tbody></table>
+    <table id="st"><tbody><tr><td>feed</td><td>no feed open</td></tr></tbody></table>
   </section>
 </main>
-<div class="cli" id="cli">comandos do registry (MCP, OSC, GUI): laser_dacs{timeout} &nbsp;|&nbsp; laser_open{dac,host,kpps} &nbsp;|&nbsp; laser_play{feed,file,fps,loop} &nbsp;|&nbsp; laser_param{feed,path,value} &nbsp;|&nbsp; laser_stop{feed} &nbsp;|&nbsp; laser_close{feed}</div>
+<div class="cli" id="cli">registry commands (MCP, OSC, GUI): laser_dacs{timeout} &nbsp;|&nbsp; laser_open{dac,host,kpps} &nbsp;|&nbsp; laser_play{feed,file,fps,loop} &nbsp;|&nbsp; laser_param{feed,path,value} &nbsp;|&nbsp; laser_stop{feed} &nbsp;|&nbsp; laser_close{feed}</div>
 <script src="bus.js"></script>
 <script src="laser.js"></script>
 </body>

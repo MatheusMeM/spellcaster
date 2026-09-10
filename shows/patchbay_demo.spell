@@ -1,5 +1,5 @@
 {
- "name": "PATCHBAY - demo do editor de graph",
+ "name": "PATCHBAY - graph editor demo",
  "fps": 30,
  "duration": 60,
  "version": 1,
@@ -13,22 +13,22 @@
  ],
  "tracks": [],
  "cues": [
-  { "name": "abertura", "fade": 2, "values": { "1/1": 255 } }
+  { "name": "opening", "fade": 2, "values": { "1/1": 255 } }
  ],
  "graph": {
   "nodes": [
    { "id": "space", "type": "in.key", "key": "Space", "x": 40, "y": 60 },
-   { "id": "ensaio", "type": "state", "initial": true, "x": 40, "y": 180 },
-   { "id": "toggle", "type": "logic.toggle", "state": "ensaio", "x": 280, "y": 60 },
-   { "id": "go", "type": "cmd", "cmd": "cue_go", "args": {}, "state": "ensaio", "x": 520, "y": 60 },
+   { "id": "rehearsal", "type": "state", "initial": true, "x": 40, "y": 180 },
+   { "id": "toggle", "type": "logic.toggle", "state": "rehearsal", "x": 280, "y": 60 },
+   { "id": "go", "type": "cmd", "cmd": "cue_go", "args": {}, "state": "rehearsal", "x": 520, "y": 60 },
    { "id": "black", "type": "in.osc", "address": "/spell/blackout", "x": 40, "y": 280,
-     "group": "seguranca" },
-   { "id": "hold", "type": "time.hold", "ms": 500, "x": 280, "y": 280, "group": "seguranca" },
+     "group": "safety" },
+   { "id": "hold", "type": "time.hold", "ms": 500, "x": 280, "y": 280, "group": "safety" },
    { "id": "param", "type": "out.param", "target": "laser/limit/r", "x": 520, "y": 280,
-     "group": "seguranca" }
+     "group": "safety" }
   ],
   "edges": [
-   ["space.down", "ensaio.enter"],
+   ["space.down", "rehearsal.enter"],
    ["space.down", "toggle.in"],
    ["toggle.out", "go.trigger"],
    ["space.down", "hold.in"],

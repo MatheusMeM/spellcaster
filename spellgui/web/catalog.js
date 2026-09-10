@@ -1,23 +1,23 @@
 "use strict";
-// catalog.js — o catalogo FECHADO do graph (spellcore/script/src/graph.rs, PRD §10) como DADO,
-// mais os nos state e module (frente graph-runtime) e as chaves universais (mute, lock, group, x, y).
-// Quem desenha o PATCHBAY le daqui: nao ha lista de nos escrita a mao em graph.js.
+// catalog.js — the CLOSED graph catalogue (spellcore/script/src/graph.rs, PRD §10) as DATA, plus
+// the state and module nodes (graph-runtime frente) and the universal keys (mute, lock, group, x, y).
+// Whoever draws the PATCHBAY reads from here: there is no hand-written node list in graph.js.
 //
-// Tipo de porta e REGRA DO EDITOR: o runtime carrega tudo como f64. Cabo so liga tipos
-// compativeis; conversao e no visivel (math.map, logic.toggle), nunca coercao escondida
-// (design/FUNCOES/orquestrador.md §1, "Cabo").
+// Port type is an EDITOR RULE: the runtime carries everything as f64. A cable only links compatible
+// types; conversion is a visible node (math.map, logic.toggle), never a hidden coercion
+// (design/FUNCOES/orquestrador.md §1, "Cable").
 //
-// ponytail: `trigger` e `bool` sao o MESMO fio (o runtime le "ligado = >= 0.5" e a borda de subida
-// com subiu()), entao os dois se ligam ; separar de vez quando o runtime tiver tipo de sinal.
+// ponytail: `trigger` and `bool` are the SAME wire (the runtime reads "on = >= 0.5" and the rising
+// edge with subiu()), so the two link ; separate them for good once the runtime has a signal type.
 
-// Forma do pino no desenho. Familia de no NAO tem cor (orquestrador.md §2); tipo de porta tem FORMA.
+// Pin shape in the drawing. A node family has NO color (orquestrador.md §2); a port type has SHAPE.
 const PORT_SHAPE = {
   trigger: "tri", bool: "sq", number: "circ", color: "dia", xy: "dia", frame: "dia", dmx: "dia",
 };
 
-const PULSO = { trigger: 1, bool: 1 };
+const PULSE = { trigger: 1, bool: 1 };
 
-// cfg: campo -> tipo do widget do Inspector ("string", "number", "bool", "enum:a|b", "json").
+// cfg: field -> Inspector widget type ("string", "number", "bool", "enum:a|b", "json").
 const CAT = {
   "in.widget": { fam: "in", cfg: { widget: "string" }, ins: {}, outs: { press: "trigger" } },
   "in.key": { fam: "in", cfg: { key: "string" }, ins: {}, outs: { down: "trigger" } },
@@ -81,7 +81,7 @@ const CAT = {
   "module": { fam: "module", cfg: { module: "string" }, ins: {}, outs: {} },
 };
 
-// Chaves aceitas em QUALQUER no. O runtime ignora as desconhecidas (confirmado em graph.rs).
+// Keys accepted on ANY node. The runtime ignores the unknown ones (confirmed in graph.rs).
 const UNIVERSAL = { mute: "bool", lock: "bool", state: "string", group: "string", label: "string" };
 
 const PARAM_PORT = {
@@ -89,8 +89,8 @@ const PARAM_PORT = {
   color: "color", string: "string", enum: "number", xy: "xy",
 };
 
-// module.json (frente module) -> definicao de no: um pino de entrada por parameter e por command,
-// um pino de saida por value.
+// module.json (module frente) -> node definition: one input pin per parameter and per command, one
+// output pin per value.
 function moduleDef(m) {
   const ins = {}, outs = {};
   for (const [p, d] of Object.entries(m.parameters || {})) ins[p] = PARAM_PORT[d && d.type] || "number";
@@ -99,41 +99,42 @@ function moduleDef(m) {
   return { fam: "module", cfg: { module: "string" }, ins, outs, module: m.name };
 }
 
-// Definicao de um no do show: tipo do catalogo, ou modulo vivo pelo campo `module`.
+// Definition of a show node: catalogue type, or a live module through the `module` field.
 function nodeDef(node, modules) {
   const t = node && node.type;
   if (t === "module" && modules && modules[node.module]) return modules[node.module];
   return CAT[t] || null;
 }
 
-function port(def, pin, saida) {
+function port(def, pin, output) {
   if (!def) return null;
-  const m = saida ? def.outs : def.ins;
+  const m = output ? def.outs : def.ins;
   return Object.prototype.hasOwnProperty.call(m, pin) ? m[pin] : null;
 }
 
-// Cabo so liga tipos compativeis. Devolve "" quando pode, senao o motivo em uma frase.
+// A cable only links compatible types. Returns "" when it can, otherwise the reason in one sentence.
 function compat(a, b) {
-  if (!a) return "pino de saida nao existe";
-  if (!b) return "pino de entrada nao existe";
+  if (!a) return "output pin does not exist";
+  if (!b) return "input pin does not exist";
   if (a === b) return "";
-  if (PULSO[a] && PULSO[b]) return "";
-  return `tipo ${a} nao liga em ${b}: use um no de conversao (math.map, logic.toggle)`;
+  if (PULSE[a] && PULSE[b]) return "";
+  return `type ${a} does not link into ${b}: use a conversion node (math.map, logic.toggle)`;
 }
 
-// Nome comparavel: sem caixa e sem separador. O nome do tipo tem ponto ("in.timer") e o operador
-// digita rapido: um ponto que nao entrou, um espaco no lugar dele ou o Caps ligado deixava a lista
-// VAZIA — e lista vazia nao cria no nem no Enter nem no clique, porque nao ha' item para clicar.
-function chave(s) { return String(s).toLowerCase().replace(/[^a-z0-9]/g, ""); }
+// Comparable name: no case and no separator. The type name has a dot ("in.timer") and the operator
+// types fast: a dot that did not land, a space in its place or Caps on left the list EMPTY — and an
+// empty list creates no node either on Enter or on click, because there is no item to click.
+function key(s) { return String(s).toLowerCase().replace(/[^a-z0-9]/g, ""); }
 
-// Lista para o menu Shift+A: busca a partir do primeiro caractere (regra 10 de FUNCOES/README).
-// ponytail: substring da chave, sem fuzzy nem ranking ; entra quando o catalogo passar de uma tela.
-function busca(q, modules) {
-  const nomes = Object.keys(CAT).concat(Object.keys(modules || {}).map(n => `module:${n}`));
-  const s = chave(q);
-  return nomes.filter(n => chave(n).includes(s)).sort();
+// List for the Shift+A menu: search from the first character (rule 10 of FUNCOES/README).
+// ponytail: substring of the key, no fuzzy and no ranking ; it comes in when the catalogue grows
+// past one screen.
+function search(q, modules) {
+  const names = Object.keys(CAT).concat(Object.keys(modules || {}).map(n => `module:${n}`));
+  const s = key(q);
+  return names.filter(n => key(n).includes(s)).sort();
 }
 
-const CATALOG = { CAT, UNIVERSAL, PORT_SHAPE, moduleDef, nodeDef, port, compat, busca };
+const CATALOG = { CAT, UNIVERSAL, PORT_SHAPE, moduleDef, nodeDef, port, compat, search };
 if (typeof module !== "undefined" && module.exports) module.exports = CATALOG;
 if (typeof window !== "undefined") window.CATALOG = CATALOG;

@@ -1,40 +1,40 @@
 "use strict";
-// bus.js — cliente do barramento do `spellcore serve`. Contrato (spellcore/README.md):
+// bus.js — client of the `spellcore serve` bus. Contract (spellcore/README.md):
 //
-//   HTTP  GET /commands -> Registry::schema()   GET /show -> show_get full   GET /<arquivo>
+//   HTTP  GET /commands -> Registry::schema()   GET /show -> show_get full   GET /<file>
 //   WS    /ws  request  {"id":7,"cmd":"locate","args":{"t":12.5}}
-//              resposta {"id":7,"result":...} | {"id":7,"error":"texto"}
-//              evento   {"event":"transport"|"show"|"log"|"widget","data":...}
-//              binario  topic:u8 | universe:u16 LE | 512 bytes   (topic 1 = dmx de saida,
-//                       topic 2 = dmx de entrada, o universo de `show.inputs`)
+//              response {"id":7,"result":...} | {"id":7,"error":"text"}
+//              event    {"event":"transport"|"show"|"log"|"widget","data":...}
+//              binary   topic:u8 | universe:u16 LE | 512 bytes   (topic 1 = output dmx,
+//                       topic 2 = input dmx, the universe of `show.inputs`)
 //
-// Toda pagina (face, timeline, patchbay, teatro, laser) fala com o engine so' por aqui: quem
-// tem logica e' o registry, isto e' encanamento.
+// Every page (face, timeline, patchbay, teatro, laser) talks to the engine only through here:
+// the logic lives in the registry, this is plumbing.
 //
-// Modo offline: sem servidor a pagina continua abrindo; `call` responde localmente e os fetch
-// vao para os arquivos abaixo.
-// ponytail: offline nao simula o engine, so' deixa a pagina montar e mostrar o que faria
-// ; apagar quando o `serve` for a unica forma de abrir a GUI.
+// Offline mode: with no server the page still opens; `call` answers locally and the fetches go
+// to the files below.
+// ponytail: offline does not simulate the engine, it only lets the page mount and show what it
+// would do ; drop it when `serve` is the only way to open the GUI.
 
 function Bus(opts) {
-  this.subs = {};                       // topico -> [fn]
+  this.subs = {};                       // topic -> [fn]
   this.pend = new Map();                // id -> {ok, err}
   this.seq = 0;
   this.offline = !!(opts && opts.offline);
   this.ws = null;
-  this.rev = 0;                         // maior revisao do show ja' vista numa resposta
+  this.rev = 0;                         // highest show revision ever seen in a response
 }
 
-// As paginas vivem em /spellgui/web/: caminho relativo nao acha /commands nem /show.
+// The pages live in /spellgui/web/: a relative path finds neither /commands nor /show.
 Bus.DEV = "/spellgui/web/dev/commands.json";
 Bus.SHOW = "/shows/medgrupo.spell";
 
-// ---- parse: a unica funcao com regra, e a unica testada sem DOM ----------
-// Devolve {id, result} | {id, error} | {event, data} | null (mensagem que nao e' do contrato).
+// ---- parse: the only function with a rule, and the only one tested without DOM ----
+// Returns {id, result} | {id, error} | {event, data} | null (message outside the contract).
 Bus.parse = function (m) {
   if (typeof m !== "string") {
     const b = m instanceof Uint8Array ? m : new Uint8Array(m);
-    // topic 1 = dmx de saida e topic 2 = dmx de entrada, 515 bytes; outro topico nao tem consumidor
+    // topic 1 = output dmx and topic 2 = input dmx, 515 bytes; any other topic has no consumer
     if (b.length < 515 || (b[0] !== 1 && b[0] !== 2)) return null;
     return {
       event: "dmx",
@@ -66,8 +66,8 @@ Bus.prototype.emit = function (topic, data) {
   for (const fn of this.subs[topic] || []) fn(data);
 };
 
-/// Entrega uma mensagem crua (texto ou binario) ao barramento. Publica para o teste poder
-/// empurrar mensagem sem socket.
+/// Delivers a raw message (text or binary) to the bus. Public so the test can push a message
+/// without a socket.
 Bus.prototype.recv = function (m) {
   const p = Bus.parse(m);
   if (!p) return;
@@ -91,7 +91,7 @@ Bus.prototype.connect = function () {
   ws.onmessage = e => this.recv(e.data);
   ws.onclose = () => {
     this.ws = null;
-    for (const [, w] of this.pend) w.err(new Error("barramento caiu"));
+    for (const [, w] of this.pend) w.err(new Error("bus went down"));
     this.pend.clear();
     this.emit("close", null);
     setTimeout(() => this.connect(), 1000);
@@ -99,9 +99,9 @@ Bus.prototype.connect = function () {
   return this;
 };
 
-// ---- chamadas -----------------------------------------------------------
-// ponytail: request com o socket fechado e' descartado (a promessa fica pendente ate' o
-// `onclose` seguinte) ; fila so' se alguma pagina precisar mandar antes de abrir.
+// ---- calls --------------------------------------------------------------
+// ponytail: a request with the socket closed is dropped (the promise stays pending until the
+// next `onclose`) ; a queue only if some page needs to send before the socket opens.
 Bus.prototype.call = function (cmd, args) {
   if (this.offline) return this.local(cmd, args || {});
   const id = ++this.seq;
@@ -113,7 +113,7 @@ Bus.prototype.call = function (cmd, args) {
   });
 };
 
-/// `input {key, value}` — o caminho de widget, tecla e modulo ate' o graph vivo.
+/// `input {key, value}` — the path from widget, key and module to the live graph.
 Bus.prototype.input = function (key, value) {
   return this.call("input", { key, value: +value });
 };
@@ -126,7 +126,8 @@ Bus.prototype.showGet = function () {
   return fetch(this.offline ? Bus.SHOW : "/show").then(r => r.json());
 };
 
-/// Offline nao tem engine: a chamada vira eco, para a pagina montar e o log mostrar o que faria.
+/// Offline has no engine: the call becomes an echo, so the page mounts and the log shows what it
+/// would do.
 Bus.prototype.local = function (cmd, args) {
   this.emit("log", { text: "offline: " + cmd + " " + JSON.stringify(args) });
   return Promise.resolve({ offline: true, cmd, args });

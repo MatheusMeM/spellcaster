@@ -1,19 +1,19 @@
 "use strict";
-// widgets.js — parametro tipado gera o widget (design/FUNCOES/README.md, regra 1); ninguem
-// desenha widget por comando. A fonte e' o schema JSON que o `schemars` gera para os `Args` de
-// cada `Registry::add`, servido em `GET /commands`.
+// widgets.js — a typed parameter generates the widget (design/FUNCOES/README.md, rule 1); nobody
+// draws a widget per command. The source is the JSON schema that `schemars` generates for the
+// `Args` of each `Registry::add`, served at `GET /commands`.
 //
-// Regra 3 (trigger, toggle e valor sao tipos distintos) cai daqui: comando sem propriedade =
-// botao (trigger); boolean = toggle; number com min e max = slider + campo; number solto e
-// integer = campo numerico; string com enum = select; string = campo; object/array = textarea
-// JSON.
+// Rule 3 (trigger, toggle and value are distinct types) falls out of here: a command with no
+// property = button (trigger); boolean = toggle; number with min and max = slider + field; loose
+// number and integer = numeric field; string with enum = select; string = field; object/array =
+// JSON textarea.
 //
-// ponytail: object/array como textarea JSON ; virar sub-formulario quando algum comando do
-// registry tiver um objeto aninhado que o operador precise editar campo a campo.
+// ponytail: object/array as a JSON textarea ; make it a sub-form when some registry command has
+// a nested object the operator needs to edit field by field.
 
 const WG = {};
 
-/// Tipo JSON efetivo: schemars escreve `Option<T>` como ["T","null"].
+/// Effective JSON type: schemars writes `Option<T>` as ["T","null"].
 function jtype(s) {
   let t = s && s.type;
   if (Array.isArray(t)) t = t.filter(x => x !== "null")[0];
@@ -21,7 +21,7 @@ function jtype(s) {
   return t || "";
 }
 
-/// schema de uma propriedade -> tipo de widget.
+/// schema of a property -> widget type.
 WG.kindOf = function (s) {
   s = s || {};
   if (Array.isArray(s.enum) && s.enum.length) return "select";
@@ -35,14 +35,14 @@ WG.kindOf = function (s) {
   return "json";
 };
 
-/// Entrada de `GET /commands` -> tipo do controle do comando inteiro.
-/// Sem propriedade nenhuma = trigger (um botao, nada para preencher).
+/// An entry of `GET /commands` -> control type of the whole command.
+/// With no property at all it is a trigger (one button, nothing to fill in).
 WG.kindOfCommand = function (c) {
   const p = (c && c.params && c.params.properties) || {};
   return Object.keys(p).length ? "form" : "button";
 };
 
-/// Texto cru do campo -> valor tipado. Lanca em JSON invalido (o formulario mostra o erro).
+/// Raw field text -> typed value. Throws on invalid JSON (the form shows the error).
 WG.coerce = function (kind, raw) {
   switch (kind) {
     case "toggle":
@@ -53,8 +53,9 @@ WG.coerce = function (kind, raw) {
     case "num":
       return Number(raw) || 0;
     case "json":
-      // Texto que e' JSON vira JSON; o resto vai como texto. Mesma regra do `key_set` do engine,
-      // que e' quem valida: a pagina nao inventa uma segunda validacao (regra do CLAUDE.md).
+      // Text that is JSON becomes JSON; the rest goes as text. Same rule as the engine `key_set`,
+      // which is the one that validates: the page does not invent a second validation (CLAUDE.md
+      // rule).
       if (typeof raw !== "string") return raw;
       try {
         return JSON.parse(raw);
@@ -66,8 +67,8 @@ WG.coerce = function (kind, raw) {
   }
 };
 
-/// Comando + valores crus dos campos -> `args` do request. Campo vazio nao obrigatorio nao vai
-/// (o `#[serde(default)]` do Rust decide), campo vazio obrigatorio vai como default do tipo.
+/// Command + raw field values -> `args` of the request. An empty optional field is not sent
+/// (Rust `#[serde(default)]` decides), an empty required field goes as the type default.
 WG.args = function (c, vals) {
   const props = (c && c.params && c.params.properties) || {};
   const req = (c && c.params && c.params.required) || [];
@@ -75,15 +76,15 @@ WG.args = function (c, vals) {
   for (const name of Object.keys(props)) {
     const raw = vals ? vals[name] : undefined;
     const kind = WG.kindOf(props[name]);
-    const vazio = raw === undefined || raw === null || raw === "";
-    if (vazio && req.indexOf(name) < 0) continue;
-    out[name] = WG.coerce(kind, vazio ? "" : raw);
+    const empty = raw === undefined || raw === null || raw === "";
+    if (empty && req.indexOf(name) < 0) continue;
+    out[name] = WG.coerce(kind, empty ? "" : raw);
   }
   return out;
 };
 
 // ---- DOM ----------------------------------------------------------------
-// Daqui para baixo nada tem regra: monta o elemento do tipo que `kindOf` decidiu.
+// From here down nothing has a rule: it builds the element of the type `kindOf` decided.
 
 function el(tag, cls, txt) {
   const e = document.createElement(tag);
@@ -92,8 +93,8 @@ function el(tag, cls, txt) {
   return e;
 }
 
-/// widget(prop, schema, onChange) -> <label> com o controle dentro.
-/// O elemento devolvido leva `get()` e `set(v)`; `onChange(valorTipado)` a cada mudanca.
+/// widget(prop, schema, onChange) -> <label> with the control inside.
+/// The returned element carries `get()` and `set(v)`; `onChange(typedValue)` on every change.
 WG.widget = function (prop, schema, onChange) {
   schema = schema || {};
   const kind = WG.kindOf(schema);
@@ -145,19 +146,20 @@ WG.widget = function (prop, schema, onChange) {
   return wrap;
 };
 
-/// form(command, bus) -> <form> com um widget por propriedade e o botao que executa.
-/// Comando sem propriedade vira so' o botao (trigger). Nada de logica: os args saem de WG.args.
+/// form(command, bus) -> <form> with one widget per property and the button that runs it.
+/// A command with no property becomes just the button (trigger). No logic: the args come from
+/// WG.args.
 WG.form = function (c, bus, onResult) {
   const f = el("form", "wg-form");
   f.appendChild(el("div", "wg-doc", c.doc || ""));
   const props = (c.params && c.params.properties) || {};
-  const campos = {};
+  const fields = {};
   const out = el("div", "wg-out", "");
   for (const name of Object.keys(props)) {
-    // mexer num campo apaga o resultado da execucao anterior, que ja' nao vale para o que
-    // esta' na tela — e' o unico consumidor de `onChange`.
+    // touching a field clears the result of the previous run, which no longer matches what is on
+    // screen — it is the only consumer of `onChange`.
     const w = WG.widget(name, props[name], () => (out.textContent = ""));
-    campos[name] = w;
+    fields[name] = w;
     f.appendChild(w);
   }
   const bt = el("button", "wg-go", c.name);
@@ -169,10 +171,10 @@ WG.form = function (c, bus, onResult) {
     let args;
     try {
       const vals = {};
-      for (const k of Object.keys(campos)) vals[k] = campos[k].get();
+      for (const k of Object.keys(fields)) vals[k] = fields[k].get();
       args = WG.args(c, vals);
     } catch (err) {
-      out.textContent = "argumento invalido: " + err.message;
+      out.textContent = "invalid argument: " + err.message;
       return;
     }
     bus.call(c.name, args).then(

@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Spellcaster — teatro de papel</title>
+<title>Spellcaster — paper theater</title>
 <link rel="stylesheet" href="../../design/tokens/spellcaster.css">
 <style>
   * { box-sizing: border-box; }
@@ -55,48 +55,48 @@
 <div id="nav"></div>
 <script src="nav.js"></script>
 <div class="bar">
-  <span class="over">teatro de papel</span>
+  <span class="over">paper theater</span>
   <button id="go">GO</button>
   <span class="over">cue</span><span id="cue-viva">—</span>
   <span class="sep"></span>
-  <input type="text" id="cena-nome" placeholder="nome da cena">
-  <button id="capturar">Capturar cena</button>
-  <button id="solta">Soltar programmer</button>
+  <input type="text" id="cena-nome" placeholder="scene name">
+  <button id="capturar">Capture scene</button>
+  <button id="solta">Release programmer</button>
   <span class="sep"></span>
-  <span class="over" id="msg">ligando</span>
+  <span class="over" id="msg">connecting</span>
 </div>
 <main>
   <div class="col">
     <section>
       <h2>Patch</h2>
       <div class="rolo">
-        <table><thead><tr><th>nome<th>perfil<th>uni<th>end<th>ch<th></tr></thead>
+        <table><thead><tr><th>name<th>profile<th>uni<th>addr<th>ch<th></tr></thead>
         <tbody id="patch"></tbody></table>
       </div>
       <div id="patch-erro"></div>
       <div class="forma">
-        <input type="text" id="f-nome" placeholder="nome">
+        <input type="text" id="f-nome" placeholder="name">
         <select id="f-perfil"></select>
-        <input type="number" id="f-uni" value="1" min="1" title="universo">
-        <input type="number" id="f-end" value="1" min="1" max="512" title="endereco">
-        <button id="add">Patchear</button>
+        <input type="number" id="f-uni" value="1" min="1" title="universe">
+        <input type="number" id="f-end" value="1" min="1" max="512" title="address">
+        <button id="add">Patch it</button>
       </div>
     </section>
     <section style="border-bottom:0">
-      <h2>Cues — clique duplo dispara, Enter = GO</h2>
+      <h2>Cues — double click fires, Enter = GO</h2>
       <div class="rolo">
-        <table><thead><tr><th>#<th>nome<th>fade<th>wait<th>follow<th>valores<th></tr></thead>
+        <table><thead><tr><th>#<th>name<th>fade<th>wait<th>follow<th>values<th></tr></thead>
         <tbody id="cues"></tbody></table>
       </div>
     </section>
   </div>
   <div class="col" style="border-right:0">
-    <h2 class="over" style="padding:5px 8px;background:var(--sc-panel);margin:0">Cenário — arraste para posicionar, clique para abrir os canais</h2>
+    <h2 class="over" style="padding:5px 8px;background:var(--sc-panel);margin:0">Stage — drag to position, click to open the channels</h2>
     <canvas id="cenario"></canvas>
     <div id="canais"></div>
   </div>
 </main>
-<div class="cli">spellcore serve --show shows/medgrupo.spell &nbsp;|&nbsp; o cenário mostra o DMX que está SAINDO, não o que foi pedido</div>
+<div class="cli">spellcore serve --show shows/medgrupo.spell &nbsp;|&nbsp; the stage shows the DMX that is GOING OUT, not what was asked for</div>
 <script src="canvaskit.js"></script>
 <script src="teatro.js"></script>
 <script>TEATRO.mount(document);</script>

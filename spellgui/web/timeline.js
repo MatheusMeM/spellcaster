@@ -1,26 +1,30 @@
 "use strict";
-// timeline.js — timeline em canvas da GUI Tauri, sobre o canvaskit.
-// Portada do prototipo Python (spellcaster/gui/web/timeline.js) e reescrita sobre CK: o kit cuida de
-// pan, zoom, selecao, marquee, DPR e dirty-flag; aqui ficam tracks, keyframes, curvas, regua,
-// snapping, scrub, in/out e loop. Cores so por token de design/tokens/spellcaster.css.
-// Atalhos: design/SHORTCUTS.md (Premiere/Resolve). Ctrl+S salva pelo engine; Alt+M abre o monitor.
+// timeline.js — canvas timeline of the Tauri GUI, on top of canvaskit.
+// Ported from the Python prototype (spellcaster/gui/web/timeline.js) and rewritten on top of CK:
+// the kit takes care of pan, zoom, selection, marquee, DPR and the dirty flag; here live tracks,
+// keyframes, curves, ruler, snapping, scrub, in/out and loop. Colors only from tokens of
+// design/tokens/spellcaster.css.
+// Shortcuts: design/SHORTCUTS.md (Premiere/Resolve). Ctrl+S saves through the engine; Alt+M opens
+// the monitor.
 //
-// Modelo: cada lane e um array de keyframes do .spell — spec.keys, ou spec.<param> (scale, rot, x...).
-// Os keyframes moram em Float64Array/Uint8Array paralelos: o desenho nao aloca por frame e o hit-test
-// e por bisect (CK.bisect). A edicao acontece no modelo local, volta pro JSON no commit() e, quando
-// ha `spellcore serve`, vira chamada do registry (key_set/key_del/show_patch/...) pelo WS.
+// Model: each lane is an array of keyframes from the .spell — spec.keys, or spec.<param> (scale,
+// rot, x...). The keyframes live in parallel Float64Array/Uint8Array: drawing allocates nothing
+// per frame and the hit-test is a bisect (CK.bisect). Editing happens in the local model, goes
+// back to JSON on commit() and, when there is a `spellcore serve`, becomes a registry call
+// (key_set/key_del/show_patch/...) over the WS.
 //
-// Sem servidor nada muda: o show vem de fetch, o transporte e o relogio local e o commit so reescreve
-// o JSON em memoria. Com servidor o playhead vem dos eventos `transport` e o show recarrega quando
-// alguem de fora mexe (evento `show` com rev acima do que a ultima resposta trouxe).
+// With no server nothing changes: the show comes from a fetch, the transport is the local clock
+// and the commit only rewrites the JSON in memory. With a server the playhead comes from the
+// `transport` events and the show reloads when someone outside edits it (`show` event with a rev
+// above what the last response brought).
 //
-// Loop e' estado do ENGINE, no intervalo In-Out do show: o botao e o Ctrl+L chamam `loop_set` e
-// `TL.loop` so' reflete o que vem no evento `transport`. A pagina nao simula loop nenhum — quando
-// simulava, o cliente voltava para o In e o engine seguia tocando ate o fim do show.
+// Loop is ENGINE state, over the In-Out range of the show: the button and Ctrl+L call `loop_set`
+// and `TL.loop` only reflects what arrives in the `transport` event. The page simulates no loop —
+// when it did, the client jumped back to In and the engine kept playing to the end of the show.
 
 const CURVES = ["linear", "hold", "in", "out", "inout", "bezier"];
-// Mesma matematica do engine (spellcaster/timeline/model.py, spellcore/engine): a curva vale para o
-// segmento que CHEGA no keyframe.
+// Same maths as the engine (spellcaster/timeline/model.py, spellcore/engine): the curve applies to
+// the segment that ARRIVES at the keyframe.
 const EASE = [
   u => u,
   () => 0,
@@ -31,25 +35,25 @@ const EASE = [
 ];
 const STEPS = [0.04, 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1800];
 const LANE_PARAMS = ["x", "y", "scale", "rot", "color"];
-const MONH = 120;                                  // altura fixa da faixa do previz (viewer.js)
+const MONH = 120;                                  // fixed height of the previz strip (viewer.js)
 
 const TL = {
   show: null, lanes: [], k: null, clip: null, snaps: null,
-  headW: 192, rulerH: 24, rowH: 32,          // multiplos de 8: grade de console (design/PRINCIPIOS.md §3)
+  headW: 192, rulerH: 24, rowH: 32,          // multiples of 8: console grid (design/PRINCIPIOS.md §3)
   snap: true, cur: -1, drawn: 0,
   t: 0, rate: 0, loop: false, last: 0,
   col: {}, menuEl: null, msgEl: null,
-  onState: () => {},                               // index.html sincroniza os botoes de transporte
-  onOpen: () => {},                                // Ctrl+O: a pagina decide como se abre um show
-  file: "", rev: 0, tstate: null,                  // engine: caminho do show, revisao, transporte
-  mon: false, dmx: new Map(), dmxIn: new Map(),    // monitor: ultimo frame binario por universo (saida / entrada)
+  onState: () => {},                               // index.html syncs the transport buttons
+  onOpen: () => {},                                // Ctrl+O: the page decides how a show is opened
+  file: "", rev: 0, tstate: null,                  // engine: show path, revision, transport
+  mon: false, dmx: new Map(), dmxIn: new Map(),    // monitor: last binary frame per universe (out / in)
   fps() { return (this.show && this.show.fps) || 30; },
   dur() { return (this.show && this.show.duration) || 60; },
   inT() { return +((this.show && this.show.in) || 0); },
   outT() { return +((this.show && this.show.out) || this.dur()); },
 };
 window.TL = TL;
-// Ganchos do previz (viewer.js): a curva de um keyframe e o barramento, sem duplicar nenhum dos dois.
+// Hooks of the previz (viewer.js): the curve of a keyframe and the bus, without duplicating either.
 TL.ease = name => EASE[Math.max(0, CURVES.indexOf(name || "linear"))];
 TL.call = (cmd, args) => BUS.call(cmd, args);
 
@@ -67,19 +71,19 @@ function tc(t, fps) {
 
 TL.log = function (s) { if (TL.msgEl) TL.msgEl.textContent = s; };
 
-// ---- barramento (spellcore/README.md, secao `serve`) --------------------
-// ponytail: cliente WS de 30 linhas aqui dentro ; trocar por bus.js (frente face) quando ele existir.
+// ---- bus (spellcore/README.md, `serve` section) -------------------------
+// ponytail: a 30-line WS client in here ; swap it for bus.js (face frente) once that exists.
 const BUS = {
   ws: null, id: 0, pend: new Map(), on: {}, ever: false,
   live() { return !!this.ws && this.ws.readyState === 1; },
   call(cmd, args) {
-    if (!this.live()) return Promise.reject("sem servidor");
+    if (!this.live()) return Promise.reject("no server");
     const id = ++this.id;
     this.ws.send(JSON.stringify({ id: id, cmd: cmd, args: args || {} }));
     return new Promise((ok, no) => this.pend.set(id, [ok, no]));
   },
   msg(d) {
-    if (typeof d !== "string") {                       // frame binario do monitor
+    if (typeof d !== "string") {                       // binary frame of the monitor
       const f = TL.frameBin(d);
       if (f) {
         (f.topic === 2 ? TL.dmxIn : TL.dmx).set(f.universe, f.data);
@@ -89,8 +93,8 @@ const BUS = {
     }
     const m = JSON.parse(d);
     if (m.event) { if (BUS.on[m.event]) BUS.on[m.event](m.data); return; }
-    // Toda resposta do barramento carrega o `rev` do engine: e' o que separa o eco da nossa
-    // propria edicao da edicao de outro cliente.
+    // Every bus response carries the engine `rev`: that is what separates the echo of our own
+    // edit from the edit of another client.
     if (typeof m.rev === "number") TL.rev = Math.max(TL.rev, m.rev);
     const p = this.pend.get(m.id);
     if (!p) return;
@@ -99,35 +103,37 @@ const BUS = {
   },
   open(url) {
     let w;
-    try { w = this.ws = new WebSocket(url); } catch (e) { TL.log("sem servidor: " + e.message); return; }
+    try { w = this.ws = new WebSocket(url); } catch (e) { TL.log("no server: " + e.message); return; }
     w.binaryType = "arraybuffer";
     w.onmessage = e => BUS.msg(e.data);
-    // engine reiniciado volta com rev = 0, e TL.revEvento so' corrige a conta para cima: sem
-    // zerar aqui, todo evento `show` do processo novo viria abaixo do numero velho e engolido.
+    // a restarted engine comes back with rev = 0, and TL.revEvent only corrects the count upwards:
+    // without zeroing here, every `show` event of the new process would come below the old number
+    // and be swallowed.
     w.onopen = () => { BUS.ever = true; TL.rev = 0; TL.reload(); };
     w.onclose = () => {
       BUS.ws = null;
       TL.tstate = null;
       if (TL.k) TL.k.dirty = true;
-      // so reconecta se um dia conectou: sem serve (python -m http.server) a pagina fica offline em paz
+      // only reconnects if it ever connected: with no serve (python -m http.server) the page stays
+      // offline in peace
       if (BUS.ever) setTimeout(() => BUS.open(url), 2000);
-      else TL.log("offline: sem spellcore serve");
+      else TL.log("offline: no spellcore serve");
     };
   },
 };
 
-// Frame binario do monitor: topic:u8 | universe:u16 LE | 512 bytes.
-// topic 1 = dmx de saida; topic 2 = dmx de ENTRADA (show.inputs), o que o engine grava.
+// Binary frame of the monitor: topic:u8 | universe:u16 LE | 512 bytes.
+// topic 1 = output dmx; topic 2 = INPUT dmx (show.inputs), what the engine records.
 TL.frameBin = function (buf) {
   const b = new Uint8Array(buf);
   if (b.length < 515 || (b[0] !== 1 && b[0] !== 2)) return null;
   return { topic: b[0], universe: b[1] | (b[2] << 8), data: b.subarray(3, 515) };
 };
 
-// Uma lista de edicoes locais vira a lista de chamadas do registry. Funcao pura: e' esta que o
-// teste cobre. Edicoes: {k:"set"|"move", track, t, from?, value, curve} | {k:"del", track, t} |
-// {k:"field", path, value}. Os `del` saem todos antes dos `set` — mover dois keyframes vizinhos
-// um sobre o outro apagaria o recem-escrito se as ops se intercalassem.
+// A list of local edits becomes the list of registry calls. Pure function: this is the one the
+// test covers. Edits: {k:"set"|"move", track, t, from?, value, curve} | {k:"del", track, t} |
+// {k:"field", path, value}. All the `del` go out before all the `set` — moving two neighbouring
+// keyframes onto each other would erase the freshly written one if the ops were interleaved.
 TL.ops = function (eds) {
   const del = [], set = [], patch = [];
   for (const e of eds) {
@@ -142,12 +148,12 @@ TL.ops = function (eds) {
   return out;
 };
 
-// Manda as chamadas. Sem servidor nao faz nada: o modo offline continua o de hoje.
-// Ha' UM contador de revisao, o do engine (`engine::edit::rev()`): toda resposta o traz e
-// `BUS.msg` o guarda em `TL.rev`. Nada de adiantar a conta antes do envio.
-// ponytail: o eco da nossa propria edicao que chegue ANTES da resposta custa um reload
-// (`d.rev > TL.rev` porque a resposta ainda nao veio) ; some quando o evento `show` carregar o
-// id do cliente que editou.
+// Sends the calls. With no server it does nothing: offline mode stays as it is today.
+// There is ONE revision counter, the engine one (`engine::edit::rev()`): every response brings it
+// and `BUS.msg` keeps it in `TL.rev`. No running the count ahead before sending.
+// ponytail: the echo of our own edit arriving BEFORE the response costs one reload
+// (`d.rev > TL.rev` because the response has not arrived yet) ; it goes away when the `show` event
+// carries the id of the client that edited.
 function send(calls) {
   if (!BUS.live()) return;
   for (const c of calls) {
@@ -155,17 +161,17 @@ function send(calls) {
   }
 }
 
-// Evento `show`: rev maior que o ultimo visto numa resposta veio de outro cliente e manda
-// recarregar; menor ou igual e' eco nosso, ou evento atrasado. Funcao pura: e' esta que o teste
-// cobre. O maximo ressincroniza a conta local em qualquer desvio.
-TL.revEvento = (rev, esperado) => ({ rev: Math.max(rev, esperado), reload: rev > esperado });
+// `show` event: a rev above the last one seen in a response came from another client and forces a
+// reload; below or equal is our own echo, or a late event. Pure function: this is the one the test
+// covers. The max resyncs the local count on any drift.
+TL.revEvent = (rev, expected) => ({ rev: Math.max(rev, expected), reload: rev > expected });
 
 const hasPlayer = () => TL.tstate === "play" || TL.tstate === "pause";
 
 const isKeys = v => Array.isArray(v) && v.length > 0 && Array.isArray(v[0]) &&
                     v[0].length >= 2 && typeof v[0][0] === "number";
 
-// ---- modelo -------------------------------------------------------------
+// ---- model --------------------------------------------------------------
 function mkLane(spec, si, param) {
   const src = (param ? spec[param] : spec.keys) || [];
   const n = src.length;
@@ -186,7 +192,7 @@ function mkLane(spec, si, param) {
     if (L.vs[i] > mx) mx = L.vs[i];
     if (L.vs[i] < mn) mn = L.vs[i];
   }
-  // lane vazia nasce em 0..255 (DMX); param de laser (scale/rot/x/y) nasce em 0..1
+  // an empty lane is born at 0..255 (DMX); a laser param (scale/rot/x/y) is born at 0..1
   L.vmax = n === 0 ? (LANE_PARAMS.indexOf(param) >= 0 ? 1 : 255) : mx <= 1 ? 1 : mx <= 255 ? 255 : mx;
   L.vmin = Math.min(0, mn);
   return L;
@@ -200,29 +206,29 @@ TL.load = function (show) {
   TL.t = 0;
   setRate(0);
   (show.tracks || []).forEach((spec, si) => {
-    TL.lanes.push(mkLane(spec, si, null));                        // lane principal (spec.keys)
+    TL.lanes.push(mkLane(spec, si, null));                        // main lane (spec.keys)
     for (const p of Object.keys(spec)) {
       if (p !== "keys" && isKeys(spec[p]) && (LANE_PARAMS.indexOf(p) >= 0 || spec.type === "fixture"))
         TL.lanes.push(mkLane(spec, si, p));
     }
   });
-  // Ordenado uma vez aqui: `jumpMarker` e o desenho leem a lista como esta'.
+  // Sorted once here: `jumpMarker` and the drawing read the list as it is.
   if (!Array.isArray(show.markers)) show.markers = [];
   else show.markers.sort((a, b) => a - b);
   TL.fit();
-  UNDO.last = JSON.stringify(show);          // marca do desfazer: o show como acabou de chegar
-  if (TL.msgEl) TL.msgEl.textContent = (show.name || "sem nome") + "  -  " +
+  UNDO.last = JSON.stringify(show);          // undo mark: the show as it has just arrived
+  if (TL.msgEl) TL.msgEl.textContent = (show.name || "unnamed") + "  -  " +
     (show.tracks || []).length + " tracks, " + TL.lanes.length + " lanes";
   return TL.lanes.length;
 };
 
-// Abrir outro arquivo zera a pilha do desfazer: as copias sao de OUTRO show.
+// Opening another file clears the undo stack: the copies belong to ANOTHER show.
 TL.fetch = path => fetch(path).then(r => {
   if (!r.ok) throw new Error(path + ": HTTP " + r.status);
   return r.json();
 }).then(sh => { UNDO.back.length = 0; UNDO.fwd.length = 0; return TL.load(sh); });
 
-// Valor da lane em t, igual ao engine: bisect + curva do keyframe seguinte.
+// Value of the lane at t, same as the engine: bisect + curve of the next keyframe.
 TL.valueAt = function (L, t) {
   if (!L.n) return null;
   const i = CK.bisect(L.ts, L.n, t + 1e-12) - 1;
@@ -294,10 +300,10 @@ function laneOut(L) {
   return out;
 }
 
-// Edicao de um keyframe da lane li (indice i depois da mudanca; fromT = tempo antigo, se mudou).
-// Lane de parametro (spec.scale, spec.x, ...) nao tem comando proprio no registry.
-// ponytail: lane de parametro vai inteira por show_patch ; virar key_set quando key_set souber
-// escrever em spec.<param> e nao so' em spec.keys.
+// Edit of a keyframe of lane li (index i after the change; fromT = old time, if it changed).
+// A parameter lane (spec.scale, spec.x, ...) has no command of its own in the registry.
+// ponytail: a parameter lane goes whole through show_patch ; make it key_set once key_set can
+// write into spec.<param> and not only into spec.keys.
 function eKey(li, i, fromT) {
   const L = TL.lanes[li];
   if (L.param) return { k: "lane", li: li };
@@ -311,16 +317,17 @@ function eDel(li, t) {
   return L.param ? { k: "lane", li: li } : { k: "del", track: L.si, t: ktime(t) };
 }
 
-// Keyframe recem-criado: o `resort` do addKey ja mexeu nos indices, entao acha pelo tempo.
+// A freshly created keyframe: the `resort` of addKey has already moved the indices, so find it by
+// time.
 function eAt(li, t) {
   const L = TL.lanes[li];
   return eKey(li, CK.bisect(L.ts, L.n, t));
 }
 
-// Desfazer/refazer: pilha de copias do show inteiro, tirada no commit (o estado ANTERIOR e' o que
-// `UNDO.last` guarda desde o commit passado). Desfazer devolve a copia com `show_set`.
-// ponytail: 20 copias do JSON inteiro, sem granularidade por edicao ; virar a pilha de `undo` que
-// o `show_patch` ja' devolve quando o registry souber empilhar do lado do engine.
+// Undo/redo: a stack of copies of the whole show, taken on commit (the PREVIOUS state is what
+// `UNDO.last` has held since the previous commit). Undo sends the copy back with `show_set`.
+// ponytail: 20 copies of the whole JSON, with no granularity per edit ; make it the `undo` stack
+// that `show_patch` already returns once the registry can stack it on the engine side.
 const UNDO = { back: [], fwd: [], last: null, max: 20 };
 
 function undoMark() {
@@ -333,7 +340,8 @@ function undoMark() {
   UNDO.last = cur;
 }
 
-// Troca o show mantendo view e lane focada: o reload do engine e o desfazer usam o mesmo caminho.
+// Swaps the show keeping the view and the focused lane: the engine reload and the undo take the
+// same path.
 function swap(sh) {
   const cur = TL.cur, view = TL.k && { x: TL.k.view.x, y: TL.k.view.y, zoom: TL.k.view.zoom };
   TL.load(sh);
@@ -342,20 +350,22 @@ function swap(sh) {
   TL.k.dirty = true;
 }
 
-// dir -1 desfaz, +1 refaz. Com servidor o show inteiro volta por `show_set`; sem ele, so' local.
+// dir -1 undoes, +1 redoes. With a server the whole show goes back through `show_set`; without it,
+// local only.
 TL.undo = function (dir) {
-  const de = dir > 0 ? UNDO.fwd : UNDO.back, para = dir > 0 ? UNDO.back : UNDO.fwd;
-  if (!de.length) return TL.log(dir > 0 ? "nada a refazer" : "nada a desfazer");
-  para.push(UNDO.last);
-  const s = de.pop();
+  const from = dir > 0 ? UNDO.fwd : UNDO.back, to = dir > 0 ? UNDO.back : UNDO.fwd;
+  if (!from.length) return TL.log(dir > 0 ? "nothing to redo" : "nothing to undo");
+  to.push(UNDO.last);
+  const s = from.pop();
   swap(JSON.parse(s));
-  UNDO.last = s;                                  // `swap` recarrega o show; a marca e' esta copia
+  UNDO.last = s;                                  // `swap` reloads the show; the mark is this copy
   if (BUS.live()) send([{ cmd: "show_set", args: { data: JSON.parse(s) } }]);
-  TL.log(dir > 0 ? "refeito" : "desfeito");
+  TL.log(dir > 0 ? "redone" : "undone");
 };
 
-// Devolve o modelo local para o JSON do show e, com servidor, manda as edicoes ao registry.
-// `eds` descreve o que mudou; sem `eds` so' reescreve o JSON local (modo offline de hoje).
+// Writes the local model back into the show JSON and, with a server, sends the edits to the
+// registry. `eds` describes what changed; without `eds` it only rewrites the local JSON (today's
+// offline mode).
 function commit(eds) {
   for (const L of TL.lanes) {
     if (L.param) L.spec[L.param] = laneOut(L); else L.spec.keys = laneOut(L);
@@ -364,55 +374,57 @@ function commit(eds) {
   undoMark();
   TL.k.dirty = true;
   if (!eds || !eds.length || !BUS.live()) return;
-  const fim = [];
-  for (const e of eds) {                          // lane inteira: uma op com o array ja' gravado
-    if (e.k !== "lane") { fim.push(e); continue; }
+  const end = [];
+  for (const e of eds) {                          // whole lane: one op with the already written array
+    if (e.k !== "lane") { end.push(e); continue; }
     const L = TL.lanes[e.li];
-    fim.push({ k: "field", path: "/tracks/" + L.si + "/" + L.param, value: L.spec[L.param] });
+    end.push({ k: "field", path: "/tracks/" + L.si + "/" + L.param, value: L.spec[L.param] });
   }
-  send(TL.ops(fim));
+  send(TL.ops(end));
 }
 TL.commit = commit;
 
-// Campo do show por show_patch (in, out, markers, mute/solo de track).
+// A show field through show_patch (in, out, markers, track mute/solo).
 function field(path, value) { commit([{ k: "field", path: path, value: value }]); }
 
 function trackFlag(L, key, on) { field("/tracks/" + L.si + "/" + key, on); }
 
-// In e Out sao um par, e este e' o unico funil: teclas I/O, botoes e as alcas da regua passam
-// por aqui. O limite novo que cruza o outro NAO colapsa o intervalo (era assim que In/Out
-// terminavam a 10 ms um do outro depois de um arrasto na regua): quem foi cruzado vai para a
-// ponta — In para 0, Out para a duracao.
+// In and Out are a pair, and this is the only funnel: the I/O keys, the buttons and the ruler
+// handles all pass through here. A new limit that crosses the other does NOT collapse the range
+// (that was how In/Out ended up 10 ms apart after a drag on the ruler): the one that was crossed
+// goes to the end — In to 0, Out to the duration.
 TL.setInOut = function (i, o) {
-  const dur = TL.dur(), velhoA = TL.inT(), velhoB = TL.outT();
-  let a = i === null || i === undefined ? velhoA : clamp(+i, 0, dur);
-  let b = o === null || o === undefined ? velhoB : clamp(+o, 0, dur);
+  const dur = TL.dur(), oldA = TL.inT(), oldB = TL.outT();
+  let a = i === null || i === undefined ? oldA : clamp(+i, 0, dur);
+  let b = o === null || o === undefined ? oldB : clamp(+o, 0, dur);
   if (a >= b) { if (o === null || o === undefined) b = dur; else a = 0; }
   TL.show.in = a;
   TL.show.out = b;
-  // O limite pedido sai SEMPRE, mesmo igual ao velho: no fim do arrasto da alca o `onMove` ja'
-  // escreveu `TL.show.in`, entao `a === velhoA` e' o caso normal — comparar aqui perderia o
-  // arrasto inteiro. O `else if` cobre o outro limite, que so' muda quando foi cruzado.
+  // The requested limit ALWAYS goes out, even when equal to the old one: at the end of the handle
+  // drag `onMove` has already written `TL.show.in`, so `a === oldA` is the normal case — comparing
+  // here would lose the whole drag. The `else if` covers the other limit, which only changes when
+  // it was crossed.
   const eds = [];
   if (i !== null && i !== undefined) eds.push({ k: "field", path: "/in", value: a });
-  else if (a !== velhoA) eds.push({ k: "field", path: "/in", value: a });
+  else if (a !== oldA) eds.push({ k: "field", path: "/in", value: a });
   if (o !== null && o !== undefined) eds.push({ k: "field", path: "/out", value: b });
-  else if (b !== velhoB) eds.push({ k: "field", path: "/out", value: b });
+  else if (b !== oldB) eds.push({ k: "field", path: "/out", value: b });
   commit(eds);
-  if (TL.loop) TL.setLoop(true);        // o loop mora no engine com o intervalo: reenvia o novo
+  if (TL.loop) TL.setLoop(true);        // the loop lives in the engine with the range: resend the new one
   return [a, b];
 };
 
-// ---- transporte ---------------------------------------------------------
-// Um funil so': todo play/pause/stop e todo salto passam por aqui. Com player vivo quem manda e' o
-// engine (o playhead vem dos eventos `transport`); sem ele, o relogio local de sempre.
+// ---- transport ----------------------------------------------------------
+// A single funnel: every play/pause/stop and every jump goes through here. With a live player the
+// engine is in charge (the playhead comes from the `transport` events); without it, the usual
+// local clock.
 function setT(t) {
   TL.t = clamp(t, 0, TL.dur());
   TL.k.dirty = true;
 }
 
-// Todo ponto que muda o transporte avisa a pagina (TL.onState): sem isso a barra pesquisaria o
-// estado por temporizador.
+// Every point that changes the transport tells the page (TL.onState): without it the bar would
+// poll the state on a timer.
 function setRate(r) {
   TL.rate = r;
   TL.onState();
@@ -423,10 +435,11 @@ TL.locate = function (t) {
   if (hasPlayer()) send([{ cmd: "locate", args: { t: TL.t } }]);
 };
 
-// ponytail: o engine nao tem shuttle nem rate reverso ; com player vivo J/L viram pause/play e o
-// x2/x4/x8 continua so' no modo offline. Sai quando o registry ganhar um comando de rate.
-// Loop: comando do engine (`loop_set`), no intervalo In-Out do show aberto. `TL.loop` e' so' o
-// reflexo — o valor de verdade chega no evento `transport`. Sem engine fica so' o botao aceso.
+// ponytail: the engine has no shuttle and no reverse rate ; with a live player J/L become
+// pause/play and the x2/x4/x8 stays offline only. It goes when the registry gains a rate command.
+// Loop: an engine command (`loop_set`), over the In-Out range of the open show. `TL.loop` is only
+// the reflection — the real value arrives in the `transport` event. With no engine only the button
+// lights up.
 TL.setLoop = function (on) {
   TL.loop = !!on;
   TL.onState();
@@ -455,39 +468,41 @@ TL.stop = function () {
   setT(0);
 };
 
-// Ctrl+S grava no caminho do ultimo aberto (file vazio); Ctrl+Shift+S pergunta o caminho.
-// ponytail: `prompt` do navegador para o "salvar como" ; virar dialogo da GUI quando ela existir.
+// Ctrl+S writes to the path of the last opened file (empty file); Ctrl+Shift+S asks for the path.
+// ponytail: the browser `prompt` for "save as" ; make it a GUI dialog once there is one.
 TL.save = function (file) {
-  if (!BUS.live()) return TL.log("Ctrl+S: sem servidor (o show fica so' em memoria)");
+  if (!BUS.live()) return TL.log("Ctrl+S: no server (the show stays in memory only)");
   send([{ cmd: "show_save", args: { file: file || "" } }]);
   if (file) TL.file = file;
 };
 
 TL.saveAs = function () {
-  const f = prompt("salvar como (.spell):", TL.file || "shows/novo.spell");
+  const f = prompt("save as (.spell):", TL.file || "shows/new.spell");
   if (f) TL.save(f);
 };
 
-// Ctrl+N: o show novo vem do engine (show_new devolve o .spell inteiro); sem engine, um vazio.
+// Ctrl+N: the new show comes from the engine (show_new returns the whole .spell); with no engine,
+// an empty one.
 TL.showNew = function () {
-  if (!BUS.live()) return swap({ name: "novo show", fps: 30, duration: 60, tracks: [], markers: [] });
+  if (!BUS.live()) return swap({ name: "new show", fps: 30, duration: 60, tracks: [], markers: [] });
   BUS.call("show_new", {}).then(sh => { TL.file = ""; swap(sh); })
     .catch(e => TL.log("show_new: " + e));
 };
 
-// Relogio local do modo offline (sem engine). Sem loop aqui: quem repete e' o player do engine.
+// Local clock of offline mode (no engine). No loop here: what repeats is the engine player.
 function frame() {
   if (!TL.rate) return;
   const now = performance.now(), dt = (now - TL.last) / 1000;
   TL.last = now;
   const t = TL.t + dt * TL.rate;
-  if (hasPlayer()) return setT(t);       // o engine manda; aqui so' interpola entre os eventos
+  if (hasPlayer()) return setT(t);       // the engine is in charge; here we only interpolate between events
   if (t <= 0 || t >= TL.dur()) setRate(0);
   setT(t);
 }
 
-// ---- ligacao com o engine ----------------------------------------------
-// O transporte do engine e' a fonte: estado, tempo e loop. Funcao nomeada porque o teste a chama.
+// ---- link to the engine -------------------------------------------------
+// The engine transport is the source: state, time and loop. A named function because the test
+// calls it.
 TL.onTransport = d => {
   TL.tstate = d.state;
   if (typeof d.loop === "boolean") TL.loop = d.loop;
@@ -497,9 +512,10 @@ TL.onTransport = d => {
 };
 BUS.on.transport = d => TL.onTransport(d);
 
-// O `show` so' sai quando o `rev` do engine muda; so' recarrega o que veio de fora.
+// The `show` event only goes out when the engine `rev` changes; only what came from outside forces
+// a reload.
 BUS.on.show = d => {
-  const r = TL.revEvento(d.rev, TL.rev);
+  const r = TL.revEvent(d.rev, TL.rev);
   TL.rev = r.rev;
   if (r.reload) TL.reload();
 };
@@ -509,7 +525,7 @@ BUS.on.log = d => TL.log(d.text);
 TL.reload = function () {
   return fetch("/show").then(r => r.json()).then(sh => {
     swap(sh);
-    return TL.recPull();                  // as lanes nasceram desarmadas: quem sabe e' o engine
+    return TL.recPull();                  // the lanes are born disarmed: the engine is the one who knows
   }).catch(e => TL.log("GET /show: " + e.message));
 };
 
@@ -518,8 +534,8 @@ TL.connect = function () {
 };
 
 // ---- tracks -------------------------------------------------------------
-// Args de `track_add` por tipo de track. `laser` leva o clipe .ild, `fx` leva o script .rhai
-// (os dois campos que o registry acrescenta ao track). Funcao pura: e' esta que o teste cobre.
+// Args of `track_add` per track type. `laser` carries the .ild clip, `fx` carries the .rhai script
+// (the two fields the registry adds to the track). Pure function: this is the one the test covers.
 TL.trackArgs = function (kind, file) {
   const a = { type: kind || "dmx", universe: 1, address: 1, name: "" };
   if (a.type === "laser") a.clip = file || "";
@@ -529,7 +545,7 @@ TL.trackArgs = function (kind, file) {
 
 TL.trackAdd = function (kind, file) {
   const args = TL.trackArgs(kind, file);
-  const spec = { type: args.type, universe: 1, address: 1, keys: [] };   // igual ao track_add
+  const spec = { type: args.type, universe: 1, address: 1, keys: [] };   // same as track_add
   if (args.clip) spec.clip = args.clip;
   if (args.script) spec.script = args.script;
   TL.show.tracks.push(spec);
@@ -538,8 +554,8 @@ TL.trackAdd = function (kind, file) {
   TL.cur = TL.lanes.length - 1;
 };
 
-// Os .ild que o engine enxerga (comando `laser_files`, diretorio padrao `shows/`). Sem servidor
-// nao ha lista: a pagina mostra o menu vazio em vez de um dialogo nativo.
+// The .ild files the engine can see (`laser_files` command, default directory `shows/`). With no
+// server there is no list: the page shows an empty menu instead of a native dialog.
 TL.laserFiles = function () {
   if (!BUS.live()) return Promise.resolve([]);
   return BUS.call("laser_files", { dir: "" }).then(r => (r && r.files) || []).catch(e => {
@@ -549,15 +565,15 @@ TL.laserFiles = function () {
 };
 
 // ---- record arm ---------------------------------------------------------
-// O arme NAO mora no .spell: quem grava e' o engine, e o estado vem dele (`rec_arm`/`rec_state`).
-// Funil unico do botao R, da tecla R e do botao da barra.
+// The arm does NOT live in the .spell: the engine is the one that records, and the state comes
+// from it (`rec_arm`/`rec_state`). Single funnel for the R button, the R key and the bar button.
 TL.recArm = function (li, on) {
   const L = TL.lanes[li];
   if (!L) return;
   if (on === undefined) on = !L.rec;
-  L.rec = on;                                   // otimista; o `rec_state` da resposta corrige
+  L.rec = on;                                   // optimistic; the `rec_state` of the response corrects it
   if (TL.k) TL.k.dirty = true;
-  if (!BUS.live()) return TL.log("R: sem servidor, nada grava");
+  if (!BUS.live()) return TL.log("R: no server, nothing records");
   BUS.call("rec_arm", { track: L.si, on: on })
      .then(() => TL.recPull())
      .catch(e => { L.rec = false; if (TL.k) TL.k.dirty = true; TL.log("rec_arm: " + e); });
@@ -568,8 +584,8 @@ TL.recPull = function () {
   return BUS.call("rec_state", {}).then(st => { TL.recApply(st); return st; }).catch(() => null);
 };
 
-// Marca nas lanes os tracks que o engine diz estarem armados. Funcao pura: e' esta que o teste
-// cobre (uma lane por track, e os parametros de laser compartilham o track do pai).
+// Marks in the lanes the tracks the engine says are armed. Pure function: this is the one the test
+// covers (one lane per track, and the laser parameters share the track of their parent).
 TL.recApply = function (st) {
   const arm = (st && st.tracks) || [];
   for (const L of TL.lanes) L.rec = !L.param && arm.indexOf(L.si) >= 0;
@@ -585,12 +601,12 @@ TL.trackDel = function () {
   TL.load(TL.show);
 };
 
-// ---- snapping (markers, in/out, playhead, keyframes visiveis) ----------
-// Arrastando uma alca da regua, In e Out ficam FORA da lista: a alca imantava na outra e o
-// intervalo colapsava (In e Out a 10 ms um do outro).
+// ---- snapping (markers, in/out, playhead, visible keyframes) -----------
+// While dragging a ruler handle, In and Out stay OUT of the list: the handle snapped to the other
+// one and the range collapsed (In and Out 10 ms apart).
 function buildSnaps() {
-  const d = TL.k.drag, alca = !!d && (d.mode === "in" || d.mode === "out");
-  const s = alca ? [0, TL.dur(), TL.t] : [0, TL.dur(), TL.inT(), TL.outT(), TL.t];
+  const d = TL.k.drag, handle = !!d && (d.mode === "in" || d.mode === "out");
+  const s = handle ? [0, TL.dur(), TL.t] : [0, TL.dur(), TL.inT(), TL.outT(), TL.t];
   for (const m of TL.show.markers) s.push(+m);
   const lo = x2t(TL.headW), hi = x2t(TL.k.w);
   for (let li = 0; li < TL.lanes.length && s.length < 4000; li++) {
@@ -611,14 +627,14 @@ function snapT(t) {
 }
 TL.snapT = snapT;
 
-// ---- cores (tokens) -----------------------------------------------------
+// ---- colors (tokens) ----------------------------------------------------
 function colors() {
-  TL.col = CK.cores(TL.k.cv);
+  TL.col = CK.colors(TL.k.cv);
   TL.k.dirty = true;
 }
 TL.colors = colors;
 
-// ---- desenho ------------------------------------------------------------
+// ---- drawing ------------------------------------------------------------
 function diamond(c, x, y, r) {
   c.moveTo(x, y - r); c.lineTo(x + r, y); c.lineTo(x, y + r); c.lineTo(x - r, y); c.closePath();
 }
@@ -629,15 +645,16 @@ function draw(k) {
   c.fillStyle = col.well;
   c.fillRect(0, 0, W, H);
 
-  // Teto da rolagem vertical do kit (roda e botao do meio): a ultima lane para no rodape em vez
-  // de sumir para cima. Fica no desenho porque e' aqui que se sabe a altura util.
+  // Ceiling of the kit vertical scroll (wheel and middle button): the last lane stops at the
+  // bottom instead of disappearing upwards. It lives in the drawing because this is where the
+  // usable height is known.
   k.ymax = Math.max(0, TL.lanes.length * rh + TL.rulerH + (TL.mon ? MONH : 0) - H);
 
   const first = Math.max(0, Math.floor(k.view.y / rh));
   const last = Math.min(TL.lanes.length - 1, Math.floor((k.view.y + H) / rh));
   TL.drawn = Math.max(0, last - first + 1);
 
-  // ---- faixas: fundo, cabecalho, M / S / R ----
+  // ---- rows: background, header, M / S / R ----
   c.textBaseline = "middle";
   for (let li = first; li <= last; li++) {
     const y = laneY(li), L = TL.lanes[li];
@@ -645,7 +662,7 @@ function draw(k) {
     c.fillRect(hw, y, W - hw, rh);
     c.fillStyle = col.panel;
     c.fillRect(0, y, hw, rh);
-    if (li === TL.cur) {                                  // track focado: 1 px no accent (PRINCIPIOS §2)
+    if (li === TL.cur) {                                  // focused track: 1 px in the accent (PRINCIPIOS §2)
       c.strokeStyle = col.accent; c.lineWidth = 1;
       c.strokeRect(0.5, y + 0.5, W - 1, rh - 1);
     }
@@ -670,14 +687,14 @@ function draw(k) {
   c.save();
   c.beginPath(); c.rect(hw, TL.rulerH, W - hw, H - TL.rulerH); c.clip();
 
-  // ---- limites do intervalo In/Out (a barra cinza fica na regua; aqui so as duas linhas) ----
+  // ---- In/Out range limits (the grey bar lives on the ruler; here only the two lines) ----
   const xi = t2x(TL.inT()), xo = t2x(TL.outT());
   c.strokeStyle = col.fg3; c.lineWidth = 1;
   c.beginPath();
   for (const x of [xi, xo]) { c.moveTo(Math.round(x) + 0.5, TL.rulerH); c.lineTo(Math.round(x) + 0.5, H); }
   c.stroke();
 
-  // ---- grade vertical ----
+  // ---- vertical grid ----
   let step = STEPS[STEPS.length - 1];
   for (const s of STEPS) if (s * k.view.zoom >= 64) { step = s; break; }
   c.strokeStyle = col.line; c.lineWidth = 1;
@@ -688,7 +705,7 @@ function draw(k) {
   }
   c.stroke();
 
-  // ---- markers (cinza: SHORTCUTS.md) ----
+  // ---- markers (grey: SHORTCUTS.md) ----
   const mk = TL.show ? TL.show.markers : [];
   if (mk.length) {
     c.strokeStyle = col.fg3; c.beginPath();
@@ -700,7 +717,7 @@ function draw(k) {
     c.stroke();
   }
 
-  // ---- curva de valor: uma path por lane, amostrada como o engine interpola ----
+  // ---- value curve: one path per lane, sampled the way the engine interpolates ----
   const dragLanes = k.drag && k.drag.mode === "keys" ? k.drag.lanes : null;
   c.strokeStyle = col.fg2; c.lineWidth = 1;
   c.beginPath();
@@ -726,7 +743,7 @@ function draw(k) {
   }
   c.stroke();
 
-  // ---- keyframes: passe 0 normais, passe 1 selecionados ----
+  // ---- keyframes: pass 0 normal, pass 1 selected ----
   for (let pass = 0; pass < 2; pass++) {
     c.beginPath();
     for (let li = first; li <= last; li++) {
@@ -740,7 +757,8 @@ function draw(k) {
         if (x > W + 8) break;
         if (x < hw - 8) continue;
         if ((sel ? sel.has(i) : false) !== !!pass) continue;
-        // ponytail: passo minimo de 3 px agrupa keyframes colados no zoom-out ; some so o desenho
+        // ponytail: a minimum step of 3 px groups keyframes stuck together when zoomed out ; only
+        // the drawing goes
         if (!pass && x - lastX < 3) continue;
         lastX = x;
         diamond(c, x, y + rh - 4 - (L.vs[i] - L.vmin) * sc, pass ? 5 : 4);
@@ -751,7 +769,7 @@ function draw(k) {
   }
   c.restore();
 
-  // ---- regua ----
+  // ---- ruler ----
   c.fillStyle = col.panel; c.fillRect(0, 0, W, TL.rulerH);
   c.strokeStyle = col.line; c.lineWidth = 1;
   c.beginPath(); c.moveTo(0, TL.rulerH - 0.5); c.lineTo(W, TL.rulerH - 0.5); c.stroke();
@@ -770,9 +788,9 @@ function draw(k) {
     c.fillStyle = col.fg2;
     c.beginPath(); c.moveTo(x, TL.rulerH - 8); c.lineTo(x + 5, TL.rulerH - 1); c.lineTo(x - 5, TL.rulerH - 1); c.fill();
   }
-  const bi = Math.max(hw, xi), bo = Math.min(W, xo);       // intervalo In-Out como barra cinza
+  const bi = Math.max(hw, xi), bo = Math.min(W, xo);       // In-Out range as a grey bar
   if (bo > bi) { c.fillStyle = col.fg3; c.fillRect(bi, TL.rulerH - 4, bo - bi, 3); }
-  for (let b = 0; b < 2; b++) {                            // alcas de In / Out
+  for (let b = 0; b < 2; b++) {                            // In / Out handles
     const x = b ? xo : xi;
     if (x < hw - 7 || x > W) continue;
     c.fillStyle = col.fg2;
@@ -795,8 +813,9 @@ function draw(k) {
     c.beginPath(); c.moveTo(xp - 6, 0); c.lineTo(xp + 6, 0); c.lineTo(xp, 10); c.fill();
   }
 
-  // ---- previz: dmx + quadro ILDA + planta do patch no playhead (Alt+M) ----
-  // ponytail: faixa sobreposta no rodape, sem painel proprio ; virar painel quando a GUI tiver layout.
+  // ---- previz: dmx + ILDA frame + patch plan at the playhead (Alt+M) ----
+  // ponytail: a strip laid over the bottom, with no panel of its own ; make it a panel once the
+  // GUI has a layout.
   if (TL.mon && window.VW) window.VW.draw(c, { x: 0, y: H - MONH, w: W, h: MONH }, TL.t);
 
   // ---- marquee ----
@@ -816,7 +835,7 @@ function laneAt(y) {
 }
 TL.laneAt = laneAt;
 
-// Keyframe sob (x, y) na lane li, ou -1. Bisect no tempo; o Y so desempata.
+// Keyframe under (x, y) in lane li, or -1. Bisect on time; the Y only breaks ties.
 function keyAt(li, x, y) {
   const L = TL.lanes[li], t = x2t(x), tol = 7 / TL.k.view.zoom;
   const sc = (TL.rowH - 8) / ((L.vmax - L.vmin) || 1), ly = laneY(li);
@@ -830,11 +849,11 @@ function keyAt(li, x, y) {
 }
 TL.keyAt = keyAt;
 
-// ---- interacao ----------------------------------------------------------
+// ---- interaction --------------------------------------------------------
 function onDown(p) {
   const k = TL.k, x = p.x, y = p.y;
   hideMenu();
-  if (y < TL.rulerH) {                                    // regua: alcas de In/Out ou scrub
+  if (y < TL.rulerH) {                                    // ruler: In/Out handles or scrub
     if (x > TL.headW) {
       const d = t => Math.abs(t2x(t) - x);
       if (d(TL.inT()) < 7) { k.drag = { mode: "in" }; buildSnaps(); return true; }
@@ -848,7 +867,7 @@ function onDown(p) {
   if (li < 0) { if (!p.shift) k.sel.clear(); k.dirty = true; return true; }
   TL.cur = li;
   const L = TL.lanes[li];
-  if (x < TL.headW) {                                     // cabecalho: M / S / R
+  if (x < TL.headW) {                                     // header: M / S / R
     const ly = laneY(li) + TL.rowH / 2;
     if (Math.abs(y - ly) < 8 && x > TL.headW - 58 && x < TL.headW - 5) {
       const b = Math.floor((x - (TL.headW - 58)) / 19);
@@ -871,20 +890,20 @@ function onDown(p) {
     k.dirty = true;
     return true;
   }
-  return false;                                           // vazio: o kit abre o marquee
+  return false;                                           // empty: the kit opens the marquee
 }
 
 function onMove(p, d) {
   const k = TL.k;
   if (d.mode === "scrub") { setT(x2t(p.x)); d.moved = true; }
-  // Durante o arrasto so' a borda do show limita; quem cruzou o outro limite e' normalizado pelo
-  // `TL.setInOut` do onUp — antes, o clamp aqui deixava In e Out a 10 ms um do outro.
+  // During the drag only the show border limits it; whoever crossed the other limit is normalized
+  // by the `TL.setInOut` of onUp — before, the clamp here left In and Out 10 ms apart.
   else if (d.mode === "in") TL.show.in = clamp(snapT(x2t(p.x)), 0, TL.dur());
   else if (d.mode === "out") TL.show.out = clamp(snapT(x2t(p.x)), 0, TL.dur());
   else if (d.mode === "keys") {
     d.moved = true;
     let dt = (p.x - d.x) / k.view.zoom;
-    if (!p.shift) dt = snapT(d.anchor + dt) - d.anchor;   // Shift solta o snapping
+    if (!p.shift) dt = snapT(d.anchor + dt) - d.anchor;   // Shift releases the snapping
     const dy = p.y - d.y;
     for (const it of d.items) {
       const L = TL.lanes[it.li];
@@ -898,13 +917,13 @@ function onMove(p, d) {
 
 function onUp(p, d) {
   if (d.mode === "keys" && d.moved) {
-    // as edicoes saem ANTES do resort: e' o resort que embaralha os indices de d.items
+    // the edits go out BEFORE the resort: it is the resort that shuffles the indices of d.items
     const eds = d.items.map(it => eKey(it.li, it.ki, it.t));
     for (const li of d.lanes) resort(li);
     commit(eds);
   } else if (d.mode === "in") TL.setInOut(TL.show.in, null);
   else if (d.mode === "out") TL.setInOut(null, TL.show.out);
-  else if (d.mode === "scrub" && d.moved) TL.locate(TL.t);   // um locate no fim, nao um por frame
+  else if (d.mode === "scrub" && d.moved) TL.locate(TL.t);   // one locate at the end, not one per frame
 }
 
 function onMarquee(r, add) {
@@ -923,10 +942,10 @@ function onMarquee(r, add) {
   for (const li of k.sel.m.keys()) { TL.cur = li; break; }
 }
 
-// ---- menu de contexto (easing) -----------------------------------------
+// ---- context menu (easing) ---------------------------------------------
 function hideMenu() { if (TL.menuEl) TL.menuEl.style.display = "none"; }
 
-// Abre o menu de easing em (x, y) do canvas. Botao direito e Ctrl+E entram por aqui.
+// Opens the easing menu at (x, y) of the canvas. Right button and Ctrl+E come in through here.
 function menuAt(x, y) {
   if (!TL.menuEl || !TL.k.sel.count()) return;
   const r = TL.k.cv.getBoundingClientRect();
@@ -951,10 +970,10 @@ function setCurve(name) {
 }
 TL.setCurve = setCurve;
 
-// ---- atalhos (design/SHORTCUTS.md) --------------------------------------
+// ---- shortcuts (design/SHORTCUTS.md) ------------------------------------
 function step(n) { TL.locate(TL.t + n / TL.fps()); }
 
-/// Anda para o instante vizinho numa lista JA' ordenada (keys da lane, marcadores do show).
+/// Moves to the neighbouring instant in an ALREADY ordered list (lane keys, show markers).
 function jump(ts, n, dir) {
   const i = CK.bisect(ts, n, TL.t + (dir > 0 ? 1e-6 : -1e-6));
   const j = dir > 0 ? i : i - 1;
@@ -971,35 +990,35 @@ function jumpMarker(dir) {
   jump(m, m.length, dir);
 }
 
-// Shift+M: edita o marcador mais proximo do playhead. Marcador aqui e' so' um instante (numero)
-// no show — nao tem nome para renomear: o prompt aceita o tempo novo, e vazio apaga.
-// ponytail: `prompt` do navegador ; vira campo na propria regua quando a GUI tiver dialogo.
+// Shift+M: edits the marker closest to the playhead. A marker here is only an instant (a number)
+// in the show — it has no name to rename: the prompt takes the new time, and empty deletes it.
+// ponytail: the browser `prompt` ; it becomes a field on the ruler itself once the GUI has a dialog.
 function editMarker() {
   const m = TL.show.markers;
   const i = CK.near(m, m.length, TL.t, 12 / TL.k.view.zoom);
-  if (i < 0) return TL.log("Shift+M: nenhum marcador perto do playhead");
-  const r = prompt("marcador " + tc(m[i], TL.fps()) + ": tempo em segundos (vazio apaga)", String(m[i]));
+  if (i < 0) return TL.log("Shift+M: no marker near the playhead");
+  const r = prompt("marker " + tc(m[i], TL.fps()) + ": time in seconds (empty deletes)", String(m[i]));
   if (r === null) return;
   if (r.trim() === "") m.splice(i, 1);
   else {
     const v = parseFloat(r);
-    if (!isFinite(v)) return TL.log("tempo invalido: " + r);
+    if (!isFinite(v)) return TL.log("invalid time: " + r);
     m[i] = clamp(v, 0, TL.dur());
     m.sort((a, b) => a - b);
   }
   field("/markers", m);
 }
 
-// K segurado + J/L anda quadro a quadro (Premiere). O keyup do `mount` so' existe por causa disto.
+// K held + J/L steps frame by frame (Premiere). The keyup of `mount` only exists because of this.
 let kHeld = false;
 
 function onKey(e) {
   if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
   const k = TL.k, key = e.key, code = e.code, ctrl = e.ctrlKey, shift = e.shiftKey, alt = e.altKey;
-  const kb = key.length === 1 ? key.toLowerCase() : key;   // a tecla; o Shift se le' em `shift`
+  const kb = key.length === 1 ? key.toLowerCase() : key;   // the key; the Shift is read in `shift`
   let used = true;
   if (code === "Space" && !ctrl) TL.play(TL.rate ? 0 : 1);
-  // K segurado + J/L = quadro a quadro; sozinhos, J/L sao o shuttle (cada toque dobra, teto 8x).
+  // K held + J/L = frame by frame; on their own, J/L are the shuttle (each press doubles, max 8x).
   else if (kb === "j" && kHeld && !ctrl) step(-1);
   else if (kb === "l" && kHeld && !ctrl) step(1);
   else if (kb === "j" && !ctrl) TL.play(TL.rate < 0 ? -Math.min(8, -TL.rate * 2) : -1);
@@ -1031,7 +1050,7 @@ function onKey(e) {
   else if (kb === "m" && shift) editMarker();
   else if (kb === "m" && !ctrl) {
     TL.show.markers.push(+TL.t.toFixed(4));
-    TL.show.markers.sort((a, b) => a - b);   // a lista fica ordenada: `jumpMarker` conta com isso
+    TL.show.markers.sort((a, b) => a - b);   // the list stays ordered: `jumpMarker` counts on it
     field("/markers", TL.show.markers);
   }
   else if (key === "=" || key === "+") k.zoomAt(k.gutter + (k.w - k.gutter) / 2, 1.25);
@@ -1076,7 +1095,7 @@ function onKey(e) {
   } else if (ctrl && kb === "e") {
     if (k.sel.count()) menuAt(clamp(t2x(TL.t), TL.headW, Math.max(TL.headW, k.w - 90)),
                               laneY(Math.max(0, TL.cur)) + TL.rowH);
-    else TL.log("Ctrl+E: selecione um keyframe");
+    else TL.log("Ctrl+E: select a keyframe");
   } else if (kb === "s" && !ctrl && !shift) TL.snap = !TL.snap;
   else if (kb === "d" && shift && TL.cur >= 0) { const L = TL.lanes[TL.cur]; L.mute = !L.mute; trackFlag(L, "mute", L.mute); }
   else if (kb === "s" && shift && TL.cur >= 0) { const L = TL.lanes[TL.cur]; L.solo = !L.solo; trackFlag(L, "solo", L.solo); }
@@ -1087,11 +1106,11 @@ function onKey(e) {
 TL.onKey = onKey;
 
 TL.fit = function () {
-  if (TL.k.w < 2) TL.k.resize();   // show carregado antes do primeiro layout: mede o canvas agora
+  if (TL.k.w < 2) TL.k.resize();   // show loaded before the first layout: measure the canvas now
   TL.k.fit(0, TL.dur());
 };
 
-// ---- montagem -----------------------------------------------------------
+// ---- mounting -----------------------------------------------------------
 TL.mount = function (cv, menuEl, msgEl) {
   const k = TL.k = CK.attach(cv, draw);
   k.gutter = TL.headW;
@@ -1107,14 +1126,14 @@ TL.mount = function (cv, menuEl, msgEl) {
       TL.menuEl.appendChild(b);
     }
     const d = document.createElement("button");
-    d.textContent = "apagar";
+    d.textContent = "delete";
     d.onclick = () => { hideMenu(); delSelected(); };
     TL.menuEl.appendChild(d);
     addEventListener("pointerdown", e => { if (!TL.menuEl.contains(e.target)) hideMenu(); }, true);
   }
   addEventListener("keydown", onKey);
   addEventListener("keyup", e => { if (e.key && e.key.toLowerCase() === "k") kHeld = false; });
-  // Alt+Tab com o K na mao nao manda keyup: sem isto, J/L ficam presos no quadro a quadro.
+  // Alt+Tab with K held sends no keyup: without this, J/L stay stuck in frame-by-frame.
   addEventListener("blur", () => { kHeld = false; });
   return k;
 };

@@ -1,9 +1,9 @@
 "use strict";
 // node --test spellgui/web/test/charset.test.js
-// Nem todo servidor manda charset no Content-Type (python -m http.server, protocolo asset do
-// Tauri, file://). Sem <meta charset> o Chrome cai em windows-1252 e a pagina inteira vira
-// mojibake ("2 TRAS ." virou "2 TRAS A." de verdade em app.html). Entao: toda pagina declara o
-// charset nos primeiros 1024 bytes, e nenhum fonte tem BOM nem byte invalido em UTF-8.
+// Not every server sends a charset in the Content-Type (python -m http.server, the Tauri asset
+// protocol, file://). With no <meta charset> Chrome falls back to windows-1252 and the whole page
+// turns into mojibake ("2 REAR ." really did become "2 REAR A." in app.html). So: every page
+// declares the charset in the first 1024 bytes, and no source has a BOM or an invalid UTF-8 byte.
 
 const { test } = require("node:test");
 const assert = require("node:assert");
@@ -25,27 +25,27 @@ function varre(dir, exts) {
 
 const rel = (p) => path.relative(RAIZ, p).replace(/\\/g, "/");
 
-test("toda pagina declara <meta charset=utf-8> nos primeiros 1024 bytes", () => {
+test("every page declares <meta charset=utf-8> in the first 1024 bytes", () => {
   const paginas = varre(RAIZ, [".html"]);
-  assert.ok(paginas.length > 0, "nenhum .html encontrado");
+  assert.ok(paginas.length > 0, "no .html found");
   for (const p of paginas) {
     const cabeca = fs.readFileSync(p).subarray(0, 1024).toString("latin1");
     assert.match(
       cabeca,
       /<meta\s+charset\s*=\s*["']?utf-?8["']?\s*\/?>/i,
-      rel(p) + ": sem <meta charset=utf-8> nos primeiros 1024 bytes"
+      rel(p) + ": no <meta charset=utf-8> in the first 1024 bytes"
     );
   }
 });
 
-test("nenhum fonte tem BOM nem byte invalido em UTF-8", () => {
+test("no source has a BOM or an invalid UTF-8 byte", () => {
   const dec = new TextDecoder("utf-8", { fatal: true });
   for (const p of varre(RAIZ, [".html", ".js", ".css"])) {
     const b = fs.readFileSync(p);
     assert.ok(
       !(b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf),
-      rel(p) + ": comeca com BOM"
+      rel(p) + ": starts with a BOM"
     );
-    assert.doesNotThrow(() => dec.decode(b), rel(p) + ": nao decodifica como UTF-8");
+    assert.doesNotThrow(() => dec.decode(b), rel(p) + ": does not decode as UTF-8");
   }
 });

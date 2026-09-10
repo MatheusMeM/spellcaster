@@ -1,17 +1,18 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <title>Spellcaster — timeline</title>
 <link rel="stylesheet" href="../../design/tokens/spellcaster.css">
 <style>
-  /* Tres faixas fixas na altura da janela: toolbar, canvas, barra de status. A pagina NUNCA rola
-     (`overflow:hidden` em html e body): rolar e' coisa das tracks, dentro do canvas, e a toolbar e
-     a barra de status ficam onde estao. O canvas e' `flex: 1 1 0` com `min-height: 0` dentro de
-     `.mid` posicionado: sem isso o atributo `height` do canvas (altura * dpr) vira altura
-     intrinseca, o body estoura, aparece a barra de rolagem da pagina e a area das tracks desce
-     para fora da tela. Faixa em flex, e nao `grid-template-rows`: a primeira linha do <body> esta'
-     reservada para o `<div id="nav">` da GUI, e um filho a mais nao pode reordenar as faixas. */
+  /* Three fixed bands in the window height: toolbar, canvas, status bar. The page NEVER scrolls
+     (`overflow:hidden` on html and body): scrolling belongs to the tracks, inside the canvas, and
+     the toolbar and the status bar stay where they are. The canvas is `flex: 1 1 0` with
+     `min-height: 0` inside a positioned `.mid`: without that the canvas `height` attribute
+     (height * dpr) becomes the intrinsic height, the body overflows, the page scrollbar shows up
+     and the track area drops off screen. Bands in flex, and not `grid-template-rows`: the first
+     row of <body> is reserved for the GUI `<div id="nav">`, and one extra child must not reorder
+     the bands. */
   * { box-sizing: border-box; }
   html, body { height: 100vh; margin: 0; overflow: hidden; background: var(--sc-bg);
                color: var(--sc-fg); font: var(--sc-text-sm)/1.3 var(--sc-mono); }
@@ -31,8 +32,8 @@
           text-transform: uppercase; font-family: var(--sc-label); }
   .mid { flex: 1 1 0; min-height: 0; position: relative; }
   #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; }
-  /* Nome do show e contagem de tracks moram aqui: na toolbar empurravam botao para fora numa
-     janela de 1000 px. O texto de atalhos encolhe com reticencias em vez de alargar a barra. */
+  /* Show name and track count live here: in the toolbar they pushed a button off screen in a
+     1000 px window. The shortcut text shrinks with an ellipsis instead of widening the bar. */
   .cli { flex: 0 0 auto; display: flex; align-items: baseline; gap: var(--sc-gap); padding: 4px 8px;
          background: var(--sc-panel); border-top: 1px solid var(--sc-line);
          color: var(--sc-fg-3); font-size: var(--sc-text-xs); }
@@ -50,26 +51,26 @@
 <script src="nav.js"></script>
 <div class="bar">
   <span class="over">timeline</span>
-  <input type="text" id="path" value="../../shows/medgrupo.spell" title="caminho do .spell (Ctrl+O foca aqui)">
-  <button id="open" title="Abrir (Ctrl+O)">Abrir</button>
-  <input type="file" id="file" accept=".spell,.json" title="abrir .spell do disco (file:// bloqueia fetch)">
+  <input type="text" id="path" value="../../shows/medgrupo.spell" title="path of the .spell (Ctrl+O focuses here)">
+  <button id="open" title="Open (Ctrl+O)">Open</button>
+  <input type="file" id="file" accept=".spell,.json" title="open a .spell from disk (file:// blocks fetch)">
   <span class="sep"></span>
-  <button id="play" title="Play / pause (Espaco)">Play</button>
+  <button id="play" title="Play / pause (Space)">Play</button>
   <button id="pause" title="Pause (K)">Pause</button>
-  <button id="stop" title="Stop (Home volta ao inicio)">Stop</button>
-  <button id="in" title="Marcar In no playhead (I)">In</button>
-  <button id="out" title="Marcar Out no playhead (O)">Out</button>
-  <button id="loop" title="Loop no intervalo In-Out (Ctrl+L)">Loop</button>
+  <button id="stop" title="Stop (Home goes back to the start)">Stop</button>
+  <button id="in" title="Mark In at the playhead (I)">In</button>
+  <button id="out" title="Mark Out at the playhead (O)">Out</button>
+  <button id="loop" title="Loop over the In-Out range (Ctrl+L)">Loop</button>
   <button id="snap" class="on" title="Snapping (S)">Snap</button>
-  <button id="rec" title="Record arm do track focado (R)">Rec arm</button>
-  <button id="fit" title="Ajustar tudo (\ ou Shift+Z)">Fit</button>
+  <button id="rec" title="Record arm of the focused track (R)">Rec arm</button>
+  <button id="fit" title="Fit everything (\ or Shift+Z)">Fit</button>
   <span class="sep"></span>
-  <button id="tadd" title="Novo track dmx">+Track</button>
-  <button id="tdel" title="Apagar o track focado">-Track</button>
-  <button id="mon" title="Monitor DMX do track focado (Alt+M)">Monitor</button>
-  <button id="undo" title="Desfazer (Ctrl+Z); refazer = Ctrl+Shift+Z">Desfazer</button>
-  <button id="new" title="Novo show (Ctrl+N)">Novo</button>
-  <button id="save" title="Salvar (Ctrl+S); salvar como = Ctrl+Shift+S">Salvar</button>
+  <button id="tadd" title="New dmx track">+Track</button>
+  <button id="tdel" title="Delete the focused track">-Track</button>
+  <button id="mon" title="DMX monitor of the focused track (Alt+M)">Monitor</button>
+  <button id="undo" title="Undo (Ctrl+Z); redo = Ctrl+Shift+Z">Undo</button>
+  <button id="new" title="New show (Ctrl+N)">New</button>
+  <button id="save" title="Save (Ctrl+S); save as = Ctrl+Shift+S">Save</button>
 </div>
 <div class="mid"><canvas id="cv" tabindex="0"></canvas></div>
 <div class="cli"><b id="msg"></b><span id="keys"></span></div>
@@ -84,13 +85,13 @@
 const q = id => document.getElementById(id);
 const msg = q("msg");
 q("keys").textContent =
-  "Espaco toca | J/K/L shuttle, K+J/K+L quadro a quadro | setas 1 quadro, Shift 5 | I/O intervalo, " +
-  "Ctrl+L loop | M marcador, Shift+M edita | S snap, R rec, Shift+D mute, Shift+S solo | " +
-  "Ctrl+K keyframe, Ctrl+E easing | Ctrl+Z desfaz, Ctrl+Shift+Z refaz | Ctrl+N novo, Ctrl+O abre, " +
-  "Ctrl+S salva, Ctrl+Shift+S salva como | Alt+M monitor (entrada quando armado) | = / - zoom, \\ ajusta | " +
-  "roda rola, Shift+roda anda, Ctrl+roda zoom";
+  "Space plays | J/K/L shuttle, K+J/K+L frame by frame | arrows 1 frame, Shift 5 | I/O range, " +
+  "Ctrl+L loop | M marker, Shift+M edits | S snap, R rec, Shift+D mute, Shift+S solo | " +
+  "Ctrl+K keyframe, Ctrl+E easing | Ctrl+Z undo, Ctrl+Shift+Z redo | Ctrl+N new, Ctrl+O open, " +
+  "Ctrl+S save, Ctrl+Shift+S save as | Alt+M monitor (input when armed) | = / - zoom, \\ fit | " +
+  "wheel scrolls, Shift+wheel moves, Ctrl+wheel zooms";
 TL.mount(q("cv"), q("menu"), msg);
-TL.load({ name: "vazio", fps: 30, duration: 60, tracks: [], markers: [] });
+TL.load({ name: "empty", fps: 30, duration: 60, tracks: [], markers: [] });
 
 q("open").onclick = () => { TL.file = q("path").value; TL.fetch(TL.file).catch(e => { msg.textContent = e.message; }); };
 q("file").onchange = e => {
@@ -105,15 +106,15 @@ q("in").onclick = () => TL.setInOut(TL.t, null);
 q("out").onclick = () => TL.setInOut(null, TL.t);
 q("loop").onclick = () => TL.setLoop(!TL.loop);
 q("snap").onclick = () => { TL.snap = !TL.snap; q("snap").classList.toggle("on", TL.snap); TL.k.invalidate(); };
-// O arme mora no engine (rec_arm); a barra so' chama o mesmo funil da tecla R.
+// The arm lives in the engine (rec_arm); the bar only calls the same funnel as the R key.
 q("rec").onclick = () => {
   if (TL.cur >= 0) TL.recArm(TL.cur);
   TL.onState();
   TL.k.invalidate();
 };
 q("fit").onclick = () => TL.fit();
-// +Track abre um menu de tipo. `laser` lista os .ild que o engine ve (laser_files), sem dialogo
-// nativo; `fx` pergunta o .rhai. Video nao entra: GStreamer/NDI dependem de SDK (ROADMAP R2).
+// +Track opens a type menu. `laser` lists the .ild files the engine sees (laser_files), with no
+// native dialog; `fx` asks for the .rhai. Video is not in: GStreamer/NDI depend on an SDK (ROADMAP R2).
 const tmenu = q("tmenu");
 function tItem(txt, fn) {
   const b = document.createElement("button");
@@ -128,13 +129,13 @@ q("tadd").onclick = () => {
   tItem("laser (.ild)", () => {
     tmenu.innerHTML = "";
     TL.laserFiles().then(fs => {
-      if (!fs.length) return tItem("(nenhum .ild)", () => { tmenu.style.display = "none"; });
+      if (!fs.length) return tItem("(no .ild)", () => { tmenu.style.display = "none"; });
       for (const f of fs) tItem(f.name, () => { tmenu.style.display = "none"; TL.trackAdd("laser", f.name); });
     });
   });
   tItem("fx (.rhai)", () => {
     tmenu.style.display = "none";
-    const n = prompt("script .rhai (ao lado do .spell):", "medgrupo.rhai");
+    const n = prompt("script .rhai (next to the .spell):", "medgrupo.rhai");
     if (n) TL.trackAdd("fx", n);
   });
   tmenu.style.left = r.left + "px";
@@ -151,11 +152,12 @@ q("undo").onclick = () => TL.undo(-1);
 q("new").onclick = () => TL.showNew();
 q("save").onclick = () => TL.save();
 
-// Ctrl+O nao abre dialogo: foca o campo de caminho, que ja' e' o "abrir" desta pagina.
+// Ctrl+O opens no dialog: it focuses the path field, which already is the "open" of this page.
 TL.onOpen = () => { const p = q("path"); p.focus(); p.select(); };
 
-// O botao Play so acende quando ha transporte andando (local ou do engine): a timeline chama isto
-// em toda mudanca de transporte, no Alt+M do monitor e quando o loop do engine muda de estado.
+// The Play button only lights up when there is transport running (local or from the engine): the
+// timeline calls this on every transport change, on the Alt+M of the monitor and when the engine
+// loop changes state.
 TL.onState = () => {
   q("play").classList.toggle("on", !!TL.rate);
   q("mon").classList.toggle("on", TL.mon);
@@ -166,11 +168,12 @@ TL.onState = () => {
 TL.k.loop();
 TL.file = q("path").value;
 TL.fetch(TL.file).catch(e => {
-  msg.textContent = e.message + " — sem servidor, use o seletor de arquivo";
-  TL.load({ name: "sem show", fps: 30, duration: 60, tracks: [], markers: [] });
+  msg.textContent = e.message + " — no server, use the file picker";
+  TL.load({ name: "no show", fps: 30, duration: 60, tracks: [], markers: [] });
 });
-// Com `spellcore serve` o WS assume: GET /show carrega, os eventos `transport` movem o playhead e
-// cada edicao vira comando do registry. Sem servidor o WS fecha e a pagina segue offline.
+// With `spellcore serve` the WS takes over: GET /show loads, the `transport` events move the
+// playhead and every edit becomes a registry command. With no server the WS closes and the page
+// carries on offline.
 if (location.protocol.indexOf("http") === 0) TL.connect();
 </script>
 </body>

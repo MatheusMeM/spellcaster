@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <title>Spellcaster — patchbay</title>
@@ -9,7 +9,7 @@
   html, body { height: 100%; margin: 0; background: var(--sc-bg); color: var(--sc-fg);
                font: var(--sc-text-sm)/1.3 var(--sc-mono); }
   body { display: flex; flex-direction: column; overflow: hidden; }
-  .zonas { flex: 1 1 auto; display: flex; min-height: 0; }        /* Chataigne: lista, canvas, Inspector */
+  .zonas { flex: 1 1 auto; display: flex; min-height: 0; }        /* Chataigne: list, canvas, Inspector */
   .centro { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
   .bar { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 6px 8px;
          white-space: nowrap; overflow: hidden;
@@ -50,12 +50,12 @@
 <script src="nav.js"></script>
 <div class="bar">
   <span class="over">patchbay</span>
-  <input type="text" id="path" value="shows/patchbay_demo.spell" title="caminho como o engine ve, a partir da raiz do repo">
-  <button id="open">Abrir</button>
+  <input type="text" id="path" value="shows/patchbay_demo.spell" title="path as the engine sees it, from the repo root">
+  <button id="open">Open</button>
   <span class="over" id="estado">offline</span>
   <span class="over" id="aviso"></span>
-  <span class="over">Shift+A add &nbsp; Delete &nbsp; Shift+Delete religa &nbsp; Ctrl+] / Ctrl+[ grupo &nbsp;
-    M mute &nbsp; L lock &nbsp; Shift+G grupo &nbsp; Ctrl+Z &nbsp; Shift+Z enquadra</span>
+  <span class="over">Shift+A add &nbsp; Delete &nbsp; Shift+Delete reconnects &nbsp; Ctrl+] / Ctrl+[ group &nbsp;
+    M mute &nbsp; L lock &nbsp; Shift+G group &nbsp; Ctrl+Z &nbsp; Shift+Z fits</span>
 </div>
 <div class="zonas">
   <div id="cat"></div>
@@ -65,7 +65,7 @@
   </div>
   <div id="insp"></div>
 </div>
-<div id="add"><input type="text" placeholder="tipo de no..."><div></div></div>
+<div id="add"><input type="text" placeholder="node type..."><div></div></div>
 <script src="bus.js"></script>
 <script src="canvaskit.js"></script>
 <script src="catalog.js"></script>
@@ -74,11 +74,11 @@
 "use strict";
 const q = id => document.getElementById(id);
 PB.init({ cv: q("cv"), cat: q("cat"), insp: q("insp"), log: q("log"),
-          aviso: q("aviso"), add: q("add"), estado: q("estado") });
+          warn: q("aviso"), add: q("add"), state: q("estado") });
 const arg = new URLSearchParams(location.search).get("show");
 if (arg) q("path").value = arg;
-q("open").onclick = () => PB.carrega(q("path").value);
-PB.liga(q("path").value);
+q("open").onclick = () => PB.load(q("path").value);
+PB.connect(q("path").value);
 </script>
 </body>
 </html>
