@@ -809,6 +809,17 @@ o laser o que `player::current()` é para o transporte (um processo, N feeds).
 | `laser_files(dir="shows")` | os `.ild` do diretório | `{dir, files:[{name, path, bytes}]}` |
 | `clip_frame(clip, t=0, index?, fps=30)` | um quadro do `.ild` para desenhar (o previz da timeline): `index` escolhe direto, senão é `floor(t*fps)` com o clipe repetindo, a conta do player. `clip` sem caminho resolve na pasta do `.spell` aberto; não toca em DAC nenhum | `{clip, index, frames, name, points:[[x, y, r, g, b, blank]]}` com `x` e `y` normalizados em -1..1 |
 
+**Descoberta do Ether Dream (`laser_dacs`, `net`).** O DAC anuncia um beacon UDP de 36 bytes em
+`255.255.255.255:7654`, 1 Hz. No Windows, com o **Ether Dream Sitter** aberto, o `bind` em
+`0.0.0.0:7654` é recusado com `WSAEACCES` (10013) mesmo com `SO_REUSEADDR` — o Windows só
+compartilha o datagrama se os **dois** sockets pedirem, e o Sitter não pede. Medido nesta
+máquina (Sitter no PID 53580, DAC em 169.254.207.140, PC em 169.254.86.236/16): `bind 0.0.0.0`
+falha, `bind 169.254.86.236:7654` passa **e recebe o broadcast** (4 beacons em 4 s). Por isso o
+`netscan` escuta no IP de cada placa, e não só no coringa; e, se nada chegar na metade do prazo,
+pede o status por TCP 7765 aos vizinhos da tabela ARP (`arp -a` / `ip neigh`, texto lido, nunca
+executado) — um Ether Dream responde 22 bytes (`ack` + comando ecoado + `dac_status`) ao aceitar
+a conexão.
+
 `path` de `laser_param` (os mesmos paths de `modules/laser.json`, a declaração do módulo laser);
 as chaves `stat/*` de `laser_stats` são os `values` do mesmo arquivo, só as que `FeedStats` conta:
 
