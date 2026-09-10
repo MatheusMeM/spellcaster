@@ -9,7 +9,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 schemars = { workspace = true }
 
-# os testes de integracao (tests/) nao veem as dependencias normais do crate
+# integration tests (tests/) do not see the crate's normal dependencies
 [dev-dependencies]
 protocols = { workspace = true }
 serde_json = { workspace = true }

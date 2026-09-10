@@ -1,5 +1,5 @@
-//! Registro de comandos: todo verbo do produto passa por aqui. CLI, OSC-API, GUI e MCP sao
-//! clientes. Erro e' `String` — sem `anyhow` na R0.
+//! Command registry: every verb of the product goes through here. CLI, OSC-API, GUI and MCP are
+//! clients. An error is a `String` — no `anyhow` in R0.
 
 use crate::player;
 use crate::show;
@@ -18,7 +18,7 @@ pub struct Command {
     pub f: Box<dyn Fn(Value) -> Result<Value, String> + Send + Sync>,
 }
 
-/// Vec na ordem de insercao (a CLI monta os subcomandos nessa ordem).
+/// Vec in insertion order (the CLI builds the subcommands in that order).
 pub struct Registry {
     cmds: Vec<Command>,
 }
@@ -68,7 +68,7 @@ impl Registry {
     pub fn call(&self, name: &str, args: Value) -> Result<Value, String> {
         match self.get(name) {
             Some(c) => (c.f)(args),
-            None => Err(format!("comando desconhecido: {}", name)),
+            None => Err(format!("unknown command: {}", name)),
         }
     }
 
@@ -79,54 +79,55 @@ impl Registry {
 
 #[derive(Deserialize, JsonSchema)]
 pub struct LoadArgs {
-    /// Caminho do arquivo .spell (o mesmo `file` de show_get, show_save e play_show).
-    // ponytail: `path` era o nome deste argumento e continua aceito por uma rodada, por script e
-    // sessao MCP ja' escritos (no repo nao sobrou chamador) ; tirar o alias na rodada 3.
+    /// Path of the .spell file (the same `file` as show_get, show_save and play_show).
+    // ponytail: `path` was the name of this argument and stays accepted for one round, for
+    // scripts and MCP sessions already written (no caller left in the repo) ; drop the alias in
+    // round 3.
     #[serde(alias = "path")]
     pub file: String,
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct LocateArgs {
-    /// Posicao em segundos.
+    /// Position in seconds.
     pub t: f64,
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct LoopArgs {
-    /// true liga o loop, false desliga.
+    /// true turns the loop on, false turns it off.
     pub on: bool,
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct CueGoArgs {
-    /// Indice da cue; ausente = a proxima.
+    /// Index of the cue; absent = the next one.
     #[serde(default)]
     pub index: Option<usize>,
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct ShowGetArgs {
-    /// Caminho do .spell a abrir; vazio = o ultimo aberto neste processo.
+    /// Path of the .spell to open; empty = the last one opened in this process.
     #[serde(default)]
     pub file: String,
-    /// true = o .spell inteiro (o que a GUI desenha) em vez do resumo.
+    /// true = the whole .spell (what the GUI draws) instead of the summary.
     #[serde(default)]
     pub full: bool,
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct InputArgs {
-    /// Chave do evento: "widget:go", "key:Space", "osc:/spell/go", "module:laser/stat/fps".
+    /// Event key: "widget:go", "key:Space", "osc:/spell/go", "module:laser/stat/fps".
     pub key: String,
-    /// Valor do evento; trigger manda 1.
+    /// Event value; a trigger sends 1.
     #[serde(default)]
     pub value: f64,
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct InputGetArgs {
-    /// Universo declarado em `show.inputs`.
+    /// Universe declared in `show.inputs`.
     #[serde(default = "um")]
     pub universe: u16,
 }
@@ -135,23 +136,24 @@ fn um() -> u16 {
     1
 }
 
-/// Comando sem parametro.
+/// Command with no parameter.
 #[derive(Deserialize, JsonSchema)]
 pub struct NoArgs {}
 
-/// Ultimo .spell aberto neste processo (o `OPEN` do `spellcaster/mcp/tools.py`): (caminho, show).
-// ponytail: um show aberto por processo, gravado por `load`, `show_get` e os comandos de `edit`
-// ; virar id de sessao quando a GUI abrir dois shows ao mesmo tempo. `play_show` NAO grava aqui
-// (mora na CLI, que nao ve este estado): depois de um play, `show_get` continua pedindo `file`.
+/// Last .spell opened in this process (the `OPEN` of `spellcaster/mcp/tools.py`): (path, show).
+// ponytail: one open show per process, written by `load`, `show_get` and the `edit` commands
+// ; make it a session id once the GUI opens two shows at the same time. `play_show` does NOT
+// write here (it lives in the CLI, which does not see this state): after a play, `show_get`
+// still asks for `file`.
 pub(crate) static OPEN: Mutex<Option<(String, show::Show)>> = Mutex::new(None);
 
 pub(crate) fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-/// Caminho do .spell aberto neste processo; vazio quando o show so' existe em memoria. E' a base
-/// dos arquivos que o show cita por nome — o `clip` de um track laser resolve contra a pasta
-/// dele, igual ao `_load_clip` de `spellcaster/player/player.py`.
+/// Path of the .spell open in this process; empty when the show exists only in memory. It is the
+/// base of the files the show names — the `clip` of a laser track resolves against its folder,
+/// like the `_load_clip` of `spellcaster/player/player.py`.
 pub fn open_path() -> String {
     lock(&OPEN)
         .as_ref()
@@ -159,8 +161,8 @@ pub fn open_path() -> String {
         .unwrap_or_default()
 }
 
-/// Resumo do show para a IA e para o resource `spell://show` (mesmos campos do `summary()` do
-/// `spellcaster/mcp/tools.py`), mais o transporte vivo quando ha player rodando.
+/// Summary of the show for the AI and for the `spell://show` resource (the same fields as the
+/// `summary()` of `spellcaster/mcp/tools.py`), plus the live transport when a player is running.
 fn resumo(file: &str, sh: &show::Show) -> Value {
     let outputs: Vec<String> = sh
         .outputs
@@ -215,22 +217,22 @@ fn resumo(file: &str, sh: &show::Show) -> Value {
            "transport": transport})
 }
 
-/// O player vivo neste processo, ou o erro que todo comando de transporte devolve sem ele.
+/// The live player in this process, or the error every transport command returns without it.
 pub(crate) fn vivo() -> Result<player::Handle, String> {
-    player::current().ok_or_else(|| "sem player em execucao".to_string())
+    player::current().ok_or_else(|| "no player running".to_string())
 }
 
 fn estado(h: &player::Handle) -> Result<Value, String> {
     serde_json::to_value(h.state()).map_err(|e| e.to_string())
 }
 
-/// Comandos do engine. `play_show` e `net` ficam na CLI (dependem de `script` e de varredura de
-/// rede) e sao acrescentados de fora com `Registry::add`.
+/// Engine commands. `play_show` and `net` live in the CLI (they depend on `script` and on the
+/// network scan) and are added from outside with `Registry::add`.
 pub fn base() -> Registry {
     let mut r = Registry::new();
     r.add::<LoadArgs>(
         "load",
-        "Abre um .spell E VALIDA a timeline (o que show_get{file} nao faz): devolve nome, fps, duracao, quantos tracks e quais foram ignorados. O argumento `path` e' o nome velho de `file` (deprecated, sai na proxima rodada).",
+        "Opens a .spell AND VALIDATES the timeline (which show_get{file} does not): returns name, fps, duration, how many tracks and which ones were ignored. The `path` argument is the old name of `file` (deprecated, gone next round).",
         |a| {
             let sh = show::load(Path::new(&a.file))?;
             let tl = Timeline::new(&sh)?;
@@ -242,7 +244,7 @@ pub fn base() -> Registry {
     );
     r.add::<ShowGetArgs>(
         "show_get",
-        "Resumo do .spell aberto (ou do arquivo dado): nome, fps, duracao, saidas, patch, tracks, cues. full=true devolve o .spell inteiro.",
+        "Summary of the open .spell (or of the given file): name, fps, duration, outputs, patch, tracks, cues. full=true returns the whole .spell.",
         |a| {
             if !a.file.is_empty() {
                 let sh = show::load(Path::new(&a.file))?;
@@ -252,17 +254,18 @@ pub fn base() -> Registry {
                 Some((_, sh)) if a.full => serde_json::to_value(sh).map_err(|e| e.to_string()),
                 Some((f, sh)) => Ok(resumo(f, sh)),
                 None => Ok(json!({"aberto": false,
-                                  "dica": "chame show_get com file=<caminho.spell>"})),
+                                  "dica": "call show_get with file=<path.spell>"})),
             }
         },
     );
-    // O par do `pause`: sem ele, quem pausou pelo registry (GUI, MCP, OSC) so' voltava a tocar
-    // subindo outro player com `play_show`, e o `serve --show`, que deixa o player parado em
-    // t=0, nao teria como solta-lo. Chama-se `resume` e nao `play` porque `play` e' o subcomando
-    // da CLI que SOBE um player (o `play_show` do registry); aqui nao se sobe nada.
+    // The pair of `pause`: without it, whoever paused through the registry (GUI, MCP, OSC) could
+    // only play again by starting another player with `play_show`, and `serve --show`, which
+    // leaves the player stopped at t=0, would have no way to release it. It is called `resume`
+    // and not `play` because `play` is the CLI subcommand that STARTS a player (the registry
+    // `play_show`); nothing is started here.
     r.add::<NoArgs>(
         "resume",
-        "Retoma o player pausado neste processo (o par do pause).",
+        "Resumes the player paused in this process (the pair of pause).",
         |_| {
             let h = vivo()?;
             h.play();
@@ -271,32 +274,29 @@ pub fn base() -> Registry {
     );
     r.add::<NoArgs>(
         "pause",
-        "Pausa o player em execucao neste processo.",
+        "Pauses the player running in this process.",
         |_| {
             let h = vivo()?;
             h.pause();
             estado(&h)
         },
     );
-    r.add::<NoArgs>("stop", "Para o player em execucao neste processo.", |_| {
+    r.add::<NoArgs>("stop", "Stops the player running in this process.", |_| {
         let h = vivo()?;
         h.stop();
         estado(&h)
     });
-    r.add::<LocateArgs>(
-        "locate",
-        "Salta o player para o instante t (segundos).",
-        |a| {
-            let h = vivo()?;
-            h.locate(a.t);
-            estado(&h)
-        },
-    );
-    // O loop e' do PLAYER, no intervalo In-Out do show ABERTO (`edit::intervalo`): quem arrasta o
-    // In na GUI e chama `loop_set` de novo ja' repete no intervalo novo. Sem In/Out, 0..duration.
+    r.add::<LocateArgs>("locate", "Jumps the player to instant t (seconds).", |a| {
+        let h = vivo()?;
+        h.locate(a.t);
+        estado(&h)
+    });
+    // The loop belongs to the PLAYER, over the In-Out range of the OPEN show (`edit::intervalo`):
+    // whoever drags the In in the GUI and calls `loop_set` again already repeats over the new
+    // range. With no In/Out, 0..duration.
     r.add::<LoopArgs>(
         "loop_set",
-        "Liga ou desliga o loop do player no intervalo In-Out do show aberto.",
+        "Turns the player loop on or off over the In-Out range of the open show.",
         |a| {
             let h = vivo()?;
             let (i, o) = crate::edit::intervalo();
@@ -306,7 +306,7 @@ pub fn base() -> Registry {
     );
     r.add::<CueGoArgs>(
         "cue_go",
-        "Dispara a proxima cue (ou a de indice dado).",
+        "Fires the next cue (or the one at the given index).",
         |a| {
             let h = vivo()?;
             h.cue_go(a.index);
@@ -315,12 +315,12 @@ pub fn base() -> Registry {
     );
     r.add::<NoArgs>(
         "transport_state",
-        "Estado do transporte do player em execucao.",
+        "Transport state of the running player.",
         |_| estado(&vivo()?),
     );
     r.add::<InputArgs>(
         "input",
-        "Entrega um evento de entrada aos ganchos do player vivo (o Graph): key + value.",
+        "Delivers an input event to the hooks of the live player (the Graph): key + value.",
         |a| {
             vivo()?.input(&a.key, a.value);
             Ok(json!({"key": a.key, "value": a.value}))
@@ -328,14 +328,11 @@ pub fn base() -> Registry {
     );
     r.add::<InputGetArgs>(
         "input_get",
-        "Ultimo frame DMX recebido no universo de ENTRADA (show.inputs): 512 valores.",
+        "Last DMX frame received on the INPUT universe (show.inputs): 512 values.",
         |a| {
-            let d = vivo()?.input_get(a.universe).ok_or_else(|| {
-                format!(
-                    "universo {}: sem entrada declarada ou sem frame",
-                    a.universe
-                )
-            })?;
+            let d = vivo()?
+                .input_get(a.universe)
+                .ok_or_else(|| format!("universe {}: no declared input or no frame", a.universe))?;
             Ok(json!({"universe": a.universe, "data": d.to_vec()}))
         },
     );
@@ -351,7 +348,7 @@ mod tests {
     use super::*;
 
     #[derive(Deserialize, JsonSchema)]
-    struct Soma {
+    struct Sum {
         a: i64,
         b: i64,
     }
@@ -359,27 +356,27 @@ mod tests {
     #[test]
     fn add_call_schema() {
         let mut r = Registry::new();
-        r.add::<Soma>("soma", "Soma a + b.", |s| Ok(json!(s.a + s.b)));
-        assert_eq!(r.call("soma", json!({"a": 2, "b": 3})).unwrap(), json!(5));
-        assert!(r.call("soma", json!({"a": 2})).is_err(), "faltando b");
-        assert!(r.call("nao_existe", json!({})).is_err());
+        r.add::<Sum>("sum", "Adds a + b.", |s| Ok(json!(s.a + s.b)));
+        assert_eq!(r.call("sum", json!({"a": 2, "b": 3})).unwrap(), json!(5));
+        assert!(r.call("sum", json!({"a": 2})).is_err(), "b is missing");
+        assert!(r.call("does_not_exist", json!({})).is_err());
 
         let sc = r.schema();
         let c = &sc.as_array().unwrap()[0];
-        assert_eq!(c["name"], "soma");
-        assert_eq!(c["doc"], "Soma a + b.");
+        assert_eq!(c["name"], "sum");
+        assert_eq!(c["doc"], "Adds a + b.");
         assert!(
             c["params"]["properties"]["a"].is_object(),
             "schema: {}",
             c["params"]
         );
-        assert_eq!(r.get("soma").unwrap().name, "soma");
+        assert_eq!(r.get("sum").unwrap().name, "sum");
         assert_eq!(r.iter().count(), 1);
     }
 
-    /// Sem player vivo, todo comando de transporte devolve o mesmo erro; `load` continua livre.
+    /// With no live player, every transport command returns the same error; `load` stays free.
     #[test]
-    fn base_tem_transporte_e_load() {
+    fn base_has_transport_and_load() {
         let r = base();
         let esperados = [
             "load",
@@ -397,10 +394,10 @@ mod tests {
             "rec_state",
         ];
         for c in esperados {
-            assert!(r.get(c).is_some(), "comando {} ausente", c);
+            assert!(r.get(c).is_some(), "command {} missing", c);
         }
-        // ponytail: o teste so' vale quando nao ha player neste processo — os testes do player
-        // sobem o seu em outro binario (tests/player.rs), entao aqui nunca ha CURRENT.
+        // ponytail: the test only holds when there is no player in this process — the player
+        // tests start theirs in another binary (tests/player.rs), so there is never a CURRENT here.
         for (c, a) in [
             ("resume", json!({})),
             ("pause", json!({})),
@@ -414,27 +411,29 @@ mod tests {
         ] {
             assert_eq!(
                 r.call(c, a).unwrap_err(),
-                "sem player em execucao",
-                "comando {}",
+                "no player running",
+                "command {}",
                 c
             );
         }
-        assert!(r.call("load", json!({"file": "nao_existe.spell"})).is_err());
-        // o alias deprecated ainda entra: erro de arquivo, nao de argumento faltando
         assert!(r
-            .call("load", json!({"path": "nao_existe.spell"}))
+            .call("load", json!({"file": "does_not_exist.spell"}))
+            .is_err());
+        // the deprecated alias still gets in: a file error, not a missing-argument one
+        assert!(r
+            .call("load", json!({"path": "does_not_exist.spell"}))
             .unwrap_err()
-            .contains("nao_existe.spell"));
+            .contains("does_not_exist.spell"));
         assert!(
             r.call("load", json!({})).is_err(),
-            "sem file nem path: erro de deserializacao"
+            "no file and no path: deserialization error"
         );
     }
 
-    /// `show_get` sem show aberto avisa; com `file` abre, resume e fica aberto para a proxima
-    /// chamada (e' o que alimenta o resource `spell://show` do MCP).
+    /// `show_get` with no open show warns; with `file` it opens, summarizes and stays open for
+    /// the next call (it is what feeds the MCP `spell://show` resource).
     #[test]
-    fn show_get_abre_e_lembra() {
+    fn show_get_opens_and_remembers() {
         let r = base();
         assert_eq!(
             r.call("show_get", json!({})).unwrap()["aberto"],
@@ -447,15 +446,11 @@ mod tests {
         assert!(d["file"].as_str().unwrap().ends_with("medgrupo.spell"));
         assert!(!d["tracks"].as_array().unwrap().is_empty());
         assert!(d["outputs"].as_array().unwrap().iter().any(|o| o == "sacn"));
-        assert_eq!(
-            d["transport"],
-            Value::Null,
-            "sem player neste binario de teste"
-        );
-        // sem `file`, devolve o mesmo show
+        assert_eq!(d["transport"], Value::Null, "no player in this test binary");
+        // with no `file`, it returns the same show
         assert_eq!(r.call("show_get", json!({})).unwrap(), d);
         assert!(r
-            .call("show_get", json!({"file": "nao_existe.spell"}))
+            .call("show_get", json!({"file": "does_not_exist.spell"}))
             .is_err());
     }
 }

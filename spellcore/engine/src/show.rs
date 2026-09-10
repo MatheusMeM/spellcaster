@@ -1,4 +1,4 @@
-//! Arquivo de show `.spell` (JSON) v1 — mesmo arquivo do `spellcaster/show.py`.
+//! Show file `.spell` (JSON) v1 — the same file as `spellcaster/show.py`.
 
 use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -27,12 +27,12 @@ pub struct ArtNet {
     pub broadcast: bool,
 }
 
-/// Saida OSC do Player: tracks `osc` e `media` de reprodutor nao-Capture.
+/// OSC output of the Player: `osc` tracks and `media` tracks on a non-Capture player.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Osc {
     #[serde(default = "local")]
     pub host: String,
-    /// Sem "port" a saida fica em 0 e o Player a ignora (o Python levanta KeyError).
+    /// With no "port" the output stays at 0 and the Player ignores it (Python raises KeyError).
     #[serde(default)]
     pub port: u16,
 }
@@ -43,8 +43,8 @@ pub enum OutputCfg {
     Sacn(Sacn),
     ArtNet(ArtNet),
     Osc(Osc),
-    // ponytail: tipo desconhecido guarda so' o nome (o resto da config se perde ao regravar)
-    // ; virar Unknown com Map quando laser/media entrarem no `outputs` do Rust.
+    // ponytail: an unknown type keeps only the name (the rest of the config is lost on save)
+    // ; make it Unknown with a Map once laser/media land in the Rust `outputs`.
     #[serde(untagged)]
     Unknown {
         #[serde(rename = "type")]
@@ -52,9 +52,9 @@ pub enum OutputCfg {
     },
 }
 
-/// Tipo conhecido com conteudo invalido e' erro (o `untagged` do derive o transformaria em
-/// `Unknown` e a saida sumiria do show sem aviso). Sem "type" vira `Unknown { tipo: "" }`,
-/// como no Python.
+/// A known type with invalid content is an error (the derived `untagged` would turn it into
+/// `Unknown` and the output would vanish from the show with no warning). With no "type" it
+/// becomes `Unknown { tipo: "" }`, as in Python.
 impl<'de> Deserialize<'de> for OutputCfg {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<OutputCfg, D::Error> {
         let v = Value::deserialize(d)?;
@@ -107,7 +107,7 @@ pub struct Show {
     pub tracks: Vec<Value>,
     #[serde(default)]
     pub version: u32,
-    /// Resto do arquivo preservado tal e qual (cues, transport, patch, ...).
+    /// The rest of the file preserved as is (cues, transport, patch, ...).
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
@@ -126,11 +126,11 @@ impl Default for Show {
     }
 }
 
-/// v0 (rascunho sem `version`) sobe para v1; version > 1 e' erro.
+/// v0 (a draft with no `version`) is raised to v1; version > 1 is an error.
 pub fn migrate(mut sh: Show) -> Result<Show, String> {
     if sh.version > VERSION {
         return Err(format!(
-            ".spell versao {}: mais novo que este player (v{})",
+            ".spell version {}: newer than this player (v{})",
             sh.version, VERSION
         ));
     }
@@ -147,9 +147,9 @@ pub fn load(path: &Path) -> Result<Show, String> {
 pub fn save(path: &Path, show: &Show) -> Result<(), String> {
     let mut out = show.clone();
     out.version = VERSION;
-    out.extra.retain(|k, _| !k.starts_with('_')); // "_dir" e afins nao vao para o arquivo
-                                                  // ponytail: indent 2 do serde em vez do indent 1 do json.dump ; o Python le igual e nenhum
-                                                  // teste compara o texto ; casar byte a byte so' se o .spell entrar em diff de git.
+    out.extra.retain(|k, _| !k.starts_with('_')); // "_dir" and friends do not go to the file
+                                                  // ponytail: serde indent 2 instead of the indent 1 of json.dump ; Python reads it the same and no
+                                                  // test compares the text ; match it byte for byte only if the .spell lands in a git diff.
     let txt = serde_json::to_string_pretty(&out).map_err(|e| e.to_string())?;
     std::fs::write(path, format!("{}\n", txt)).map_err(|e| format!("{}: {}", path.display(), e))
 }
@@ -159,7 +159,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn version_maior_e_erro() {
+    fn higher_version_is_an_error() {
         let sh: Show = serde_json::from_str(r#"{"version":2}"#).unwrap();
         assert!(migrate(sh).is_err());
         let v0: Show = serde_json::from_str(r#"{"name":"x"}"#).unwrap();
@@ -169,7 +169,7 @@ mod tests {
     }
 
     #[test]
-    fn outputs_conhecidos_e_desconhecido() {
+    fn known_and_unknown_outputs() {
         let sh: Show = serde_json::from_str(
             r#"{"version":1,"outputs":[{"type":"sacn","universes":[1,2]},
                                        {"type":"artnet","broadcast":false},
@@ -183,7 +183,7 @@ mod tests {
                 assert_eq!(c.priority, 100);
                 assert_eq!(c.source_name, "Spellcaster");
             }
-            o => panic!("esperava sacn, veio {:?}", o),
+            o => panic!("expected sacn, got {:?}", o),
         }
         assert_eq!(
             sh.outputs[1],
@@ -200,16 +200,16 @@ mod tests {
         );
     }
 
-    /// O `untagged` do derive engolia isso: o show carregava com a saida virada em `Unknown` e
-    /// nao saia universo nenhum.
+    /// The derived `untagged` used to swallow this: the show loaded with the output turned into
+    /// `Unknown` and no universe went out at all.
     #[test]
-    fn tipo_conhecido_com_conteudo_invalido_e_erro() {
+    fn known_type_with_invalid_content_is_an_error() {
         for src in [
             r#"{"outputs":[{"type":"sacn","universes":"1"}]}"#,
             r#"{"outputs":[{"type":"sacn","universes":[1],"priority":"alto"}]}"#,
         ] {
             let e = serde_json::from_str::<Show>(src).unwrap_err().to_string();
-            assert!(e.contains("sacn"), "erro sem o tipo: {}", e);
+            assert!(e.contains("sacn"), "error without the type: {}", e);
         }
         let sh: Show =
             serde_json::from_str(r#"{"outputs":[{"type":"laser","x":1},{"pps":25000}]}"#).unwrap();
@@ -225,7 +225,7 @@ mod tests {
     }
 
     #[test]
-    fn save_nao_escreve_null() {
+    fn save_writes_no_null() {
         let sh: Show = serde_json::from_str(
             r#"{"outputs":[{"type":"sacn","universes":[1]},{"type":"artnet"}]}"#,
         )
@@ -235,7 +235,7 @@ mod tests {
     }
 
     #[test]
-    fn ida_e_volta_preserva_extras() {
+    fn round_trip_preserves_extras() {
         let src = r#"{"name":"t","fps":44,"duration":2.5,
                       "outputs":[{"type":"sacn","universes":[7],"priority":50,"source_name":"S"}],
                       "tracks":[{"type":"dmx","universe":1,"address":1,"keys":[[0,0,"hold"]]}],
@@ -252,6 +252,6 @@ mod tests {
         assert_eq!(b.tracks, a.tracks);
         assert_eq!(b.extra.get("transport"), a.extra.get("transport"));
         assert!(b.extra.contains_key("cues"));
-        assert!(!b.extra.contains_key("_dir"), "chave com _ nao e' gravada");
+        assert!(!b.extra.contains_key("_dir"), "a key with _ is not written");
     }
 }

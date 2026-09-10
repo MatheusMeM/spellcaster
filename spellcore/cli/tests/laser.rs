@@ -1,9 +1,9 @@
-//! O ILDA player como o operador o usa: os comandos `laser_*` do registry, vistos pelo MCP,
-//! contra o `Emulator` Ether Dream do proprio crate `laser`.
+//! The ILDA player as the operator uses it: the `laser_*` commands of the registry, seen through
+//! the MCP, against the Ether Dream `Emulator` of the `laser` crate itself.
 //!
-//! Binario proprio, e o servidor num processo separado, porque a tabela `FEEDS` e' global ao
-//! processo (mesma razao de `engine/tests/edit.rs`). O emulador fica AQUI: assim o teste le' os
-//! pontos que chegaram ao "DAC" e confere a geometria que saiu.
+//! Its own binary, and the server in a separate process, because the `FEEDS` table is global to
+//! the process (the same reason as `engine/tests/edit.rs`). The emulator stays HERE: that way the
+//! test reads the points that reached the "DAC" and checks the geometry that went out.
 
 use laser::{ild, Emulator, Frame, Point};
 use serde_json::json;
@@ -16,9 +16,9 @@ use std::time::Duration;
 mod common;
 use common::Mcp;
 
-// ------------------------------------------------------------------- utilidades
+// ---------------------------------------------------------------------- helpers
 
-/// Quadrado de +-10000 unidades ILDA, aceso: bbox bem maior que o `min_size` da safety.
+/// A +-10000 ILDA unit square, lit: a bbox much larger than the safety `min_size`.
 fn quadrado(nome: &str) -> Frame {
     let c = [
         (-10000.0, -10000.0),
@@ -43,7 +43,7 @@ fn quadrado(nome: &str) -> Frame {
     Frame::new(p, nome)
 }
 
-/// Maior |x| dos pontos acesos que o emulador recebeu a partir de `desde`.
+/// Largest |x| of the lit points the emulator received starting at `desde`.
 fn largura(emu: &Emulator, desde: usize) -> i32 {
     emu.points()
         .iter()
@@ -64,14 +64,14 @@ fn espera<F: FnMut() -> bool>(mut f: F) -> bool {
     false
 }
 
-// ------------------------------------------------------------------------ teste
+// ------------------------------------------------------------------------- test
 
 #[test]
-fn ilda_player_do_scan_ao_close() {
-    let emu = Emulator::start(1800).expect("emulador Ether Dream");
+fn ilda_player_from_scan_to_close() {
+    let emu = Emulator::start(1800).expect("Ether Dream emulator");
     let porta = emu.port;
 
-    // beacon do emulador em 127.0.0.1:7654 enquanto o `laser_dacs` do outro processo escuta
+    // emulator beacon on 127.0.0.1:7654 while the `laser_dacs` of the other process listens
     let run = Arc::new(AtomicBool::new(true));
     let (b, r) = (emu.beacon([0xaa, 0xbb, 0xcc, 0, 0, 1]), run.clone());
     let farol = std::thread::spawn(move || {
@@ -86,15 +86,15 @@ fn ilda_player_do_scan_ao_close() {
     });
 
     let dir = std::env::temp_dir().join("spellcore_laser_test");
-    std::fs::create_dir_all(&dir).expect("dir do teste");
+    std::fs::create_dir_all(&dir).expect("test dir");
     let ild = dir.join("quadrado.ild");
     let frames: Vec<Frame> = (0..3).map(|i| quadrado(&format!("q{}", i))).collect();
-    ild::write(&ild, &frames, 5, "teste", "spell", None).expect("gravar .ild");
+    ild::write(&ild, &frames, 5, "test", "spell", None).expect("write the .ild");
     let arquivo = ild.to_string_lossy().to_string();
 
     let mut m = Mcp::start();
 
-    // ---- laser_files acha o .ild gravado
+    // ---- laser_files finds the .ild that was written
     let f = m.cmd("laser_files", json!({"dir": dir.to_string_lossy()}));
     assert!(
         f["files"]
@@ -102,27 +102,27 @@ fn ilda_player_do_scan_ao_close() {
             .unwrap()
             .iter()
             .any(|x| x["name"] == "quadrado.ild"),
-        "laser_files nao listou o .ild: {}",
+        "laser_files did not list the .ild: {}",
         f
     );
 
-    // ---- laser_dacs acha o emulador pelo beacon
+    // ---- laser_dacs finds the emulator by its beacon
     let d = m.cmd("laser_dacs", json!({"timeout": 1.5}));
     let achou = d
         .as_array()
-        .expect("laser_dacs devolve lista")
+        .expect("laser_dacs returns a list")
         .iter()
         .any(|x| x["type"] == "etherdream" && x["id"] == "aa:bb:cc:00:00:01");
     run.store(false, Ordering::Relaxed);
     farol.join().ok();
-    assert!(achou, "laser_dacs nao viu o beacon do emulador: {}", d);
+    assert!(achou, "laser_dacs did not see the emulator beacon: {}", d);
 
-    // ---- abre, toca, mede
+    // ---- open, play, measure
     let o = m.cmd(
         "laser_open",
         json!({"dac": "etherdream", "host": format!("127.0.0.1:{}", porta), "kpps": 30}),
     );
-    let feed = o["feed"].as_u64().expect("id do feed");
+    let feed = o["feed"].as_u64().expect("feed id");
     assert!(
         o["dac"].as_str().unwrap().starts_with("etherdream:"),
         "{}",
@@ -135,11 +135,11 @@ fn ilda_player_do_scan_ao_close() {
     );
     assert_eq!(p["frames"], json!(3));
 
-    assert!(espera(|| emu.count() > 0), "nada chegou ao emulador");
+    assert!(espera(|| emu.count() > 0), "nothing reached the emulator");
     let s = m.cmd("laser_stats", json!({"feed": feed}));
     assert!(
         s["stat/sent"].as_u64().unwrap() > 0,
-        "laser_stats sem frames entregues: {}",
+        "laser_stats with no delivered frames: {}",
         s
     );
     assert_eq!(s["playing"], json!(true));
@@ -148,11 +148,11 @@ fn ilda_player_do_scan_ao_close() {
     let cheio = largura(&emu, 0);
     assert!(
         (9000..=10000).contains(&cheio),
-        "quadrado inteiro deu {}",
+        "the whole square gave {}",
         cheio
     );
 
-    // ---- geo/scale 0.5 encolhe a bbox do que sai
+    // ---- geo/scale 0.5 shrinks the bbox of what goes out
     let marca = emu.points().len();
     let r = m.cmd(
         "laser_param",
@@ -163,12 +163,12 @@ fn ilda_player_do_scan_ao_close() {
     let meio = largura(&emu, marca + 400);
     assert!(
         (4000..=5100).contains(&meio),
-        "com geo/scale 0.5 a bbox deu {} (era {})",
+        "with geo/scale 0.5 the bbox gave {} (it was {})",
         meio,
         cheio
     );
 
-    // ---- shutter apaga sem parar o transporte
+    // ---- the shutter blanks the output without stopping the transport
     m.cmd(
         "laser_param",
         json!({"feed": feed, "path": "shutter", "value": 1}),
@@ -178,7 +178,7 @@ fn ilda_player_do_scan_ao_close() {
     let apagados = emu.points()[marca + 400..]
         .iter()
         .all(|p| (p.r | p.g | p.b) == 0);
-    assert!(apagados, "shutter fechado e ainda saiu cor");
+    assert!(apagados, "the shutter is closed and color still went out");
     assert_eq!(
         m.cmd("laser_stats", json!({"feed": feed}))["shutter"],
         json!(true)
@@ -188,7 +188,8 @@ fn ilda_player_do_scan_ao_close() {
         json!({"feed": feed, "path": "shutter", "value": 0}),
     );
 
-    // ---- safe/*: o clamp e' o do modules/laser.json (min_size 0..32767, max_intensity 0..255)
+    // ---- safe/*: the clamp is the one from modules/laser.json (min_size 0..32767,
+    // max_intensity 0..255)
     m.cmd(
         "laser_param",
         json!({"feed": feed, "path": "safe/min_size", "value": 99999}),
@@ -205,28 +206,28 @@ fn ilda_player_do_scan_ao_close() {
         json!({"feed": feed, "path": "safe/min_size", "value": 2000}),
     );
 
-    // ---- path invalido nomeia os validos e nao mexe em nada
+    // ---- an invalid path names the valid ones and touches nothing
     let e = m.erro(
         "laser_param",
         json!({"feed": feed, "path": "curve/r", "value": 1}),
     );
     assert!(
         e.contains("geo/scale") && e.contains("shutter"),
-        "erro pobre: {}",
+        "poor error: {}",
         e
     );
 
-    // ---- sem loop, o fim do arquivo desarma o transporte sozinho (bug 6 da revisao)
+    // ---- with no loop, the end of the file disarms the transport by itself (bug 6 of the review)
     m.cmd(
         "laser_play",
         json!({"feed": feed, "file": arquivo, "fps": 60, "loop": false}),
     );
     assert!(
         espera(|| m.cmd("laser_stats", json!({"feed": feed}))["playing"] == json!(false)),
-        "arquivo sem loop terminou e laser_stats seguiu playing"
+        "the file with no loop ended and laser_stats kept playing"
     );
 
-    // ---- stop mantem o feed; close some com ele
+    // ---- stop keeps the feed; close takes it away
     assert_eq!(
         m.cmd("laser_stop", json!({"feed": feed}))["playing"],
         json!(false)
@@ -241,7 +242,7 @@ fn ilda_player_do_scan_ao_close() {
     );
     assert_eq!(
         m.erro("laser_stats", json!({"feed": feed})),
-        format!("feed {} nao existe", feed)
+        format!("feed {} does not exist", feed)
     );
 
     std::fs::remove_file(&ild).ok();
@@ -249,12 +250,13 @@ fn ilda_player_do_scan_ao_close() {
 
 // ------------------------------------------------------- clip_frame (previz)
 
-/// O quadro que o viewer da timeline desenha: escolha por `index` e por `t` a `fps`, e os pontos
-/// ja' normalizados em -1..1. Um .ild de tres quadros, cada um com o ponto num canto diferente.
+/// The frame the timeline viewer draws: pick by `index` and by `t` at `fps`, and the points
+/// already normalized to -1..1. An .ild of three frames, each with the point in a different
+/// corner.
 #[test]
-fn clip_frame_escolhe_o_quadro_e_normaliza() {
+fn clip_frame_picks_the_frame_and_normalizes() {
     let dir = std::env::temp_dir().join("spellcore_clipframe_test");
-    std::fs::create_dir_all(&dir).expect("dir do teste");
+    std::fs::create_dir_all(&dir).expect("test dir");
     let ild = dir.join("tres.ild");
     let frames: Vec<Frame> = (0..3)
         .map(|i| {
@@ -264,18 +266,18 @@ fn clip_frame_escolhe_o_quadro_e_normaliza() {
             )
         })
         .collect();
-    ild::write(&ild, &frames, 5, "teste", "spell", None).expect("gravar .ild");
+    ild::write(&ild, &frames, 5, "test", "spell", None).expect("write the .ild");
     let arquivo = ild.to_string_lossy().to_string();
 
     let mut m = Mcp::start();
 
-    // index direto, e o clipe repete (index 4 de 3 quadros = 1)
+    // a direct index, and the clip repeats (index 4 of 3 frames = 1)
     let a = m.cmd("clip_frame", json!({"clip": arquivo, "index": 4}));
     assert_eq!(a["index"], json!(1));
     assert_eq!(a["frames"], json!(3));
     assert_eq!(a["name"], json!("f1"));
 
-    // t a fps: floor(t * fps) % quadros, a conta do player
+    // t at fps: floor(t * fps) % frames, the player's arithmetic
     for (t, fps, i) in [
         (0.0, 30.0, 0),
         (0.05, 30.0, 1),
@@ -288,7 +290,7 @@ fn clip_frame_escolhe_o_quadro_e_normaliza() {
         assert_eq!(v["index"], json!(i), "t={} fps={}", t, fps);
     }
 
-    // ponto [x, y, r, g, b, blank] com x e y em -1..1
+    // a point [x, y, r, g, b, blank] with x and y in -1..1
     let p = &m.cmd("clip_frame", json!({"clip": arquivo, "index": 2}))["points"][0];
     assert_eq!(p[0], json!(1.0));
     assert_eq!(p[1], json!(-1.0));
@@ -296,11 +298,11 @@ fn clip_frame_escolhe_o_quadro_e_normaliza() {
         (p[2].as_u64(), p[3].as_u64(), p[4].as_u64()),
         (Some(255), Some(128), Some(0))
     );
-    assert_eq!(p[5], json!(1), "blank do terceiro quadro");
+    assert_eq!(p[5], json!(1), "blank of the third frame");
 
     assert!(m
-        .erro("clip_frame", json!({"clip": "nao_existe.ild"}))
-        .contains("nao_existe.ild"));
+        .erro("clip_frame", json!({"clip": "no_such_file.ild"}))
+        .contains("no_such_file.ild"));
 
     std::fs::remove_file(&ild).ok();
 }

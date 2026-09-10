@@ -1,10 +1,10 @@
-//! Gravacao: track `dmx` armado le o universo de ENTRADA (`input.rs`) a cada frame e escreve
-//! keyframe so' quando o valor muda. A escrita passa pelo mesmo funil da edicao manual
-//! (`edit::key_put`), entao `rev` sobe e o barramento avisa os clientes.
+//! Recording: an armed `dmx` track reads the INPUT universe (`input.rs`) every frame and writes
+//! a keyframe only when the value changes. The write goes through the same funnel as a manual
+//! edit (`edit::key_put`), so `rev` bumps and the bus tells the clients.
 //!
-//! Comandos: `rec_arm {track, on}` e `rec_state`. PARAR o transporte desarma tudo: a thread de
-//! transporte chama `disarm()` na borda de entrada em Stop, nao enquanto parado — armar com o
-//! transporte parado e so' depois dar play e' o caminho normal do operador.
+//! Commands: `rec_arm {track, on}` and `rec_state`. STOPPING the transport disarms everything:
+//! the transport thread calls `disarm()` on the edge into Stop, not while stopped — arming with
+//! the transport stopped and only then hitting play is the operator normal path.
 
 use crate::edit;
 use crate::input::Inputs;
@@ -15,26 +15,26 @@ use serde_json::{json, Value};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
-/// Um track armado: onde ler a entrada e o que ja' foi gravado.
+/// One armed track: where to read the input and what has been recorded so far.
 struct Arm {
     track: usize,
     universe: u16,
     address: u16,
     width: usize,
-    /// Ultimo valor gravado; vazio = nada gravado ainda (o primeiro frame sempre grava).
+    /// Last value recorded; empty = nothing recorded yet (the first frame always records).
     last: Vec<u8>,
 }
 
 static ARMED: Mutex<Vec<Arm>> = Mutex::new(Vec::new());
-/// Espelho do tamanho de `ARMED`: a thread de transporte le isto por frame e so' pega o mutex
-/// quando ha algo armado.
+/// Mirror of the size of `ARMED`: the transport thread reads this per frame and only takes the
+/// mutex when something is armed.
 static N: AtomicUsize = AtomicUsize::new(0);
 
-/// Arma ou desarma um track. O tipo, o universo e o endereco vem do show ABERTO (`edit`), nao da
-/// timeline do player: e' no show aberto que o keyframe vai ser gravado.
+/// Arms or disarms a track. The type, the universe and the address come from the OPEN show
+/// (`edit`), not from the player timeline: the keyframe is going to be written in the open show.
 pub fn arm(indice: usize, on: bool) -> Result<Value, String> {
-    // O `track_dmx` pega o lock de OPEN e o solta antes de ARMED entrar: a ordem dos dois locks
-    // e' sempre ARMED -> OPEN (o `tick` faz assim), nunca o contrario.
+    // `track_dmx` takes the OPEN lock and releases it before ARMED comes in: the order of the two
+    // locks is always ARMED -> OPEN (that is what `tick` does), never the other way round.
     let info = if on {
         Some(edit::track_dmx(indice)?)
     } else {
@@ -59,13 +59,13 @@ fn lista(g: &[Arm]) -> Vec<usize> {
     g.iter().map(|a| a.track).collect()
 }
 
-/// Tracks armados, em ordem de armamento.
+/// Armed tracks, in arming order.
 pub fn state() -> Value {
     let g = lock(&ARMED);
     json!({"recording": !g.is_empty(), "tracks": lista(&g)})
 }
 
-/// Desarma tudo (o transporte parou). Barato quando nada esta armado.
+/// Disarms everything (the transport stopped). Cheap when nothing is armed.
 pub fn disarm() {
     if N.load(Ordering::Relaxed) == 0 {
         return;
@@ -74,11 +74,11 @@ pub fn disarm() {
     N.store(0, Ordering::Relaxed);
 }
 
-/// Um frame de gravacao: para cada track armado, le o universo de entrada e grava keyframe em
-/// `t` quando os canais do track mudam. Roda no passo 3 do frame (efeito colateral), antes das
-/// cues, e nao toca nos Universes de saida.
-// ponytail: um keyframe por MUDANCA, sem thinning ; um fader andando a 60 fps deixa 60 keys por
-// segundo. Entra reducao de curva (Douglas-Peucker) quando o arquivo gravado incomodar.
+/// One recording frame: for each armed track, it reads the input universe and writes a keyframe
+/// at `t` when the channels of the track change. It runs on step 3 of the frame (side effect),
+/// before the cues, and does not touch the output Universes.
+// ponytail: one keyframe per CHANGE, no thinning ; a fader moving at 60 fps leaves 60 keys per
+// second. Curve reduction (Douglas-Peucker) lands when the recorded file starts to hurt.
 pub fn tick(t: f64, inputs: &Inputs) {
     if N.load(Ordering::Relaxed) == 0 {
         return;
@@ -102,10 +102,10 @@ pub fn tick(t: f64, inputs: &Inputs) {
             json!(novo)
         };
         if let Err(e) = edit::key_put(a.track, t, v, "linear") {
-            // Falhar aqui e' o track ter sumido (`track_del`) ou o show ter trocado: o indice
-            // guardado no arme nao existe mais. Desarma UMA vez, em vez de repetir o erro a cada
-            // frame com um indice velho.
-            eprintln!("gravacao do track {}: {} - desarmado", a.track, e);
+            // Failing here means the track is gone (`track_del`) or the show was swapped: the
+            // index kept by the arm does not exist any more. Disarm ONCE, instead of repeating
+            // the error every frame with a stale index.
+            eprintln!("recording of track {}: {} - disarmed", a.track, e);
             caiu.push(n);
         }
     }
@@ -119,9 +119,9 @@ pub fn tick(t: f64, inputs: &Inputs) {
 
 #[derive(Deserialize, JsonSchema)]
 pub struct RecArmArgs {
-    /// Indice do track em `tracks` (tem que ser `dmx` ou `artnet`).
+    /// Index of the track in `tracks` (it has to be `dmx` or `artnet`).
     pub track: usize,
-    /// true arma, false desarma.
+    /// true arms, false disarms.
     #[serde(default = "sim")]
     pub on: bool,
 }
@@ -133,15 +133,15 @@ fn sim() -> bool {
 pub fn register(r: &mut Registry) {
     r.add::<RecArmArgs>(
         "rec_arm",
-        "Arma (ou desarma) a gravacao de um track dmx: com o transporte tocando, o universo de entrada vira keyframe.",
+        "Arms (or disarms) the recording of a dmx track: with the transport playing, the input universe becomes keyframes.",
         |a| arm(a.track, a.on),
     );
     r.add::<NoArgs>(
         "rec_state",
-        "Tracks armados para gravacao neste processo.",
+        "Tracks armed for recording in this process.",
         |_| Ok(state()),
     );
 }
 
-// Teste em `engine/tests/rec.rs`, binario proprio: armar consulta o show ABERTO, e `OPEN` e' um
-// por processo — o teste aqui abriria um show e derrubaria os outros testes do mesmo binario.
+// Test in `engine/tests/rec.rs`, its own binary: arming queries the OPEN show, and `OPEN` is one
+// per process — a test here would open a show and take down the other tests of the same binary.

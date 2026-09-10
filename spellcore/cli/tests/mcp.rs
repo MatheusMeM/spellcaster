@@ -1,6 +1,6 @@
-//! O servidor MCP como o Claude o ve: `spellcore mcp` em stdio, uma mensagem JSON-RPC por linha.
-//! Sobe o binario de verdade (nao o `Spell` em memoria) porque o que quebra na pratica e' o
-//! empacotamento: subcomando errado, stdout sujo, registry incompleto.
+//! The MCP server as Claude sees it: `spellcore mcp` over stdio, one JSON-RPC message per line.
+//! It brings the real binary up (not the `Spell` in memory) because what breaks in practice is
+//! the packaging: a wrong subcommand, a dirty stdout, an incomplete registry.
 
 use serde_json::{json, Value};
 
@@ -10,13 +10,13 @@ use common::{texto, Mcp};
 const SHOW: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../shows/medgrupo.spell");
 
 #[test]
-fn handshake_tools_e_resources() {
-    let mut m = Mcp::cru(); // sem o handshake do harness: e' ele que se confere aqui
+fn handshake_tools_and_resources() {
+    let mut m = Mcp::cru(); // without the harness handshake: it is the thing being checked here
 
     let init = m.rpc(
         "initialize",
         json!({"protocolVersion": "2025-06-18", "capabilities": {},
-               "clientInfo": {"name": "teste", "version": "0"}}),
+               "clientInfo": {"name": "test", "version": "0"}}),
     );
     assert_eq!(init["serverInfo"]["name"], json!("spellcaster"));
     assert!(init["capabilities"]["tools"].is_object());
@@ -24,7 +24,7 @@ fn handshake_tools_e_resources() {
     assert!(init["instructions"].as_str().unwrap().contains("show_get"));
     m.notifica("notifications/initialized");
 
-    // tools/list: uma tool por comando do registry da CLI, com o schema do schemars
+    // tools/list: one tool per command of the CLI registry, with the schemars schema
     let tools = m.rpc("tools/list", json!({}));
     let nomes: Vec<&str> = tools["tools"]
         .as_array()
@@ -60,7 +60,7 @@ fn handshake_tools_e_resources() {
         "laser_open",
         "laser_play",
     ] {
-        assert!(nomes.contains(&n), "tool {} ausente: {:?}", n, nomes);
+        assert!(nomes.contains(&n), "tool {} missing: {:?}", n, nomes);
     }
     let play = tools["tools"]
         .as_array()
@@ -72,21 +72,22 @@ fn handshake_tools_e_resources() {
     assert!(play["inputSchema"]["properties"]["loop"].is_object());
     assert_eq!(play["inputSchema"]["required"], json!(["file"]));
 
-    // tools/call show_get no show de conformidade
+    // tools/call show_get on the conformance show
     let r = m.tool("show_get", json!({"file": SHOW}));
     assert_eq!(r["isError"], json!(false));
-    let d: Value = serde_json::from_str(&texto(&r)).expect("show_get devolve JSON");
+    let d: Value = serde_json::from_str(&texto(&r)).expect("show_get returns JSON");
     assert_eq!(d["aberto"], json!(true));
     assert_eq!(d["fps"], json!(30));
     assert!(!d["tracks"].as_array().unwrap().is_empty());
     assert!(d["outputs"].as_array().unwrap().iter().any(|o| o == "sacn"));
 
-    // erro do comando volta como erro de TOOL (o cliente le o texto), nao como erro JSON-RPC
+    // a command error comes back as a TOOL error (the client reads the text), not as a JSON-RPC
+    // error
     let r = m.tool("pause", json!({}));
     assert_eq!(r["isError"], json!(true));
-    assert_eq!(texto(&r), "sem player em execucao");
+    assert_eq!(texto(&r), "no player running");
 
-    // resources: spell://commands e' o registry inteiro; spell://show, o show que acabou de abrir
+    // resources: spell://commands is the whole registry; spell://show, the show just opened
     let rs = m.rpc("resources/list", json!({}));
     let uris: Vec<&str> = rs["resources"]
         .as_array()
@@ -105,8 +106,8 @@ fn handshake_tools_e_resources() {
     );
 
     let c = m.rpc("resources/read", json!({"uri": "spell://commands"}));
-    let txt = c["contents"][0]["text"].as_str().expect("texto");
-    let cmds: Value = serde_json::from_str(txt).expect("commands devolve JSON");
+    let txt = c["contents"][0]["text"].as_str().expect("text");
+    let cmds: Value = serde_json::from_str(txt).expect("commands returns JSON");
     let nomes: Vec<&str> = cmds
         .as_array()
         .unwrap()
@@ -114,23 +115,27 @@ fn handshake_tools_e_resources() {
         .map(|c| c["name"].as_str().unwrap_or(""))
         .collect();
     assert!(nomes.contains(&"play_show") && nomes.contains(&"show_get"));
-    assert!(cmds[0]["params"].is_object(), "cada comando leva o schema");
+    assert!(
+        cmds[0]["params"].is_object(),
+        "every command carries the schema"
+    );
 
     let s = m.rpc("resources/read", json!({"uri": "spell://show"}));
     let d: Value = serde_json::from_str(s["contents"][0]["text"].as_str().unwrap()).unwrap();
     assert_eq!(
         d["aberto"],
         json!(true),
-        "o show aberto pelo show_get continua aberto"
+        "the show opened by show_get stays open"
     );
-    assert_eq!(d["transport"], Value::Null, "nenhum player rodando");
+    assert_eq!(d["transport"], Value::Null, "no player running");
 
-    // graph: o resource le o graph_get do registry; o medgrupo nao tem graph, entao vem vazio
+    // graph: the resource reads the registry graph_get; the medgrupo has no graph, so it comes
+    // back empty
     let g = m.rpc("resources/read", json!({"uri": "spell://graph"}));
     let g: Value = serde_json::from_str(g["contents"][0]["text"].as_str().unwrap()).unwrap();
     assert_eq!(g, json!({"nodes": [], "edges": []}));
 
-    // show_patch em /graph + resource: o que a IA grava e' o que o resource devolve
+    // show_patch at /graph + resource: what the AI writes is what the resource returns
     let g = json!({"nodes": [{"id": "k", "type": "in.key", "key": "Space"},
                              {"id": "t", "type": "logic.toggle"},
                              {"id": "c", "type": "cmd", "cmd": "cue_go"}],
@@ -144,13 +149,13 @@ fn handshake_tools_e_resources() {
     let lido: Value = serde_json::from_str(lido["contents"][0]["text"].as_str().unwrap()).unwrap();
     assert_eq!(lido, g);
 
-    // graph_check compila o graph aberto: 3 nos, sem erro
+    // graph_check compiles the open graph: 3 nodes, no error
     let r = m.tool("graph_check", json!({}));
-    let c: Value = serde_json::from_str(&texto(&r)).expect("graph_check devolve JSON");
+    let c: Value = serde_json::from_str(&texto(&r)).expect("graph_check returns JSON");
     assert_eq!(c["nodes"], json!(3), "{}", texto(&r));
     assert_eq!(c["error"], Value::Null);
 
-    // ciclo: erro no campo, nao excecao (o editor mostra o texto ao lado dos nos)
+    // a cycle: an error in the field, not an exception (the editor shows the text beside the nodes)
     let ciclo = json!({"nodes": [{"id": "a", "type": "logic.not"},
                                  {"id": "b", "type": "logic.not"}],
                        "edges": [["a.out", "b.in"], ["b.out", "a.in"]]});
@@ -159,20 +164,21 @@ fn handshake_tools_e_resources() {
         json!({"ops": [{"op": "replace", "path": "/graph", "value": ciclo}]}),
     );
     let r = m.tool("graph_check", json!({}));
-    let c: Value = serde_json::from_str(&texto(&r)).expect("graph_check devolve JSON");
+    let c: Value = serde_json::from_str(&texto(&r)).expect("graph_check returns JSON");
     let e = c["error"].as_str().unwrap_or("");
+    // the message comes from the `script` crate, which is translated in another round: either word
     assert!(
-        e.contains("ciclo") && e.contains('a') && e.contains('b'),
+        (e.contains("cycle") || e.contains("ciclo")) && e.contains('a') && e.contains('b'),
         "{}",
         e
     );
 
-    // show_patch: edita e devolve as ops de undo
+    // show_patch: it edits and returns the undo ops
     let r = m.tool(
         "show_patch",
         json!({"ops": [{"op": "replace", "path": "/fps", "value": 25}]}),
     );
-    let d: Value = serde_json::from_str(&texto(&r)).expect("show_patch devolve JSON");
+    let d: Value = serde_json::from_str(&texto(&r)).expect("show_patch returns JSON");
     assert!(d["rev"].as_u64().unwrap_or(0) > 0);
     assert_eq!(
         d["undo"],
@@ -180,30 +186,31 @@ fn handshake_tools_e_resources() {
     );
 }
 
-/// `play_show` bloqueia ate o fim do show: pelo MCP ele roda em thread e a tool volta na hora.
-/// E, sobretudo, a linha de status do `play` NAO pode sair no stdout — la' passa o JSON-RPC.
+/// `play_show` blocks until the end of the show: through the MCP it runs in a thread and the
+/// tool comes back at once. And, above all, the `play` status line must NOT go out on the stdout
+/// — the JSON-RPC goes through there.
 #[test]
-fn play_show_em_background_nao_suja_o_stdout() {
+fn play_show_in_the_background_does_not_dirty_the_stdout() {
     let p = std::env::temp_dir().join("spellcore_mcp_play.spell");
     std::fs::write(
         &p,
-        r#"{"name":"curto","fps":30,"duration":0.4,"version":1,"outputs":[],
+        r#"{"name":"short","fps":30,"duration":0.4,"version":1,"outputs":[],
             "tracks":[{"type":"dmx","universe":1,"address":1,"keys":[[0,10],[0.4,200]]}]}"#,
     )
-    .expect("escrever o show");
+    .expect("write the show");
     let mut m = Mcp::start();
 
     let f = p.to_string_lossy().to_string();
     let r = m.tool("play_show", json!({"file": f}));
     assert_eq!(r["isError"], json!(false));
     assert!(
-        texto(&r).starts_with("play_show iniciado em background"),
+        texto(&r).starts_with("play_show started in the background"),
         "{}",
         texto(&r)
     );
 
-    // o show tem 0,4 s; ate ele acabar, `transport_state` responde — e cada resposta que chega
-    // inteira aqui prova que a linha de status do play foi para o stderr.
+    // the show is 0.4 s long; until it ends, `transport_state` answers — and every answer that
+    // arrives whole here proves the play status line went to the stderr.
     let mut viu_play = false;
     for _ in 0..9 {
         let r = m.tool("transport_state", json!({}));
@@ -212,7 +219,7 @@ fn play_show_em_background_nao_suja_o_stdout() {
             break;
         }
     }
-    assert!(viu_play, "o player nao chegou a tocar");
+    assert!(viu_play, "the player never got to play");
     m.tool("stop", json!({}));
     std::fs::remove_file(&p).ok();
 }

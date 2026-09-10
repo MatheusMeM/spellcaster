@@ -1,5 +1,6 @@
-//! Relogio unico do engine: tick de fase fixa, transporte play/pause/stop/locate e jitter medido.
-//! Transporte igual ao `spellcaster/core/clock.py`; a espera e' que muda — fase fixa, sleep+spin.
+//! The one engine clock: fixed-phase tick, play/pause/stop/locate transport and measured jitter.
+//! Transport is the same as `spellcaster/core/clock.py`; the wait is what changes — fixed phase,
+//! sleep+spin.
 
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -22,8 +23,8 @@ pub struct Stats {
 
 struct Tr {
     state: State,
-    pos: f64,    // posicao quando parado/pausado
-    t0: Instant, // instante correspondente a t=0 quando tocando
+    pos: f64,    // position while stopped/paused
+    t0: Instant, // instant that matches t=0 while playing
 }
 
 struct Inner {
@@ -32,7 +33,7 @@ struct Inner {
     stats: Mutex<Stats>,
 }
 
-/// Clonavel: o transporte de outra thread age no mesmo relogio.
+/// Cloneable: transport from another thread acts on the same clock.
 #[derive(Clone)]
 pub struct Clock {
     i: Arc<Inner>,
@@ -42,7 +43,7 @@ impl Clock {
     pub fn new(fps: u32) -> Clock {
         Clock {
             i: Arc::new(Inner {
-                fps: fps.max(1), // ponytail: fps 0 vira 1 em vez de erro ; validar no .spell quando houver schema de show
+                fps: fps.max(1), // ponytail: fps 0 becomes 1 instead of an error ; validate in the .spell once there is a show schema
                 tr: Mutex::new(Tr {
                     state: State::Stop,
                     pos: 0.0,
@@ -98,24 +99,25 @@ impl Clock {
         tr.t0 = Instant::now() - Duration::from_secs_f64(t.max(0.0));
     }
 
-    /// Chama f(t) a cada 1/fps s ate stop() ou t >= duration. Bloqueia a thread chamadora.
-    /// Fase fixa (`next += period`): atraso nao reancora o relogio, so' pula frames e conta drift.
+    /// Calls f(t) every 1/fps s until stop() or t >= duration. Blocks the calling thread.
+    /// Fixed phase (`next += period`): a late frame does not re-anchor the clock, it only skips
+    /// frames and counts drift.
     pub fn run<F: FnMut(f64)>(&self, mut f: F, duration: Option<f64>) {
         if self.state() == State::Stop {
             self.play();
         }
         let pd = Duration::from_secs_f64(1.0 / self.i.fps as f64);
-        // Quanto o `sleep` desta maquina passa do pedido, medido em obra e nao chutado: dormir
-        // ate 1 ms fixo antes do alvo queima ~1 ms de spin por frame (6 % de um nucleo a 60 Hz)
-        // quando o overshoot real aqui e' ~0,45 ms. A margem persegue a media do overshoot; o
-        // spin cobre so' o que sobra.
-        // ponytail: EWMA simples com fator 0,05 e teto de 1,3x, limitada a 0,3..2 ms — e' a
-        // calibracao, o unico botao ; trocar por quantil real se um alvo (Pi, VM) tiver cauda
-        // larga o bastante para o p99 de jitter passar de 1 ms.
-        let mut over_avg = 8e-4_f64; // chute inicial conservador: 0,8 ms
+        // How far this machine's `sleep` overshoots the request, measured on site and not
+        // guessed: sleeping until a fixed 1 ms before the target burns ~1 ms of spin per frame
+        // (6 % of a core at 60 Hz) when the real overshoot here is ~0.45 ms. The margin chases
+        // the mean overshoot; the spin covers only what is left.
+        // ponytail: plain EWMA with factor 0.05 and 1.3x headroom, clamped to 0.3..2 ms — it is
+        // the calibration, the only knob ; swap it for a real quantile if some target (Pi, VM)
+        // has a tail wide enough to push the jitter p99 past 1 ms.
+        let mut over_avg = 8e-4_f64; // conservative first guess: 0.8 ms
         let mut margin = Duration::from_secs_f64(over_avg * 1.3);
-        // ponytail: sem duration, guarda 10 min de amostras e para de amostrar ; trocar por
-        // histograma de baldes se o run passar a durar horas com stats ligado.
+        // ponytail: with no duration it keeps 10 min of samples and stops sampling ; swap it for
+        // a bucket histogram if a run starts lasting hours with stats on.
         let cap = duration
             .map(|d| (d * self.i.fps as f64).ceil() as usize + 2)
             .unwrap_or(self.i.fps as usize * 600);
@@ -125,8 +127,8 @@ impl Clock {
         let _boost = rt::Boost::on();
         let mut next = Instant::now();
         while self.state() != State::Stop {
-            // Tempo travado no quadro: n/fps exato, como o gerador do fixture (t = i/fps). Sem isso um fx
-            // continuo (sin) amostrado no tempo medido (i/fps + overshoot) diverge em +-1 na truncagem.
+            // Time locked to the frame: exact n/fps, like the fixture generator (t = i/fps). Without it a
+            // continuous fx (sin) sampled at the measured time (i/fps + overshoot) drifts by +-1 on truncation.
             let t = (self.time() * self.i.fps as f64).round() / self.i.fps as f64;
             if let Some(d) = duration {
                 if t >= d {
@@ -179,7 +181,7 @@ impl Clock {
         };
     }
 
-    /// Jitter do ultimo run: (p50, p99, max) em segundos, frames emitidos e frames perdidos.
+    /// Jitter of the last run: (p50, p99, max) in seconds, frames emitted and frames dropped.
     pub fn stats(&self) -> Stats {
         *self.i.stats.lock().unwrap()
     }
@@ -187,7 +189,7 @@ impl Clock {
 
 #[cfg(windows)]
 mod rt {
-    // Tres simbolos declarados na mao: `windows-sys` inteiro nao paga a pena (README).
+    // Three symbols declared by hand: the whole of `windows-sys` does not pay for itself (README).
     #[link(name = "winmm")]
     unsafe extern "system" {
         fn timeBeginPeriod(u: u32) -> u32;
@@ -202,7 +204,7 @@ mod rt {
     const TIME_CRITICAL: i32 = 15;
     const ERROR_RETURN: i32 = 0x7fff_ffff;
 
-    /// timeBeginPeriod(1) + prioridade da thread; restaura tudo no Drop.
+    /// timeBeginPeriod(1) + thread priority; restores everything on Drop.
     pub struct Boost(i32);
 
     impl Boost {
@@ -231,10 +233,10 @@ mod rt {
 
 #[cfg(not(windows))]
 mod rt {
-    /// ponytail: no-op fora do Windows ; o Pi ganha SCHED_FIFO/nice na R1.
+    /// ponytail: no-op outside Windows ; the Pi gets SCHED_FIFO/nice in R1.
     pub struct Boost;
     impl Drop for Boost {
-        fn drop(&mut self) {} // o run() faz drop(_boost) explicito antes das estatisticas; clippy (drop_non_drop) exige Drop real
+        fn drop(&mut self) {} // run() calls drop(_boost) explicitly before the stats; clippy (drop_non_drop) demands a real Drop
     }
     impl Boost {
         pub fn on() -> Boost {
@@ -248,7 +250,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn transporte() {
+    fn transport() {
         let c = Clock::new(30);
         assert_eq!(c.state(), State::Stop);
         assert_eq!(c.time(), 0.0);
@@ -261,17 +263,17 @@ mod tests {
         assert_eq!(c.state(), State::Pause);
         let a = c.time();
         std::thread::sleep(Duration::from_millis(5));
-        assert_eq!(c.time(), a, "pausado nao anda");
+        assert_eq!(c.time(), a, "paused does not advance");
         c.stop();
         assert_eq!(c.time(), 0.0);
     }
 
     #[test]
-    fn run_conta_frames_e_para_na_duracao() {
+    fn run_counts_frames_and_stops_at_duration() {
         let c = Clock::new(100);
         let mut n = 0u32;
         c.run(|_| n += 1, Some(0.2));
-        // 20 frames em 0,2 s; a folga para baixo cobre a maquina engasgada (frames pulados).
+        // 20 frames in 0.2 s; the slack below covers a stuttering machine (skipped frames).
         assert!((15..=21).contains(&n), "frames={}", n);
         let s = c.stats();
         assert_eq!(s.frames as u32, n);
@@ -279,7 +281,7 @@ mod tests {
     }
 
     #[test]
-    fn stop_de_outra_thread_encerra_o_run() {
+    fn stop_from_another_thread_ends_the_run() {
         let c = Clock::new(50);
         let c2 = c.clone();
         std::thread::spawn(move || {

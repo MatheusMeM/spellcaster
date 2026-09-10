@@ -1,10 +1,10 @@
-//! Gravacao de DMX: uma saida sACN em 127.0.0.1 no universo 7 muda de valor, o player toca com o
-//! track armado e os valores viram keyframes no show aberto. Binario proprio: `OPEN` (o show
-//! aberto) e `CURRENT` (o player vivo) sao globais do processo.
+//! DMX recording: an sACN output on 127.0.0.1 on universe 7 changes value, the player plays with
+//! the track armed and the values become keyframes in the open show. Its own binary: `OPEN` (the
+//! open show) and `CURRENT` (the live player) are process globals.
 //!
-//! Tudo em loopback, sem hardware: o `SacnOut` manda unicast para 127.0.0.1:5568 alem do
-//! multicast, e e' por esse unicast que o `SacnIn` do player recebe (o mesmo truque dos testes
-//! de `protocols::sacn`).
+//! All in loopback, with no hardware: `SacnOut` sends unicast to 127.0.0.1:5568 besides the
+//! multicast, and it is over that unicast that the player `SacnIn` receives (the same trick as
+//! the `protocols::sacn` tests).
 
 use engine::registry::Registry;
 use engine::{Player, Show};
@@ -22,7 +22,7 @@ fn espera(secs: f64, mut cond: impl FnMut() -> bool) -> bool {
     cond()
 }
 
-/// Valores de um track do show aberto, na ordem dos keyframes.
+/// Values of a track of the open show, in keyframe order.
 fn gravados(r: &Registry, track: usize) -> Vec<f64> {
     let sh = r.call("show_get", json!({"full": true})).expect("show_get");
     sh["tracks"][track]["keys"]
@@ -36,17 +36,17 @@ fn gravados(r: &Registry, track: usize) -> Vec<f64> {
 }
 
 #[test]
-fn track_armado_grava_o_universo_de_entrada() {
+fn armed_track_records_the_input_universe() {
     let cfg = json!({
-        "name": "gravacao", "fps": 30, "version": 1, "outputs": [],
+        "name": "recording", "fps": 30, "version": 1, "outputs": [],
         "inputs": [{"type": "sacn", "universe": 7}],
         "tracks": [{"type": "dmx", "universe": 7, "address": 1, "keys": []}]
     });
     let r = engine::registry::base();
-    // sem player ainda: `input_get` responde como todo comando de transporte
+    // no player yet: `input_get` answers like every transport command
     assert_eq!(
         r.call("input_get", json!({"universe": 7})).unwrap_err(),
-        "sem player em execucao"
+        "no player running"
     );
     assert_eq!(
         r.call("rec_state", json!({})).unwrap(),
@@ -55,10 +55,10 @@ fn track_armado_grava_o_universo_de_entrada() {
     r.call("show_set", json!({ "data": cfg }))
         .expect("show_set");
 
-    let sh: Show = serde_json::from_value(cfg).expect("show de teste");
+    let sh: Show = serde_json::from_value(cfg).expect("test show");
     let mut p = match Player::new(sh, false) {
         Ok(p) => p,
-        Err(e) => return println!("pulado: entrada sACN nao subiu: {}", e),
+        Err(e) => return println!("skipped: sACN input did not come up: {}", e),
     };
     p.start(None).expect("start");
     let h = p.handle();
@@ -68,7 +68,7 @@ fn track_armado_grava_o_universo_de_entrada() {
         Ok(t) => t,
         Err(e) => {
             p.close();
-            return println!("pulado: saida sACN nao subiu: {:?}", e.kind());
+            return println!("skipped: sACN output did not come up: {:?}", e.kind());
         }
     };
 
@@ -80,7 +80,7 @@ fn track_armado_grava_o_universo_de_entrada() {
     );
     h.play();
 
-    // 0,5 s de gravacao: tres valores distintos, cada um segurado por mais de um frame (30 fps).
+    // 0.5 s of recording: three distinct values, each held for more than one frame (30 fps).
     let esperados = [10u8, 20, 30];
     use protocols::Output;
     for v in esperados {
@@ -93,7 +93,7 @@ fn track_armado_grava_o_universo_de_entrada() {
     }
     let chegou = espera(2.0, || gravados(&r, 0).len() >= 3);
 
-    // em pausa o frame continua rodando com t congelado: NAO grava
+    // while paused the frame keeps running with t frozen: it does NOT record
     h.pause();
     std::thread::sleep(Duration::from_millis(100));
     let antes = gravados(&r, 0).len();
@@ -105,7 +105,7 @@ fn track_armado_grava_o_universo_de_entrada() {
     }
     let em_pausa = gravados(&r, 0).len() - antes;
 
-    // parar o transporte desarma
+    // stopping the transport disarms
     h.stop();
     let desarmou = espera(1.0, || {
         r.call("rec_state", json!({})).unwrap()["recording"] == json!(false)
@@ -117,12 +117,12 @@ fn track_armado_grava_o_universo_de_entrada() {
     p.close();
 
     if entrada.is_none() {
-        return println!("pulado: UDP em loopback nao entregou (firewall?)");
+        return println!("skipped: loopback UDP did not deliver (firewall?)");
     }
-    assert!(chegou, "gravou {} keyframes: {:?}", keys.len(), keys);
-    // A entrada nasce em zero: o primeiro frame gravado pode ser o 0 antes do primeiro pacote.
+    assert!(chegou, "recorded {} keyframes: {:?}", keys.len(), keys);
+    // The input is born at zero: the first frame recorded may be the 0 before the first packet.
     let vs: Vec<f64> = keys.into_iter().filter(|v| *v > 0.0).collect();
-    assert_eq!(vs, vec![10.0, 20.0, 30.0], "valores gravados em ordem");
-    assert_eq!(em_pausa, 0, "gravou em pausa");
-    assert!(desarmou, "stop nao desarmou a gravacao");
+    assert_eq!(vs, vec![10.0, 20.0, 30.0], "values recorded in order");
+    assert_eq!(em_pausa, 0, "it recorded while paused");
+    assert!(desarmou, "stop did not disarm the recording");
 }

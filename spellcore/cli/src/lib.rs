@@ -1,18 +1,18 @@
-//! `spellcore` — CLI da R1/R7/R5. Cinco subcomandos, escritos com `clap::Parser`:
+//! `spellcore` — the R1/R7/R5 CLI. Five subcommands, written with `clap::Parser`:
 //!
 //!   spellcore play <show.spell> [--loop] [--osc-port N]
 //!   spellcore net [--json] [--timeout N]
-//!   spellcore commands [nome]
+//!   spellcore commands [name]
 //!   spellcore mcp [install --target desktop|code [--path P] [--yes]]
 //!   spellcore serve [--port N] [--dir D] [--show x.spell]
 //!
-//! Quem tem logica e' o registry; a CLI so' chama e imprime. Os subcomandos NAO sao mais
-//! gerados em runtime a partir do `Registry::schema()`: `load`, `pause`, `stop`, `locate`,
-//! `cue_go`, `transport_state` e `show_get` agem no player VIVO NESTE PROCESSO e nao faziam
-//! sentido como processo separado. Eles continuam no registry, que e' o que o MCP expoe.
+//! What holds the logic is the registry; the CLI only calls and prints. The subcommands are NO
+//! longer generated at runtime from `Registry::schema()`: `load`, `pause`, `stop`, `locate`,
+//! `cue_go`, `transport_state` and `show_get` act on the player ALIVE IN THIS PROCESS and made
+//! no sense as a separate process. They stay in the registry, which is what the MCP exposes.
 //!
-//! `PlayArgs` e `NetArgs` servem as duas pontas: `clap::Args` para o argv e `JsonSchema` +
-//! `Deserialize` para o registry (e, por ele, para as tools do MCP).
+//! `PlayArgs` and `NetArgs` serve both ends: `clap::Args` for the argv and `JsonSchema` +
+//! `Deserialize` for the registry (and, through it, for the MCP tools).
 
 mod laser_cmd;
 
@@ -27,26 +27,27 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-// ------------------------------------------------------------------ comandos
+// ------------------------------------------------------------------ commands
 
-/// Uma fonte para o `doc` do registry (`/commands`, tools MCP) e para o `about` do clap
-/// (`spellcore --help`, `spellcore play --help`): os dois lados leem estas constantes.
-const DOC_PLAY: &str = "Toca um show .spell ate o fim ou Ctrl+C.";
+/// One source for the registry `doc` (`/commands`, MCP tools) and for the clap `about`
+/// (`spellcore --help`, `spellcore play --help`): both sides read these constants.
+const DOC_PLAY: &str = "Plays a .spell show to the end or Ctrl+C.";
 const DOC_NET: &str =
-    "Varre a rede: interfaces, nos Art-Net, fontes sACN, Ether Dream e sugestoes.";
-const DOC_GRAPH_CHECK: &str = "Compila o graph do show aberto sem rodar. Devolve {nodes, error}.";
+    "Scans the network: interfaces, Art-Net nodes, sACN sources, Ether Dream and hints.";
+const DOC_GRAPH_CHECK: &str =
+    "Compiles the graph of the open show without running it. Returns {nodes, error}.";
 
 #[derive(Args, Deserialize, JsonSchema)]
 #[schemars(crate = "engine::schemars")]
 struct PlayArgs {
-    /// Caminho do arquivo .spell.
+    /// Path of the .spell file.
     file: String,
-    /// Repete o show do inicio ao chegar no fim.
+    /// Repeats the show from the start when it reaches the end.
     #[arg(long = "loop")]
     #[serde(default, rename = "loop")]
     #[schemars(rename = "loop")]
     looping: bool,
-    /// Porta do transporte remoto por OSC (sobrepoe transport.osc_port do .spell).
+    /// Port of the remote transport over OSC (overrides transport.osc_port of the .spell).
     #[arg(long)]
     #[serde(default)]
     osc_port: Option<u16>,
@@ -55,11 +56,11 @@ struct PlayArgs {
 #[derive(Args, Deserialize, JsonSchema)]
 #[schemars(crate = "engine::schemars")]
 struct NetArgs {
-    /// Segundos de escuta por protocolo.
+    /// Seconds of listening per protocol.
     #[arg(long, default_value_t = def_timeout())]
     #[serde(default = "def_timeout")]
     timeout: f64,
-    /// Devolve o resultado cru em JSON em vez do relatorio de texto.
+    /// Returns the raw result as JSON instead of the text report.
     #[arg(long)]
     #[serde(default)]
     json: bool,
@@ -69,24 +70,24 @@ fn def_timeout() -> f64 {
     2.0
 }
 
-// ------------------------------------------------------------- sink de evento
+// ------------------------------------------------------------------ event sink
 
-/// Saida de evento do Graph: `Cmd` vai para o registry, `Osc` para a saida OSC do show, o
-/// resto para o stderr em uma linha ASCII.
+/// Event output of the Graph: `Cmd` goes to the registry, `Osc` to the show OSC output, the
+/// rest to the stderr in one ASCII line.
 struct CliSink {
     reg: Registry,
     osc: Option<osc::OscOut>,
 }
 
 impl CliSink {
-    // ponytail: o sink monta seu proprio `registry::base()` (o transporte age no player vivo por
-    // `player::current()`, nao precisa do registry da CLI) ; passar o registry inteiro quando um
-    // no `cmd` precisar de `net` ou `play_show`.
+    // ponytail: the sink builds its own `registry::base()` (the transport acts on the live player
+    // through `player::current()`, it does not need the CLI registry) ; pass the whole registry
+    // when a `cmd` node needs `net` or `play_show`.
     fn new(target: Option<(String, u16)>) -> CliSink {
         let osc = target.and_then(|(h, p)| match osc::OscOut::new(&h, p) {
             Ok(o) => Some(o),
             Err(e) => {
-                eprintln!("aviso: saida osc {}:{} indisponivel: {}", h, p, e);
+                eprintln!("warning: osc output {}:{} unavailable: {}", h, p, e);
                 None
             }
         });
@@ -97,7 +98,7 @@ impl CliSink {
     }
 }
 
-/// `args` do `Ev::Cmd` mais `feed`, para o roteador do no `module`.
+/// The `Ev::Cmd` `args` plus `feed`, for the `module` node router.
 fn com_feed(mut args: Value, feed: &str) -> Value {
     if let Some(o) = args.as_object_mut() {
         o.insert("feed".into(), Value::String(feed.into()));
@@ -108,9 +109,9 @@ fn com_feed(mut args: Value, feed: &str) -> Value {
 impl EventSink for CliSink {
     fn emit(&mut self, e: &Ev) {
         match e {
-            // O no `module` do graph emite `<mod>/<cmd>`; o comando registrado e' `<mod>_<cmd>`,
-            // com `feed` = nome do modulo.
-            // ponytail: convencao feed = nome do modulo ; instancia nomeada quando houver dois lasers.
+            // The graph `module` node emits `<mod>/<cmd>`; the registered command is
+            // `<mod>_<cmd>`, with `feed` = the module name.
+            // ponytail: convention feed = module name ; a named instance when there are two lasers.
             Ev::Cmd { name, args } => {
                 let (nome, args) = match name.split_once('/') {
                     Some((m, c)) => (format!("{}_{}", m, c), com_feed(args.clone(), m)),
@@ -121,16 +122,16 @@ impl EventSink for CliSink {
                 }
             }
             Ev::Osc { address, args } => match &self.osc {
-                // float32 e' o que o `spellcaster/protocols/osc.py` emite para numero solto.
+                // float32 is what `spellcaster/protocols/osc.py` emits for a bare number.
                 Some(o) => {
                     let a: Vec<osc::Arg> =
                         args.iter().map(|v| osc::Arg::Float(*v as f32)).collect();
                     o.send(address, &a);
                 }
-                None => eprintln!("osc {}: show sem saida osc", address),
+                None => eprintln!("osc {}: show with no osc output", address),
             },
-            // `out.widget` e' da GUI: vai para o barramento (nada acontece sem `serve` no ar) e
-            // para o stderr, que e' o unico monitor do `spellcore play`.
+            // `out.widget` belongs to the GUI: it goes to the bus (nothing happens without `serve`
+            // up) and to the stderr, which is the only monitor of `spellcore play`.
             Ev::Widget { id, prop, value } => {
                 serve::widget(id, prop, *value);
                 eprintln!("widget {}.{}={}", id, prop, value);
@@ -149,7 +150,7 @@ impl EventSink for CliSink {
     }
 }
 
-/// Host/porta da saida `osc` do .spell — o destino do `out.osc` do Graph.
+/// Host/port of the `osc` output of the .spell — the destination of the Graph `out.osc`.
 fn osc_target(sh: &show::Show) -> Option<(String, u16)> {
     sh.outputs.iter().find_map(|o| match o {
         show::OutputCfg::Osc(o) => Some((o.host.clone(), o.port)),
@@ -159,8 +160,8 @@ fn osc_target(sh: &show::Show) -> Option<(String, u16)> {
 
 // ------------------------------------------------------------ play (headless)
 
-/// Uma linha por segundo, largura estavel no `t`, so' ASCII. Sem `\r` e sem barra de progresso:
-/// a saida do play tem que sobreviver a um `ssh ... | tee` no Pi.
+/// One line per second, stable width on `t`, ASCII only. No `\r` and no progress bar: the play
+/// output has to survive an `ssh ... | tee` on the Pi.
 fn status_line(st: &TransportState, jit_p99_ms: f64) -> String {
     let u: Vec<String> = st.universes.iter().map(|n| n.to_string()).collect();
     format!(
@@ -174,8 +175,8 @@ fn status_line(st: &TransportState, jit_p99_ms: f64) -> String {
     )
 }
 
-/// Falso enquanto o servidor MCP roda: la' o stdout e' o canal JSON-RPC e uma linha de status
-/// derruba o protocolo (o Python resolve com `contextlib.redirect_stdout`).
+/// False while the MCP server runs: there the stdout is the JSON-RPC channel and one status line
+/// takes the protocol down (Python solves it with `contextlib.redirect_stdout`).
 static STDOUT_LIVRE: AtomicBool = AtomicBool::new(true);
 
 fn saida(l: &str) {
@@ -188,8 +189,8 @@ fn saida(l: &str) {
 
 static INT: AtomicBool = AtomicBool::new(false);
 
-/// Ctrl+C vira um flag; quem fecha o player e' o laco do `play`, na thread principal (chamar o
-/// engine de dentro de um handler de sinal nao e' seguro).
+/// Ctrl+C becomes a flag; what closes the player is the `play` loop, on the main thread (calling
+/// the engine from inside a signal handler is not safe).
 #[cfg(windows)]
 mod sig {
     use std::sync::atomic::Ordering;
@@ -199,7 +200,7 @@ mod sig {
     }
     extern "system" fn on_ctrl(_ty: u32) -> i32 {
         super::INT.store(true, Ordering::SeqCst);
-        1 // TRUE: tratado, o processo continua vivo ate o `close()`
+        1 // TRUE: handled, the process stays alive until the `close()`
     }
     pub fn trap() {
         unsafe { SetConsoleCtrlHandler(Some(on_ctrl), 1) };
@@ -240,15 +241,15 @@ fn play(a: PlayArgs) -> Result<Value, String> {
     h.play();
     sig::trap();
 
-    // Cabecalho sem universos: eles so' existem depois do primeiro frame; quem os mostra e' a
-    // linha de status.
+    // Header with no universes: they only exist after the first frame; what shows them is the
+    // status line.
     let st = h.state();
     let dur = st
         .duration
-        .map_or("sem fim".into(), |d| format!("{:.2}s", d));
+        .map_or("no end".into(), |d| format!("{:.2}s", d));
     saida(&format!("{}: {} fps, {}", name, st.fps, dur));
-    // ponytail: acorda a cada 200 ms so' para ver o Ctrl+C e imprimir o status ; virar condvar
-    // do player se a linha de status precisar de resolucao melhor que 1 s.
+    // ponytail: it wakes every 200 ms just to check the Ctrl+C and print the status ; make it a
+    // player condvar if the status line needs better resolution than 1 s.
     let mut last = Instant::now();
     while !p.wait(Some(Duration::from_millis(200))) {
         if INT.load(Ordering::SeqCst) {
@@ -256,8 +257,9 @@ fn play(a: PlayArgs) -> Result<Value, String> {
         }
         if last.elapsed() >= Duration::from_secs(1) {
             last = Instant::now();
-            // ponytail: jit_p99 e' o do ultimo `Clock::run` FECHADO (o Clock so' publica stats no
-            // fim do run) ; virar contador vivo se o operador precisar do jitter durante o show.
+            // ponytail: jit_p99 is the one of the last CLOSED `Clock::run` (the Clock only
+            // publishes stats at the end of the run) ; make it a live counter if the operator
+            // needs the jitter during the show.
             saida(&status_line(&h.state(), p.clock().stats().p99 * 1e3));
         }
     }
@@ -279,8 +281,9 @@ fn net(a: NetArgs) -> Result<Value, String> {
     }
 }
 
-/// Compila o graph do show aberto sem rodar: quantos nos ele tem, ou o erro. Mora aqui porque
-/// so' a CLI conhece o crate `script` — `graph_get`, que e' edicao pura, fica no engine.
+/// Compiles the graph of the open show without running it: how many nodes it has, or the error.
+/// It lives here because only the CLI knows the `script` crate — `graph_get`, which is pure
+/// editing, stays in the engine.
 fn graph_check(_: NoArgs) -> Result<Value, String> {
     let g = engine::edit::graph();
     match script::graph::Graph::new(&g, Box::new(engine::NullSink)) {
@@ -289,10 +292,9 @@ fn graph_check(_: NoArgs) -> Result<Value, String> {
     }
 }
 
-/// `play_show`, `net` e `graph_check` moram aqui porque so' a CLI conhece `script` e
-/// `protocols`; o resto do
-/// transporte vem de `registry::base()`, que age no player vivo (`player::current()`).
-/// E' este registry que o MCP expoe como tools.
+/// `play_show`, `net` and `graph_check` live here because only the CLI knows `script` and
+/// `protocols`; the rest of the transport comes from `registry::base()`, which acts on the live
+/// player (`player::current()`). It is this registry that the MCP exposes as tools.
 pub fn registry() -> Registry {
     let mut r = engine::registry::base();
     r.add::<PlayArgs>("play_show", DOC_PLAY, play);
@@ -308,7 +310,7 @@ pub fn registry() -> Registry {
 #[command(
     name = "spellcore",
     version,
-    about = "Spellcaster core: timeline, cues, fx, graph, sACN, Art-Net, OSC, rede, MCP",
+    about = "Spellcaster core: timeline, cues, fx, graph, sACN, Art-Net, OSC, network, MCP",
     subcommand_required = true,
     arg_required_else_help = true
 )]
@@ -319,14 +321,14 @@ struct Cli {
 
 #[derive(Args)]
 struct ServeArgs {
-    /// Porta HTTP; 0 = uma livre (a linha `serve http://...` no stderr diz qual).
+    /// HTTP port; 0 = a free one (the `serve http://...` line on the stderr says which).
     #[arg(long, default_value_t = 8000)]
     port: u16,
-    /// Raiz do estatico; padrao = raiz do repo, porque as paginas de `spellgui/web`
-    /// referenciam `../../design/tokens` e `../../shows`.
+    /// Root of the static files; default = the repo root, because the `spellgui/web` pages
+    /// reference `../../design/tokens` and `../../shows`.
     #[arg(long, default_value = ".")]
     dir: String,
-    /// .spell aberto no boot, com o player parado em t=0.
+    /// .spell opened at boot, with the player stopped at t=0.
     #[arg(long)]
     show: Option<String>,
 }
@@ -337,15 +339,15 @@ enum Cmd {
     Play(PlayArgs),
     #[command(about = DOC_NET)]
     Net(NetArgs),
-    /// Lista o registry em JSON: nome, doc e schema de cada comando. Com um nome, so' esse
-    /// comando - e' o `spellcore <cmd> --help` dos verbos que nao viraram subcomando.
+    /// Lists the registry as JSON: name, doc and schema of each command. With a name, only that
+    /// command - it is the `spellcore <cmd> --help` of the verbs that did not become subcommands.
     Commands {
-        /// Nome do comando do registry; vazio = todos.
+        /// Name of the registry command; empty = all of them.
         name: Option<String>,
     },
-    /// Servidor MCP em stdio; `spellcore mcp install` registra o servidor no Claude.
+    /// MCP server over stdio; `spellcore mcp install` registers the server in Claude.
     Mcp(McpArgs),
-    /// Barramento: HTTP + WebSocket + MCP em /mcp. E' o processo que toca o hardware.
+    /// Bus: HTTP + WebSocket + MCP at /mcp. It is the process that drives the hardware.
     Serve(ServeArgs),
 }
 
@@ -357,23 +359,23 @@ struct McpArgs {
 
 #[derive(Subcommand)]
 enum McpCmd {
-    /// Grava a entrada "spellcaster" no config do Claude (pede confirmacao).
+    /// Writes the "spellcaster" entry into the Claude config (it asks for confirmation).
     Install {
-        /// desktop = claude_desktop_config.json; code = .mcp.json do diretorio corrente.
+        /// desktop = claude_desktop_config.json; code = .mcp.json of the current directory.
         #[arg(long, default_value = "desktop")]
         target: String,
-        /// Caminho do config; vazio = o padrao do target.
+        /// Path of the config; empty = the target default.
         #[arg(long, default_value = "")]
         path: String,
-        /// Grava sem perguntar.
+        /// Writes without asking.
         #[arg(long)]
         yes: bool,
     },
 }
 
 pub fn main() {
-    // O mapa MIDI chama o registry COMPLETO (com `play_show`, `net` e os `laser_*`), nao so' o
-    // `base()` do engine.
+    // The MIDI map calls the FULL registry (with `play_show`, `net` and the `laser_*`), not just
+    // the engine `base()`.
     engine::midi::builder(registry);
     let r = match Cli::parse().cmd {
         Cmd::Play(a) => play(a),
@@ -384,10 +386,10 @@ pub fn main() {
                 .schema()
                 .as_array()
                 .and_then(|a| a.iter().find(|c| c["name"] == n.as_str()).cloned())
-                .ok_or_else(|| format!("comando desconhecido: {}", n)),
+                .ok_or_else(|| format!("unknown command: {}", n)),
         },
         Cmd::Serve(a) => {
-            // o stdout de um servidor nao e' canal de dado: status e log vao para o stderr
+            // the stdout of a server is not a data channel: status and log go to the stderr
             STDOUT_LIVRE.store(false, Ordering::SeqCst);
             serve::serve(registry(), a.port, a.dir.into(), a.show, |_| {}).map(|_| Value::Null)
         }
@@ -402,12 +404,12 @@ pub fn main() {
         },
     };
     match r {
-        Ok(Value::Null) => {} // servidor MCP encerrado, ou install abortado: ja' se explicou
-        // string = relatorio pronto (net sem --json); o resto sai como JSON
+        Ok(Value::Null) => {} // MCP server closed, or install aborted: it has explained itself
+        // a string = a finished report (net without --json); the rest goes out as JSON
         Ok(Value::String(s)) => println!("{}", s),
         Ok(v) => println!("{}", serde_json::to_string_pretty(&v).unwrap_or_default()),
         Err(e) => {
-            eprintln!("erro: {}", e);
+            eprintln!("error: {}", e);
             std::process::exit(1);
         }
     }
@@ -419,13 +421,13 @@ mod tests {
     use clap::CommandFactory;
 
     #[test]
-    fn clap_bem_formado() {
+    fn clap_well_formed() {
         Cli::command().debug_assert();
     }
 
-    /// O contrato do argv: os cinco subcomandos e as flags que o operador digita hoje.
+    /// The argv contract: the five subcommands and the flags the operator types today.
     #[test]
-    fn argv_dos_cinco_subcomandos() {
+    fn argv_of_the_five_subcommands() {
         let c = Cli::try_parse_from([
             "spellcore",
             "play",
@@ -434,45 +436,45 @@ mod tests {
             "--osc-port",
             "9000",
         ])
-        .expect("play aceita posicional, --loop e --osc-port");
+        .expect("play accepts a positional, --loop and --osc-port");
         match c.cmd {
             Cmd::Play(a) => {
                 assert_eq!(a.file, "shows/x.spell");
                 assert!(a.looping);
                 assert_eq!(a.osc_port, Some(9000));
             }
-            _ => panic!("esperava play"),
+            _ => panic!("expected play"),
         }
 
         match Cli::try_parse_from(["spellcore", "net", "--timeout", "0.5", "--json"])
-            .expect("net aceita --timeout e --json")
+            .expect("net accepts --timeout and --json")
             .cmd
         {
             Cmd::Net(a) => {
                 assert_eq!(a.timeout, 0.5);
                 assert!(a.json);
             }
-            _ => panic!("esperava net"),
+            _ => panic!("expected net"),
         }
         match Cli::try_parse_from(["spellcore", "net"]).unwrap().cmd {
-            Cmd::Net(a) => assert_eq!(a.timeout, 2.0, "default do --timeout"),
-            _ => panic!("esperava net"),
+            Cmd::Net(a) => assert_eq!(a.timeout, 2.0, "the --timeout default"),
+            _ => panic!("expected net"),
         }
 
         match Cli::try_parse_from(["spellcore", "commands"]).unwrap().cmd {
-            Cmd::Commands { name } => assert!(name.is_none(), "`commands` sozinho = todos"),
-            _ => panic!("esperava commands"),
+            Cmd::Commands { name } => assert!(name.is_none(), "`commands` alone = all of them"),
+            _ => panic!("expected commands"),
         }
         match Cli::try_parse_from(["spellcore", "commands", "cue_go"])
             .unwrap()
             .cmd
         {
             Cmd::Commands { name } => assert_eq!(name.as_deref(), Some("cue_go")),
-            _ => panic!("esperava commands"),
+            _ => panic!("expected commands"),
         }
         match Cli::try_parse_from(["spellcore", "mcp"]).unwrap().cmd {
-            Cmd::Mcp(m) => assert!(m.cmd.is_none(), "`mcp` sozinho = servidor stdio"),
-            _ => panic!("esperava mcp"),
+            Cmd::Mcp(m) => assert!(m.cmd.is_none(), "`mcp` alone = the stdio server"),
+            _ => panic!("expected mcp"),
         }
         match Cli::try_parse_from(["spellcore", "mcp", "install", "--target", "code", "--yes"])
             .unwrap()
@@ -485,33 +487,33 @@ mod tests {
                 assert!(path.is_empty());
                 assert!(yes);
             }
-            _ => panic!("esperava mcp install"),
+            _ => panic!("expected mcp install"),
         }
         match Cli::try_parse_from(["spellcore", "serve", "--port", "0", "--show", "x.spell"])
-            .expect("serve aceita --port, --dir e --show")
+            .expect("serve accepts --port, --dir and --show")
             .cmd
         {
             Cmd::Serve(a) => {
                 assert_eq!(a.port, 0);
-                assert_eq!(a.dir, ".", "default do --dir e' a raiz do repo");
+                assert_eq!(a.dir, ".", "the --dir default is the repo root");
                 assert_eq!(a.show.as_deref(), Some("x.spell"));
             }
-            _ => panic!("esperava serve"),
+            _ => panic!("expected serve"),
         }
         assert!(
             Cli::try_parse_from(["spellcore"]).is_err(),
-            "sem subcomando = ajuda"
+            "no subcommand = help"
         );
     }
 
-    /// O operador digita `play`; o registry (e o MCP) so' conhece `play_show`. O schema dos
-    /// parametros e' o que vira `inputSchema` da tool.
+    /// The operator types `play`; the registry (and the MCP) only knows `play_show`. The schema
+    /// of the parameters is what becomes the tool `inputSchema`.
     #[test]
-    fn registry_expoe_play_show_e_net_com_schema() {
+    fn registry_exposes_play_show_and_net_with_schema() {
         let reg = registry();
         assert!(reg.get("play_show").is_some());
         assert!(reg.get("net").is_some());
-        assert!(reg.get("play").is_none(), "sem comando duplicado");
+        assert!(reg.get("play").is_none(), "no duplicated command");
         let sc = reg.schema();
         let e = sc
             .as_array()
@@ -523,7 +525,7 @@ mod tests {
         assert!(props["file"].is_object());
         assert!(
             props["loop"].is_object(),
-            "o campo JSON chama-se loop: {}",
+            "the JSON field is called loop: {}",
             props
         );
         assert!(props["osc_port"].is_object());
@@ -533,13 +535,13 @@ mod tests {
         );
     }
 
-    /// Uma fonte: o `about` do subcomando e o `doc` do registry sao a mesma constante.
+    /// One source: the subcommand `about` and the registry `doc` are the same constant.
     #[test]
-    fn about_do_clap_e_doc_do_registry_sao_o_mesmo_texto() {
+    fn clap_about_and_registry_doc_are_the_same_text() {
         let c = Cli::command();
         let about = |n: &str| {
             c.find_subcommand(n)
-                .unwrap_or_else(|| panic!("subcomando {}", n))
+                .unwrap_or_else(|| panic!("subcommand {}", n))
                 .get_about()
                 .expect("about")
                 .to_string()
@@ -553,7 +555,7 @@ mod tests {
     }
 
     #[test]
-    fn linha_de_status() {
+    fn status_line_is_stable() {
         let st = TransportState {
             t: 12.345,
             state: "play",
@@ -570,7 +572,7 @@ mod tests {
             status_line(&st, 0.41),
             "t=  12.35s state=play cue=3 frames=372 jit_p99=0.41ms u=1,2"
         );
-        // largura do campo `t` estavel: a linha nao muda de forma entre um segundo e o proximo
+        // stable width on the `t` field: the line does not change shape from one second to the next
         let parado = TransportState {
             t: 0.0,
             state: "stop",

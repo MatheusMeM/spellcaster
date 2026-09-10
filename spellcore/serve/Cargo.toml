@@ -9,7 +9,7 @@ mcp = { workspace = true }
 serde_json = { workspace = true }
 axum = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "net", "sync", "time", "fs"] }
-# `transport-streamable-http-server` = `server-side-http` + o gerente de sessao local
+# `transport-streamable-http-server` = `server-side-http` + the local session manager
 rmcp = { workspace = true, features = ["transport-streamable-http-server"] }
 
 [dev-dependencies]

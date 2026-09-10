@@ -1,9 +1,9 @@
-//! Cue list: GO manual, `wait` antes de comecar, `follow` automatico ao terminar, fade linear
-//! entre snapshots. Porte de `spellcaster/timeline/cues.py`.
+//! Cue list: manual GO, `wait` before it starts, automatic `follow` when it ends, linear fade
+//! between snapshots. Port of `spellcaster/timeline/cues.py`.
 //!
-//! Snapshot = {"universo/endereco": [valores]} no .spell; vira `((universo, endereco), valores)`.
-//! O estado corrente e' escrito nos Universes por `update()`, sem alocar por frame: os `Vec` de
-//! valores sao reaproveitados (so' o primeiro toque em cada chave aloca).
+//! Snapshot = {"universe/address": [values]} in the .spell; becomes `((universe, address), values)`.
+//! The current state is written into the Universes by `update()`, with no per-frame allocation:
+//! the value `Vec`s are reused (only the first touch on each key allocates).
 
 use crate::universe::Universes;
 use serde_json::Value;
@@ -12,8 +12,8 @@ type Key = (u16, u16);
 type Snap = Vec<(Key, Vec<f64>)>;
 
 /// `"1/100"` -> `(1, 100)`; `"100"` -> `(1, 100)`.
-// ponytail: chave malformada devolve None e o Cue a descarta com aviso (o Python levanta
-// ValueError) ; virar erro de carga quando o .spell tiver validacao de schema.
+// ponytail: a malformed key returns None and the Cue drops it with a warning (Python raises
+// ValueError) ; make it a load error once the .spell has schema validation.
 pub fn key(s: &str) -> Option<Key> {
     match s.split_once('/') {
         Some((u, a)) => Some((u.trim().parse().ok()?, a.trim().parse().ok()?)),
@@ -24,9 +24,9 @@ pub fn key(s: &str) -> Option<Key> {
 pub struct Cue {
     pub name: String,
     pub fade: f64,
-    /// Atraso entre o gatilho e o inicio do fade.
+    /// Delay between the trigger and the start of the fade.
     pub wait: f64,
-    /// Ao terminar, dispara a proxima.
+    /// When it ends, it fires the next one.
     pub follow: bool,
     pub values: Vec<(Key, Vec<f64>)>,
 }
@@ -35,9 +35,9 @@ impl Cue {
     pub fn new(spec: &Value) -> Cue {
         let num = |k: &str| spec.get(k).and_then(|v| v.as_f64()).unwrap_or(0.0);
         let mut values = Vec::new();
-        // ponytail: a ordem das chaves e' a do Map do serde_json (alfabetica), nao a do arquivo
-        // ; so' muda o resultado se duas chaves da MESMA cue escreverem no mesmo canal
-        // ; ligar a feature "preserve_order" do serde_json se algum show depender disso.
+        // ponytail: key order is the serde_json Map order (alphabetical), not the file order
+        // ; it only changes the result if two keys of the SAME cue write to the same channel
+        // ; turn on the serde_json "preserve_order" feature if some show comes to depend on it.
         if let Some(m) = spec.get("values").and_then(|v| v.as_object()) {
             for (k, v) in m {
                 match key(k) {
@@ -50,7 +50,7 @@ impl Cue {
                             other => vec![other.as_f64().unwrap_or(0.0)],
                         },
                     )),
-                    None => eprintln!("aviso: cue com chave invalida: {}", k),
+                    None => eprintln!("warning: cue with invalid key: {}", k),
                 }
             }
         }
@@ -78,7 +78,7 @@ pub struct CueList {
     index: i32,
     cur: Option<usize>,
     t0: f64,
-    /// (indice, instante do gatilho) — vira cue corrente quando passa o `wait`.
+    /// (index, trigger instant) — becomes the current cue once the `wait` is over.
     pending: Option<(usize, f64)>,
 }
 
@@ -103,12 +103,12 @@ impl CueList {
         self.cues.is_empty()
     }
 
-    /// Indice da ultima cue disparada; -1 = nenhuma.
+    /// Index of the last cue fired; -1 = none.
     pub fn index(&self) -> i32 {
         self.index
     }
 
-    /// Dispara a proxima cue (ou a de indice dado). O fade comeca depois do `wait` dela.
+    /// Fires the next cue (or the one at the given index). The fade starts after its `wait`.
     pub fn go(&mut self, t: f64, index: Option<usize>) -> bool {
         let i = match index {
             Some(i) => i as i64,
@@ -121,7 +121,7 @@ impl CueList {
         true
     }
 
-    /// Avanca o fade e escreve o snapshot corrente nos Universes.
+    /// Advances the fade and writes the current snapshot into the Universes.
     pub fn update(&mut self, t: f64, uni: &mut Universes) {
         if let Some((i, t0)) = self.pending {
             if t >= t0 + self.cues[i].wait {
@@ -129,7 +129,7 @@ impl CueList {
                 self.index = i as i32;
                 self.cur = Some(i);
                 self.t0 = t;
-                self.from.clone_from(&self.state); // ponto de partida do fade
+                self.from.clone_from(&self.state); // starting point of the fade
             }
         }
         if let Some(i) = self.cur {
@@ -147,7 +147,7 @@ impl CueList {
                 ((t - *t0) / c.fade).clamp(0.0, 1.0)
             };
             for (k, v) in &c.values {
-                // valor de partida: o que estava no estado, completado com 0.0 (igual ao Python)
+                // starting value: whatever the state held, padded with 0.0 (same as Python)
                 let a = from
                     .iter()
                     .find(|(kk, _)| kk == k)
@@ -186,15 +186,15 @@ impl CueList {
     }
 }
 
-/// Entrada de `snap` para a chave, criando-a no fim se ainda nao existir.
-// ponytail: busca linear ; uma cue tem dezenas de chaves, nao milhares — virar Vec ordenado
-// com busca binaria se um show passar a ter centenas de canais por cue.
+/// The `snap` entry for the key, appending it at the end if it does not exist yet.
+// ponytail: linear search ; a cue has dozens of keys, not thousands — make it a sorted Vec with
+// binary search if a show comes to have hundreds of channels per cue.
 fn slot(snap: &mut Snap, k: Key) -> &mut Vec<f64> {
     match snap.iter().position(|(kk, _)| *kk == k) {
         Some(i) => &mut snap[i].1,
         None => {
             snap.push((k, Vec::new()));
-            &mut snap.last_mut().expect("acabou de entrar").1
+            &mut snap.last_mut().expect("just pushed").1
         }
     }
 }
@@ -205,7 +205,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn key_nas_duas_formas() {
+    fn key_in_both_forms() {
         assert_eq!(key("1/100"), Some((1, 100)));
         assert_eq!(key("100"), Some((1, 100)));
         assert_eq!(key("3/512"), Some((3, 512)));
@@ -215,10 +215,10 @@ mod tests {
     }
 
     fn ch(uni: &Universes, u: u16, a: u16) -> u8 {
-        uni.get(u).expect("universo").data[(a - 1) as usize]
+        uni.get(u).expect("universe").data[(a - 1) as usize]
     }
 
-    /// wait + fade + follow com os valores na mao.
+    /// wait + fade + follow with the values worked out by hand.
     #[test]
     fn wait_fade_follow() {
         let specs = vec![
@@ -232,68 +232,76 @@ mod tests {
         assert_eq!(cl.len(), 2);
         assert_eq!(cl.index(), -1);
 
-        // sem GO nada acontece
+        // with no GO nothing happens
         cl.update(0.0, &mut uni);
         assert_eq!(ch(&uni, 1, 1), 0);
 
         assert!(cl.go(0.0, None));
-        // dentro do wait: ainda nao comecou
+        // inside the wait: it has not started yet
         cl.update(0.5, &mut uni);
         assert_eq!(cl.index(), -1);
         assert_eq!(ch(&uni, 1, 1), 0);
 
-        // t = 1.0: passou o wait, o fade comeca aqui (u = 0)
+        // t = 1.0: the wait is over, the fade starts here (u = 0)
         cl.update(1.0, &mut uni);
         assert_eq!(cl.index(), 0);
         assert_eq!(ch(&uni, 1, 1), 0);
-        // meio do fade de 2 s
+        // middle of the 2 s fade
         cl.update(2.0, &mut uni);
         assert_eq!(ch(&uni, 1, 1), 50);
         cl.update(2.5, &mut uni);
         assert_eq!(ch(&uni, 1, 1), 75);
-        // fim do fade: valor cheio e o follow arma a proxima
+        // end of the fade: full value and the follow arms the next one
         cl.update(3.0, &mut uni);
         assert_eq!(ch(&uni, 1, 1), 100);
-        assert_eq!(cl.index(), 0, "a proxima so' entra no update seguinte");
-        // cue b: fade 0 => u = 1 de cara
+        assert_eq!(
+            cl.index(),
+            0,
+            "the next one only lands on the following update"
+        );
+        // cue b: fade 0 => u = 1 right away
         cl.update(3.1, &mut uni);
         assert_eq!(cl.index(), 1);
         assert_eq!(ch(&uni, 1, 1), 200);
         assert_eq!(ch(&uni, 2, 5), 10);
         assert_eq!(ch(&uni, 2, 6), 20);
-        // fim da lista: o follow da ultima nao tem para onde ir
+        // end of the list: the follow of the last one has nowhere to go
         cl.update(4.0, &mut uni);
         assert_eq!(cl.index(), 1);
 
-        // GO com indice explicito volta para a cue 0
+        // GO with an explicit index goes back to cue 0
         assert!(cl.go(4.0, Some(0)));
-        cl.update(5.0, &mut uni); // wait 1.0 cumprido: u = 0, parte de 200
+        cl.update(5.0, &mut uni); // wait 1.0 served: u = 0, starting from 200
         assert_eq!(ch(&uni, 1, 1), 200);
-        cl.update(6.0, &mut uni); // metade do caminho de 200 para 100
+        cl.update(6.0, &mut uni); // halfway from 200 to 100
         assert_eq!(ch(&uni, 1, 1), 150);
 
-        assert!(!cl.go(6.0, Some(9)), "indice fora da lista");
+        assert!(!cl.go(6.0, Some(9)), "index outside the list");
         cl.reset();
         assert_eq!(cl.index(), -1);
         cl.update(7.0, &mut uni);
-        assert_eq!(ch(&uni, 1, 1), 150, "reset nao apaga o que ja foi escrito");
+        assert_eq!(
+            ch(&uni, 1, 1),
+            150,
+            "reset does not erase what was already written"
+        );
     }
 
     #[test]
-    fn fade_zero_e_valor_solto() {
+    fn zero_fade_and_bare_value() {
         let specs = vec![json!({"values": {"7": 255, "1/2": [1, 2, 3]}})];
         let mut cl = CueList::new(&specs);
         let mut uni = Universes::new();
         cl.go(0.0, None);
         cl.update(0.0, &mut uni);
-        assert_eq!(ch(&uni, 1, 7), 255, "chave sem universo e' o universo 1");
+        assert_eq!(ch(&uni, 1, 7), 255, "a key with no universe is universe 1");
         assert_eq!(ch(&uni, 1, 2), 1);
         assert_eq!(ch(&uni, 1, 4), 3);
         assert_eq!(cl.index(), 0);
     }
 
     #[test]
-    fn lista_vazia_e_chave_invalida() {
+    fn empty_list_and_invalid_key() {
         let mut cl = CueList::new(&[]);
         let mut uni = Universes::new();
         assert!(cl.is_empty());
@@ -301,7 +309,7 @@ mod tests {
         cl.update(0.0, &mut uni);
         assert!(uni.is_empty());
 
-        let cl = CueList::new(&[json!({"values": {"nao/e/chave": [1]}})]);
-        assert_eq!(cl.len(), 1, "chave invalida nao derruba a cue");
+        let cl = CueList::new(&[json!({"values": {"not/a/key": [1]}})]);
+        assert_eq!(cl.len(), 1, "an invalid key does not take the cue down");
     }
 }

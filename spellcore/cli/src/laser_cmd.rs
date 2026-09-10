@@ -1,28 +1,28 @@
-//! ILDA player: os verbos da funcao `spell ilda play` como comandos do registry.
+//! ILDA player: the verbs of the `spell ilda play` function as registry commands.
 //!
-//! Mora na CLI, e nao no engine, pela mesma razao de `play_show` e `net`: o engine nao conhece
-//! o crate `laser`. Como todo comando do produto, e' um `Registry::add`, entao CLI (`spellcore
-//! commands`), MCP, OSC e GUI o veem sem uma linha a mais.
+//! It lives in the CLI, and not in the engine, for the same reason as `play_show` and `net`: the
+//! engine does not know the `laser` crate. Like every product command, it is a `Registry::add`,
+//! so the CLI (`spellcore commands`), MCP, OSC and GUI see it without one extra line.
 //!
-//! Um feed = um DAC aberto. A tabela `FEEDS` e' para o laser o que `player::current()` e' para o
-//! transporte: um processo, N feeds, cada um com a thread do DAC (do proprio `Feed`) e, enquanto
-//! toca, uma thread que le o `.ild` e empurra frames no ritmo pedido.
+//! One feed = one open DAC. The `FEEDS` table is to the laser what `player::current()` is to the
+//! transport: one process, N feeds, each with the DAC thread (of the `Feed` itself) and, while it
+//! plays, a thread that reads the `.ild` and pushes frames at the rate asked for.
 //!
-//! `laser_param path -> campo` (os mesmos paths de `modules/laser.json`, a declaracao do modulo):
+//! `laser_param path -> field` (the same paths as `modules/laser.json`, the module declaration):
 //!
-//! | path | campo | faixa |
+//! | path | field | range |
 //! |---|---|---|
-//! | `geo/x`, `geo/y` | `Transform.x`, `Transform.y` | unidades ILDA, +-32767 |
+//! | `geo/x`, `geo/y` | `Transform.x`, `Transform.y` | ILDA units, +-32767 |
 //! | `geo/scale` | `Transform.scale` | 0..4 |
-//! | `geo/rot` | `Transform.rot` | graus, +-180 |
+//! | `geo/rot` | `Transform.rot` | degrees, +-180 |
 //! | `limit/r`, `limit/g`, `limit/b` | `Transform.color.0/.1/.2` | 0..1 |
-//! | `safe/min_size` | `Safety.min_size` | unidades ILDA, 0..32767 |
+//! | `safe/min_size` | `Safety.min_size` | ILDA units, 0..32767 |
 //! | `safe/max_intensity` | `Safety.max_intensity` | 0..255 |
-//! | `shutter` | zera `Safety.max_intensity` e devolve o valor guardado ao abrir | 0 ou 1 |
+//! | `shutter` | zeroes `Safety.max_intensity` and gives the stored value back on open | 0 or 1 |
 //!
-// ponytail: so' os campos que `Transform` e `Safety` ja' tem ; `curve/r|g|b`, `Blanking/*` e
-// `Cor/Time Shift` da tabela do ilda-player entram quando o `Feed` tiver LUT de cor e o
-// `optimize` for parametrizavel em runtime.
+// ponytail: only the fields `Transform` and `Safety` already have ; `curve/r|g|b`, `Blanking/*`
+// and `Cor/Time Shift` of the ilda-player table come in when the `Feed` has a color LUT and the
+// `optimize` is parameterizable at runtime.
 
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -38,17 +38,17 @@ use protocols::netscan;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-/// Buffer do Ether Dream em pontos. O beacon carrega o valor real (`buffer_capacity`), mas
-/// `laser_open` aceita host digitado, sem beacon.
-// ponytail: capacidade fixa em 1800 (o padrao do hardware) ; ler do beacon quando `laser_open`
-// aceitar o id devolvido por `laser_dacs` em vez do host.
+/// Ether Dream buffer in points. The beacon carries the real value (`buffer_capacity`), but
+/// `laser_open` accepts a typed host, with no beacon.
+// ponytail: capacity fixed at 1800 (the hardware default) ; read it from the beacon when
+// `laser_open` accepts the id returned by `laser_dacs` instead of the host.
 const CAPACITY: u16 = 1800;
 
-// -------------------------------------------------------------- tabela de feeds
+// -------------------------------------------------------------------- feed table
 
 struct Play {
     file: String,
-    /// A thread zera ao sair, inclusive quando o arquivo acaba sem loop; `colher` recolhe.
+    /// The thread clears it on exit, including when the file ends with no loop; `colher` reaps.
     run: Arc<AtomicBool>,
     th: Option<JoinHandle<()>>,
 }
@@ -59,7 +59,7 @@ struct Live {
     feed: Arc<Feed>,
     tf: Transform,
     safety: Safety,
-    /// `max_intensity` guardado enquanto o obturador esta' fechado; `None` = obturador aberto.
+    /// `max_intensity` stored while the shutter is closed; `None` = an open shutter.
     shut: Option<u8>,
     play: Option<Play>,
 }
@@ -74,10 +74,10 @@ fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 fn achar(v: &mut [Live], id: u64) -> Result<&mut Live, String> {
     v.iter_mut()
         .find(|f| f.id == id)
-        .ok_or_else(|| format!("feed {} nao existe", id))
+        .ok_or_else(|| format!("feed {} does not exist", id))
 }
 
-/// Para a thread de playback e espera ela sair. Idempotente.
+/// Stops the playback thread and waits for it to leave. Idempotent.
 fn parar(l: &mut Live) {
     if let Some(mut p) = l.play.take() {
         p.run.store(false, Ordering::Relaxed);
@@ -87,8 +87,8 @@ fn parar(l: &mut Live) {
     }
 }
 
-/// Recolhe a thread que terminou sozinha (fim do arquivo sem loop): `play` so' existe
-/// enquanto toca, entao `playing` nunca fica preso em `true`.
+/// Reaps the thread that finished on its own (end of the file with no loop): `play` only exists
+/// while it plays, so `playing` never gets stuck at `true`.
 fn colher(l: &mut Live) {
     if l.play
         .as_ref()
@@ -103,7 +103,7 @@ fn colher(l: &mut Live) {
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "engine::schemars")]
 struct DacsArgs {
-    /// Segundos de escuta por protocolo.
+    /// Seconds of listening per protocol.
     #[serde(default = "def_timeout")]
     timeout: f64,
 }
@@ -121,8 +121,8 @@ fn dacs(a: DacsArgs) -> Result<Value, String> {
                    "buffer": d.buffer_capacity, "max_pps": d.max_point_rate, "via": d.via})
         })
         .collect();
-    // ponytail: sem Helios na lista ; o DAC USB entra quando o driver (hidapi/rusb) entrar —
-    // `laser::dac::helios` hoje so' tem o encoder do frame, documentado para o porte.
+    // ponytail: no Helios in the list ; the USB DAC comes in when the driver (hidapi/rusb) does —
+    // `laser::dac::helios` today only has the frame encoder, documented for the port.
     out.extend(idn::scan(std::net::Ipv4Addr::BROADCAST, t).iter().map(|u| {
         json!({"type": "idn", "id": u.unit_id.iter().map(|b| format!("{b:02x}")).collect::<String>(),
                "host": u.ip, "name": u.name})
@@ -135,16 +135,16 @@ fn dacs(a: DacsArgs) -> Result<Value, String> {
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "engine::schemars")]
 struct OpenArgs {
-    /// etherdream ou idn.
+    /// etherdream or idn.
     dac: String,
-    /// "ip" ou "ip:porta" (o `host` de `laser_dacs`).
+    /// "ip" or "ip:port" (the `host` of `laser_dacs`).
     #[serde(default)]
     host: String,
-    /// Milhares de pontos por segundo entregues ao DAC.
+    /// Thousands of points per second delivered to the DAC.
     #[serde(default = "def_kpps")]
     kpps: f64,
-    /// Safety do feed: {"min_size": 2000, "max_intensity": 255, "zone": [x0,y0,x1,y1]} em
-    /// unidades ILDA. Ausente = o padrao. Nunca desligavel.
+    /// Safety of the feed: {"min_size": 2000, "max_intensity": 255, "zone": [x0,y0,x1,y1]} in
+    /// ILDA units. Absent = the default. Never switchable off.
     #[serde(default)]
     safety: Option<Value>,
 }
@@ -160,7 +160,10 @@ fn abrir(a: OpenArgs) -> Result<Value, String> {
         None => Safety::default(),
     };
     if a.host.is_empty() {
-        return Err(format!("laser_open {} exige host (veja laser_dacs)", a.dac));
+        return Err(format!(
+            "laser_open {} requires a host (see laser_dacs)",
+            a.dac
+        ));
     }
     let d: Box<dyn Dac> = match a.dac.as_str() {
         "etherdream" => Box::new(
@@ -168,7 +171,7 @@ fn abrir(a: OpenArgs) -> Result<Value, String> {
                 .map_err(|e| format!("etherdream {}: {}", a.host, e))?,
         ),
         "idn" => Box::new(Idn::connect(&a.host, 0).map_err(|e| format!("idn {}: {}", a.host, e))?),
-        o => return Err(format!("dac desconhecido: {} (etherdream, idn)", o)),
+        o => return Err(format!("unknown dac: {} (etherdream, idn)", o)),
     };
     let feed = Feed::start(d, pps, 2, safety).map_err(|e| e.to_string())?;
     let id = NEXT.fetch_add(1, Ordering::Relaxed);
@@ -190,14 +193,14 @@ fn abrir(a: OpenArgs) -> Result<Value, String> {
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "engine::schemars")]
 struct LaserPlayArgs {
-    /// Id devolvido por `laser_open`.
+    /// Id returned by `laser_open`.
     feed: u64,
-    /// Caminho do .ild.
+    /// Path of the .ild.
     file: String,
-    /// Frames por segundo empurrados ao DAC (o .ild nao carrega taxa).
+    /// Frames per second pushed to the DAC (the .ild carries no rate).
     #[serde(default = "def_fps")]
     fps: f64,
-    /// Recomeca do primeiro frame ao chegar no fim.
+    /// Restarts from the first frame when it reaches the end.
     #[serde(default, rename = "loop")]
     #[schemars(rename = "loop")]
     looping: bool,
@@ -210,7 +213,7 @@ fn def_fps() -> f64 {
 fn tocar(a: LaserPlayArgs) -> Result<Value, String> {
     let frames = ild::read(Path::new(&a.file))?;
     if frames.is_empty() {
-        return Err(format!("{}: nenhum frame", a.file));
+        return Err(format!("{}: no frame", a.file));
     }
     let n = frames.len();
     let dt = Duration::from_secs_f64(1.0 / a.fps.clamp(1.0, 240.0));
@@ -219,8 +222,8 @@ fn tocar(a: LaserPlayArgs) -> Result<Value, String> {
     parar(l);
     let run = Arc::new(AtomicBool::new(true));
     let (feed, r, looping) = (l.feed.clone(), run.clone(), a.looping);
-    // ponytail: os frames vao inteiros para a memoria antes de tocar ; o maior .ild do repo tem
-    // 1,2 MB. Vira leitura por frame quando alguem trouxer um .ild de show inteiro.
+    // ponytail: the frames go whole into memory before playing ; the biggest .ild in the repo is
+    // 1.2 MB. It becomes a per-frame read when someone brings in a whole-show .ild.
     let th = std::thread::spawn(move || {
         let mut i = 0usize;
         let mut next = Instant::now();
@@ -241,7 +244,7 @@ fn tocar(a: LaserPlayArgs) -> Result<Value, String> {
                 next = now;
             }
         }
-        r.store(false, Ordering::Relaxed); // fim do arquivo: `colher` desarma o `play`
+        r.store(false, Ordering::Relaxed); // end of the file: `colher` disarms the `play`
     });
     l.play = Some(Play {
         file: a.file.clone(),
@@ -259,7 +262,7 @@ fn tocar(a: LaserPlayArgs) -> Result<Value, String> {
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "engine::schemars")]
 struct FeedArgs {
-    /// Id devolvido por `laser_open`.
+    /// Id returned by `laser_open`.
     feed: u64,
 }
 
@@ -275,10 +278,10 @@ fn fechar(a: FeedArgs) -> Result<Value, String> {
     let i = v
         .iter()
         .position(|f| f.id == a.feed)
-        .ok_or_else(|| format!("feed {} nao existe", a.feed))?;
+        .ok_or_else(|| format!("feed {} does not exist", a.feed))?;
     let mut l = v.remove(i);
     parar(&mut l);
-    drop(v); // o `Feed` para a thread do DAC no Drop; nao segure a tabela enquanto ele junta
+    drop(v); // the `Feed` stops the DAC thread on Drop; do not hold the table while it joins
     Ok(json!({"feed": a.feed, "dac": l.name, "closed": true}))
 }
 
@@ -287,12 +290,12 @@ fn fechar(a: FeedArgs) -> Result<Value, String> {
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "engine::schemars")]
 struct ParamArgs {
-    /// Id devolvido por `laser_open`.
+    /// Id returned by `laser_open`.
     feed: u64,
     /// geo/x, geo/y, geo/scale, geo/rot, limit/r, limit/g, limit/b, safe/min_size,
     /// safe/max_intensity, shutter.
     path: String,
-    /// Valor na faixa do `path` (a tabela de faixas esta no spellcore/README.md).
+    /// Value in the range of the `path` (the range table is in spellcore/README.md).
     value: f64,
 }
 
@@ -309,7 +312,7 @@ fn aplicar(l: &mut Live, path: &str, v: f64) -> Result<(), String> {
         "limit/g" => l.tf.color.1 = v.clamp(0.0, 1.0),
         "limit/b" => l.tf.color.2 = v.clamp(0.0, 1.0),
         "safe/min_size" => l.safety.min_size = v.clamp(0.0, 32767.0) as i32,
-        // com o obturador fechado o valor pedido fica guardado e vale quando ele abrir
+        // with the shutter closed the value asked for is stored and applies when it opens
         "safe/max_intensity" => {
             let m = v.clamp(0.0, 255.0) as u8;
             match l.shut {
@@ -327,7 +330,7 @@ fn aplicar(l: &mut Live, path: &str, v: f64) -> Result<(), String> {
                 l.safety.max_intensity = m;
             }
         }
-        p => return Err(format!("path desconhecido: {} ({})", p, PATHS)),
+        p => return Err(format!("unknown path: {} ({})", p, PATHS)),
     }
     l.feed.set_transform(l.tf);
     l.feed.set_safety(l.safety);
@@ -343,8 +346,8 @@ fn param(a: ParamArgs) -> Result<Value, String> {
 
 // ----------------------------------------------------------------- laser_stats
 
-/// Os `stat/*` sao os `values` de `modules/laser.json`; so' saem os que `FeedStats` tem
-/// (`stat/fps`, `stat/points` e `stat/clipped` entram quando o `Feed` os contar).
+/// The `stat/*` are the `values` of `modules/laser.json`; only the ones `FeedStats` has go out
+/// (`stat/fps`, `stat/points` and `stat/clipped` come in when the `Feed` counts them).
 fn stats(a: FeedArgs) -> Result<Value, String> {
     let mut v = lock(&FEEDS);
     let l = achar(&mut v, a.feed)?;
@@ -369,7 +372,7 @@ fn stats(a: FeedArgs) -> Result<Value, String> {
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "engine::schemars")]
 struct FilesArgs {
-    /// Diretorio a listar; vazio = `shows/`.
+    /// Directory to list; empty = `shows/`.
     #[serde(default)]
     dir: String,
 }
@@ -403,21 +406,21 @@ fn files(a: FilesArgs) -> Result<Value, String> {
 #[derive(Deserialize, JsonSchema)]
 #[schemars(crate = "engine::schemars")]
 struct ClipFrameArgs {
-    /// Caminho do .ild, ou o nome que o track usa (resolve na pasta do show aberto).
+    /// Path of the .ild, or the name the track uses (it resolves in the open show folder).
     clip: String,
-    /// Tempo em segundos; com `fps` escolhe o quadro. Ignorado quando vem `index`.
+    /// Time in seconds; with `fps` it picks the frame. Ignored when `index` comes in.
     #[serde(default)]
     t: f64,
-    /// Quadro pedido direto; sem ele, o quadro de `t`.
+    /// The frame asked for directly; without it, the frame of `t`.
     #[serde(default)]
     index: Option<usize>,
-    /// Quadros por segundo do track (o .ild nao carrega taxa).
+    /// Frames per second of the track (the .ild carries no rate).
     #[serde(default = "def_fps")]
     fps: f64,
 }
 
-/// Nome que o track usa contra a pasta do .spell aberto, igual ao `_load_clip` do Python. Caminho
-/// que ja' existe passa direto.
+/// The name the track uses against the folder of the open .spell, same as the Python
+/// `_load_clip`. A path that already exists goes straight through.
 fn caminho(clip: &str) -> std::path::PathBuf {
     let p = Path::new(clip);
     if p.exists() {
@@ -430,9 +433,10 @@ fn caminho(clip: &str) -> std::path::PathBuf {
     }
 }
 
-/// Ultimo .ild lido. O previz pede um quadro por vez e o mesmo arquivo toca o show inteiro.
-// ponytail: cache de um arquivo so', sem olhar mtime ; virar mapa com mtime quando dois clips
-// tocarem juntos ou quando o previz precisar ver o .ild trocado em disco sem reabrir o show.
+/// The last .ild read. The previz asks for one frame at a time and the same file plays the whole
+/// show.
+// ponytail: a one-file cache, with no look at mtime ; make it a map with mtime when two clips play
+// together or when the previz needs to see the .ild swapped on disk without reopening the show.
 static CLIP: Mutex<Option<(std::path::PathBuf, Arc<Vec<laser::Frame>>)>> = Mutex::new(None);
 
 fn quadros(p: &Path) -> Result<Arc<Vec<laser::Frame>>, String> {
@@ -451,9 +455,9 @@ fn clip_frame(a: ClipFrameArgs) -> Result<Value, String> {
     let p = caminho(&a.clip);
     let fs = quadros(&p)?;
     if fs.is_empty() {
-        return Err(format!("{}: nenhum frame", p.display()));
+        return Err(format!("{}: no frame", p.display()));
     }
-    // Mesma conta do player (`spellcaster/player/player.py::laser_frame`): o clipe repete.
+    // The same math as the player (`spellcaster/player/player.py::laser_frame`): the clip repeats.
     let i = match a.index {
         Some(i) => i % fs.len(),
         None => ((a.t * a.fps.clamp(1.0, 240.0)).floor().max(0.0) as usize) % fs.len(),
@@ -471,48 +475,52 @@ fn clip_frame(a: ClipFrameArgs) -> Result<Value, String> {
     )
 }
 
-// -------------------------------------------------------------------- registro
+// -------------------------------------------------------------------- registry
 
 pub fn register(r: &mut Registry) {
     r.add::<DacsArgs>(
         "laser_dacs",
-        "Procura DACs de laser: Ether Dream por beacon e IDN por scan.",
+        "Looks for laser DACs: Ether Dream by beacon and IDN by scan.",
         dacs,
     );
     r.add::<OpenArgs>(
         "laser_open",
-        "Abre um DAC de laser e devolve o id do feed. A safety e' obrigatoria e nunca desliga.",
+        "Opens a laser DAC and returns the feed id. The safety is mandatory and never switches off.",
         abrir,
     );
     r.add::<LaserPlayArgs>(
         "laser_play",
-        "Toca um .ild no feed: le os frames e empurra a fps (o .ild nao carrega taxa).",
+        "Plays a .ild on the feed: it reads the frames and pushes them at fps (the .ild carries no rate).",
         tocar,
     );
     r.add::<FeedArgs>(
         "laser_stop",
-        "Para o playback do feed; o DAC continua aberto.",
+        "Stops the playback of the feed; the DAC stays open.",
         parar_cmd,
     );
-    r.add::<FeedArgs>("laser_close", "Para e fecha o feed (apaga o DAC).", fechar);
+    r.add::<FeedArgs>(
+        "laser_close",
+        "Stops and closes the feed (it shuts the DAC down).",
+        fechar,
+    );
     r.add::<ParamArgs>(
         "laser_param",
-        "Ajusta um parametro do feed: geo/x geo/y geo/scale geo/rot limit/r limit/g limit/b safe/min_size safe/max_intensity shutter.",
+        "Sets a parameter of the feed: geo/x geo/y geo/scale geo/rot limit/r limit/g limit/b safe/min_size safe/max_intensity shutter.",
         param,
     );
     r.add::<FeedArgs>(
         "laser_stats",
-        "Estado do feed: playing, arquivo, stat/sent, stat/dropped, stat/errors, jitter e cpu.",
+        "State of the feed: playing, file, stat/sent, stat/dropped, stat/errors, jitter and cpu.",
         stats,
     );
     r.add::<FilesArgs>(
         "laser_files",
-        "Lista os .ild de um diretorio (vazio = shows/).",
+        "Lists the .ild of a directory (empty = shows/).",
         files,
     );
     r.add::<ClipFrameArgs>(
         "clip_frame",
-        "Um quadro do .ild para desenhar: escolhe por `index` ou por `t` a `fps`, e devolve os pontos [x, y, r, g, b, blank] com x e y normalizados em -1..1.",
+        "One frame of the .ild to draw: it picks by `index` or by `t` at `fps`, and returns the points [x, y, r, g, b, blank] with x and y normalized to -1..1.",
         clip_frame,
     );
 }
@@ -522,12 +530,13 @@ mod tests {
     use super::*;
     use laser::Emulator;
 
-    /// Sem beacon (o Sitter fica com a UDP 7654, ou o broadcast nao passa), quem acha o DAC e' o
-    /// pedido de status na TCP: o `Emulator` responde `a?` + `dac_status` ao aceitar a conexao,
-    /// que e' o que o hardware faz. Mora na CLI porque o `protocols` nao depende do `laser`.
+    /// With no beacon (the Sitter holds UDP 7654, or the broadcast does not get through), what
+    /// finds the DAC is the status request over TCP: the `Emulator` answers `a?` + `dac_status`
+    /// when it accepts the connection, which is what the hardware does. It lives in the CLI
+    /// because `protocols` does not depend on `laser`.
     #[test]
-    fn fallback_tcp_acha_o_dac_sem_beacon() {
-        let emu = Emulator::start(1800).expect("emulador");
+    fn tcp_fallback_finds_the_dac_with_no_beacon() {
+        let emu = Emulator::start(1800).expect("emulator");
         let vizinhos = [("127.0.0.1".to_string(), "8a:9e:36:98:8c:ce".to_string())];
         let wait = Duration::from_millis(500);
 
@@ -538,7 +547,7 @@ mod tests {
         assert_eq!(achados[0].via, "tcp");
         assert_eq!(achados[0].status.protocol, 1);
 
-        // porta sem ninguem escutando: lista vazia, sem travar
+        // a port with nobody listening: an empty list, with no hang
         let livre = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let porta = livre.local_addr().unwrap().port();
         drop(livre);

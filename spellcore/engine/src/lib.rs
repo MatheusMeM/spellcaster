@@ -1,5 +1,5 @@
-//! Engine do Spellcaster (R0): relogio, buffers DMX, timeline, arquivo de show e registry.
-//! Nada aqui conhece rede nem GUI — `protocols` e `cli` sao clientes deste crate.
+//! Spellcaster engine (R0): clock, DMX buffers, timeline, show file and registry.
+//! Nothing here knows the network or the GUI — `protocols` and `cli` are clients of this crate.
 
 pub mod clock;
 pub mod cues;
@@ -15,8 +15,8 @@ pub mod show;
 pub mod timeline;
 pub mod universe;
 
-/// Reexportado: quem registra comando no `Registry` deriva `JsonSchema`, e a versao do schemars
-/// e' contrato do engine — `cli` e `mcp` nao pinam a sua.
+/// Re-exported: whoever registers a command in the `Registry` derives `JsonSchema`, and the
+/// schemars version is an engine contract — `cli` and `mcp` do not pin their own.
 pub use schemars;
 
 pub use clock::{Clock, State, Stats};

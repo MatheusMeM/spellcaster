@@ -1,12 +1,12 @@
 [
   {
-    "doc": "Abre um .spell E VALIDA a timeline (o que show_get{file} nao faz): devolve nome, fps, duracao, quantos tracks e quais foram ignorados. O argumento `path` e' o nome velho de `file` (deprecated, sai na proxima rodada).",
+    "doc": "Opens a .spell AND VALIDATES the timeline (which show_get{file} does not): returns name, fps, duration, how many tracks and which ones were ignored. The `path` argument is the old name of `file` (deprecated, gone next round).",
     "name": "load",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "file": {
-          "description": "Caminho do arquivo .spell (o mesmo `file` de show_get, show_save e play_show).",
+          "description": "Path of the .spell file (the same `file` as show_get, show_save and play_show).",
           "type": "string"
         }
       },
@@ -18,19 +18,19 @@
     }
   },
   {
-    "doc": "Resumo do .spell aberto (ou do arquivo dado): nome, fps, duracao, saidas, patch, tracks, cues. full=true devolve o .spell inteiro.",
+    "doc": "Summary of the open .spell (or of the given file): name, fps, duration, outputs, patch, tracks, cues. full=true returns the whole .spell.",
     "name": "show_get",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "file": {
           "default": "",
-          "description": "Caminho do .spell a abrir; vazio = o ultimo aberto neste processo.",
+          "description": "Path of the .spell to open; empty = the last one opened in this process.",
           "type": "string"
         },
         "full": {
           "default": false,
-          "description": "true = o .spell inteiro (o que a GUI desenha) em vez do resumo.",
+          "description": "true = the whole .spell (what the GUI draws) instead of the summary.",
           "type": "boolean"
         }
       },
@@ -39,43 +39,43 @@
     }
   },
   {
-    "doc": "Retoma o player pausado neste processo (o par do pause).",
+    "doc": "Resumes the player paused in this process (the pair of pause).",
     "name": "resume",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "description": "Comando sem parametro.",
+      "description": "Command with no parameter.",
       "title": "NoArgs",
       "type": "object"
     }
   },
   {
-    "doc": "Pausa o player em execucao neste processo.",
+    "doc": "Pauses the player running in this process.",
     "name": "pause",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "description": "Comando sem parametro.",
+      "description": "Command with no parameter.",
       "title": "NoArgs",
       "type": "object"
     }
   },
   {
-    "doc": "Para o player em execucao neste processo.",
+    "doc": "Stops the player running in this process.",
     "name": "stop",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "description": "Comando sem parametro.",
+      "description": "Command with no parameter.",
       "title": "NoArgs",
       "type": "object"
     }
   },
   {
-    "doc": "Salta o player para o instante t (segundos).",
+    "doc": "Jumps the player to instant t (seconds).",
     "name": "locate",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "t": {
-          "description": "Posicao em segundos.",
+          "description": "Position in seconds.",
           "format": "double",
           "type": "number"
         }
@@ -88,13 +88,13 @@
     }
   },
   {
-    "doc": "Liga ou desliga o loop do player no intervalo In-Out do show aberto.",
+    "doc": "Turns the player loop on or off over the In-Out range of the open show.",
     "name": "loop_set",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "on": {
-          "description": "true liga o loop, false desliga.",
+          "description": "true turns the loop on, false turns it off.",
           "type": "boolean"
         }
       },
@@ -106,14 +106,14 @@
     }
   },
   {
-    "doc": "Dispara a proxima cue (ou a de indice dado).",
+    "doc": "Fires the next cue (or the one at the given index).",
     "name": "cue_go",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "index": {
           "default": null,
-          "description": "Indice da cue; ausente = a proxima.",
+          "description": "Index of the cue; absent = the next one.",
           "format": "uint",
           "minimum": 0.0,
           "type": [
@@ -127,28 +127,28 @@
     }
   },
   {
-    "doc": "Estado do transporte do player em execucao.",
+    "doc": "Transport state of the running player.",
     "name": "transport_state",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "description": "Comando sem parametro.",
+      "description": "Command with no parameter.",
       "title": "NoArgs",
       "type": "object"
     }
   },
   {
-    "doc": "Entrega um evento de entrada aos ganchos do player vivo (o Graph): key + value.",
+    "doc": "Delivers an input event to the hooks of the live player (the Graph): key + value.",
     "name": "input",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "key": {
-          "description": "Chave do evento: \"widget:go\", \"key:Space\", \"osc:/spell/go\", \"module:laser/stat/fps\".",
+          "description": "Event key: \"widget:go\", \"key:Space\", \"osc:/spell/go\", \"module:laser/stat/fps\".",
           "type": "string"
         },
         "value": {
           "default": 0.0,
-          "description": "Valor do evento; trigger manda 1.",
+          "description": "Event value; a trigger sends 1.",
           "format": "double",
           "type": "number"
         }
@@ -161,14 +161,14 @@
     }
   },
   {
-    "doc": "Ultimo frame DMX recebido no universo de ENTRADA (show.inputs): 512 valores.",
+    "doc": "Last DMX frame received on the INPUT universe (show.inputs): 512 values.",
     "name": "input_get",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "universe": {
           "default": 1,
-          "description": "Universo declarado em `show.inputs`.",
+          "description": "Universe declared in `show.inputs`.",
           "format": "uint16",
           "minimum": 0.0,
           "type": "integer"
@@ -179,23 +179,23 @@
     }
   },
   {
-    "doc": "Zera o show aberto: novo show, sACN no universo 1, 60 s. Devolve o show inteiro.",
+    "doc": "Clears the open show: new show, sACN on universe 1, 60 s. Returns the whole show.",
     "name": "show_new",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "description": "Comando sem parametro.",
+      "description": "Command with no parameter.",
       "title": "NoArgs",
       "type": "object"
     }
   },
   {
-    "doc": "Substitui o show aberto pelo JSON dado (para IMPORTAR um show inteiro; para editar, prefira show_patch). Devolve o show inteiro.",
+    "doc": "Replaces the open show with the given JSON (to IMPORT a whole show; to edit, prefer show_patch). Returns the whole show.",
     "name": "show_set",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "data": {
-          "description": "O show inteiro: objeto JSON (ou texto JSON)."
+          "description": "The whole show: JSON object (or JSON text)."
         }
       },
       "required": [
@@ -206,14 +206,14 @@
     }
   },
   {
-    "doc": "Grava o show aberto (sem file, no caminho do ultimo aberto). Devolve o caminho.",
+    "doc": "Saves the open show (without file, at the path of the last one opened). Returns the path.",
     "name": "show_save",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "file": {
           "default": "",
-          "description": "Caminho do .spell; vazio = o do ultimo load/show_get/show_save.",
+          "description": "Path of the .spell; empty = the one from the last load/show_get/show_save.",
           "type": "string"
         }
       },
@@ -222,31 +222,31 @@
     }
   },
   {
-    "doc": "Acrescenta um track vazio ao show aberto (type dmx|artnet|osc|media|cue|fx|laser; clip para laser, script para fx). Devolve o indice do track. O argumento `label` e' o nome velho de `name` (deprecated, sai na proxima rodada).",
+    "doc": "Appends an empty track to the open show (type dmx|artnet|osc|media|cue|fx|laser; clip for laser, script for fx). Returns the index of the track. The `label` argument is the old name of `name` (deprecated, gone next round).",
     "name": "track_add",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "address": {
           "default": 1,
-          "description": "Endereco DMX 1..512 (tracks osc usam texto: passe pelo show_set).",
+          "description": "DMX address 1..512 (osc tracks use text: go through show_set).",
           "format": "uint16",
           "minimum": 0.0,
           "type": "integer"
         },
         "clip": {
           "default": "",
-          "description": "Clipe `.ild` do track `laser` (campo `clip`).",
+          "description": "`.ild` clip of the `laser` track (the `clip` field).",
           "type": "string"
         },
         "name": {
           "default": "",
-          "description": "Nome do track (campo `name` do .spell). O argumento `label` e' o nome velho deste (deprecated, sai na proxima rodada).",
+          "description": "Track name (the .spell `name` field). The `label` argument is the old name of this one (deprecated, gone next round).",
           "type": "string"
         },
         "script": {
           "default": "",
-          "description": "Script `.rhai` do track `fx` (campo `script`).",
+          "description": "`.rhai` script of the `fx` track (the `script` field).",
           "type": "string"
         },
         "type": {
@@ -256,7 +256,7 @@
         },
         "universe": {
           "default": 1,
-          "description": "Universo de saida, a partir de 1.",
+          "description": "Output universe, from 1 on.",
           "format": "uint16",
           "minimum": 0.0,
           "type": "integer"
@@ -267,13 +267,13 @@
     }
   },
   {
-    "doc": "Remove o track de indice dado. Devolve o track removido.",
+    "doc": "Removes the track at the given index. Returns the removed track.",
     "name": "track_del",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "index": {
-          "description": "Indice do track em `tracks`.",
+          "description": "Index of the track in `tracks`.",
           "format": "uint",
           "minimum": 0.0,
           "type": "integer"
@@ -287,30 +287,30 @@
     }
   },
   {
-    "doc": "Cria ou substitui o keyframe do track em t. Devolve os keyframes do track.",
+    "doc": "Creates or replaces the keyframe of the track at t. Returns the keyframes of the track.",
     "name": "key_set",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "curve": {
           "default": "linear",
-          "description": "linear | hold | in | out | inout | bezier (curva do segmento que CHEGA neste keyframe).",
+          "description": "linear | hold | in | out | inout | bezier (curve of the segment that ARRIVES at this keyframe).",
           "type": "string"
         },
         "t": {
-          "description": "Instante em segundos.",
+          "description": "Instant in seconds.",
           "format": "double",
           "type": "number"
         },
         "track": {
-          "description": "Indice do track.",
+          "description": "Index of the track.",
           "format": "uint",
           "minimum": 0.0,
           "type": "integer"
         },
         "value": {
           "default": null,
-          "description": "255, [255, 0, 0] ou texto (\"play\"); ausente = 0."
+          "description": "255, [255, 0, 0] or text (\"play\"); absent = 0."
         }
       },
       "required": [
@@ -322,18 +322,18 @@
     }
   },
   {
-    "doc": "Apaga o keyframe do track em t (tolerancia 1 ms). Devolve quantos sairam.",
+    "doc": "Deletes the keyframe of the track at t (1 ms tolerance). Returns how many were removed.",
     "name": "key_del",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "t": {
-          "description": "Instante do keyframe (tolerancia 1 ms).",
+          "description": "Instant of the keyframe (1 ms tolerance).",
           "format": "double",
           "type": "number"
         },
         "track": {
-          "description": "Indice do track em `tracks`.",
+          "description": "Index of the track in `tracks`.",
           "format": "uint",
           "minimum": 0.0,
           "type": "integer"
@@ -348,25 +348,25 @@
     }
   },
   {
-    "doc": "Cria (sem index) ou substitui uma cue: nome, fade, wait, follow e valores DMX. Devolve o indice.",
+    "doc": "Creates (without index) or replaces a cue: name, fade, wait, follow and DMX values. Returns the index.",
     "name": "cue_set",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "fade": {
           "default": 0.0,
-          "description": "Segundos de fade linear ate os valores.",
+          "description": "Seconds of linear fade to the values.",
           "format": "double",
           "type": "number"
         },
         "follow": {
           "default": false,
-          "description": "Ao terminar, dispara a proxima.",
+          "description": "When it ends, it fires the next one.",
           "type": "boolean"
         },
         "index": {
           "default": null,
-          "description": "Indice da cue a substituir; ausente = acrescenta no fim.",
+          "description": "Index of the cue to replace; absent = appended at the end.",
           "format": "uint",
           "minimum": 0.0,
           "type": [
@@ -376,18 +376,18 @@
         },
         "name": {
           "default": "",
-          "description": "Nome da cue, como aparece na lista.",
+          "description": "Cue name, as it shows in the list.",
           "type": "string"
         },
         "values": {
           "additionalProperties": true,
           "default": {},
-          "description": "{\"universo/endereco\": valor ou [valores]}; \"100\" = universo 1.",
+          "description": "{\"universe/address\": value or [values]}; \"100\" = universe 1.",
           "type": "object"
         },
         "wait": {
           "default": 0.0,
-          "description": "Segundos entre o GO e o inicio do fade.",
+          "description": "Seconds between the GO and the start of the fade.",
           "format": "double",
           "type": "number"
         }
@@ -397,13 +397,13 @@
     }
   },
   {
-    "doc": "Remove a cue de indice dado. Devolve a cue removida.",
+    "doc": "Removes the cue at the given index. Returns the removed cue.",
     "name": "cue_del",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "index": {
-          "description": "Indice da cue em `cues`.",
+          "description": "Index of the cue in `cues`.",
           "format": "uint",
           "minimum": 0.0,
           "type": "integer"
@@ -417,29 +417,29 @@
     }
   },
   {
-    "doc": "Patcheia uma fixture (perfil, universo, endereco); recusa sobreposicao e estouro de 512. Devolve a grade do patch.",
+    "doc": "Patches a fixture (profile, universe, address); refuses overlap and running past 512. Returns the patch grid.",
     "name": "patch_add",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "address": {
           "default": 1,
-          "description": "Primeiro canal DMX (1..512).",
+          "description": "First DMX channel (1..512).",
           "format": "uint16",
           "minimum": 0.0,
           "type": "integer"
         },
         "name": {
-          "description": "Nome unico da fixture no show.",
+          "description": "Unique fixture name in the show.",
           "type": "string"
         },
         "profile": {
-          "description": "Perfil em profiles/ (sem .json) ou caminho de um .json.",
+          "description": "Profile in profiles/ (without .json) or path of a .json.",
           "type": "string"
         },
         "universe": {
           "default": 1,
-          "description": "Universo de saida, a partir de 1.",
+          "description": "Output universe, from 1 on.",
           "format": "uint16",
           "minimum": 0.0,
           "type": "integer"
@@ -454,13 +454,13 @@
     }
   },
   {
-    "doc": "Tira a fixture do patch pelo nome. Devolve a entrada removida.",
+    "doc": "Removes the fixture from the patch by name. Returns the removed entry.",
     "name": "patch_del",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "name": {
-          "description": "Nome da fixture no patch.",
+          "description": "Fixture name in the patch.",
           "type": "string"
         }
       },
@@ -472,27 +472,27 @@
     }
   },
   {
-    "doc": "Grade do patch do show aberto (nome, perfil, universo, endereco, canais) e o erro de sobreposicao, se houver.",
+    "doc": "Patch grid of the open show (name, profile, universe, address, channels) and the overlap error, if there is one.",
     "name": "patch_check",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "description": "Comando sem parametro.",
+      "description": "Command with no parameter.",
       "title": "NoArgs",
       "type": "object"
     }
   },
   {
-    "doc": "Nomes dos perfis disponiveis em profiles/.",
+    "doc": "Names of the profiles available in profiles/.",
     "name": "profiles",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "description": "Comando sem parametro.",
+      "description": "Command with no parameter.",
       "title": "NoArgs",
       "type": "object"
     }
   },
   {
-    "doc": "Edita o show aberto por JSON Patch (RFC 6902: add, remove, replace, test). Uma op que falha cancela todas. Devolve {rev, undo}: `undo` e' a lista de ops que volta ao estado anterior, ja' na ordem de aplicacao.",
+    "doc": "Edits the open show by JSON Patch (RFC 6902: add, remove, replace, test). One failing op cancels them all. Returns {rev, undo}: `undo` is the list of ops that goes back to the previous state, already in application order.",
     "name": "show_patch",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -504,12 +504,12 @@
               "type": "string"
             },
             "path": {
-              "description": "JSON Pointer (RFC 6901) dentro do show: \"/fps\", \"/tracks/-\", \"/tracks/0/keys/2\", \"/graph/nodes\". O documento inteiro (\"\") nao e' alvo: para isso ha' show_set.",
+              "description": "JSON Pointer (RFC 6901) inside the show: \"/fps\", \"/tracks/-\", \"/tracks/0/keys/2\", \"/graph/nodes\". The whole document (\"\") is not a target: show_set is there for that.",
               "type": "string"
             },
             "value": {
               "default": null,
-              "description": "Valor de add, replace e test; `remove` nao usa. Ausente nos tres primeiros = erro."
+              "description": "Value of add, replace and test; `remove` does not use it. Absent on the first three = error."
             }
           },
           "required": [
@@ -521,7 +521,7 @@
       },
       "properties": {
         "ops": {
-          "description": "As operacoes, em ordem; a primeira que falhar cancela todas.",
+          "description": "The operations, in order; the first one that fails cancels them all.",
           "items": {
             "$ref": "#/definitions/PatchOp"
           },
@@ -529,7 +529,7 @@
         },
         "rev": {
           "default": null,
-          "description": "A revisao que o cliente tinha; diferente da atual = recusa (\"rev 3 != 5\").",
+          "description": "The revision the client held; different from the current one = refused (\"rev 3 != 5\").",
           "format": "uint64",
           "minimum": 0.0,
           "type": [
@@ -546,33 +546,33 @@
     }
   },
   {
-    "doc": "O graph do show aberto (secao 10 do PRD: nodes e edges); vazio quando o show nao tem graph.",
+    "doc": "The graph of the open show (PRD section 10: nodes and edges); empty when the show has no graph.",
     "name": "graph_get",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "description": "Comando sem parametro.",
+      "description": "Command with no parameter.",
       "title": "NoArgs",
       "type": "object"
     }
   },
   {
-    "doc": "A face do show aberto: o objeto inline de `face`, ou faces/<nome>.face.json quando `face` e' texto. null quando o show nao tem face.",
+    "doc": "The face of the open show: the inline object of `face`, or faces/<name>.face.json when `face` is text. null when the show has no face.",
     "name": "face_get",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "description": "Comando sem parametro.",
+      "description": "Command with no parameter.",
       "title": "NoArgs",
       "type": "object"
     }
   },
   {
-    "doc": "O perfil inteiro (nome, canais com offset, ranges e wheel) para o cliente montar os widgets.",
+    "doc": "The whole profile (name, channels with offset, ranges and wheel) for the client to build the widgets.",
     "name": "profile_get",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "name": {
-          "description": "Perfil em profiles/ (sem .json) ou caminho de um .json.",
+          "description": "Profile in profiles/ (without .json) or path of a .json.",
           "type": "string"
         }
       },
@@ -584,27 +584,27 @@
     }
   },
   {
-    "doc": "Programmer: escreve valores no override manual, por cima da timeline (HTP). Exige player em execucao.",
+    "doc": "Programmer: writes values into the manual override, on top of the timeline (HTP). Requires a running player.",
     "name": "level_set",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "address": {
-          "description": "Primeiro canal DMX (1..512).",
+          "description": "First DMX channel (1..512).",
           "format": "uint16",
           "minimum": 0.0,
           "type": "integer"
         },
         "universe": {
           "default": 1,
-          "description": "Universo de saida, a partir de 1.",
+          "description": "Output universe, from 1 on.",
           "format": "uint16",
           "minimum": 0.0,
           "type": "integer"
         },
         "values": {
           "default": [],
-          "description": "Valores 0..255 a partir de `address`; lista vazia escreve zero no canal.",
+          "description": "Values 0..255 from `address` on; an empty list writes zero on the channel.",
           "items": {
             "format": "double",
             "type": "number"
@@ -620,14 +620,14 @@
     }
   },
   {
-    "doc": "Solta o override do programmer (um universo, ou todos sem universe). Devolve quantos canais sairam.",
+    "doc": "Releases the programmer override (one universe, or all of them without universe). Returns how many channels were freed.",
     "name": "level_clear",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "universe": {
           "default": null,
-          "description": "Universo; ausente = todos.",
+          "description": "Universe; absent = all of them.",
           "format": "uint16",
           "minimum": 0.0,
           "type": [
@@ -641,14 +641,14 @@
     }
   },
   {
-    "doc": "Override do programmer como {\"universo/endereco\": valor}.",
+    "doc": "Programmer override as {\"universe/address\": value}.",
     "name": "level_get",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "universe": {
           "default": null,
-          "description": "Universo; ausente = todos.",
+          "description": "Universe; absent = all of them.",
           "format": "uint16",
           "minimum": 0.0,
           "type": [
@@ -662,30 +662,30 @@
     }
   },
   {
-    "doc": "Grava o override do programmer como uma cue nova no fim da lista e solta o override. Devolve o indice.",
+    "doc": "Stores the programmer override as a new cue at the end of the list and releases the override. Returns the index.",
     "name": "cue_capture",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "fade": {
           "default": 0.0,
-          "description": "Segundos de fade linear ate os valores.",
+          "description": "Seconds of linear fade to the values.",
           "format": "double",
           "type": "number"
         },
         "follow": {
           "default": false,
-          "description": "Ao terminar, dispara a proxima.",
+          "description": "When it ends, it fires the next one.",
           "type": "boolean"
         },
         "name": {
           "default": "",
-          "description": "Nome da cue nova.",
+          "description": "Name of the new cue.",
           "type": "string"
         },
         "wait": {
           "default": 0.0,
-          "description": "Segundos entre o GO e o inicio do fade.",
+          "description": "Seconds between the GO and the start of the fade.",
           "format": "double",
           "type": "number"
         }
@@ -695,17 +695,17 @@
     }
   },
   {
-    "doc": "Escreve num canal de uma fixture do patch pelo nome do canal no perfil (via level_set).",
+    "doc": "Writes into a channel of a patched fixture by the channel name in the profile (via level_set).",
     "name": "fixture_set",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "channel": {
-          "description": "Nome do canal no perfil (\"dim\", \"r\"); numero nao resolve.",
+          "description": "Channel name in the profile (\"dim\", \"r\"); a number does not resolve.",
           "type": "string"
         },
         "name": {
-          "description": "Nome da fixture no patch.",
+          "description": "Fixture name in the patch.",
           "type": "string"
         },
         "value": {
@@ -724,18 +724,18 @@
     }
   },
   {
-    "doc": "Carrega um module.json (file=) ou o manifesto (data=), valida e poe na tabela de modulos vivos; mesmo nome substitui. Devolve nome e versao.",
+    "doc": "Loads a module.json (file=) or the manifest (data=), validates it and puts it in the table of live modules; the same name replaces. Returns name and version.",
     "name": "module_add",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "data": {
           "default": null,
-          "description": "O manifesto inteiro, quando nao vem de arquivo."
+          "description": "The whole manifest, when it does not come from a file."
         },
         "file": {
           "default": "",
-          "description": "Nome em modules/ (sem .json) ou caminho de um .json.",
+          "description": "Name in modules/ (without .json) or path of a .json.",
           "type": "string"
         }
       },
@@ -744,13 +744,13 @@
     }
   },
   {
-    "doc": "Tira o modulo da tabela pelo nome. Devolve o manifesto removido.",
+    "doc": "Removes the module from the table by name. Returns the removed manifest.",
     "name": "module_del",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "name": {
-          "description": "Nome do modulo (o campo `name` do manifesto).",
+          "description": "Module name (the `name` field of the manifest).",
           "type": "string"
         }
       },
@@ -762,23 +762,23 @@
     }
   },
   {
-    "doc": "Modulos vivos: nome, tipo e versao.",
+    "doc": "Live modules: name, type and version.",
     "name": "module_list",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "description": "Comando sem parametro.",
+      "description": "Command with no parameter.",
       "title": "NoArgs",
       "type": "object"
     }
   },
   {
-    "doc": "Manifesto inteiro do modulo carregado (parameters, values, commands).",
+    "doc": "The whole manifest of the loaded module (parameters, values, commands).",
     "name": "module_get",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "name": {
-          "description": "Nome do modulo (o campo `name` do manifesto).",
+          "description": "Module name (the `name` field of the manifest).",
           "type": "string"
         }
       },
@@ -790,18 +790,18 @@
     }
   },
   {
-    "doc": "Arma (ou desarma) a gravacao de um track dmx: com o transporte tocando, o universo de entrada vira keyframe.",
+    "doc": "Arms (or disarms) the recording of a dmx track: with the transport playing, the input universe becomes keyframes.",
     "name": "rec_arm",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "on": {
           "default": true,
-          "description": "true arma, false desarma.",
+          "description": "true arms, false disarms.",
           "type": "boolean"
         },
         "track": {
-          "description": "Indice do track em `tracks` (tem que ser `dmx` ou `artnet`).",
+          "description": "Index of the track in `tracks` (it has to be `dmx` or `artnet`).",
           "format": "uint",
           "minimum": 0.0,
           "type": "integer"
@@ -815,34 +815,34 @@
     }
   },
   {
-    "doc": "Tracks armados para gravacao neste processo.",
+    "doc": "Tracks armed for recording in this process.",
     "name": "rec_state",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "description": "Comando sem parametro.",
+      "description": "Command with no parameter.",
       "title": "NoArgs",
       "type": "object"
     }
   },
   {
-    "doc": "Lista as portas MIDI de entrada da maquina e qual esta' aberta.",
+    "doc": "Lists the MIDI input ports of the machine and which one is open.",
     "name": "midi_ports",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "description": "Comando sem parametro.",
+      "description": "Command with no parameter.",
       "title": "NoArgs",
       "type": "object"
     }
   },
   {
-    "doc": "Abre uma porta MIDI de entrada (nome, trecho do nome ou indice) e grava midi_port no show aberto.",
+    "doc": "Opens a MIDI input port (name, part of the name or index) and writes midi_port into the open show.",
     "name": "midi_open",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "port": {
           "default": "",
-          "description": "Nome da porta (ou um trecho dele), indice em texto (\"0\"), ou vazio = a primeira.",
+          "description": "Port name (or part of it), index as text (\"0\"), or empty = the first one.",
           "type": "string"
         }
       },
@@ -851,31 +851,31 @@
     }
   },
   {
-    "doc": "Fecha a porta MIDI e tira o midi_port do show aberto.",
+    "doc": "Closes the MIDI port and removes midi_port from the open show.",
     "name": "midi_close",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "description": "Comando sem parametro.",
+      "description": "Command with no parameter.",
       "title": "NoArgs",
       "type": "object"
     }
   },
   {
-    "doc": "Liga uma tecla/CC a um comando no show aberto. Devolve o mapa.",
+    "doc": "Binds a key/CC to a command in the open show. Returns the map.",
     "name": "midi_map",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "args": {
           "default": null,
-          "description": "Argumentos do comando. \"$\" vira o valor 0..1 e \"$<n>\" vira round(valor * n)."
+          "description": "Arguments of the command. \"$\" becomes the value 0..1 and \"$<n>\" becomes round(value * n)."
         },
         "cmd": {
-          "description": "Nome do comando do registry.",
+          "description": "Name of the registry command.",
           "type": "string"
         },
         "key": {
-          "description": "Chave do evento: \"<status>/<data1>\" (144/60 = note on nota 60, 176/1 = CC 1).",
+          "description": "Event key: \"<status>/<data1>\" (144/60 = note on note 60, 176/1 = CC 1).",
           "type": "string"
         }
       },
@@ -888,13 +888,13 @@
     }
   },
   {
-    "doc": "Desliga uma tecla do show aberto.",
+    "doc": "Unbinds a key from the open show.",
     "name": "midi_unmap",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "key": {
-          "description": "Chave do evento a remover.",
+          "description": "Event key to remove.",
           "type": "string"
         }
       },
@@ -906,53 +906,53 @@
     }
   },
   {
-    "doc": "O mapa tecla -> comando do show aberto.",
+    "doc": "The key -> command map of the open show.",
     "name": "midi_maps",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "description": "Comando sem parametro.",
+      "description": "Command with no parameter.",
       "title": "NoArgs",
       "type": "object"
     }
   },
   {
-    "doc": "Ultima tecla MIDI recebida: {key, value, raw, seq}. E' com ela que a GUI mostra ao vivo.",
+    "doc": "Last MIDI key received: {key, value, raw, seq}. It is what the GUI shows live.",
     "name": "midi_last",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "description": "Comando sem parametro.",
+      "description": "Command with no parameter.",
       "title": "NoArgs",
       "type": "object"
     }
   },
   {
-    "doc": "Espera ate' 5 s pela proxima tecla MIDI e devolve a chave dela.",
+    "doc": "Waits up to 5 s for the next MIDI key and returns its key.",
     "name": "midi_learn",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "description": "Comando sem parametro.",
+      "description": "Command with no parameter.",
       "title": "NoArgs",
       "type": "object"
     }
   },
   {
-    "doc": "Toca um show .spell ate o fim ou Ctrl+C.",
+    "doc": "Plays a .spell show to the end or Ctrl+C.",
     "name": "play_show",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "file": {
-          "description": "Caminho do arquivo .spell.",
+          "description": "Path of the .spell file.",
           "type": "string"
         },
         "loop": {
           "default": false,
-          "description": "Repete o show do inicio ao chegar no fim.",
+          "description": "Repeats the show from the start when it reaches the end.",
           "type": "boolean"
         },
         "osc_port": {
           "default": null,
-          "description": "Porta do transporte remoto por OSC (sobrepoe transport.osc_port do .spell).",
+          "description": "Port of the remote transport over OSC (overrides transport.osc_port of the .spell).",
           "format": "uint16",
           "minimum": 0.0,
           "type": [
@@ -969,19 +969,19 @@
     }
   },
   {
-    "doc": "Varre a rede: interfaces, nos Art-Net, fontes sACN, Ether Dream e sugestoes.",
+    "doc": "Scans the network: interfaces, Art-Net nodes, sACN sources, Ether Dream and hints.",
     "name": "net",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "json": {
           "default": false,
-          "description": "Devolve o resultado cru em JSON em vez do relatorio de texto.",
+          "description": "Returns the raw result as JSON instead of the text report.",
           "type": "boolean"
         },
         "timeout": {
           "default": 2.0,
-          "description": "Segundos de escuta por protocolo.",
+          "description": "Seconds of listening per protocol.",
           "format": "double",
           "type": "number"
         }
@@ -991,24 +991,24 @@
     }
   },
   {
-    "doc": "Compila o graph do show aberto sem rodar. Devolve {nodes, error}.",
+    "doc": "Compiles the graph of the open show without running it. Returns {nodes, error}.",
     "name": "graph_check",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "description": "Comando sem parametro.",
+      "description": "Command with no parameter.",
       "title": "NoArgs",
       "type": "object"
     }
   },
   {
-    "doc": "Procura DACs de laser: Ether Dream por beacon e IDN por scan.",
+    "doc": "Looks for laser DACs: Ether Dream by beacon and IDN by scan.",
     "name": "laser_dacs",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "timeout": {
           "default": 2.0,
-          "description": "Segundos de escuta por protocolo.",
+          "description": "Seconds of listening per protocol.",
           "format": "double",
           "type": "number"
         }
@@ -1018,29 +1018,29 @@
     }
   },
   {
-    "doc": "Abre um DAC de laser e devolve o id do feed. A safety e' obrigatoria e nunca desliga.",
+    "doc": "Opens a laser DAC and returns the feed id. The safety is mandatory and never switches off.",
     "name": "laser_open",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "dac": {
-          "description": "etherdream ou idn.",
+          "description": "etherdream or idn.",
           "type": "string"
         },
         "host": {
           "default": "",
-          "description": "\"ip\" ou \"ip:porta\" (o `host` de `laser_dacs`).",
+          "description": "\"ip\" or \"ip:port\" (the `host` of `laser_dacs`).",
           "type": "string"
         },
         "kpps": {
           "default": 30.0,
-          "description": "Milhares de pontos por segundo entregues ao DAC.",
+          "description": "Thousands of points per second delivered to the DAC.",
           "format": "double",
           "type": "number"
         },
         "safety": {
           "default": null,
-          "description": "Safety do feed: {\"min_size\": 2000, \"max_intensity\": 255, \"zone\": [x0,y0,x1,y1]} em unidades ILDA. Ausente = o padrao. Nunca desligavel."
+          "description": "Safety of the feed: {\"min_size\": 2000, \"max_intensity\": 255, \"zone\": [x0,y0,x1,y1]} in ILDA units. Absent = the default. Never switchable off."
         }
       },
       "required": [
@@ -1051,30 +1051,30 @@
     }
   },
   {
-    "doc": "Toca um .ild no feed: le os frames e empurra a fps (o .ild nao carrega taxa).",
+    "doc": "Plays a .ild on the feed: it reads the frames and pushes them at fps (the .ild carries no rate).",
     "name": "laser_play",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "feed": {
-          "description": "Id devolvido por `laser_open`.",
+          "description": "Id returned by `laser_open`.",
           "format": "uint64",
           "minimum": 0.0,
           "type": "integer"
         },
         "file": {
-          "description": "Caminho do .ild.",
+          "description": "Path of the .ild.",
           "type": "string"
         },
         "fps": {
           "default": 30.0,
-          "description": "Frames por segundo empurrados ao DAC (o .ild nao carrega taxa).",
+          "description": "Frames per second pushed to the DAC (the .ild carries no rate).",
           "format": "double",
           "type": "number"
         },
         "loop": {
           "default": false,
-          "description": "Recomeca do primeiro frame ao chegar no fim.",
+          "description": "Restarts from the first frame when it reaches the end.",
           "type": "boolean"
         }
       },
@@ -1087,13 +1087,13 @@
     }
   },
   {
-    "doc": "Para o playback do feed; o DAC continua aberto.",
+    "doc": "Stops the playback of the feed; the DAC stays open.",
     "name": "laser_stop",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "feed": {
-          "description": "Id devolvido por `laser_open`.",
+          "description": "Id returned by `laser_open`.",
           "format": "uint64",
           "minimum": 0.0,
           "type": "integer"
@@ -1107,13 +1107,13 @@
     }
   },
   {
-    "doc": "Para e fecha o feed (apaga o DAC).",
+    "doc": "Stops and closes the feed (it shuts the DAC down).",
     "name": "laser_close",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "feed": {
-          "description": "Id devolvido por `laser_open`.",
+          "description": "Id returned by `laser_open`.",
           "format": "uint64",
           "minimum": 0.0,
           "type": "integer"
@@ -1127,13 +1127,13 @@
     }
   },
   {
-    "doc": "Ajusta um parametro do feed: geo/x geo/y geo/scale geo/rot limit/r limit/g limit/b safe/min_size safe/max_intensity shutter.",
+    "doc": "Sets a parameter of the feed: geo/x geo/y geo/scale geo/rot limit/r limit/g limit/b safe/min_size safe/max_intensity shutter.",
     "name": "laser_param",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "feed": {
-          "description": "Id devolvido por `laser_open`.",
+          "description": "Id returned by `laser_open`.",
           "format": "uint64",
           "minimum": 0.0,
           "type": "integer"
@@ -1143,7 +1143,7 @@
           "type": "string"
         },
         "value": {
-          "description": "Valor na faixa do `path` (a tabela de faixas esta no spellcore/README.md).",
+          "description": "Value in the range of the `path` (the range table is in spellcore/README.md).",
           "format": "double",
           "type": "number"
         }
@@ -1158,13 +1158,13 @@
     }
   },
   {
-    "doc": "Estado do feed: playing, arquivo, stat/sent, stat/dropped, stat/errors, jitter e cpu.",
+    "doc": "State of the feed: playing, file, stat/sent, stat/dropped, stat/errors, jitter and cpu.",
     "name": "laser_stats",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "feed": {
-          "description": "Id devolvido por `laser_open`.",
+          "description": "Id returned by `laser_open`.",
           "format": "uint64",
           "minimum": 0.0,
           "type": "integer"
@@ -1178,14 +1178,14 @@
     }
   },
   {
-    "doc": "Lista os .ild de um diretorio (vazio = shows/).",
+    "doc": "Lists the .ild of a directory (empty = shows/).",
     "name": "laser_files",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "dir": {
           "default": "",
-          "description": "Diretorio a listar; vazio = `shows/`.",
+          "description": "Directory to list; empty = `shows/`.",
           "type": "string"
         }
       },
@@ -1194,24 +1194,24 @@
     }
   },
   {
-    "doc": "Um quadro do .ild para desenhar: escolhe por `index` ou por `t` a `fps`, e devolve os pontos [x, y, r, g, b, blank] com x e y normalizados em -1..1.",
+    "doc": "One frame of the .ild to draw: it picks by `index` or by `t` at `fps`, and returns the points [x, y, r, g, b, blank] with x and y normalized to -1..1.",
     "name": "clip_frame",
     "params": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {
         "clip": {
-          "description": "Caminho do .ild, ou o nome que o track usa (resolve na pasta do show aberto).",
+          "description": "Path of the .ild, or the name the track uses (it resolves in the open show folder).",
           "type": "string"
         },
         "fps": {
           "default": 30.0,
-          "description": "Quadros por segundo do track (o .ild nao carrega taxa).",
+          "description": "Frames per second of the track (the .ild carries no rate).",
           "format": "double",
           "type": "number"
         },
         "index": {
           "default": null,
-          "description": "Quadro pedido direto; sem ele, o quadro de `t`.",
+          "description": "The frame asked for directly; without it, the frame of `t`.",
           "format": "uint",
           "minimum": 0.0,
           "type": [
@@ -1221,7 +1221,7 @@
         },
         "t": {
           "default": 0.0,
-          "description": "Tempo em segundos; com `fps` escolhe o quadro. Ignorado quando vem `index`.",
+          "description": "Time in seconds; with `fps` it picks the frame. Ignored when `index` comes in.",
           "format": "double",
           "type": "number"
         }

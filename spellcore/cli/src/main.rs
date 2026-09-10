@@ -1,7 +1,7 @@
-//! O binario `spellcore`. A CLI inteira mora em `lib.rs` porque a janela
-//! (`spellcore/gui`, binario `spellcaster`) precisa do MESMO registry: `registry()` acrescenta
-//! `play_show`, `net`, `graph_check` e os `laser_*` ao `engine::registry::base()`, e um segundo
-//! registry montado a mao ficaria para tras no primeiro comando novo.
+//! The `spellcore` binary. The whole CLI lives in `lib.rs` because the window
+//! (`spellcore/gui`, binary `spellcaster`) needs the SAME registry: `registry()` adds
+//! `play_show`, `net`, `graph_check` and the `laser_*` to `engine::registry::base()`, and a
+//! second registry built by hand would fall behind on the first new command.
 
 fn main() {
     cli::main();
