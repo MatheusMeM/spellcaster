@@ -63,6 +63,7 @@ window.Pino3D = (function () {
        quadro, que seria alocar e liberar 168 vértices 60 vezes por segundo para nada. */
     var END = TGT.clone().addScaledVector(AX, .058); // sai pelo alivio do plugue, nao pelo painel
     var P = Rope.make(N, [0, .3, 0], [END.x, END.y, END.z]), rest = .02, live = true;
+    var ropeOn = true;  // linha CABO DO PINO do menu VIDEO: sem Verlet e sem retube quando desligada
     var tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(0, .3, 0), END.clone()]), N - 1, RAD, RS, false), cabo);
     tube.castShadow = false; tube.frustumCulled = false; scene.add(tube); // ponytail: cabo sem sombra; ele quase nunca encosta em superfície
     /* Plugue XLR macho: corpo preto, colar prateado, alivio de borracha. Prateado inteiro (como era)
@@ -140,6 +141,7 @@ window.Pino3D = (function () {
       // corda: a ponta de cima é a bota do Pino (anda com a câmera), a de baixo é o DMX OUT
       var t0 = performance.now();
       boca.copy(BOOT); head.localToWorld(boca);
+      if (ropeOn) {
       /* ponytail: o comprimento de repouso segue a distância (com a folga FOLGA para dar catenária).
          Cabo de comprimento fixo esticaria reto na vista SHOW, onde a câmera fica a 2 m do aparelho,
          ou empilharia meio metro de corda na vista TRÁS. Trocar por comprimento fixo no dia em que o
@@ -150,7 +152,7 @@ window.Pino3D = (function () {
       rest += (want - rest) * Math.min(1, dt * 2);
       Rope.pin(P, 0, boca.x, boca.y, boca.z); Rope.pin(P, N - 1, END.x, END.y, END.z);
       Rope.step(P, rest, Math.min(dt, .033), GRAV, 3, 4); retube();
-      ms += performance.now() - t0; msN++;
+      ms += performance.now() - t0; msN++; }
       v.set(0, .014, 0); head.localToWorld(v); v.project(cam); var sx = (v.x + 1) / 2 * W, sy2 = (1 - v.y) / 2 * H; if (mouse) { var dx = mouse[0] - sx, dy = mouse[1] - sy2, dd = Math.max(1, Math.hypot(dx, dy)), k = Math.min(1, dd / 200) * .0028; pupils.forEach(function (p) { p.position.x = dx / dd * k; p.position.y = -dy / dd * k; }); }
       /* O balão abre para a DIREITA da cabeça (o Pino mudou para o canto esquerdo) e nunca por cima
          do aparelho: `minTop` é a base da traseira na tela, e o balão fica dali para baixo — senão
@@ -163,6 +165,7 @@ window.Pino3D = (function () {
 
     // custo médio da corda desde a última leitura, em ms por quadro (erro é dado: dá para medir na tela)
     function cost() { var r = msN ? ms / msN : 0; ms = 0; msN = 0; return r; }
-    return { group: g, head: head, say: say, hide: hide, current: current, bye: bye, back: back, update: update, cost: cost, alive: function () { return live; }, PINS: PINS }; }
+    return { group: g, head: head, say: say, hide: hide, current: current, bye: bye, back: back, update: update, cost: cost, alive: function () { return live; },
+      rope: function (on) { ropeOn = !!on; tube.visible = !!on && !gone; plug.visible = relief.visible = !!on && !gone; }, PINS: PINS }; }
   return { build: build, PINS: PINS };
 })();

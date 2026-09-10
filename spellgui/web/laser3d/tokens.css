@@ -95,6 +95,20 @@ kbd { border-bottom-width:2px; }
 #dbody .tx { background:#0A0D10; color:var(--fg); border:1px solid var(--line-2); font-family:var(--font-mono); font-size:var(--fs-2); padding:4px 6px; width:100%; box-sizing:border-box; }
 #dbody .tx.n { width:64px; }
 #dbody .soon { color:var(--amb); }
+/* aba VÍDEO: menu de vídeo de jogo — uma lista de linhas `rótulo … valor`, valor sempre à direita
+   e sempre alinhado, seja select ou fader. O rótulo é elástico e o controle tem largura fixa: linha
+   com rótulo longo não empurra o controle para fora da gaveta de 360 px. */
+#dbody .vrow { display:grid; grid-template-columns:1fr 108px 44px; align-items:center; gap:8px; font-size:var(--fs-1); margin:5px 0; }
+#dbody .vrow > label { color:var(--fg); letter-spacing:.04em; }
+#dbody .vrow.sel > select { grid-column:2 / span 2; }
+#dbody .vrow .v { text-align:right; color:var(--las); font-variant-numeric:tabular-nums; }
+#dbody .vrow input[type=range] { width:100%; accent-color:var(--las); background:transparent; }
+#dbody .vnote { font-size:var(--fs-0); color:var(--dim); margin:-1px 0 7px; line-height:1.45; }
+#dbody select { background:#0A0D10; color:var(--las); border:1px solid var(--line-2); font-family:var(--font-mono); font-size:var(--fs-1); padding:3px 4px; width:100%; box-sizing:border-box; }
+#dbody select:focus-visible { outline:2px solid #fff; outline-offset:1px; }
+#dbody .vpre { border:1px solid var(--las); padding:7px 8px; margin:0 0 10px; box-shadow:inset 0 0 10px rgba(56,255,92,.08); }
+#dbody .vpre select { border-color:var(--las); }
+#dbody #vperf { margin:2px 0 10px; }
 /* sala: nunca retangular */
 .room { position:relative; background:#000; overflow:hidden; user-select:none; clip-path:polygon(var(--chamfer-room) 0, calc(100% - var(--chamfer-room)) 0, 100% var(--chamfer-room), 100% calc(100% - var(--chamfer-room)), calc(100% - var(--chamfer-room)) 100%, calc(50% + 120px) 100%, calc(50% + 96px) calc(100% - 26px), calc(50% - 96px) calc(100% - 26px), calc(50% - 120px) 100%, var(--chamfer-room) 100%, 0 calc(100% - var(--chamfer-room)), 0 var(--chamfer-room)); }
 /* Pino fala em balão Win98: a única coisa "de software" na cena, de propósito */

@@ -111,7 +111,7 @@
   var segMat = wmat(new THREE.LineBasicMaterial({ vertexColors: true, opacity: 1 }), false);
   var haloMat = wmat(new THREE.PointsMaterial({ size: 9, sizeAttenuation: false, map: glowTex, vertexColors: true, opacity: .12 }), true);
   var dotMat = wmat(new THREE.PointsMaterial({ size: 14, sizeAttenuation: false, map: glowTex, opacity: .9 }), true);
-  var fadeMat = wmat(new THREE.MeshBasicMaterial({ color: 0x000000, opacity: reduced ? .6 : .3 }), false), FADE = reduced ? .4 : .7;
+  var fadeMat = wmat(new THREE.MeshBasicMaterial({ color: 0x000000, opacity: .3 }), false), FADE = +VIDEO.get("rastro");   // PERSISTENCIA DO RASTRO, menu VIDEO
   var fade = new THREE.Mesh(new THREE.PlaneGeometry(WW, WH), fadeMat); fade.position.set(WW / 2, WH / 2, 0);
   var segs = new THREE.LineSegments(segGeo, segMat), halo = new THREE.Points(haloGeo, haloMat), dot = new THREE.Points(dotGeo, dotMat);
   [fade, segs, halo, dot].forEach(function (o, i) { o.frustumCulled = false; o.renderOrder = i; wscene.add(o); });
@@ -168,15 +168,16 @@
   /* ---------- cena ---------- */
   var stage = $("#stage"), gl = $("#gl"), R = new THREE.WebGLRenderer({ canvas: gl, antialias: false, powerPreference: "high-performance" }), scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(42, 1, .02, 60), pick = [];
   R.setPixelRatio(Math.min(2, devicePixelRatio)); scene.background = new THREE.Color(0x020306); scene.fog = new THREE.FogExp2(0x03040a, .12);
-  var X = MAT(THREE, R); scene.environment = X.env();
+  R.info.autoReset = false;   // o quadro tem varios render(): quem zera o contador e' o `tick`
+  var X = MAT(THREE, R), ENVTEX = X.env(); scene.environment = ENVTEX;   // guardado: REFLEXOS DO AMBIENTE liga e desliga sem regerar o PMREM
   var sun = new THREE.SpotLight(0xfff4e6, 90, 9, .42, .7, 1.4); sun.position.set(1.4, 3.2, 1.2); sun.target.position.set(0, .35, 0); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -.0004; sun.shadow.radius = 4; scene.add(sun, sun.target);
   var fill = new THREE.PointLight(0x38ff5c, 4, 4, 2); fill.position.set(-.9, .9, .5); scene.add(fill); var rim = new THREE.PointLight(0xa0c0ff, 8, 5, 2); rim.position.set(.4, 1.2, -1.6); scene.add(rim);
   var inLight = new THREE.PointLight(0xfff0dc, 0, 1.2, 2); inLight.position.set(.05, .62, 0); scene.add(inLight);
   var B = BODY(THREE, X, scene, pick), O = OPTICS(THREE, X, B.body, pick);
   var wallTex = new THREE.CanvasTexture(WC); wallTex.minFilter = THREE.LinearFilter; wallTex.encoding = THREE.sRGBEncoding; var proj = new THREE.Mesh(new THREE.PlaneGeometry(8, 5), new THREE.MeshBasicMaterial({ map: wallTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })); proj.position.set(0, 2.2, -5); scene.add(proj);
-  var beamsOut = BEAM(THREE, scene, 160, .006, .028), beamsIn = BEAM(THREE, scene, 12, .0012, .0045);
+  var beamsOut = BEAM(THREE, scene, 320, .006, .028), beamsIn = BEAM(THREE, scene, 12, .0012, .0045);   // 320 = teto da linha FEIXES EXTERNOS
   var FC = document.createElement("canvas"); FC.width = FC.height = 128; var fc = FC.getContext("2d"), fg = fc.createRadialGradient(64, 64, 0, 64, 64, 64); fg.addColorStop(0, "rgba(120,140,170,1)"); fg.addColorStop(1, "rgba(120,140,170,0)"); fc.fillStyle = fg; fc.fillRect(0, 0, 128, 128);
-  var fogTex = new THREE.CanvasTexture(FC), puffs = []; for (var i = 0; i < 14; i++) { var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: fogTex, transparent: true, opacity: .05, blending: THREE.AdditiveBlending, depthWrite: false })); sp.position.set((Math.random() - .5) * 5, .4 + Math.random() * 2.4, -.5 - Math.random() * 4.5); var sc = 1.5 + Math.random() * 2.5; sp.scale.set(sc, sc, 1); sp.userData.v = [(Math.random() - .5) * .08, (Math.random() - .5) * .03]; scene.add(sp); puffs.push(sp); }
+  var fogTex = new THREE.CanvasTexture(FC), puffs = []; for (var i = 0; i < 28; i++) { var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: fogTex, transparent: true, opacity: .05, blending: THREE.AdditiveBlending, depthWrite: false })); sp.position.set((Math.random() - .5) * 5, .4 + Math.random() * 2.4, -.5 - Math.random() * 4.5); var sc = 1.5 + Math.random() * 2.5; sp.scale.set(sc, sc, 1); sp.userData.v = [(Math.random() - .5) * .08, (Math.random() - .5) * .03]; scene.add(sp); puffs.push(sp); }
   var composer = new THREE.EffectComposer(R); composer.renderTarget1.texture.encoding = composer.renderTarget2.texture.encoding = THREE.sRGBEncoding; composer.addPass(new THREE.RenderPass(scene, cam)); var bloom = new THREE.UnrealBloomPass(new THREE.Vector2(1024, 760), .5, .45, .82); composer.addPass(bloom); var fxaa = new THREE.ShaderPass(THREE.FXAAShader); composer.addPass(fxaa);
 
   /* ---------- câmera ---------- */
@@ -216,7 +217,7 @@
      mesma navegação de antes, num lugar só. O puxador na borda abre e fecha, `Tab` também, `Esc`
      fecha. Dentro da gaveta o `Tab` volta a ser do teclado (foco entre os controles). */
   var drawer = $("#drawer"), dbody = $("#dbody"), dtabs = $("#dtabs"), dcur = "laser";
-  var TABN = { laser: "LASER", dmx: "DMX", net: "NET", interlock: "INTERLOCK", bind: "BINDINGS", info: "INFO" };
+  var TABN = { laser: "LASER", dmx: "DMX", net: "NET", interlock: "INTERLOCK", bind: "BINDINGS", video: "VÍDEO", info: "INFO" };
   dtabs.innerHTML = Object.keys(TABN).map(function (t) { return "<button class='lb' data-tab='" + t + "'>" + TABN[t] + "</button>"; }).join("");
   function drawerOn() { return drawer.classList.contains("on"); }
   function openDrawer(tab) { if (tab) dcur = tab; drawer.classList.add("on"); paint(); }
@@ -239,6 +240,9 @@
   /// Campo de texto (host do DAC, universo/canal do interlock, tópico MQTT) não redesenha a gaveta
   /// enquanto se digita: o campo sumiria debaixo do cursor.
   drawer.addEventListener("input", function (e) { var r = e.target;
+    /// Fader do menu VÍDEO: aplica na hora e reescreve SÓ o número ao lado. Repintar a gaveta a
+    /// cada pixel de arrasto jogaria o scroll para o topo e mataria o fader debaixo do cursor.
+    if (r.dataset.vr) { if (VIDEO.set(r.dataset.vr, +r.value)) { var vv = dbody.querySelector("[data-vv='" + r.dataset.vr + "']"); if (vv) vv.textContent = vfmt(VIDEO.opt(r.dataset.vr), VIDEO.get(r.dataset.vr)); vpreset(); } return; }
     if (r.dataset.host !== undefined) { ENG.host = r.value.trim(); return; }
     if (r.dataset.ilk) { ILK[r.dataset.ilk] = r.dataset.ilk === "topic" ? r.value : Math.max(1, Math.min(512, +r.value || 1)); ilkSave(); return; }
     if (!r.dataset.p) return; set(r.dataset.p, +r.value); dbody.querySelector("[data-v='" + r.dataset.p + "']").textContent = fmtOf[r.dataset.p](+r.value); remember(); if (/^(lim|gam)\./.test(r.dataset.p)) { var old = dbody.querySelector(".cv"); if (old) old.replaceWith(curveCanvas()); } push(r.dataset.p, get(r.dataset.p)); Bind.syncAll(); });
@@ -246,7 +250,10 @@
   /// e o `<pre>` ficava congelado no valor de quando o painel abriu — LIMITE 25% com
   /// `spell ilda limit --r 1.00` embaixo. Ao SOLTAR o fader o painel se redesenha inteiro (não
   /// durante o arrasto, que destruiria o fader na mão) e o foco volta para o mesmo fader.
-  drawer.addEventListener("change", function (e) { var p = e.target.dataset.p; if (!p) return; refresh(); var el = dbody.querySelector("[data-p='" + p + "']"); if (el) el.focus(); });
+  drawer.addEventListener("change", function (e) {
+    if (e.target.dataset.vs) { VIDEO.set(e.target.dataset.vs, e.target.value); vpreset(); return; }
+    if (e.target.dataset.vpreset !== undefined) { VIDEO.preset(e.target.value); paint(); return; }
+    var p = e.target.dataset.p; if (!p) return; refresh(); var el = dbody.querySelector("[data-p='" + p + "']"); if (el) el.focus(); });
   drawer.addEventListener("click", function (e) { if (Bind.click(e)) { paint(); return; }
     var f = e.target.closest("[data-f]"); if (f) { playFile(f.dataset.f, f.dataset.n); refresh(); return; }
     var d = e.target.closest("[data-d]"); if (d) { var p = d.dataset.d.split("|"); ENG.dac = p[0]; ENG.host = p[1]; refresh(); return; }
@@ -277,7 +284,36 @@
   function ilkSave() { try { localStorage.setItem("sc-laser-ilk", JSON.stringify(ILK)); } catch (e) {} }
   function learnBtn(src, ready) { var l = Bind.learnState(), on = l && l.id === "lock.toggle" && l.src === src;
     return "<button class='lb" + (on ? " learn" : "") + "' data-learn='" + src + "' data-id='lock.toggle'>" + (on ? ready : (Bind.keyOf("lock.toggle", src) || "MAPEAR")) + "</button>"; }
+  /* ---------- aba VÍDEO ----------
+     O menu de vídeo do visualizador no formato de menu de jogo: PREDEFINIÇÃO no topo, blocos de
+     linhas `rótulo … valor`, RESTAURAR PADRÃO embaixo, e um bloco de leitura com o que a GPU está
+     fazendo AGORA. A lista sai inteira de `VIDEO.OPTS`: quem acrescenta opção mexe na tabela do
+     `video.js`, não aqui. Tudo aplica na hora — não há botão APLICAR porque não há nada que precise
+     de um (até o MSAA troca o alvo do composer em tempo de execução, sem recriar o renderer). */
+  function vfmt(o, v) { return o.type === "range" ? (o.step >= 1 ? (+v).toFixed(0) : (+v).toFixed(2)) + o.unit : ""; }
+  function vrow(o) { var v = VIDEO.get(o.id), h;
+    if (o.type === "select") h = "<div class='vrow sel'><label for='v_" + o.id + "'>" + o.label + "</label><select id='v_" + o.id + "' data-vs='" + o.id + "'>"
+      + o.vals.map(function (x) { return "<option value=\"" + x[0] + "\"" + (String(v) === x[0] ? " selected" : "") + ">" + x[1] + "</option>"; }).join("") + "</select></div>";
+    else h = "<div class='vrow'><label for='v_" + o.id + "'>" + o.label + "</label><input id='v_" + o.id + "' type='range' data-vr='" + o.id + "' min='" + o.min + "' max='" + o.max + "' step='" + o.step + "' value='" + v + "'><span class='v' data-vv='" + o.id + "'>" + vfmt(o, v) + "</span></div>";
+    return h + (o.note ? "<div class='vnote'>" + o.note + "</div>" : ""); }
+  /// Mexer em qualquer linha vira PERSONALIZADO — e o nome é derivado dos valores, então repor o
+  /// valor na mão volta sozinho ao nome da predefinição.
+  function vpreset() { var s = dbody.querySelector("[data-vpreset]"); if (!s) return; var pn = VIDEO.presetName();
+    if (pn === "custom" && !s.querySelector("option[value='custom']")) { var op = document.createElement("option"); op.value = "custom"; op.textContent = VIDEO.NOME.custom; s.appendChild(op); }
+    s.value = pn; }
+  function videoPane() { var pn = VIDEO.presetName();
+    var h = h3("VÍDEO", "o custo do quadro é escolha do operador · toda linha aplica na hora")
+      + "<div class='vpre'><div class='vrow sel'><label for='v_preset'>PREDEFINIÇÃO</label><select id='v_preset' data-vpreset>"
+      + VIDEO.PRESETS.concat(pn === "custom" ? ["custom"] : []).map(function (k) { return "<option value='" + k + "'" + (k === pn ? " selected" : "") + ">" + VIDEO.NOME[k] + "</option>"; }).join("")
+      + "</select></div></div>";
+    VIDEO.GRUPOS.forEach(function (g) { h += h3(g, VIDEO.SUB[g]);
+      VIDEO.OPTS.forEach(function (o) { if (o.g === g) h += vrow(o); });
+      if (g === "TELA") h += "<div class='btns'><button class='lb' data-a='video.fullscreen'>TELA CHEIA</button></div>"; });
+    return h + h3("DESEMPENHO", "medido, não estimado: sai de R.info e do relógio do quadro")
+      + "<pre id='vperf'>" + perfText() + "</pre>"
+      + "<div class='btns'><button class='lb amb' data-a='video.padrao'>RESTAURAR PADRÃO</button></div>"; }
   var PANE = {
+    video: videoPane,
     /// Contador ao vivo é do HUD (canto de cima: frame, pontos, fps). Aqui ficava a mesma conta
     /// congelada no instante em que o painel abriu — número parado ao lado de um número andando é
     /// pior que número nenhum. A gaveta diz o que não muda: o arquivo, os limites, a curva.
@@ -385,7 +421,6 @@
   Bind.def("kpps", "kpps (fader)", function (v) { S.kpps = Math.round(5000 + v * 35000); remember(); refresh(); }, { type: "cc", get: function () { return (S.kpps - 5000) / 35000; } });
   Bind.def("size", "tamanho (fader)", function (v) { S.size = .3 + v; push("size", S.size); refresh(); }, { type: "cc", get: function () { return S.size - .3; } });
   ["r", "g", "b"].forEach(function (k) { Bind.def("lim." + k, "limite " + { r: "vermelho", g: "verde", b: "azul" }[k] + " (fader)", function (v) { S.lim[k] = v; push("lim." + k, v); refresh(); }, { type: "cc", get: function () { return S.lim[k]; } }); });
-  Bind.def("fog", "névoa (fader)", function (v) { S.fog = v; }, { type: "cc", get: function () { return S.fog; } });
   Bind.def("file.open", "abrir .ild", function () { $("#file").click(); }, { key: "O" });
   Bind.def("demo", "demo.ild", function () { S.show = demo.frames; S.frame = 0; S.pos = 0; S.name = "demo.ild · " + demo.frames.length + " frames"; refresh(); pino.say("Demo de volta: túnel, pentagrama e a fita.", null, false); }, { key: "D" });
   ["ndi", "spout", "artnet", "sacn"].forEach(function (k) { Bind.def("net." + k, "rede: " + k.toUpperCase(), function () { S.net[k] = !S.net[k]; blip(1000); drawOled(); refresh(); if (S.net[k] && (k === "ndi" || k === "spout")) pino.say(k.toUpperCase() + " ligado, mas o conversor para ILDA ainda não existe: o FÓSFORO, um monitor de rack nesta porta.", null, false); }, { get: function () { return S.net[k]; } }); });
@@ -517,25 +552,31 @@
     if (/^[0-9]/.test(Bind.midi)) h += row("", "MIDI · " + Bind.midi, /^0 in/.test(Bind.midi) ? "" : "on");
     h += row(F && F < 25 && live() ? "red" : "las", (S.kpps / 1000).toFixed(0) + " kpps · " + (f ? f.length : 0) + " pts · " + (F ? F.toFixed(0) : "–") + " fps", "nil");
     h += row("", S.name.split(" · ")[0] + " · frame " + (S.frame + 1) + "/" + S.show.length + " · DMX " + S.dmx, "nil");
+    if (VIDEO.get("hudFps") === "sim") h += row("", QFPS.toFixed(0) + " fps · " + QMSF.toFixed(1) + " ms · " + R.info.render.calls + " draw calls", "nil");
     h += row(st[0], st[2], st[1]);
     if (h !== lastHud) { lastHud = h; srows.innerHTML = h; }
   }
 
   /* ---------- tick ---------- */
   var last = performance.now(), W = 0, H = 0, T0 = performance.now(), lidT = 0, rearI = 0, segsW = [], tmpV = new THREE.Vector3();
-  function size() { if (stage.clientWidth !== W || stage.clientHeight !== H) { W = stage.clientWidth; H = stage.clientHeight; var pr = R.getPixelRatio(); R.setSize(W, H, false); composer.setSize(W, H); bloom.resolution.set(W, H); fxaa.uniforms.resolution.value.set(1 / (W * pr), 1 / (H * pr)); cam.aspect = W / H; cam.updateProjectionMatrix(); } }
+  function size() { if (stage.clientWidth !== W || stage.clientHeight !== H) { W = stage.clientWidth; H = stage.clientHeight; var pr = R.getPixelRatio(); R.setSize(W, H, false); composer.setSize(W, H); bloom.setSize(W * pr * +VIDEO.get("bloomRes"), H * pr * +VIDEO.get("bloomRes")); fxaa.uniforms.resolution.value.set(1 / (W * pr), 1 / (H * pr)); cam.aspect = W / H; cam.updateProjectionMatrix(); } }
   /* dt nunca anda para trás. O `now` do requestAnimationFrame é o instante em que o QUADRO começou,
      e ele pode ser anterior ao `performance.now()` guardado em `last` na carga da página: nos
      primeiros quadros dt saía negativo (−0,23 s, medido no headless), `S.pos += S.kpps * dt` jogava
      a posição do galvo para −6848 e `f[índice negativo]` virava `undefined` — TypeError na parede a
      cada quadro até a posição voltar a subir, com a tarja vermelha de erro por cima da tela de quem
      abre `app.html#laser`. Era também a animação inteira (câmera, tampa, ventoinha) andando de ré. */
-  function tick(now) { size(); var dt = Math.min(.1, Math.max(0, (now - last) / 1000)); last = now; var t = (now - T0) / 1000;
+  function tick(now) { requestAnimationFrame(tick);
+    /* LIMITE DE FPS: quadro pulado por relógio, não por `setTimeout` — o rAF continua no ritmo do
+       monitor e o que se corta é o trabalho. `dt` não some junto: `last` só anda no quadro que roda. */
+    if (FPSCAP) { if (now < nextT) return; nextT = (nextT > now - 100 ? nextT : now) + 1000 / FPSCAP - .3; }
+    var q0 = performance.now(); R.info.reset();
+    size(); var dt = Math.min(.1, Math.max(0, (now - last) / 1000)); last = now; var t = (now - T0) / 1000;
     var wt0 = PERF && performance.now(); if (S.mode === "splash") { wallSplash(now, dt); wallTex.needsUpdate = true; } else wallTick(now, dt); if (PERF) { PERF.wallMs += performance.now() - wt0; PERF.frames++; }
     var want = S.cam === "inside" ? 1 : 0; lidT += (want - lidT) * Math.min(1, dt * 3); var sT = Math.min(1, lidT / .45), lT = Math.max(0, (lidT - .4) / .6); B.screws.forEach(function (s, i) { s.position.y = .004 + sT * .05; s.rotation.y = sT * 12 + i; }); B.lid.rotation.x = -lT * 1.9;
     CAM.update(dt * camSpeed / 5); rearI += (((S.cam === "rear" && S.mode === "play") ? 14 : 0) - rearI) * Math.min(1, dt * 3); B.rearLight.intensity = rearI; inLight.intensity = .35 * lidT; sun.intensity = 90 * S.dim; B.wallLight.intensity = 14 * S.dim;
     // feixes externos: abertura → pontos acesos da parede
-    var on = S.power && (S.mode === "splash" || live()), step = Math.max(1, Math.ceil(lit.length / 150)), gain = (.05 + .16 * S.fog); segsW.length = 0; if (on) for (var i = 0; i < lit.length; i += step) { var L = lit[i]; segsW.push([[B.APERT.x, B.APERT.y, B.APERT.z], [(L[0][0] / WW - .5) * 8, 2.2 + (.5 - L[0][1] / WH) * 5, -5], [L[1][0] / 255 * gain, L[1][1] / 255 * gain, L[1][2] / 255 * gain]]); } beamsOut.set(segsW, 1);
+    var on = S.power && (S.mode === "splash" || live()), step = Math.max(1, Math.ceil(lit.length / BEAMN)), gain = (.05 + .16 * S.fog); segsW.length = 0; if (on) for (var i = 0; i < lit.length; i += step) { var L = lit[i]; segsW.push([[B.APERT.x, B.APERT.y, B.APERT.z], [(L[0][0] / WW - .5) * 8, 2.2 + (.5 - L[0][1] / WH) * 5, -5], [L[1][0] / 255 * gain, L[1][1] / 255 * gain, L[1][2] / 255 * gain]]); } beamsOut.set(segsW, 1);
     // caminho óptico interno
     var arm = S.power && (S.key || S.mode === "splash"), opn = S.lock, segsI = O.segments(arm, opn, S.lim, gpos).map(function (s) { return [[s[0][0], s[0][1] + .314, s[0][2]], [s[1][0], s[1][1] + .314, s[1][2]], s[2]]; }); beamsIn.set(segsI, 1.2); beamsOut.tick(t); beamsIn.tick(t);
     O.shutter.rotation.y += (((arm && opn) ? 1.2 : 0) - O.shutter.rotation.y) * Math.min(1, dt * 12); O.mirX.rotation.y = -Math.PI / 4 + gpos[0] * .1; O.mirY.rotation.z = gpos[1] * .1;
@@ -544,21 +585,143 @@
     // LED de emissão com os quatro estados do aparelho (SISTEMA.md §5): apagado · âmbar lento em
     // STANDBY · vermelho fixo em SCAN FAIL · verde fixo em LIVE. Era vermelho para qualquer coisa
     // armada, e no LED o LIVE ficava igual ao SCAN FAIL. Os LEDs da NET só acendem com energia.
-    B.emLed.material.color.setHex(!S.power ? 0x2a0a08 : !arm ? ((reduced || Math.floor(t * 1.2) % 2) ? 0xffb000 : 0x2a1e00) : !S.lock ? 0xff2a1a : 0x38ff5c);
+    B.emLed.material.color.setHex(!S.power ? 0x2a0a08 : !arm ? ((!MOVE || Math.floor(t * 1.2) % 2) ? 0xffb000 : 0x2a1e00) : !S.lock ? 0xff2a1a : 0x38ff5c);
     B.led1.material.color.setHex(S.power && (S.net.sacn || S.net.artnet) ? 0x38ff5c : 0x0a2a10); B.led2.material.color.setHex(S.power && (S.net.ndi || S.net.spout) && Math.floor(t * 6) % 2 ? 0xffb000 : 0x2a1e00);
-    B.keyM.rotation.z += ((S.key ? Math.PI / 2 : 0) - B.keyM.rotation.z) * Math.min(1, dt * 8); B.lockPlug.position.z += ((S.lock ? 0 : .022) - B.lockPlug.position.z) * Math.min(1, dt * 6); B.rocker.rotation.x += ((S.power ? -.3 : .3) - B.rocker.rotation.x) * Math.min(1, dt * 18); B.blades.rotation.z += dt * (S.power ? 24 : 0);
+    B.keyM.rotation.z += ((S.key ? Math.PI / 2 : 0) - B.keyM.rotation.z) * Math.min(1, dt * 8); B.lockPlug.position.z += ((S.lock ? 0 : .022) - B.lockPlug.position.z) * Math.min(1, dt * 6); B.rocker.rotation.x += ((S.power ? -.3 : .3) - B.rocker.rotation.x) * Math.min(1, dt * 18); B.blades.rotation.z += dt * (S.power && MOVE ? 24 : 0);
     // encoder e BACK afundam quando apertados: botão físico que não anda não dá feedback
     S.encT = Math.max(0, S.encT - dt); S.backT = Math.max(0, (S.backT || 0) - dt);
     B.knob.position.z += ((S.encT > 0 ? .0072 : .009) - B.knob.position.z) * Math.min(1, dt * 22); B.backCap.position.z += ((S.backT > 0 ? .0015 : .003) - B.backCap.position.z) * Math.min(1, dt * 22);
-    puffs.forEach(function (p) { p.position.x += p.userData.v[0] * dt; p.position.y += p.userData.v[1] * dt; if (p.position.x > 3) p.position.x = -3; if (p.position.x < -3) p.position.x = 3; p.material.opacity = .02 + .06 * S.fog; });
+    puffs.forEach(function (p) { if (!p.visible) return; p.position.x += p.userData.v[0] * dt; p.position.y += p.userData.v[1] * dt; if (p.position.x > 3) p.position.x = -3; if (p.position.x < -3) p.position.x = 3; p.material.opacity = .02 + .06 * S.fog; });
     S.temp += ((live() ? 42 : 31) - S.temp) * dt * .05;
     tmpV.set(0, .314, .15).project(cam); pino.update(dt, mouse, W, H, (1 - tmpV.y) / 2 * H + 14);
     // LED grande de ARMADO no chassi (contrato do `chassi-4`): apagado sem energia, vermelho forte
     // piscando desarmado pela chave, vermelho fixo em SCAN FAIL, verde fixo armado. É o mesmo
     // estado do bloco de stats — o operador lê no aparelho e na tela sem precisar comparar.
-    if (B.armLed) B.armLed.material.color.setHex(!S.power ? 0x2a0a08 : !S.key ? ((reduced || Math.floor(t * 1.6) % 2) ? 0xff2a1a : 0x2a0a08) : !S.lock ? 0xff2a1a : 0x38ff5c);
+    if (B.armLed) B.armLed.material.color.setHex(!S.power ? 0x2a0a08 : !S.key ? ((!MOVE || Math.floor(t * 1.6) % 2) ? 0xff2a1a : 0x2a0a08) : !S.lock ? 0xff2a1a : 0x38ff5c);
     hudStats();
-    if (S.mode === "play") tips(); composer.render(); requestAnimationFrame(tick); }
+    if (S.mode === "play") tips(); composer.render();
+    // fps e ms/quadro: MEDIDA, e a que o menu VÍDEO mostra. Meia janela de meio segundo, para o
+    // número não tremer a cada quadro — o que o bloco DESEMPENHO diz é o que o relógio contou.
+    QN++; QMS += performance.now() - q0; QT += dt; if (QT >= .5) { QFPS = QN / QT; QMSF = QMS / QN; QT = QN = QMS = 0; }
+    perfT += dt; if (perfT >= .25) { perfT = 0; vperf(); } }
+
+  /* ---------- vídeo: a tabela do `video.js` traduzida para o three.js ----------
+     Um caso por id, e nada além disso. Se uma linha do menu não muda nada no render, ela não
+     existe: opção decorativa é mentira na tela. `applyVideo(null)` aplica a tabela inteira (boot e
+     troca de predefinição); `applyVideo(id)` aplica uma linha só. */
+  var FPSCAP = 0, nextT = 0, MOVE = true, BEAMN = 160, msRT = null, shKey = "";
+  var QN = 0, QMS = 0, QT = 0, QFPS = 0, QMSF = 0, perfT = 0;
+  var GLNAME = (function () { try { var g = R.getContext(), e = g.getExtension("WEBGL_debug_renderer_info");
+    return String((e && g.getParameter(e.UNMASKED_RENDERER_WEBGL)) || g.getParameter(g.RENDERER) || "renderer desconhecido"); } catch (e) { return "renderer desconhecido"; } })();
+  function mats(fn) { scene.traverse(function (o) { var m = o.material; if (!m) return; (Array.isArray(m) ? m : [m]).forEach(fn); }); }
+  function matsDirty() { mats(function (m) { m.needsUpdate = true; }); }
+  // teto 2x no devicePixelRatio, como ja' era: 100 % e' a resolução nativa, 200 % e' supersampling de verdade
+  function applyScale() { var pr = Math.min(2, devicePixelRatio) * +VIDEO.get("escala"); R.setPixelRatio(pr); composer.setPixelRatio(pr); W = 0; size(); }
+  // a vista fixa e' enquadrada A PARTIR do fov (cam.js `frame`): mudar o fov sem repor a lei deixaria
+  // a traseira enquadrada pelo fov antigo. `CAM.mode` refaz a pose.
+  function applyFov() { cam.fov = +VIDEO.get("fov"); cam.updateProjectionMatrix(); CAM.mode(LAWS[S.cam].mode, LAWS[S.cam]); }
+  /* ANTI-ALIASING. O que age no resultado e' o composer, não o canvas: com EffectComposer, o
+     `antialias:true` do WebGLRenderer não toca nos passes (a cena vai para um render target). Então
+     MSAA aqui e' `WebGLMultisampleRenderTarget` no composer — que o `composer.reset()` do r128 troca
+     em tempo de execução, sem recriar o renderer e sem recarregar a página. Exige WebGL 2; sem ele
+     a linha cai para FXAA em vez de mentir. FXAA e MSAA não somam: um substitui o outro. */
+  function applyAA() { var v = VIDEO.get("aa"), want = v === "msaa4";
+    if (want && !R.capabilities.isWebGL2) { VIDEO.set("aa", "fxaa"); return; }
+    fxaa.enabled = v === "fxaa";
+    if (want === !!msRT) return;
+    var pr = R.getPixelRatio(), w = Math.max(1, Math.round((W || 1440) * pr)), h = Math.max(1, Math.round((H || 900) * pr)),
+      par = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat },
+      rt = want ? new THREE.WebGLMultisampleRenderTarget(w, h, par) : new THREE.WebGLRenderTarget(w, h, par);
+    if (want) rt.samples = 4;
+    composer.reset(rt); msRT = want ? rt : null;
+    composer.renderTarget1.texture.encoding = composer.renderTarget2.texture.encoding = THREE.sRGBEncoding;
+    W = 0; size(); }
+  // o mapa de sombra e' recriado quando muda de tamanho OU de filtro (VSM não usa o mesmo formato)
+  function applyShadow() { var n = +VIDEO.get("sombras"), t = VIDEO.get("sombraTipo"), k = n + "/" + t;
+    R.shadowMap.enabled = n > 0; sun.castShadow = n > 0;
+    R.shadowMap.type = { basic: THREE.BasicShadowMap, pcf: THREE.PCFShadowMap, pcfsoft: THREE.PCFSoftShadowMap, vsm: THREE.VSMShadowMap }[t];
+    if (n > 0) sun.shadow.mapSize.set(n, n);
+    if (k !== shKey) { shKey = k; if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; } matsDirty(); }
+    R.shadowMap.needsUpdate = true; }
+  /* Só textura com imagem de verdade (canvas, <img>, ImageBitmap). A textura de um render target
+     tem `image = {width, height, depth}`: marcá-la `needsUpdate` faz o three tentar `texImage2D`
+     com isso e o quadro morre em TypeError — e a parede (`proj`) usa uma como `map`. */
+  function real(t) { return !!(t && t.image && (t.image.nodeName || (typeof ImageBitmap !== "undefined" && t.image instanceof ImageBitmap))); }
+  function applyAniso() { var n = Math.min(+VIDEO.get("aniso"), R.capabilities.getMaxAnisotropy());
+    mats(function (m) { ["map", "normalMap", "roughnessMap", "metalnessMap", "emissiveMap", "alphaMap"].forEach(function (k) {
+      var t = m[k]; if (real(t) && t.anisotropy !== n) { t.anisotropy = n; t.needsUpdate = true; } }); }); }
+  // a intensidade multiplica o valor que o material trouxe de `mat.js` (a bancada e' .5, o chão .15):
+  // um valor único achataria o ajuste que cada superfície ja' tem. O original fica guardado no material.
+  function applyEnv() { scene.environment = VIDEO.get("reflexo") === "sim" ? ENVTEX : null; var k = +VIDEO.get("reflexoInt");
+    mats(function (m) { if (m.envMapIntensity === undefined) return; if (m.userData.ei0 === undefined) m.userData.ei0 = m.envMapIntensity; m.envMapIntensity = m.userData.ei0 * k; }); }
+  function applyBloom() { bloom.enabled = VIDEO.get("bloom") === "sim"; bloom.strength = +VIDEO.get("bloomForca"); bloom.radius = +VIDEO.get("bloomRaio"); bloom.threshold = +VIDEO.get("bloomLimiar"); }
+  // exposição e' uniform (custa nada); tone mapping e' #define, e so' ele obriga a recompilar
+  function applyTone() { var t = { nenhum: THREE.NoToneMapping, linear: THREE.LinearToneMapping, reinhard: THREE.ReinhardToneMapping, cineon: THREE.CineonToneMapping, aces: THREE.ACESFilmicToneMapping }[VIDEO.get("tone")];
+    if (R.toneMapping !== t) { R.toneMapping = t; matsDirty(); }
+    R.toneMappingExposure = +VIDEO.get("exposicao"); }
+  /* RESOLUÇÃO DA PAREDE: o render target onde o rastro mora. Trocar de tamanho e' trocar também a
+     câmera ortográfica (que esta' em coordenadas de canvas), o quad de esmaecer e o canvas 2D da
+     splash — WW e WH são a unidade de tudo que desenha ali. O alvo novo nasce com lixo da GPU: se
+     não for limpo aqui, o primeiro quadro da parede vem com o que estava na memória. */
+  function applyWall() { var q = String(VIDEO.get("parede")).split("x"), w = +q[0], h = +q[1];
+    if (w === WW && h === WH) return;
+    WW = w; WH = h; WC.width = WW; WC.height = WH; wrt.setSize(WW, WH);
+    wcam.right = WW; wcam.bottom = WH; wcam.updateProjectionMatrix();
+    fade.geometry.dispose(); fade.geometry = new THREE.PlaneGeometry(WW, WH); fade.position.set(WW / 2, WH / 2, 0);
+    galvo = null; segN = 0; dotN = 0;
+    var c0 = R.getClearColor(new THREE.Color()), a0 = R.getClearAlpha();
+    R.setRenderTarget(wrt); R.setClearColor(0x000000, 1); R.clear(true, false, false); R.setClearColor(c0, a0); R.setRenderTarget(null); }
+  function applyTrace() { haloMat.opacity = +VIDEO.get("halo"); haloMat.size = +VIDEO.get("haloPx"); }
+  function applyPuffs() { var n = +VIDEO.get("puffs"); puffs.forEach(function (x, i) { x.visible = i < n; }); }
+  var VAPP = {
+    escala: applyScale, fov: applyFov,
+    fpsMax: function () { FPSCAP = +VIDEO.get("fpsMax"); },
+    hudFps: function () { lastHud = ""; },
+    aa: applyAA, sombras: applyShadow, sombraTipo: applyShadow, aniso: applyAniso,
+    reflexo: applyEnv, reflexoInt: applyEnv,
+    bloom: applyBloom, bloomForca: applyBloom, bloomRaio: applyBloom, bloomLimiar: applyBloom,
+    bloomRes: function () { W = 0; size(); },
+    tone: applyTone, exposicao: applyTone,
+    parede: applyWall,
+    rastro: function () { FADE = +VIDEO.get("rastro"); },
+    halo: applyTrace, haloPx: applyTrace,
+    feixes: function () { BEAMN = +VIDEO.get("feixes"); },
+    poeira: function () { var on = VIDEO.get("poeira") === "sim"; beamsOut.dust(on); beamsIn.dust(on); },
+    nevoa: function () { S.fog = +VIDEO.get("nevoa"); },
+    puffs: applyPuffs,
+    corda: function () { pino.rope(VIDEO.get("corda") === "sim"); },
+    movimento: function () { MOVE = VIDEO.get("movimento") === "sim"; }
+  };
+  function applyVideo(id) { if (id) { if (VAPP[id]) VAPP[id](); } else Object.keys(VAPP).forEach(function (k) { VAPP[k](); }); }
+  function perfText() { var r = R.info.render, m = R.info.memory, pr = R.getPixelRatio();
+    return QFPS.toFixed(0) + " fps \u00b7 " + QMSF.toFixed(2) + " ms/quadro" + (FPSCAP ? " \u00b7 limite " + FPSCAP : "")
+      + "\n" + r.calls + " draw calls \u00b7 " + r.triangles + " tri\u00e2ngulos"
+      + "\n" + m.geometries + " geometrias \u00b7 " + m.textures + " texturas"
+      + "\ntela " + Math.round(W * pr) + "\u00d7" + Math.round(H * pr) + " px (dpr " + pr.toFixed(2) + ") \u00b7 parede " + WW + "\u00d7" + WH
+      + "\n" + (R.capabilities.isWebGL2 ? "WebGL 2" : "WebGL 1") + (msRT ? " \u00b7 MSAA " + msRT.samples + "\u00d7" : "") + " \u00b7 aniso m\u00e1x " + R.capabilities.getMaxAnisotropy()
+      + "\n" + GLNAME; }
+  // o bloco DESEMPENHO anda sozinho, sem repintar a gaveta: so' o texto do <pre> e' reescrito
+  function vperf() { if (!drawerOn() || dcur !== "video") return; var el = dbody.querySelector("#vperf"); if (el) el.textContent = perfText(); }
+  /// Cada linha do menu também e' um endereço — `video.<id>`, do tipo certo (fader = cc, sim/não =
+  /// botão, lista = cc que anda pelos itens). Sai da mesma tabela, então opção nova ganha binding
+  /// sem ninguém escrever binding. `Bind` ja' sabe learn: nenhuma tecla fixa nova e' gasta aqui.
+  VIDEO.OPTS.forEach(function (o) { var id = "video." + o.id, lbl = "v\u00eddeo: " + o.label.toLowerCase();
+    if (o.type === "range") Bind.def(id, lbl, function (v) { VIDEO.set(o.id, o.min + v * (o.max - o.min)); },
+      { type: "cc", get: function () { return (VIDEO.get(o.id) - o.min) / (o.max - o.min); } });
+    else if (o.vals.length === 2) Bind.def(id, lbl, function () { VIDEO.set(o.id, VIDEO.get(o.id) === o.vals[1][0] ? o.vals[0][0] : o.vals[1][0]); },
+      { get: function () { return VIDEO.get(o.id) === o.vals[1][0]; } });
+    else Bind.def(id, lbl, function (v) { VIDEO.set(o.id, o.vals[Math.max(0, Math.min(o.vals.length - 1, Math.round(v * (o.vals.length - 1))))][0]); },
+      { type: "cc", get: function () { var i = 0; o.vals.forEach(function (x, j) { if (x[0] === String(VIDEO.get(o.id))) i = j; }); return i / (o.vals.length - 1); } });
+  });
+  Bind.def("video", "menu de v\u00eddeo", tabKey("video"));
+  Bind.def("video.preset", "v\u00eddeo: predefini\u00e7\u00e3o", function (v) { VIDEO.preset(VIDEO.PRESETS[Math.max(0, Math.min(3, Math.round(v * 3)))]); },
+    { type: "cc", get: function () { var i = VIDEO.PRESETS.indexOf(VIDEO.presetName()); return i < 0 ? 1 : i / 3; } });
+  Bind.def("video.padrao", "v\u00eddeo: restaurar padr\u00e3o", function () { VIDEO.reset(); });
+  Bind.def("video.fullscreen", "v\u00eddeo: tela cheia", function () { try { if (document.fullscreenElement) document.exitFullscreen(); else stage.requestFullscreen(); } catch (e) {} });
+  // a medida do quadro fica legivel de fora: e' por aqui que o portao headless le' fps e draw calls
+  window.SC = window.SC || {}; SC.video = function () { var r = R.info.render; return { fps: QFPS, ms: QMSF, calls: r.calls, tris: r.triangles, preset: VIDEO.presetName(), aa: VIDEO.get("aa"), msaa: msRT ? msRT.samples : 0, gl: GLNAME, dpr: R.getPixelRatio(), parede: WW + "x" + WH }; };
+  VIDEO.onChange(function (id) { applyVideo(id); if (!id) refresh(); Bind.syncAll(); });
+  applyVideo(null);
 
   /* ---------- boot: câmera mirada no output; o foco sai do ponto estático e vai para a parede ---------- */
   document.fonts.ready.then(function () { size(); plate(null); var ol = ILDA.outlines([["SPELLCASTER", "64px Michroma", 272], ["LASER", "64px Michroma", 372]], WW, WH); SP.loops = ol.loops; SP.len = ol.len;
