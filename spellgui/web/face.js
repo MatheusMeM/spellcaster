@@ -1,36 +1,36 @@
 "use strict";
-// face.js — runtime da Face (PRD §10): `faces/<nome>.face.json` declara quais widgets existem,
-// onde e em que view; o comportamento vive no Graph, no engine. A pagina so' desenha estado e
-// manda evento — nao ha segundo runtime aqui.
+// face.js — Face runtime (PRD §10): `faces/<name>.face.json` declares which widgets exist, where
+// and in which view; the behaviour lives in the Graph, in the engine. The page only draws state
+// and sends events — there is no second runtime here.
 //
-// Um widget liga por um destes dois caminhos, nunca por logica propria:
-//   {"cmd": "cue_go", "args": {...}}   -> Registry::call pelo barramento
-//   {"input": "widget:blackout"}       -> comando `input {key, value}`, que alimenta o Graph
-//     (`in.widget` escuta a chave "widget:<id>")
-// O caminho de volta e' o evento `widget` do barramento, que o `out.widget` do Graph emite:
+// A widget fires through one of these two paths, never through logic of its own:
+//   {"cmd": "cue_go", "args": {...}}   -> Registry::call over the bus
+//   {"input": "widget:blackout"}       -> `input {key, value}` command, which feeds the Graph
+//     (`in.widget` listens on the key "widget:<id>")
+// The way back is the `widget` event of the bus, emitted by the Graph `out.widget`:
 //   {"event":"widget","data":{"id":"go","prop":"glow","value":1}}
 //
-// ponytail: catalogo de widget reduzido a button, toggle, fader e label ; o resto do catalogo
-// do PRD §10 (cuelist, meter, universes, timecode, transport) entra com o editor de Face (R9).
+// ponytail: widget catalogue reduced to button, toggle, fader and label ; the rest of the PRD §10
+// catalogue (cuelist, meter, universes, timecode, transport) comes with the Face editor (R9).
 
 const Face = {};
 
-/// View pedida ou a primeira declarada. `views` e' obrigatorio no .face.json.
+/// The requested view, or the first declared one. `views` is required in the .face.json.
 Face.pick = function (face, name) {
   const vs = face.views;
   const k = name && vs[name] ? name : Object.keys(vs)[0];
   return Object.assign({ name: k }, vs[k]);
 };
 
-/// Widgets da view, na ordem declarada por ela.
+/// Widgets of the view, in the order the view declares.
 Face.widgets = function (face, view) {
   const by = {};
   for (const w of face.widgets || []) by[w.id] = w;
   return (view.widgets || Object.keys(by)).map(id => by[id]).filter(Boolean);
 };
 
-/// O que um toque no widget manda para o barramento. Puro: sem isto nao ha o que testar.
-/// value so' importa para toggle/fader; botao e' sempre 1 (o pulso do `in.widget`).
+/// What a touch on the widget sends to the bus. Pure: without it there would be nothing to test.
+/// value only matters for toggle/fader; a button is always 1 (the `in.widget` pulse).
 Face.action = function (w, value) {
   const v = value === undefined ? 1 : +value;
   if (w.input) return { input: w.input, value: v };
@@ -46,15 +46,15 @@ function el(tag, cls, txt) {
   return e;
 }
 
-/// Prop vinda do `out.widget` e' o nome da classe; a pagina decide o que cada uma pinta.
+/// The prop coming from `out.widget` is the class name; the page decides what each one paints.
 Face.applyProp = function (node, prop, value) {
-  // `prop` vem da rede: `classList.toggle` LANCA com nome vazio ou com espaco, e o evento
-  // que chega dentro do `emit` derrubaria os assinantes seguintes.
+  // `prop` comes from the network: `classList.toggle` THROWS with an empty name or with a space,
+  // and the event arriving inside `emit` would take down the following subscribers.
   if (!/^[\w-]+$/.test(prop)) return;
   node.classList.toggle(prop, +value !== 0);
 };
 
-/// Monta a view no host. Devolve {view, nodes} para o chamador trocar de view.
+/// Builds the view in the host. Returns {view, nodes} so the caller can switch view.
 Face.build = function (host, face, view, bus) {
   const [cols, rows] = view.grid;
   host.innerHTML = "";
@@ -70,7 +70,7 @@ Face.build = function (host, face, view, bus) {
   for (const w of Face.widgets(face, view)) {
     const t = w.type || "button";
     const node = el("div", "w w-" + t + (w.tone ? " tone-" + w.tone : ""));
-    // a view pode remanejar sem duplicar o widget (PRD §10: mesma Face, arranjos diferentes)
+    // the view can rearrange without duplicating the widget (PRD §10: same Face, different layouts)
     const at = (view.at && view.at[w.id]) || w.at || [0, 0, 1, 1];
     node.style.gridColumn = at[0] + 1 + " / span " + (at[2] || 1);
     node.style.gridRow = at[1] + 1 + " / span " + (at[3] || 1);
@@ -110,7 +110,7 @@ Face.build = function (host, face, view, bus) {
   return { view, nodes };
 };
 
-/// Carrega a face, monta e liga os eventos do barramento. `opts.view` escolhe a view.
+/// Loads the face, builds it and wires the bus events. `opts.view` picks the view.
 Face.mount = function (host, url, bus, opts) {
   opts = opts || {};
   return fetch(url)

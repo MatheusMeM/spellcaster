@@ -1,34 +1,34 @@
-// MIDI mapping: porta de entrada, tabela tecla -> comando, LEARN. Cliente do registry, nunca
-// dona de logica: cada botao e' um comando `midi_*` e o mapa mora no `.spell`, no engine.
+// MIDI mapping: input port, key -> command table, LEARN. A registry client, never the owner of
+// logic: every button is a `midi_*` command and the map lives in the `.spell`, in the engine.
 //
-// A metade de cima e' pura (args do mapa) e roda no `node --test`; a de baixo e' DOM.
+// The top half is pure (map args) and runs under `node --test`; the bottom half is DOM.
 "use strict";
 
-// --------------------------------------------------------------- parte pura
+// --------------------------------------------------------------- pure part
 
-// Texto do campo -> objeto de args. Vazio = {}. So' objeto: o registry recebe um objeto.
+// Field text -> args object. Empty = {}. Object only: the registry takes an object.
 function parseArgs(txt) {
   const s = (txt || "").trim();
   if (!s) return {};
-  const v = JSON.parse(s); // erro sobe com a mensagem do JSON
-  if (!v || typeof v !== "object" || Array.isArray(v)) throw new Error("esperava um objeto JSON");
+  const v = JSON.parse(s); // the error comes up with the JSON message
+  if (!v || typeof v !== "object" || Array.isArray(v)) throw new Error("expected a JSON object");
   return v;
 }
 
-// O mesmo `expande` do engine (spellcore/engine/src/midi.rs): "$" vira o valor 0..1 e "$<n>"
-// vira round(valor * n). E' o que a pagina mostra como previa do que vai ser enviado.
-function preview(v, valor) {
+// The same `expande` of the engine (spellcore/engine/src/midi.rs): "$" becomes the value 0..1 and
+// "$<n>" becomes round(value * n). This is what the page shows as a preview of what will be sent.
+function preview(v, value) {
   if (typeof v === "string") {
     if (v[0] !== "$") return v;
     const r = v.slice(1);
-    if (r === "") return valor;
+    if (r === "") return value;
     const n = Number(r);
-    return Number.isFinite(n) && r.trim() !== "" ? Math.round(valor * n) : v;
+    return Number.isFinite(n) && r.trim() !== "" ? Math.round(value * n) : v;
   }
-  if (Array.isArray(v)) return v.map(x => preview(x, valor));
+  if (Array.isArray(v)) return v.map(x => preview(x, value));
   if (v && typeof v === "object") {
     const o = {};
-    for (const k of Object.keys(v)) o[k] = preview(v[k], valor);
+    for (const k of Object.keys(v)) o[k] = preview(v[k], value);
     return o;
   }
   return v;
@@ -37,25 +37,25 @@ function preview(v, valor) {
 const MIDI = { parseArgs, preview };
 if (typeof module !== "undefined") module.exports = MIDI;
 
-// ------------------------------------------------------------------- pagina
+// ------------------------------------------------------------------- page
 
 if (typeof window !== "undefined") {
   window.MIDI = MIDI;
   const q = id => document.getElementById(id);
   const bus = new Bus({ offline: location.search.includes("offline=1") }).connect();
   const msg = () => q("msg");
-  const erro = e => { msg().textContent = e.message || String(e); };
-  const call = (cmd, args) => bus.call(cmd, args).catch(e => { erro(e); throw e; });
+  const err = e => { msg().textContent = e.message || String(e); };
+  const call = (cmd, args) => bus.call(cmd, args).catch(e => { err(e); throw e; });
 
-  let aberta = null;   // nome da porta aberta
-  let ultima = 0;      // seq do ultimo evento visto
+  let openPort = null;   // name of the open port
+  let lastSeq = 0;       // seq of the last event seen
 
-  bus.on("close", () => { msg().textContent = "sem servidor (spellcore serve)"; });
-  bus.on("show", () => tabela());
+  bus.on("close", () => { msg().textContent = "no server (spellcore serve)"; });
+  bus.on("show", () => table());
 
-  // -------------------------------------------------------------- portas
+  // -------------------------------------------------------------- ports
 
-  function portas() {
+  function ports() {
     return call("midi_ports", {}).then(r => {
       const s = q("ports");
       s.innerHTML = "";
@@ -67,62 +67,62 @@ if (typeof window !== "undefined") {
       if (!(r.ports || []).length) {
         const o = document.createElement("option");
         o.value = "";
-        o.textContent = "(nenhuma porta MIDI)";
+        o.textContent = "(no MIDI port)";
         s.append(o);
       }
-      aberta = r.open || null;
-      if (aberta) s.value = aberta;
-      botoes();
+      openPort = r.open || null;
+      if (openPort) s.value = openPort;
+      buttons();
     });
   }
 
-  function botoes() {
-    q("open").disabled = !!aberta;
-    q("close").disabled = !aberta;
-    q("porta").textContent = aberta || "fechada";
-    q("porta").classList.toggle("on", !!aberta);
+  function buttons() {
+    q("open").disabled = !!openPort;
+    q("close").disabled = !openPort;
+    q("porta").textContent = openPort || "closed";
+    q("porta").classList.toggle("on", !!openPort);
   }
 
-  q("scan").onclick = portas;
+  q("scan").onclick = ports;
   q("open").onclick = () => call("midi_open", { port: q("ports").value }).then(r => {
-    aberta = r.open; msg().textContent = ""; botoes();
+    openPort = r.open; msg().textContent = ""; buttons();
   });
-  q("close").onclick = () => call("midi_close", {}).then(() => { aberta = null; botoes(); });
+  q("close").onclick = () => call("midi_close", {}).then(() => { openPort = null; buttons(); });
 
-  // ------------------------------------------------------- ultima tecla e LEARN
+  // ------------------------------------------------------- last key and LEARN
 
-  function mostra(r) {
+  function show(r) {
     if (!r || !r.key) return;
     q("last").textContent = `${r.key}  v=${(+r.value).toFixed(3)}  raw=${r.raw}`;
-    if (r.seq !== ultima) {
-      ultima = r.seq;
+    if (r.seq !== lastSeq) {
+      lastSeq = r.seq;
       q("last").classList.remove("hit");
       void q("last").offsetWidth;
       q("last").classList.add("hit");
     }
   }
 
-  // ponytail: sondagem a 5 Hz so' para o operador ver a tecla chegando ; virar evento do
-  // barramento se o monitor de MIDI precisar de cada mensagem.
-  setInterval(() => { if (aberta) bus.call("midi_last", {}).then(mostra, () => {}); }, 200);
+  // ponytail: polling at 5 Hz only so the operator sees the key arriving ; make it a bus event if
+  // the MIDI monitor needs every message.
+  setInterval(() => { if (openPort) bus.call("midi_last", {}).then(show, () => {}); }, 200);
 
   q("learn").onclick = () => {
     const b = q("learn");
     b.classList.add("live");
-    b.textContent = "APERTE...";
-    bus.call("midi_learn", {}).then(r => { q("key").value = r.key; mostra(r); }, erro)
-      .finally(() => { b.classList.remove("live"); b.textContent = "APRENDER"; });
+    b.textContent = "PRESS...";
+    bus.call("midi_learn", {}).then(r => { q("key").value = r.key; show(r); }, err)
+      .finally(() => { b.classList.remove("live"); b.textContent = "LEARN"; });
   };
 
-  // ----------------------------------------------------------------- mapa
+  // ----------------------------------------------------------------- map
 
-  function tabela() {
+  function table() {
     return call("midi_maps", {}).then(m => {
-      if (!m || m.offline) m = {}; // sem engine (offline=1) nao ha' mapa para mostrar
+      if (!m || m.offline) m = {}; // with no engine (offline=1) there is no map to show
       const t = q("map");
       t.innerHTML = "";
-      const chaves = Object.keys(m || {}).sort();
-      for (const k of chaves) {
+      const keys = Object.keys(m || {}).sort();
+      for (const k of keys) {
         const e = m[k] || {};
         const tr = document.createElement("tr");
         const args = JSON.stringify(e.args || {});
@@ -135,12 +135,12 @@ if (typeof window !== "undefined") {
         const b = document.createElement("button");
         b.textContent = "x";
         b.title = "midi_unmap " + k;
-        b.onclick = () => call("midi_unmap", { key: k }).then(tabela);
+        b.onclick = () => call("midi_unmap", { key: k }).then(table);
         td.append(b);
         tr.append(td);
         t.append(tr);
       }
-      q("n").textContent = chaves.length + " tecla(s)";
+      q("n").textContent = keys.length + " key(s)";
     });
   }
 
@@ -149,16 +149,16 @@ if (typeof window !== "undefined") {
     try {
       args = parseArgs(q("args").value);
     } catch (e) {
-      return erro(new Error("args: " + e.message));
+      return err(new Error("args: " + e.message));
     }
     call("midi_map", { key: q("key").value.trim(), cmd: q("cmd").value.trim(), args }).then(() => {
       msg().textContent = "";
       q("args").value = "";
-      tabela();
+      table();
     });
   };
 
-  // previa do que o comando recebe com o fader no meio (valor 0,5)
+  // preview of what the command gets with the fader halfway (value 0.5)
   q("args").oninput = () => {
     try {
       q("prev").textContent = JSON.stringify(preview(parseArgs(q("args").value), 0.5));
@@ -167,7 +167,7 @@ if (typeof window !== "undefined") {
     }
   };
 
-  // --------------------------------------------------------------- comandos
+  // --------------------------------------------------------------- commands
 
   bus.commands().then(cs => {
     const dl = q("cmds");
@@ -178,11 +178,11 @@ if (typeof window !== "undefined") {
     }
     const doc = Object.fromEntries(cs.map(c => [c.name, c.doc]));
     q("cmd").oninput = () => { q("doc").textContent = doc[q("cmd").value.trim()] || ""; };
-  }, erro);
+  }, err);
 
-  // Request mandada com o socket fechado e' descartada pelo `bus.js`: a primeira leitura espera
-  // o "open" (que tambem volta a cada reconexao).
-  const carrega = () => portas().then(tabela, erro);
-  if (bus.offline) carrega();
-  else bus.on("open", carrega);
+  // A request sent with the socket closed is dropped by `bus.js`: the first read waits for the
+  // "open" (which also comes back on every reconnection).
+  const load = () => ports().then(table, err);
+  if (bus.offline) load();
+  else bus.on("open", load);
 }

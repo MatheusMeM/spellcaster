@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Spellcaster — face</title>
 <link rel="stylesheet" href="../../design/tokens/spellcaster.css">
 <style>
-  /* Kiosk: sem chrome, fonte grande, alvo de toque. Cor so' por token. */
+  /* Kiosk: no chrome, large font, touch targets. Color only from tokens. */
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; overflow: hidden; background: var(--sc-bg); color: var(--sc-fg);
                font: var(--sc-text-md)/1.2 var(--sc-mono); -webkit-user-select: none; user-select: none; }
@@ -19,7 +19,7 @@
        text-transform: uppercase; color: var(--sc-fg); transition: none; }
   .w:focus-visible { border-color: var(--sc-accent); }
   .w-label { cursor: default; font-size: var(--sc-text-lg); color: var(--sc-fg-2); }
-  /* `prop` do out.widget e' o nome da classe (face.js): a pagina pinta as que conhece. */
+  /* the out.widget `prop` is the class name (face.js): the page paints the ones it knows. */
   .w.hit, .w.on, .w.glow { background: var(--sc-panel-2); border-color: var(--sc-accent);
                   color: var(--sc-accent); box-shadow: var(--sc-glow-accent); }
   .w.alert, .w.live { border-color: var(--sc-live); color: var(--sc-live); box-shadow: var(--sc-glow-live); }
@@ -54,11 +54,12 @@
 "use strict";
 const q = id => document.getElementById(id);
 const p = new URLSearchParams(location.search);
-const nome = p.get("face") || "quatro";
-// ?offline=1 abre sem engine (python -m http.server); sem isso tenta o WS do `spellcore serve`.
+const faceName = p.get("face") || "quatro";
+// ?offline=1 opens without an engine (python -m http.server); without it, it tries the
+// `spellcore serve` WS.
 const bus = new Bus({ offline: p.get("offline") === "1" }).connect();
 
-bus.on("open", () => { q("conn").textContent = "ao vivo"; q("conn").className = "live"; });
+bus.on("open", () => { q("conn").textContent = "live"; q("conn").className = "live"; });
 bus.on("close", () => { q("conn").textContent = "offline"; q("conn").className = ""; });
 bus.on("log", d => { q("log").textContent = (d && d.text) || ""; });
 bus.on("transport", d => {
@@ -67,13 +68,13 @@ bus.on("transport", d => {
   q("cue").textContent = d.cue === undefined || d.cue < 0 ? "—" : d.cue;
 });
 
-q("nome").textContent = nome;
-// a raiz servida e' a do repo (README de spellgui/web): a face esta' em ../../faces.
-Face.mount(q("grid"), "../../faces/" + nome + ".face.json", bus, { view: p.get("view") })
+q("nome").textContent = faceName;
+// the served root is the repo root (spellgui/web README): the face lives in ../../faces.
+Face.mount(q("grid"), "../../faces/" + faceName + ".face.json", bus, { view: p.get("view") })
   .then(st => { q("view").textContent = st.view.name; })
   .catch(e => { q("log").textContent = e.message; });
 
-// SHORTCUTS.md: Enter = cue GO, Esc segurado 0,5 s = blackout, Shift+F = tela cheia.
+// SHORTCUTS.md: Enter = cue GO, Esc held 0.5 s = blackout, Shift+F = full screen.
 let esc = 0;
 addEventListener("keydown", e => {
   if (e.key === "Enter") bus.call("cue_go", {});

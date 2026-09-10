@@ -1,7 +1,7 @@
 "use strict";
 // node --test spellgui/web/test/
-// As duas regras do help.js: ler a tabela de `design/SHORTCUTS.md` e resumir os argumentos de um
-// comando do registry. O resto da pagina e' DOM e nao tem regra.
+// The two rules of help.js: reading the table of `design/SHORTCUTS.md` and summarizing the
+// arguments of a registry command. The rest of the page is DOM and has no rule.
 
 const { test } = require("node:test");
 const assert = require("node:assert");
@@ -17,54 +17,67 @@ const CMDS = JSON.parse(
   fs.readFileSync(path.join(__dirname, "..", "dev", "commands.json"), "utf8")
 );
 
-test("tabela: cabecalho, sem separador, celulas aparadas", () => {
-  const md = ["## X", "", "| a | b |", "|---|---|", "| 1 | 2 |", "|3|4|", "", "texto"].join("\n");
-  assert.deepStrictEqual(HELP.tabela(md, "X"), [
+test("table: header, no separator, trimmed cells", () => {
+  const md = ["## X", "", "| a | b |", "|---|---|", "| 1 | 2 |", "|3|4|", "", "text"].join("\n");
+  assert.deepStrictEqual(HELP.table(md, "X"), [
     ["a", "b"],
     ["1", "2"],
     ["3", "4"],
   ]);
 });
 
-test("tabela: para na primeira tabela depois do titulo pedido", () => {
-  const md = ["| z |", "|---|", "| antes |", "## X", "| a |", "|---|", "| 1 |", "", "| depois |"]
+test("table: it stops at the first table after the requested heading", () => {
+  const md = ["| z |", "|---|", "| before |", "## X", "| a |", "|---|", "| 1 |", "", "| after |"]
     .join("\n");
-  assert.deepStrictEqual(HELP.tabela(md, "X"), [["a"], ["1"]]);
-  assert.deepStrictEqual(HELP.tabela(md), [["z"], ["antes"]], "sem titulo = a primeira");
-  assert.deepStrictEqual(HELP.tabela(md, "nao existe"), []);
-  assert.deepStrictEqual(HELP.tabela(""), []);
-  assert.deepStrictEqual(HELP.tabela(null), []);
+  assert.deepStrictEqual(HELP.table(md, "X"), [["a"], ["1"]]);
+  assert.deepStrictEqual(HELP.table(md), [["z"], ["before"]], "no heading = the first one");
+  assert.deepStrictEqual(HELP.table(md, "does not exist"), []);
+  assert.deepStrictEqual(HELP.table(""), []);
+  assert.deepStrictEqual(HELP.table(null), []);
 });
 
-test("tabela: o Mapa padrao do SHORTCUTS.md tem quatro colunas e a coluna estado", () => {
-  const rows = HELP.tabela(MD, HELP.TABELA);
-  assert.ok(rows.length > 30, "linhas: " + rows.length);
-  assert.deepStrictEqual(rows[0], ["Ação", "Tecla", "Origem", "Estado"]);
-  for (const r of rows) assert.strictEqual(r.length, 4, "linha irregular: " + r.join(" | "));
-  const estados = new Set(rows.slice(1).map(r => r[3]));
-  assert.deepStrictEqual([...estados].sort(), ["falta", "feito", "n.a."]);
-  // a celula com a barra invertida do Resolve sobrevive ao split
+// The heading comes as a list because SHORTCUTS.md exists in two languages: any of the accepted
+// headings finds the table, and a list with none of them finds nothing.
+test("table: a list of headings takes whichever one is in the file", () => {
+  const md = ["## Default map", "| a |", "|---|", "| 1 |"].join("\n");
+  const pt = ["## Mapa padrão", "| a |", "|---|", "| 1 |"].join("\n");
+  assert.deepStrictEqual(HELP.table(md, HELP.TABLE), [["a"], ["1"]]);
+  assert.deepStrictEqual(HELP.table(pt, HELP.TABLE), [["a"], ["1"]]);
+  assert.deepStrictEqual(HELP.table(md, ["A", "B"]), []);
+});
+
+// Structural assertions: the SHORTCUTS.md text belongs to another file and may be translated, so
+// what is checked here is the shape of the table, not its words.
+test("table: the default map of SHORTCUTS.md has four columns and a status column", () => {
+  const rows = HELP.table(MD, HELP.TABLE);
+  assert.ok(rows.length > 30, "rows: " + rows.length);
+  assert.strictEqual(rows[0].length, 4, "header: " + rows[0].join(" | "));
+  for (const r of rows) assert.strictEqual(r.length, 4, "irregular row: " + r.join(" | "));
+  const states = new Set(rows.slice(1).map(r => r[3]));
+  assert.ok(states.size >= 2 && states.size <= 4, "states: " + [...states].join(", "));
+  for (const s of states) assert.ok(s && s.length < 12, "state cell: " + s);
+  // the cell with the Resolve backslash survives the split
   assert.ok(
     rows.some(r => r[1].indexOf("\\") >= 0),
-    "a linha de zoom perdeu o `\\`"
+    "the zoom row lost the `\\`"
   );
 });
 
-test("args: ordem do schema, `?` no que nao e' obrigatorio", () => {
+test("args: schema order, `?` on what is not required", () => {
   const c = n => CMDS.find(x => x.name === n);
   assert.deepStrictEqual(HELP.args(c("load")), ["file"]);
   assert.deepStrictEqual(HELP.args(c("locate")), ["t"]);
   assert.deepStrictEqual(HELP.args(c("show_get")), ["file?", "full?"]);
-  assert.deepStrictEqual(HELP.args(c("pause")), [], "comando sem argumento e' botao");
+  assert.deepStrictEqual(HELP.args(c("pause")), [], "a command with no argument is a button");
   assert.deepStrictEqual(HELP.args(null), []);
 });
 
-test("todo comando do registry tem doc e todo argumento tem descricao", () => {
+test("every registry command has a doc and every argument has a description", () => {
   for (const c of CMDS) {
-    assert.ok(c.doc && c.doc.length > 10, c.name + ": sem doc");
+    assert.ok(c.doc && c.doc.length > 10, c.name + ": no doc");
     const p = (c.params && c.params.properties) || {};
     for (const k of Object.keys(p)) {
-      assert.ok(p[k].description, c.name + "." + k + ": sem description");
+      assert.ok(p[k].description, c.name + "." + k + ": no description");
     }
   }
 });

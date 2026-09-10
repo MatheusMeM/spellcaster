@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Spellcaster — ajuda</title>
+<title>Spellcaster — help</title>
 <link rel="stylesheet" href="../../design/tokens/spellcaster.css">
 <style>
   * { box-sizing: border-box; }
@@ -23,7 +23,7 @@
        text-transform: uppercase; color: var(--sc-fg-3); margin: 0 0 10px; }
   h2 small { color: var(--sc-fg-3); margin-left: 8px; }
 
-  /* ---- atalhos ---- */
+  /* ---- shortcuts ---- */
   table.grade { border-collapse: collapse; width: 100%; }
   table.grade th { text-align: left; color: var(--sc-fg-3); font: var(--sc-text-xs) var(--sc-label);
                    letter-spacing: var(--sc-tracking); text-transform: uppercase;
@@ -36,7 +36,7 @@
   td.st-na    { color: var(--sc-fg-3); }
   .vazio { color: var(--sc-fg-3); }
 
-  /* ---- comandos ---- */
+  /* ---- commands ---- */
   details.cmd { border-bottom: 1px solid var(--sc-hair); padding: 3px 0; }
   details.cmd summary { cursor: pointer; display: flex; gap: 8px; align-items: baseline;
                         flex-wrap: wrap; }
@@ -46,7 +46,7 @@
   details.cmd .doc { color: var(--sc-fg-2); flex: 1 1 240px; min-width: 0; }
   details.cmd[open] { background: var(--sc-panel); }
 
-  /* ---- WG.form (classes de widgets.js) ---- */
+  /* ---- WG.form (classes of widgets.js) ---- */
   .wg-form { padding: 8px 10px 12px; display: flex; flex-direction: column; gap: 6px; }
   .wg-doc { color: var(--sc-fg-3); }
   .wg { display: grid; grid-template-columns: 130px 1fr 60px; gap: 6px; align-items: center; }
@@ -69,21 +69,21 @@
 <div id="nav"></div>
 <script src="nav.js"></script>
 <div class="bar">
-  <span class="over">ajuda</span>
-  <span class="over">tecla ?</span>
+  <span class="over">help</span>
+  <span class="over">key ?</span>
   <span class="grow"></span>
-  <input type="search" id="busca" placeholder="filtrar comandos" size="24">
+  <input type="search" id="busca" placeholder="filter commands" size="24">
   <span class="over" id="n"></span>
   <span class="over" id="conn">offline</span>
 </div>
 <main>
   <section>
-    <h2>Atalhos <small>design/SHORTCUTS.md</small></h2>
-    <div id="atalhos" class="vazio">lendo...</div>
+    <h2>Shortcuts <small>design/SHORTCUTS.md</small></h2>
+    <div id="atalhos" class="vazio">reading...</div>
   </section>
   <section>
-    <h2>Comandos <small>GET /commands — o registry</small></h2>
-    <div id="comandos" class="vazio">lendo...</div>
+    <h2>Commands <small>GET /commands — the registry</small></h2>
+    <div id="comandos" class="vazio">reading...</div>
   </section>
 </main>
 <script src="bus.js"></script>

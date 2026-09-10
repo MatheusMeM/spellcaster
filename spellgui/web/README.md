@@ -1,91 +1,91 @@
-# spellgui/web — as páginas do Spellcaster
+# spellgui/web — the Spellcaster pages
 
-HTML e JS puro, sem build, sem framework, sem npm. Cada página é uma pasta rasa de arquivos que
-o `spellcore serve` (ou qualquer servidor estático) entrega. Cor e tipografia vêm só de
-`design/tokens/spellcaster.css`; nenhuma página escreve cor literal.
+Plain HTML and JS, no build, no framework, no npm. Each page is a flat folder of files that
+`spellcore serve` (or any static server) hands out. Color and typography come only from
+`design/tokens/spellcaster.css`; no page writes a literal color.
 
-| Arquivo | O que é |
+| File | What it is |
 |---|---|
-| `nav.js` | a barra do topo das cinco páginas (uma linha `<script src="nav.js">` e um `<div id="nav">`): abas TIMELINE/PATCHBAY/TEATRO/FACE/LASER com `Shift+1`..`Shift+5`, indicador ENGINE/OFFLINE com `rev`, e o nome do show editável (grava no Enter ou no blur, nunca por tecla) |
-| `bus.js` | cliente do barramento: WS `{"id","cmd","args"}` com promessa por id, reconexão, eventos (`transport`, `show`, `log`, `widget`), frames binários `topic\|universe\|512` decodificados em `{topic, universe, data}` (topic 1 = saída, topic 2 = entrada). Modo offline embutido |
-| `widgets.js` | parâmetro tipado → widget (`WG.kindOf`), campos → `args` do request (`WG.args`), formulário de um comando do registry (`WG.form`). Classes para a página estilizar: `.wg`, `.wg-<tipo>`, `.wg-lab`, `.wg-num`, `.wg-form`, `.wg-doc`, `.wg-go`, `.wg-out` |
-| `face.js` + `face.html` | runtime da Face: `faces/<nome>.face.json` vira grade de widgets em modo kiosk |
-| `canvaskit.js` | pan, zoom, hit-test, marquee, DPR, dirty-flag; quem monta um canvas com ele é `timeline.js` e `graph.js` (o `teatro.js` só usa `CK.cores`). Roda do mouse igual nos dois: **roda** rola o conteúdo, **Shift+roda** anda no eixo do tempo, **Ctrl+roda** dá zoom no cursor, botão do meio arrasta. Todo evento leva `preventDefault` (`passive:false`): a página nunca rola e o Ctrl+roda não dá zoom no navegador. O limite de baixo de `view.y` é 0; o de cima é `k.ymax`, escrito por quem sabe a altura do conteúdo |
-| `timeline.js` + `index.html` | timeline em canvas. Layout de três faixas fixas na altura da janela (toolbar, canvas, barra de status) com `overflow:hidden`: a página não rola. Loop é estado do engine (`loop_set`), não do cliente; desfazer/refazer é pilha local de 20 cópias do show (`show_set`). `R` (botão do cabeçalho, tecla e botão da barra) chama `rec_arm` no engine e o estado do arme vem de `rec_state`; `+Track` abre menu de tipo (`dmx`, `laser` com a lista de `laser_files`, `fx`). Atalhos: `design/SHORTCUTS.md` |
-| `help.js` + `help.html` | ajuda: a tabela "Mapa padrão" de `design/SHORTCUTS.md` (parser de tabela em `HELP.tabela`, sem biblioteca de markdown) e o registry vivo de `bus.commands()`, um `WG.form` por comando para executar. `HELP.bindKey()` liga a tecla `?` em qualquer página que carregue `help.js` |
-| `viewer.js` | previz 2D na faixa de baixo da timeline (`Alt+M`): barras DMX do universo da lane focada — o de ENTRADA quando ela está armada —, o quadro ILDA de cada track laser em `t` (`clip_frame` do engine, com `scale`/`rot` do track) e a planta do patch em grade por endereço, com a cor da fixture saindo da parte pura de `teatro.js` (a mesma conta nas duas plantas). Coluna sem dado escreve “sem laser” / “sem patch” |
-| `midi.js` + `midi.html` | MIDI mapping: portas, abrir/fechar, tabela `tecla -> comando` do `.spell`, LEARN e a última tecla ao vivo. Só cliente dos comandos `midi_*` |
-| `laser3d/` | **a página principal do programa**: o projetor laser 10 W em 3D (three.js r128 + PBR, feixe em GLSL com bloom, mesa óptica, câmera no padrão SolidWorks, splash na parede, bindings tecla+MIDI com learn, Pino como menu das telas). `engine.js` é o mapa estado → comando (`cmdFor`); `bind.js` guarda as bindings e expõe `Bind.manifest()`; `tokens.css` é o design system só desta ferramenta; `video.js` é a tabela de opções da aba VÍDEO (predefinições, faixas, padrão e persistência em `localStorage`), a única fonte de que a aba se desenha e de onde `app.js` lê o que aplicar no three.js. O modelo, o feixe, a câmera e o Pino vêm do protótipo de design votado, copiados sem mexer |
-| `vendor/` | three.js r128 (`build` + os passes de post-processing) e as duas fontes `.woff2` (Michroma, Share Tech Mono). Vendorizado de propósito: o programa roda em evento, **sem rede** — nenhuma página pede CDN |
-| `dev/commands.json` | `Registry::schema()` congelado, usado no modo offline |
-| `test/*.test.js` | `node --test spellgui/web/test/*.test.js`. Toda página declara `<meta charset="utf-8">` nos primeiros 1024 bytes porque nem todo servidor manda charset no `Content-Type` (`python -m http.server`, protocolo asset do Tauri, `file://`) e sem isso o acento vira mojibake; `charset.test.js` vigia isso e o BOM. |
+| `nav.js` | the top bar of the five pages (one `<script src="nav.js">` line and one `<div id="nav">`): tabs TIMELINE/PATCHBAY/THEATER/FACE/LASER with `Shift+1`..`Shift+5`, ENGINE/OFFLINE indicator with `rev`, and the editable show name (writes on Enter or on blur, never on a key) |
+| `bus.js` | bus client: WS `{"id","cmd","args"}` with a promise per id, reconnection, events (`transport`, `show`, `log`, `widget`), binary frames `topic\|universe\|512` decoded into `{topic, universe, data}` (topic 1 = output, topic 2 = input). Offline mode built in |
+| `widgets.js` | typed parameter → widget (`WG.kindOf`), fields → request `args` (`WG.args`), form of a registry command (`WG.form`). Classes for the page to style: `.wg`, `.wg-<type>`, `.wg-lab`, `.wg-num`, `.wg-form`, `.wg-doc`, `.wg-go`, `.wg-out` |
+| `face.js` + `face.html` | Face runtime: `faces/<name>.face.json` becomes a widget grid in kiosk mode |
+| `canvaskit.js` | pan, zoom, hit-test, marquee, DPR, dirty flag; what mounts a canvas with it is `timeline.js` and `graph.js` (`teatro.js` only uses `CK.colors`). The mouse wheel behaves the same in both: **wheel** scrolls the content, **Shift+wheel** moves along the time axis, **Ctrl+wheel** zooms at the cursor, the middle button drags. Every event carries `preventDefault` (`passive:false`): the page never scrolls and Ctrl+wheel does not zoom the browser. The bottom limit of `view.y` is 0; the top one is `k.ymax`, written by whoever knows the content height |
+| `timeline.js` + `index.html` | canvas timeline. Layout of three fixed bands in the window height (toolbar, canvas, status bar) with `overflow:hidden`: the page does not scroll. Loop is engine state (`loop_set`), not client state; undo/redo is a local stack of 20 copies of the show (`show_set`). `R` (header button, key and bar button) calls `rec_arm` in the engine and the arm state comes from `rec_state`; `+Track` opens a type menu (`dmx`, `laser` with the `laser_files` list, `fx`). Shortcuts: `design/SHORTCUTS.md` |
+| `help.js` + `help.html` | help: the "Default map" table of `design/SHORTCUTS.md` (table parser in `HELP.table`, no markdown library) and the live registry from `bus.commands()`, one `WG.form` per command to run it. `HELP.bindKey()` binds the `?` key on any page that loads `help.js` |
+| `viewer.js` | 2D previz in the bottom strip of the timeline (`Alt+M`): DMX bars of the universe of the focused lane — the INPUT one when it is armed —, the ILDA frame of each laser track at `t` (`clip_frame` of the engine, with the track `scale`/`rot`) and the patch plan in a grid by address, with the fixture color coming from the pure part of `teatro.js` (the same maths in both plans). A column with no data writes “no laser” / “no patch” |
+| `midi.js` + `midi.html` | MIDI mapping: ports, open/close, `key -> command` table of the `.spell`, LEARN and the last key live. Only a client of the `midi_*` commands |
+| `laser3d/` | **the main page of the program**: the 10 W laser projector in 3D (three.js r128 + PBR, GLSL beam with bloom, optical table, camera in the SolidWorks convention, splash on the wall, key+MIDI bindings with learn, Pino as the menu of the screens). `engine.js` is the state → command map (`cmdFor`); `bind.js` holds the bindings and exposes `Bind.manifest()`; `tokens.css` is the design system of this tool only; `video.js` is the option table of the VIDEO tab (presets, ranges, default and persistence in `localStorage`), the single source the tab draws itself from and where `app.js` reads what to apply in three.js. The model, the beam, the camera and the Pino come from the design prototype that was voted, copied untouched |
+| `vendor/` | three.js r128 (`build` + the post-processing passes) and the two `.woff2` fonts (Michroma, Share Tech Mono). Vendored on purpose: the program runs at an event, **with no network** — no page asks a CDN |
+| `dev/commands.json` | `Registry::schema()` frozen, used in offline mode |
+| `test/*.test.js` | `node --test spellgui/web/test/*.test.js`. Every page declares `<meta charset="utf-8">` in the first 1024 bytes because not every server sends a charset in the `Content-Type` (`python -m http.server`, the Tauri asset protocol, `file://`) and without it an accent turns into mojibake; `charset.test.js` watches that and the BOM. |
 
-## Como abrir
+## How to open
 
-As páginas leem `../../design/tokens/spellcaster.css`, `../../faces/` e `../../shows/` (é o que o
-`index.html` já fazia): **sirva a raiz do repo**, não `spellgui/web`.
+The pages read `../../design/tokens/spellcaster.css`, `../../faces/` and `../../shows/` (it is what
+`index.html` already did): **serve the repo root**, not `spellgui/web`.
 
-Com engine (o normal — é o único processo que toca hardware):
+With an engine (the normal case — it is the only process that touches hardware):
 
 ```
 spellcore serve --port 8000 --dir . --show shows/medgrupo.spell
-# http://127.0.0.1:8000/spellgui/web/laser3d/app.html      <- a página principal
+# http://127.0.0.1:8000/spellgui/web/laser3d/app.html      <- the main page
 # http://127.0.0.1:8000/spellgui/web/face.html?face=quatro
 ```
 
-`laser3d/app.html` abre pela splash; os hashes `#tras`, `#dentro` e `#laser` pulam direto para o
-menu, as preferências e a vista do show. `Tab` abre a gaveta de abas; o Pino fica preso à câmera.
-Manual do operador: `MANUAL.md` na raiz do repo.
+`laser3d/app.html` opens through the splash; the hashes `#rear`, `#inside` and `#laser` jump
+straight to the menu, the preferences and the show view. `Tab` opens the tab drawer; the Pino stays
+attached to the camera. Operator manual: `MANUAL.md` at the repo root.
 
-Sem engine (só para desenhar a página; nada de saída DMX):
+With no engine (only to draw the page; no DMX output):
 
 ```
 python -m http.server 8000
 # http://127.0.0.1:8000/spellgui/web/face.html?face=quatro&offline=1
 ```
 
-No modo offline não há engine: `bus.call` ecoa `{offline, cmd, args}` e escreve no log o que
-faria. A página monta, os botões respondem, nada sai pela rede.
+In offline mode there is no engine: `bus.call` echoes `{offline, cmd, args}` and writes in the log
+what it would do. The page mounts, the buttons respond, nothing goes out on the network.
 
 ## Face
 
-`faces/<nome>.face.json` (PRD §10). O widget declara **onde** fica e **o que dispara**; o
-comportamento mora no Graph, dentro do `.spell`:
+`faces/<name>.face.json` (PRD §10). The widget declares **where** it sits and **what it fires**; the
+behaviour lives in the Graph, inside the `.spell`:
 
 ```json
 {"id": "go", "type": "button", "label": "GO", "at": [0, 0, 2, 2], "cmd": "cue_go", "args": {}}
 {"id": "blackout", "type": "button", "label": "BLACK", "at": [3, 1, 1, 1], "input": "widget:blackout"}
 ```
 
-- `cmd` + `args` → `Registry::call` pelo barramento.
-- `input` → comando `input {key, value}`; um nó `in.widget` com `"widget": "blackout"` no graph
-  do show é quem decide o que isso faz. Sem esse nó, o `input` não tem efeito — é de propósito:
-  a página não implementa comportamento.
-- Volta pelo evento `widget` (`out.widget` do Graph): `{"id","prop","value"}`. `prop` vira classe
-  de mesmo nome no widget, ligada quando o valor não é zero; `face.html` pinta `glow`/`on`,
-  `alert`/`live` e `off`, e o resto fica para a página estilizar.
-- `views` remanejam os mesmos widgets (`grid` `[colunas, linhas]`, lista de `widgets`, `at` por
-  id); `?view=compact`. `views` é obrigatório.
-- Tipos hoje: `button`, `toggle`, `fader`, `label`. O resto do catálogo do PRD §10 entra com o
-  editor de Face (R9).
+- `cmd` + `args` → `Registry::call` over the bus.
+- `input` → `input {key, value}` command; an `in.widget` node with `"widget": "blackout"` in the
+  show graph is what decides what that does. Without that node the `input` has no effect — on
+  purpose: the page implements no behaviour.
+- The way back is the `widget` event (`out.widget` of the Graph): `{"id","prop","value"}`. `prop`
+  becomes a class of the same name on the widget, on when the value is not zero; `face.html` paints
+  `glow`/`on`, `alert`/`live` and `off`, and the rest is left for the page to style.
+- `views` rearrange the same widgets (`grid` `[columns, rows]`, list of `widgets`, `at` per id);
+  `?view=compact`. `views` is required.
+- Types today: `button`, `toggle`, `fader`, `label`. The rest of the PRD §10 catalogue comes in with
+  the Face editor (R9).
 
-Atalhos da Face (design/SHORTCUTS.md): `Enter` = cue GO, `Esc` segurado 0,5 s = blackout,
-`Shift+F` = tela cheia.
+Face shortcuts (design/SHORTCUTS.md): `Enter` = cue GO, `Esc` held 0.5 s = blackout, `Shift+F` =
+full screen.
 
-## Regenerar `dev/commands.json`
+## Regenerating `dev/commands.json`
 
-Sai do registry, nunca escrito à mão:
+It comes out of the registry, never written by hand:
 
 ```
 spellcore commands > spellgui/web/dev/commands.json
 ```
 
-`spellcore/cli/tests/commands_json.rs` falha quando um comando sai do registry ou muda de schema.
+`spellcore/cli/tests/commands_json.rs` fails when a command leaves the registry or changes schema.
 
-## Como abrir sem navegador
+## How to open without a browser
 
-`spellcaster.exe` (crate `spellcore/gui`) sobe o barramento em processo, numa porta livre, e abre
-estas mesmas páginas numa janela do programa. É o modo normal no Windows:
+`spellcaster.exe` (crate `spellcore/gui`) brings the bus up in process, on a free port, and opens
+these same pages in a window of the program. It is the normal mode on Windows:
 
 ```
 spellcaster shows/medgrupo.spell

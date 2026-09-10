@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <title>Spellcaster — midi</title>
@@ -47,45 +47,45 @@
 <body>
 <div class="bar">
   <span class="over">midi</span>
-  <select id="ports"><option value="">(procure portas)</option></select>
-  <button id="scan">Atualizar</button>
-  <button id="open">Abrir</button>
-  <button id="close" disabled>Fechar</button>
-  <span class="over">porta</span><span id="porta">fechada</span>
+  <select id="ports"><option value="">(scan for ports)</option></select>
+  <button id="scan">Refresh</button>
+  <button id="open">Open</button>
+  <button id="close" disabled>Close</button>
+  <span class="over">port</span><span id="porta">closed</span>
   <span class="sep"></span>
-  <span class="over">ultima tecla</span><span id="last">—</span>
+  <span class="over">last key</span><span id="last">—</span>
   <span class="sep"></span>
   <span class="over" id="msg"></span>
 </div>
 <main>
   <section class="panel">
-    <h2>mapa do show <span id="n" class="over"></span></h2>
+    <h2>show map <span id="n" class="over"></span></h2>
     <table>
-      <thead><tr><th>tecla</th><th>comando</th><th>args</th><th></th></tr></thead>
+      <thead><tr><th>key</th><th>command</th><th>args</th><th></th></tr></thead>
       <tbody id="map"></tbody>
     </table>
     <div class="novo">
       <input type="text" id="key" size="10" placeholder="144/60">
-      <button id="learn">APRENDER</button>
-      <input type="text" id="cmd" size="18" list="cmds" placeholder="comando">
+      <button id="learn">LEARN</button>
+      <input type="text" id="cmd" size="18" list="cmds" placeholder="command">
       <datalist id="cmds"></datalist>
-      <input type="text" id="args" size="40" placeholder='args JSON, ex. {"address":1,"values":["$255"]}'>
-      <button id="map_add">Mapear</button>
+      <input type="text" id="args" size="40" placeholder='args JSON, e.g. {"address":1,"values":["$255"]}'>
+      <button id="map_add">Map it</button>
     </div>
     <div class="novo"><span id="doc"></span></div>
-    <div class="novo"><span class="over">com o fader no meio</span><span id="prev"></span></div>
-    <h2>como a chave e' escrita</h2>
-    <p><code>&lt;status&gt;/&lt;data1&gt;</code>: <code>144/60</code> = note on canal 1 nota 60,
-       <code>128/60</code> = a mesma tecla solta, <code>176/1</code> = CC 1 do canal 1.
-       O canal ja' esta' no status (canal 2 = 145 / 177).</p>
-    <p>Nos args, <code>"$"</code> vira o valor 0..1 da tecla e <code>"$&lt;n&gt;"</code> vira
-       <code>round(valor &times; n)</code> — <code>"$127"</code> e' o byte cru do MIDI e
-       <code>"$255"</code> e' o nivel DMX.</p>
-    <p>A mesma tecla tambem chega ao graph como <code>midi:&lt;chave&gt;</code>, para o no'
-       <code>in.midi</code>.</p>
+    <div class="novo"><span class="over">with the fader halfway</span><span id="prev"></span></div>
+    <h2>how the key is written</h2>
+    <p><code>&lt;status&gt;/&lt;data1&gt;</code>: <code>144/60</code> = note on channel 1 note 60,
+       <code>128/60</code> = the same key released, <code>176/1</code> = CC 1 of channel 1.
+       The channel is already in the status (channel 2 = 145 / 177).</p>
+    <p>In the args, <code>"$"</code> becomes the 0..1 value of the key and <code>"$&lt;n&gt;"</code>
+       becomes <code>round(value &times; n)</code> — <code>"$127"</code> is the raw MIDI byte and
+       <code>"$255"</code> is the DMX level.</p>
+    <p>The same key also reaches the graph as <code>midi:&lt;key&gt;</code>, for the
+       <code>in.midi</code> node.</p>
   </section>
 </main>
-<div class="cli" id="cli">comandos do registry (MCP, OSC, GUI): midi_ports &nbsp;|&nbsp; midi_open{port} &nbsp;|&nbsp; midi_close &nbsp;|&nbsp; midi_map{key,cmd,args} &nbsp;|&nbsp; midi_unmap{key} &nbsp;|&nbsp; midi_maps &nbsp;|&nbsp; midi_last &nbsp;|&nbsp; midi_learn</div>
+<div class="cli" id="cli">registry commands (MCP, OSC, GUI): midi_ports &nbsp;|&nbsp; midi_open{port} &nbsp;|&nbsp; midi_close &nbsp;|&nbsp; midi_map{key,cmd,args} &nbsp;|&nbsp; midi_unmap{key} &nbsp;|&nbsp; midi_maps &nbsp;|&nbsp; midi_last &nbsp;|&nbsp; midi_learn</div>
 <script src="bus.js"></script>
 <script src="midi.js"></script>
 </body>

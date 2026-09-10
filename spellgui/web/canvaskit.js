@@ -1,21 +1,23 @@
 "use strict";
-// canvaskit.js — kit de canvas do Spellcaster, compartilhado pela timeline e (R9) pelo graph.
-// Faz o que o PRD §6 pede da base da R5: pan, zoom no cursor, selecao (clique, shift, marquee),
-// hit-test por bisect em lista ordenada por tempo, dirty-flag (so redesenha quando marcado) e DPR.
+// canvaskit.js — Spellcaster canvas kit, shared by the timeline and (R9) by the graph.
+// It does what PRD §6 asks of the R5 base: pan, zoom at the cursor, selection (click, shift,
+// marquee), hit-test by bisect on a time-ordered list, dirty flag (only redraws when marked) and
+// DPR.
 //
-// Modelo: um objeto por canvas. `view.x` e o tempo (ou X do mundo) na borda esquerda da area util,
-// `view.zoom` e px por unidade de tempo, `view.y` e a rolagem vertical em px. O eixo Y e do cliente:
-// o kit nao sabe o que e um track. `gutter` e a coluna fixa a esquerda (cabecalho de track).
+// Model: one object per canvas. `view.x` is the time (or world X) at the left edge of the usable
+// area, `view.zoom` is px per time unit, `view.y` is the vertical scroll in px. The Y axis
+// belongs to the client: the kit does not know what a track is. `gutter` is the fixed column on
+// the left (track header).
 //
-// Roda do mouse (vale para as tres paginas de canvas): roda = rola o conteudo (`view.y`),
-// Shift+roda = anda no tempo (`view.x`), Ctrl+roda = zoom no cursor. Todo evento leva
-// `preventDefault` com `passive:false`: e' o que impede a PAGINA de rolar (era a barra de rolagem
-// que levava a toolbar embora) e o Ctrl+roda de dar zoom no navegador. `view.y` nao passa de 0 em
-// baixo nem de `k.ymax` em cima; quem sabe a altura do conteudo escreve `k.ymax` (a timeline faz
-// isso no desenho), e quem nao escreve fica sem teto.
+// Mouse wheel (valid for the three canvas pages): wheel = scroll the content (`view.y`),
+// Shift+wheel = move in time (`view.x`), Ctrl+wheel = zoom at the cursor. Every event calls
+// `preventDefault` with `passive:false`: that is what stops the PAGE from scrolling (it was the
+// scrollbar that took the toolbar away) and Ctrl+wheel from zooming the browser. `view.y` never
+// goes past 0 at the bottom nor past `k.ymax` at the top; whoever knows the content height writes
+// `k.ymax` (the timeline does it while drawing), and whoever does not write it has no ceiling.
 //
-// ponytail: um contexto 2D por canvas, sem camadas nem cache de tile ; virtualizar por viewport e
-// depois WebGL (PRD §8) so quando o desenho passar de 16 ms com show real.
+// ponytail: one 2D context per canvas, no layers and no tile cache ; virtualize by viewport and
+// then WebGL (PRD §8) only when drawing goes past 16 ms with a real show.
 
 const CK = {
   ZMIN: 0.02,
@@ -23,14 +25,14 @@ const CK = {
 
   clamp(v, a, b) { return v < a ? a : v > b ? b : v; },
 
-  // Primeiro indice com ts[i] >= t. Base de todo hit-test e de todo desenho por viewport.
+  // First index with ts[i] >= t. Base of every hit-test and of every draw by viewport.
   bisect(ts, n, t) {
     let lo = 0, hi = n;
     while (lo < hi) { const m = (lo + hi) >> 1; if (ts[m] < t) lo = m + 1; else hi = m; }
     return lo;
   },
 
-  // Indice do item mais proximo de t dentro de tol, ou -1. Lista ordenada; olha so os dois vizinhos.
+  // Index of the item closest to t within tol, or -1. Ordered list; looks only at the two neighbours.
   near(ts, n, t, tol) {
     const i = CK.bisect(ts, n, t);
     let best = -1, bd = tol;
@@ -42,10 +44,10 @@ const CK = {
     return best;
   },
 
-  // Cores do `design/tokens` lidas do elemento (o canvas herda as vars). UMA tabela para as tres
-  // paginas de canvas: o que a pagina nao usa custa uma leitura de var, nao um arquivo a mais.
-  // ponytail: fallback hex embutido ; sai quando o tokens.css for garantido em toda pagina.
-  cores(el) {
+  // Colors from `design/tokens` read off the element (the canvas inherits the vars). ONE table for
+  // the three canvas pages: what a page does not use costs one var read, not another file.
+  // ponytail: hex fallback baked in ; drop it when tokens.css is guaranteed on every page.
+  colors(el) {
     const cs = getComputedStyle(el || document.documentElement);
     const g = (n, d) => cs.getPropertyValue(n).trim() || d;
     return {
@@ -61,11 +63,11 @@ const CK = {
     };
   },
 
-  // Selecao esparsa: linha (track/lane) -> Set de indices.
+  // Sparse selection: row (track/lane) -> Set of indices.
   sel() {
     const m = new Map();
     return {
-      m,                                     // linha -> Set; quem quer ler percorre `m` direto
+      m,                                     // row -> Set; whoever wants to read walks `m` directly
       has(r, i) { const s = m.get(r); return !!s && s.has(i); },
       add(r, i) { let s = m.get(r); if (!s) m.set(r, s = new Set()); s.add(i); },
       toggle(r, i) {
@@ -78,14 +80,14 @@ const CK = {
     };
   },
 
-  // Liga um canvas. `draw(k)` desenha tudo; o kit so o chama quando alguem marcou dirty.
+  // Attaches a canvas. `draw(k)` draws everything; the kit only calls it when someone marked dirty.
   attach(cv, draw) {
     const k = {
       cv, cx: cv.getContext("2d"), w: 0, h: 0, dpr: 1,
       view: { x: 0, zoom: 40, y: 0 },
       gutter: 0, dirty: true, drag: null, marquee: null, ymax: Infinity,
       sel: CK.sel(),
-      on: {},                       // down, move, up, hover, menu, marquee, frame — todos opcionais
+      on: {},                       // down, move, up, hover, menu, marquee, frame — all optional
     };
 
     k.toScreen = t => k.gutter + (t - k.view.x) * k.view.zoom;
@@ -94,7 +96,7 @@ const CK = {
 
     k.resize = () => {
       const r = cv.getBoundingClientRect();
-      if (r.width < 1) return;                          // painel escondido: nao mexe na escala
+      if (r.width < 1) return;                          // hidden panel: do not touch the scale
       k.dpr = window.devicePixelRatio || 1;
       k.w = Math.max(1, r.width | 0);
       k.h = Math.max(1, r.height | 0);
@@ -106,7 +108,7 @@ const CK = {
 
     k.panY = y => { k.view.y = CK.clamp(y, 0, Math.max(0, k.ymax)); k.dirty = true; };
 
-    k.zoomAt = (px, f) => {                           // zoom ancorado no cursor
+    k.zoomAt = (px, f) => {                           // zoom anchored at the cursor
       const t = k.toWorld(px);
       k.view.zoom = CK.clamp(k.view.zoom * f, CK.ZMIN, CK.ZMAX);
       k.view.x = t - (px - k.gutter) / k.view.zoom;
@@ -127,11 +129,11 @@ const CK = {
 
     const pt = e => ({ x: e.offsetX, y: e.offsetY, t: k.toWorld(e.offsetX), button: e.button,
                        shift: e.shiftKey, ctrl: e.ctrlKey, alt: e.altKey, e });
-    // ponytail: captura best-effort ; evento sintetico (teste) nao tem pointerId valido e nao captura.
-    const cap = e => { try { cv.setPointerCapture(e.pointerId); } catch (err) { /* sem captura */ } };
+    // ponytail: best-effort capture ; a synthetic event (test) has no valid pointerId and does not capture.
+    const cap = e => { try { cv.setPointerCapture(e.pointerId); } catch (err) { /* no capture */ } };
 
-    // Pan (botao do meio), zoom (roda), marquee (arrasto no vazio) sao do kit.
-    // O cliente pega o clique antes: se `on.down` devolver true, o kit nao inicia marquee.
+    // Pan (middle button), zoom (wheel) and marquee (drag on empty space) belong to the kit.
+    // The client gets the click first: if `on.down` returns true, the kit does not start a marquee.
     cv.addEventListener("pointerdown", e => {
       const p = pt(e);
       cv.focus();
@@ -174,9 +176,9 @@ const CK = {
     cv.addEventListener("pointerup", up);
     cv.addEventListener("pointercancel", up);
 
-    // Roda: sem modificador rola o conteudo, Shift anda no tempo, Ctrl da zoom no cursor.
-    // Com Shift o Windows manda o delta em `deltaX`; com Ctrl o navegador daria zoom na pagina —
-    // por isso o preventDefault vem antes de tudo e o listener e' `passive:false`.
+    // Wheel: with no modifier it scrolls the content, Shift moves in time, Ctrl zooms at the cursor.
+    // With Shift, Windows sends the delta in `deltaX`; with Ctrl the browser would zoom the page —
+    // that is why preventDefault comes before everything and the listener is `passive:false`.
     cv.addEventListener("wheel", e => {
       e.preventDefault();
       if (e.ctrlKey) k.zoomAt(e.offsetX, Math.exp(-e.deltaY * 0.0015));
@@ -186,7 +188,7 @@ const CK = {
 
     cv.addEventListener("contextmenu", e => e.preventDefault());
 
-    // Um rAF por canvas: `on.frame` adianta o tempo do cliente, o desenho so sai se estiver dirty.
+    // One rAF per canvas: `on.frame` advances the client clock, the draw only happens when dirty.
     k.loop = () => {
       const step = () => {
         if (k.on.frame) k.on.frame();
@@ -195,7 +197,7 @@ const CK = {
       };
       requestAnimationFrame(step);
     };
-    k.redraw = () => { k.dirty = false; draw(k); };     // desenho sincrono (teste e captura)
+    k.redraw = () => { k.dirty = false; draw(k); };     // synchronous draw (test and capture)
 
     k.resize();
     new ResizeObserver(k.resize).observe(cv);

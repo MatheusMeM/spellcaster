@@ -1,65 +1,65 @@
 "use strict";
-// nav.js — a barra que liga as seis paginas e mostra o show aberto. Toda pagina inclui com
-// duas linhas no topo do <body>:
+// nav.js — the bar that links the six pages and shows the open show. Every page includes it with
+// two lines at the top of the <body>:
 //
 //   <div id="nav"></div>
 //   <script src="nav.js"></script>
 //
-// Abas TIMELINE / PATCHBAY / TEATRO / FACE / LASER / AJUDA, `Shift+1`..`Shift+6`
-// (design/SHORTCUTS.md, "Foco de painel"), indicador ENGINE/OFFLINE com o `rev` do show, e o
-// nome do show editavel. A barra tambem carrega o `help.js`: e' o que liga a tecla `?` em
-// toda pagina, e nao so' na de ajuda.
-// Cor e fonte so' de design/tokens/spellcaster.css.
+// Tabs TIMELINE / PATCHBAY / THEATER / FACE / LASER / HELP, `Shift+1`..`Shift+6`
+// (design/SHORTCUTS.md, "Foco de painel"), ENGINE/OFFLINE indicator with the show `rev`, and the
+// editable show name. The bar also loads `help.js`: that is what binds the `?` key on every
+// page, and not only on the help page.
+// Color and font only from design/tokens/spellcaster.css.
 
 const NAV = {};
 
-NAV.PAGINAS = [
-  { rot: "TIMELINE", href: "index.html" },
-  { rot: "PATCHBAY", href: "patchbay.html" },
-  { rot: "TEATRO", href: "teatro.html" },
-  { rot: "FACE", href: "face.html?face=quatro" },
-  { rot: "LASER", href: "laser.html" },
-  { rot: "AJUDA", href: "help.html" },
+NAV.PAGES = [
+  { lab: "TIMELINE", href: "index.html" },
+  { lab: "PATCHBAY", href: "patchbay.html" },
+  { lab: "THEATER", href: "teatro.html" },
+  { lab: "FACE", href: "face.html?face=quatro" },
+  { lab: "LASER", href: "laser.html" },
+  { lab: "HELP", href: "help.html" },
 ];
 
-// ---- regras (o resto e' DOM) --------------------------------------------
+// ---- rules (the rest is DOM) --------------------------------------------
 
-/// Arquivo de um caminho ou href, sem diretorio nem query; a raiz e' o index.
-NAV.arquivo = function (p) {
+/// File name of a path or href, without directory or query; the root is the index.
+NAV.file = function (p) {
   return String(p || "").split("?")[0].split("/").pop() || "index.html";
 };
 
-/// As abas com a atual marcada.
-NAV.abas = function (pathname) {
-  const aqui = NAV.arquivo(pathname);
-  return NAV.PAGINAS.map(p => ({
-    rot: p.rot,
+/// The tabs, with the current one marked.
+NAV.tabs = function (pathname) {
+  const here = NAV.file(pathname);
+  return NAV.PAGES.map(p => ({
+    lab: p.lab,
     href: p.href,
-    atual: NAV.arquivo(p.href) === aqui,
+    current: NAV.file(p.href) === here,
   }));
 };
 
-/// `Shift+1`..`Shift+6` -> href, ou null. Digitando num campo, nenhuma tecla navega: o nome do
-/// show tem digitos. Vale o `code` da tecla, nao o `key`: em teclado ABNT2 o Shift+2 escreve `"`
-/// e o Shift+3 escreve `#`. O `key` so' entra como reserva, para layout em que o Shift mantem o
-/// digito (e para evento sintetico, que costuma vir sem `code`).
-NAV.destino = function (e) {
+/// `Shift+1`..`Shift+6` -> href, or null. While typing in a field no key navigates: the show
+/// name has digits. What counts is the key `code`, not the `key`: on an ABNT2 keyboard Shift+2
+/// writes `"` and Shift+3 writes `#`. The `key` is only the fallback, for layouts where Shift
+/// keeps the digit (and for synthetic events, which usually come without `code`).
+NAV.target = function (e) {
   const t = e.target || {};
   if (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable) return null;
   if (!e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return null;
-  const p = NAV.PAGINAS.find((_, n) => e.code === "Digit" + (n + 1) || e.key === String(n + 1));
+  const p = NAV.PAGES.find((_, n) => e.code === "Digit" + (n + 1) || e.key === String(n + 1));
   return p ? p.href : null;
 };
 
-/// O `show_patch` do nome, ou null quando nao ha' o que gravar (vazio, ou igual ao que ja' esta'
-/// no engine). Nome nao se edita por tecla: quem chama isto e' o Enter e o blur.
-NAV.renomeia = function (bus, antes, valor) {
-  const v = String(valor == null ? "" : valor).trim();
-  if (!v || v === antes) return null;
+/// The `show_patch` for the name, or null when there is nothing to write (empty, or equal to what
+/// the engine already has). The name is not edited by key: what calls this is Enter and blur.
+NAV.rename = function (bus, before, value) {
+  const v = String(value == null ? "" : value).trim();
+  if (!v || v === before) return null;
   return bus.call("show_patch", { ops: [{ op: "replace", path: "/name", value: v }] });
 };
 
-// ---- barra --------------------------------------------------------------
+// ---- bar ----------------------------------------------------------------
 
 NAV.CSS = `
 .sc-nav { flex: 0 0 auto; display: flex; align-items: center; gap: var(--sc-gap);
@@ -70,8 +70,8 @@ NAV.CSS = `
   border: 1px solid transparent; border-radius: var(--sc-radius); }
 .sc-nav a:hover { color: var(--sc-fg); border-color: var(--sc-line); }
 .sc-nav a.atual { color: var(--sc-accent); border-color: var(--sc-accent); }
-/* Nada de \`margin-left: auto\`: numa coluna flex a barra estica ate' a largura do conteudo da
-   pagina (a de cima e' mais larga que a janela), e o campo do nome sairia da tela. */
+/* No \`margin-left: auto\`: in a flex column the bar stretches to the width of the page content
+   (the one above is wider than the window), and the name field would leave the screen. */
 .sc-nav .sc-nav-nome { margin-left: var(--sc-gap); width: 220px; padding: 3px 6px;
   background: var(--sc-well); color: var(--sc-fg); border: 1px solid var(--sc-line);
   border-radius: var(--sc-radius); font: var(--sc-text-sm) var(--sc-mono);
@@ -82,73 +82,74 @@ NAV.CSS = `
 .sc-nav .sc-nav-rev { color: var(--sc-fg-3); font-family: var(--sc-mono); }
 `;
 
-/// Monta a barra em `el` e liga no `bus`. `doc` e' o document (o teste passa um de mentira).
-NAV.monta = function (doc, el, bus) {
-  const cria = (tag, cls) => {
+/// Builds the bar in `el` and wires it to the `bus`. `doc` is the document (the test passes a
+/// fake one).
+NAV.mount = function (doc, el, bus) {
+  const make = (tag, cls) => {
     const n = doc.createElement(tag);
     if (cls) n.className = cls;
     return n;
   };
-  const estilo = cria("style");
-  estilo.textContent = NAV.CSS;
-  (doc.head || el).appendChild(estilo);
+  const style = make("style");
+  style.textContent = NAV.CSS;
+  (doc.head || el).appendChild(style);
 
   el.className = "sc-nav";
-  for (const a of NAV.abas(doc.location && doc.location.pathname)) {
-    const link = cria("a", a.atual ? "atual" : "");
+  for (const a of NAV.tabs(doc.location && doc.location.pathname)) {
+    const link = make("a", a.current ? "atual" : "");
     link.href = a.href;
-    link.textContent = a.rot;
+    link.textContent = a.lab;
     el.appendChild(link);
   }
-  const nome = cria("input", "sc-nav-nome");
-  nome.type = "text";
-  nome.id = "sc-nav-nome";
-  nome.title = "nome do show — Enter ou sair do campo grava";
-  el.appendChild(nome);
-  const estado = cria("span", "sc-nav-estado");
-  estado.textContent = "OFFLINE";
-  el.appendChild(estado);
-  const rev = cria("span", "sc-nav-rev");
+  const name = make("input", "sc-nav-nome");
+  name.type = "text";
+  name.id = "sc-nav-nome";
+  name.title = "show name — Enter or leaving the field writes it";
+  el.appendChild(name);
+  const state = make("span", "sc-nav-estado");
+  state.textContent = "OFFLINE";
+  el.appendChild(state);
+  const rev = make("span", "sc-nav-rev");
   rev.textContent = "rev 0";
   el.appendChild(rev);
 
-  let atual = ""; // o nome como o engine tem
-  const recarrega = () =>
+  let current = ""; // the name as the engine has it
+  const reload = () =>
     bus.call("show_get", {}).then(s => {
-      atual = (s && s.name) || "";
+      current = (s && s.name) || "";
       rev.textContent = "rev " + (bus.rev || 0);
-      // nao pisa em cima de quem esta' digitando
-      if (doc.activeElement !== nome) nome.value = atual;
+      // does not step on whoever is typing
+      if (doc.activeElement !== name) name.value = current;
     });
-  const grava = () => {
-    const p = NAV.renomeia(bus, atual, nome.value);
-    if (!p) return void (nome.value = atual);
-    atual = String(nome.value).trim(); // otimista; o evento `show` confirma
-    p.catch(recarrega);
+  const write = () => {
+    const p = NAV.rename(bus, current, name.value);
+    if (!p) return void (name.value = current);
+    current = String(name.value).trim(); // optimistic; the `show` event confirms
+    p.catch(reload);
   };
 
-  nome.addEventListener("keydown", e => {
-    e.stopPropagation(); // as teclas da pagina (Space toca, S snap) nao valem dentro do campo
-    if (e.key === "Enter") grava();
+  name.addEventListener("keydown", e => {
+    e.stopPropagation(); // the page keys (Space plays, S snaps) do not apply inside the field
+    if (e.key === "Enter") write();
   });
-  nome.addEventListener("blur", grava);
+  name.addEventListener("blur", write);
 
-  const aberto = () => {
-    estado.textContent = "ENGINE";
-    estado.className = "sc-nav-estado on";
-    recarrega();
+  const opened = () => {
+    state.textContent = "ENGINE";
+    state.className = "sc-nav-estado on";
+    reload();
   };
-  bus.on("open", aberto);
+  bus.on("open", opened);
   bus.on("close", () => {
-    estado.textContent = "OFFLINE";
-    estado.className = "sc-nav-estado";
+    state.textContent = "OFFLINE";
+    state.className = "sc-nav-estado";
   });
-  bus.on("show", recarrega);
-  // a pagina pode ter conectado antes da barra montar: nesse caso o `open` ja' passou
-  if (bus.ws && bus.ws.readyState === 1) aberto();
+  bus.on("show", reload);
+  // the page may have connected before the bar mounted: in that case `open` has already passed
+  if (bus.ws && bus.ws.readyState === 1) opened();
 
   doc.addEventListener("keydown", e => {
-    const h = NAV.destino(e);
+    const h = NAV.target(e);
     if (!h) return;
     if (e.preventDefault) e.preventDefault();
     doc.location = h;
@@ -156,43 +157,43 @@ NAV.monta = function (doc, el, bus) {
   return el;
 };
 
-// ---- arranque -----------------------------------------------------------
+// ---- start-up -----------------------------------------------------------
 
 if (typeof module !== "undefined") module.exports = NAV;
 
 if (typeof document !== "undefined") {
-  // Reaproveita o Bus da pagina quando ela tem um (face, laser, patchbay); timeline e teatro
-  // ainda tem cliente WS proprio, com outra interface, e ai' a barra abre o seu.
-  // ponytail: duas conexoes na mesma pagina ; o barramento trata cada WS como um cliente
-  // independente, e o custo e' o monitor DMX indo duas vezes em loopback — cai sozinho quando
-  // timeline.js e teatro.js passarem a usar bus.js.
-  const daPagina = () => {
+  // Reuses the page Bus when it has one (face, laser, patchbay); timeline and teatro still have
+  // their own WS client, with another interface, and there the bar opens its own.
+  // ponytail: two connections on the same page ; the bus treats each WS as an independent
+  // client, and the cost is the DMX monitor going twice over loopback — it goes away on its own
+  // once timeline.js and teatro.js use bus.js.
+  const fromPage = () => {
     const b =
       window.bus ||
       (window.PB && window.PB.bus) ||
       (typeof bus !== "undefined" ? bus : null); // eslint-disable-line no-undef
     return window.Bus && b instanceof window.Bus ? b : null;
   };
-  // A tecla `?` do SHORTCUTS.md so' existe em quem carrega o help.js; a barra esta' em todas as
-  // paginas, entao e' ela quem o traz.
-  const ajuda = () => {
+  // The `?` key of SHORTCUTS.md only exists where help.js is loaded; the bar is on every page,
+  // so it is the bar that brings it in.
+  const help = () => {
     if (window.HELP) return window.HELP.bindKey();
     const s = document.createElement("script");
     s.src = "help.js";
     s.onload = () => window.HELP && window.HELP.bindKey();
     document.head.appendChild(s);
   };
-  const arranca = () => {
+  const start = () => {
     const el = document.getElementById("nav");
     if (!el) return;
-    ajuda();
-    const pronto = () => NAV.monta(document, el, daPagina() || new window.Bus({}).connect());
-    if (window.Bus) return pronto();
+    help();
+    const ready = () => NAV.mount(document, el, fromPage() || new window.Bus({}).connect());
+    if (window.Bus) return ready();
     const s = document.createElement("script");
     s.src = "bus.js";
-    s.onload = pronto;
+    s.onload = ready;
     document.head.appendChild(s);
   };
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", arranca);
-  else arranca();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
+  else start();
 }
