@@ -208,3 +208,14 @@ Seis documentos novos em `design/FUNCOES/` (`daw-arranjo`, `daw-sessao`, `browse
 - **Motivo:** quem abre a tampa é `app.js`, que escreve um ângulo **negativo** em `lid.rotation.x`. Com o eixo atrás, ângulo negativo joga a chapa para baixo e para trás: ela atravessa o painel traseiro e o flightcase — é exatamente o "tampa clipando" reclamado. Com o eixo na frente, o mesmo ângulo negativo abre a tampa para cima e para a frente, sem varrer nada entre 0 e −1,9 rad, e sem precisar de limite de curso artificial.
 - **A alternativa era editar `app.js`** (inverter o sinal), e `app.js` não é desta frente. Se o integrador preferir a dobradiça atrás, o conserto é uma linha em `app.js` (`rotation.x = +ângulo`) mais mover `lid.position.z` de volta para `D/2 − 4,5 mm`.
 - **Efeito colateral que fica para o integrador:** `app.js` sobe os parafusos da tampa 50 mm (`s.position.y = .004 + sT * .05`). Eles são filhos da tampa e acompanham o giro, mas o curso é exagerado; 8 mm bastaria.
+
+## 10/09/2026 · `Z` e `Shift+Z` trocados de lado, para bater com o manual do SolidWorks
+
+- Estava `Z` = zoom **+** e `Shift+Z` = zoom **−**. A referência rápida oficial da Dassault
+  (`quick_reference.pdf`, p. 1, `SWQRCENG06060`) diz o contrário: **`Z` afasta, `Shift+Z` aproxima**.
+  Como a câmera da vista SHOW passou a copiar o SolidWorks inteiro (`design/FUNCOES/camera-solidworks.md`),
+  ficar com metade do mapa invertida seria a pior das duas opções: quem conhece o CAD erra, e quem não
+  conhece não ganha nada. Os dois continuam sendo endereços (`cam.zoomIn`, `cam.zoomOut`), remapeáveis.
+- Não estava no pedido; foi decidido aqui porque o pedido mandou seguir o manual e o manual discorda
+  do que havia. **Reversível em uma linha** (as duas teclas no `Bind.def` de `app.js`) se o voto disser
+  que a intuição "Z aproxima" vale mais que a compatibilidade com o CAD.

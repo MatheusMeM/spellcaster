@@ -185,12 +185,21 @@
       return h ? { o: h, p: hits[i].point } : null; }
     return null; }
   function unhover() { glow(hot, false); hot = null; tip.style.display = "none"; gl.style.cursor = "grab"; }
-  var CAM = SWCam(THREE, cam, gl, { emptyRotate: true, speed: 5, hit: function (e) { return !!hitOf(e); }, pick: function (e) { ptr(e); ray.setFromCamera(mv, cam); var hs = ray.intersectObjects(scene.children, true).filter(function (h) { return h.object.visible && !h.object.isSprite && h.object.type !== "InstancedMesh"; }); return hs.length ? hs[0].point : null; }, plane: function (e, t) { ptr(e); ray.setFromCamera(mv, cam); var n = cam.getWorldDirection(new THREE.Vector3()), pl = new THREE.Plane().setFromNormalAndCoplanarPoint(n, t), p = new THREE.Vector3(); return ray.ray.intersectPlane(pl, p) ? p : null; } });
+  var CAM = SWCam(THREE, cam, gl, { hit: function (e) { return !!hitOf(e); }, pick: function (e) { ptr(e); ray.setFromCamera(mv, cam); var hs = ray.intersectObjects(scene.children, true).filter(function (h) { return h.object.visible && !h.object.isSprite && h.object.type !== "InstancedMesh"; }); return hs.length ? hs[0].point : null; }, plane: function (e, t) { ptr(e); ray.setFromCamera(mv, cam); var n = cam.getWorldDirection(new THREE.Vector3()), pl = new THREE.Plane().setFromNormalAndCoplanarPoint(n, t), p = new THREE.Vector3(); return ray.ray.intersectPlane(pl, p) ? p : null; } });
+  var CENTER = new THREE.Vector3(0, .40, 0);
   var VIEWS = { show: [[1.5, .95, 1.25], [0, .8, -1.9]], rear: [[.015, .445, .60], [0, .40, .04]], inside: [[.09, .80, .27], [-.02, .38, -.03]], wall0: [[.25, .8, .35], [0, 1.5, -2.6]], wall: [[0, 2.0, .2], [0, 2.2, -5]] }, camSpeed = 5;
+  /* A vista não é só uma pose: é a lei do mouse depois de chegar nela (FUNCOES/camera-solidworks.md
+     §3). SHOW é o visualizador e ganha o SolidWorks inteiro; a TRÁS é o menu e por isso é pose FIXA
+     relativa ao painel traseiro (sem arrasto, sem roda-zoom); DENTRO é órbita presa à mesa óptica,
+     com a distância travada. As poses fixas são refeitas quando a janela muda de tamanho. */
+  var LAWS = { show: { mode: "free", center: CENTER, R: .34 },
+    rear: { mode: "rear", center: new THREE.Vector3(0, .314 + B.H / 2, B.D / 2), normal: new THREE.Vector3(0, 0, 1), w: B.W, h: B.H, pad: 1.55 },
+    inside: { mode: "inside", center: new THREE.Vector3(-.02, .348, -.03), yaw0: .35, pit0: .92, w: .40, h: .26, pad: 1.6 },
+    wall0: { mode: "free", center: CENTER, R: .34 }, wall: { mode: "free", center: CENTER, R: .34 } };
   // a câmera anda por baixo do cursor: a etiqueta da peça que estava sob ele fica mentindo na tela
   // (e a peça continua acesa) até o próximo movimento do mouse. Trocar de vista apaga as duas.
-  function setCam(k, speed) { S.cam = k; unhover(); CAM.setView(VIEWS[k][0], VIEWS[k][1]); camSpeed = speed || 5; document.querySelectorAll("#cams [data-a]").forEach(function (b) { b.classList.toggle("on", b.dataset.a === "cam." + k); }); if (S.mode === "play") blip(k === "inside" ? 700 : 1000); if (k !== "inside") closePanel(); }
-  var CENTER = new THREE.Vector3(0, .40, 0);
+  function setCam(k, speed) { S.cam = k; unhover(); CAM.mode(LAWS[k].mode, LAWS[k]); CAM.setView(VIEWS[k][0], VIEWS[k][1]); camSpeed = speed || 5; document.querySelectorAll("#cams [data-a]").forEach(function (b) { b.classList.toggle("on", b.dataset.a === "cam." + k); }); if (S.mode === "play") blip(k === "inside" ? 700 : 1000); if (k !== "inside") closePanel(); }
+  window.SC = window.SC || {}; SC.camMode = function () { return CAM.camMode(); };   // contrato 4: hud-4 só lê
 
   /* ---------- painel ---------- */
   var panel = $("#panel"), pbody = $("#pbody"), pcur = null; panel.querySelector(".x").addEventListener("click", closePanel);
@@ -330,10 +339,15 @@
   Bind.def("dacs", "procurar DACs", function () { if (!ENG.on) { pino.say("Sem engine não há DAC para procurar. Sobe o spellcore serve e a chave passa a armar de verdade.", null, false); return; } ENG.dacs = []; ENG.scan = true; refresh(); bus.call("laser_dacs", { timeout: 2 }).then(function (r) { ENG.dacs = Array.isArray(r) ? r : []; ENG.scan = false; if (ENG.dacs.length) { if (!ENG.host) { ENG.dac = ENG.dacs[0].type; ENG.host = ENG.dacs[0].host; } pino.say(ENG.dacs.length + (ENG.dacs.length > 1 ? " DACs na rede." : " DAC na rede.") + " Clica no que vai receber o feixe.", null, false); } else pino.say("Nenhum DAC respondeu em 2 s. Confere o cabo no RJ45 e se o EtherDream está na mesma rede.", null, false); refresh(); }, function (e) { ENG.scan = false; refresh(); fail("laser_dacs: " + e.message); }); });
   Bind.def("midi.connect", "MIDI: conectar", function () { Bind.connect(); }); Bind.def("bind.reset", "bindings: reset", function () { Bind.reset(); });
   Bind.def("cam.reverse", "roda: sentido SolidWorks", function () { CAM.reverse = !CAM.reverse; try { localStorage.setItem("sc-laser-wheel", CAM.reverse ? "1" : "0"); } catch (e) {} refresh(); }, { get: function () { return CAM.reverse; } }); try { if (localStorage.getItem("sc-laser-wheel") === "0") CAM.reverse = false; } catch (e) {}
+  // ±2° de paralaxe na vista fixa: é o único movimento que a traseira aceita, e é desligável
+  Bind.def("cam.breathe", "TRÁS: paralaxe do mouse", function () { CAM.breathe = !CAM.breathe; try { localStorage.setItem("sc-laser-breathe", CAM.breathe ? "1" : "0"); } catch (e) {} refresh(); }, { get: function () { return CAM.breathe; } }); try { if (localStorage.getItem("sc-laser-breathe") === "0") CAM.breathe = false; } catch (e) {}
   var d15 = Math.PI / 12; [["L", "ArrowLeft", d15, 0], ["R", "ArrowRight", -d15, 0], ["U", "ArrowUp", 0, d15], ["D", "ArrowDown", 0, -d15]].forEach(function (a) { Bind.def("cam.rot" + a[0], "câmera: gira 15° " + a[0], function () { CAM.rotate(a[2], a[3]); }, { key: a[1] }); Bind.def("cam.rot90" + a[0], "câmera: gira 90° " + a[0], function () { CAM.rotate(a[2] * 6, a[3] * 6); }, { key: "Shift+" + a[1] }); Bind.def("cam.pan" + a[0], "câmera: pan " + a[0], function () { CAM.pan(a[2] * -400, a[3] * 400); }, { key: "Ctrl+" + a[1] }); });
+  // Alt+setas = roll (t_roll_view.htm): girar a vista no plano da tela, que era o único gesto do manual sem par aqui
+  [["L", "ArrowLeft", .12], ["R", "ArrowRight", -.12]].forEach(function (a) { Bind.def("cam.roll" + a[0], "câmera: roll " + a[0], function () { CAM.roll(a[2]); }, { key: "Alt+" + a[1] }); });
   Bind.def("cam.fit", "câmera: enquadra", function () { CAM.fit(CENTER, .32); }, { key: "F" });
   [["front", "1"], ["back", "2"], ["left", "3"], ["right", "4"], ["top", "5"], ["bottom", "6"], ["iso", "7"]].forEach(function (v) { Bind.def("cam." + v[0], "vista padrão: " + v[0], function () { CAM.std(v[0], CENTER, .32); }, { key: "Ctrl+" + v[1] }); });
-  Bind.def("cam.zoomIn", "câmera: zoom +", function () { CAM.zoom(.8); }, { key: "Z" }); Bind.def("cam.zoomOut", "câmera: zoom −", function () { CAM.zoom(1.25); }, { key: "Shift+Z" });
+  // no manual (t_zoom_in_out.htm) é `Z` que AFASTA e `Shift+Z` que aproxima; estava trocado aqui
+  Bind.def("cam.zoomIn", "câmera: zoom +", function () { CAM.zoom(.8); }, { key: "Shift+Z" }); Bind.def("cam.zoomOut", "câmera: zoom −", function () { CAM.zoom(1.25); }, { key: "Z" });
   Bind.onChange(function () { if (pcur === "bind") PANELS.bind(); $("#midi").textContent = "MIDI " + Bind.midi + (Bind.learnState() ? " · LEARN: aperte a tecla ou mexa no controlador" : ""); });
   $("#midi").textContent = "MIDI " + Bind.midi;
   document.querySelectorAll("#cams [data-a]").forEach(function (b) { b.addEventListener("click", function () { if (S.mode === "splash") return; Bind.run(b.dataset.a); }); });
@@ -350,13 +364,28 @@
   var ACT = { power: function () { Bind.run("power.toggle"); }, keyswitch: function () { Bind.run("key.toggle"); }, interlock: function () { Bind.run("lock.toggle"); },
     enc: oledOk, back: oledBack, lid: function () { setCam("inside"); }, pino: function () { pinoMenu(); } };
   function cursorFor(k) { return LaserEngine.kindOf(k) === "conector" ? "default" : "pointer"; }
-  gl.addEventListener("pointermove", function (e) { var p = ptr(e); if (CAM.dragging() || S.mode === "splash") { tip.style.display = "none"; return; } var h = hitOf(e), o = h ? h.o : null; if (o !== hot) { glow(hot, false); hot = o; if (hot && cursorFor(hot.userData.key) === "pointer") glow(hot, true); if (hot && /^pino\./.test(hot.userData.key)) pino.say(hot.userData.label, null, false); }
-    if (hot) { tip.style.display = "block"; tip.textContent = hot.userData.label; tip.style.left = (p[0] + 14) + "px"; tip.style.top = (p[1] + 14) + "px"; gl.style.cursor = cursorFor(hot.userData.key); } else { tip.style.display = "none"; gl.style.cursor = "grab"; } });
+  /* O knob do encoder no gesto do TouchDesigner: aperta e sobe o mouse = aumenta, desce = diminui,
+     um passo a cada 6 px (Shift = 24 px, ajuste fino). A câmera não gira durante o arrasto em vista
+     nenhuma (`cam.js` recusa arrasto do esquerdo que começa numa peça), e soltar sem andar 3 px
+     continua sendo clique = OK. A roda em cima do knob continua girando o encoder, como antes.
+     ponytail: só o knob; os faders do painel são `<input type=range>`, e o gesto deles é do HTML. */
+  var knob = null;
+  gl.addEventListener("pointermove", function (e) { var p = ptr(e);
+    if (knob) { var up = knob.y - e.clientY; knob.y = e.clientY; knob.acc += up; var px = e.shiftKey ? 24 : 6;
+      while (knob.acc >= px) { knob.acc -= px; oledTurn(1); } while (knob.acc <= -px) { knob.acc += px; oledTurn(-1); }
+      tip.style.display = "none"; return; }
+    if (CAM.dragging() || S.mode === "splash") { tip.style.display = "none"; return; } var h = hitOf(e), o = h ? h.o : null; if (o !== hot) { glow(hot, false); hot = o; if (hot && cursorFor(hot.userData.key) === "pointer") glow(hot, true); if (hot && /^pino\./.test(hot.userData.key)) pino.say(hot.userData.label, null, false); }
+    if (hot) { tip.style.display = "block"; tip.textContent = hot.userData.label; tip.style.left = (p[0] + 14) + "px"; tip.style.top = (p[1] + 14) + "px"; gl.style.cursor = hot.userData.key === "enc" ? "ns-resize" : cursorFor(hot.userData.key); } else { tip.style.display = "none"; gl.style.cursor = "grab"; } });
   gl.addEventListener("pointerleave", unhover);
-  gl.addEventListener("pointerdown", function (e) { pressed = e.button === 0; });
+  gl.addEventListener("pointerdown", function (e) { pressed = e.button === 0;
+    if (e.button !== 0 || S.mode === "splash") return;
+    var h = hitOf(e); if (!h || h.o.userData.key !== "enc") return;                 // contrato 3: `B.knobHit` também é "enc"
+    knob = { y: e.clientY, y0: e.clientY, acc: 0 }; gl.setPointerCapture(e.pointerId); e.preventDefault(); });
   // o alvo do clique sai do raycast do próprio `pointerup`, nunca do `hot` do hover: câmera que
   // anda por baixo do cursor (ou clique sem mexer o mouse antes) não pode fazer o painel errado abrir
-  gl.addEventListener("pointerup", function (e) { if (!pressed || e.button !== 0) return; pressed = false; if (CAM.dragging()) return; if (S.mode === "splash") { skipSplash(); return; }
+  gl.addEventListener("pointerup", function (e) { if (!pressed || e.button !== 0) return; pressed = false;
+    if (knob) { var moved = Math.abs(e.clientY - knob.y0) >= 3; knob = null; try { gl.releasePointerCapture(e.pointerId); } catch (x) {} if (moved) return; }
+    if (CAM.dragging()) return; if (S.mode === "splash") { skipSplash(); return; }
     var h = hitOf(e); if (!h) return; var k = h.o.userData.key;
     if (LaserEngine.kindOf(k) === "conector") { pino.say(h.o.userData.label, null, false); return; }
     if (/^pino\./.test(k)) { onPin(k.slice(5)); return; }
