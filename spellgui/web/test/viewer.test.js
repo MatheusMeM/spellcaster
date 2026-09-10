@@ -158,3 +158,14 @@ test("dimmer escala o rgb, e sem cor nenhuma a fixture fica vazia", () => {
   assert.strictEqual(VW.cor(null, d, 1), null, "perfil que ainda nao chegou");
   assert.strictEqual(VW.cor([{ name: "r", offset: 0 }], null, 1), null, "sem frame de saida");
 });
+
+// ---- coluna dmx: saida, ou entrada quando a lane esta' armada -----------
+
+test("fonte: lane armada le a entrada; a outra, a saida", () => {
+  assert.deepStrictEqual(VW.fonte({ spec: { universe: 3 }, rec: true }),
+    { u: 3, arm: true, lab: "dmx u3 in" });
+  assert.deepStrictEqual(VW.fonte({ spec: { universe: 3 } }),
+    { u: 3, arm: false, lab: "dmx u3 out" });
+  assert.deepStrictEqual(VW.fonte({ spec: {} }), { u: 1, arm: false, lab: "dmx u1 out" });
+  assert.deepStrictEqual(VW.fonte(undefined), { u: 1, arm: false, lab: "dmx u1 out" });
+});

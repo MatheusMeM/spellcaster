@@ -2,7 +2,8 @@
 // viewer.js — previz 2D da timeline: o que sai no tempo `t`, na faixa de baixo do canvas (Alt+M).
 //
 // Tres colunas, cada uma um pedaco da saida no playhead:
-//   dmx    512 barras do ultimo frame binario do universo da lane focada (topic 1 do barramento);
+//   dmx    512 barras do ultimo frame binario do universo da lane focada: a SAIDA (topic 1 do
+//          barramento), ou a ENTRADA (topic 2) quando a lane esta' armada para gravar;
 //   ilda   o quadro do .ild de cada track laser em `t`, com `scale` e `rot` do track aplicados;
 //   patch  uma bolinha por fixture do patch, pintada com o frame de saida pelo perfil.
 //
@@ -90,17 +91,25 @@
 
   // ---- desenho ------------------------------------------------------------
 
+  // Lane armada mostra o que ENTRA (topic 2 do barramento, `TL.dmxIn`) na cor de ao vivo; as
+  // outras, o que sai (topic 1, `TL.dmx`). O rotulo diz qual dos dois esta' na tela.
+  // Universo e sentido da coluna dmx: lane armada mostra o que ENTRA. Pura: e' o que o teste cobre.
+  VW.fonte = function (sel) {
+    const u = sel ? +(sel.spec.universe || 1) : 1, arm = !!(sel && sel.rec);
+    return { u: u, arm: arm, lab: "dmx u" + u + (arm ? " in" : " out") };
+  };
+
   function barras(c, b) {
-    const sel = TL.lanes[TL.cur];
-    const u = sel ? +(sel.spec.universe || 1) : 1, d = TL.dmx.get(u);
-    if (!d) return "dmx u" + u + "  sem frame";
+    const { u, arm, lab } = VW.fonte(TL.lanes[TL.cur]);
+    const d = (arm ? TL.dmxIn : TL.dmx).get(u);
+    if (!d) return lab + "  sem frame";
     const bw = b.w / 512;
-    c.fillStyle = TL.col.accent;
+    c.fillStyle = arm ? TL.col.live : TL.col.accent;
     for (let i = 0; i < 512; i++) {
       const v = d[i];
       if (v) c.fillRect(b.x + i * bw, b.y + b.h - v / 255 * b.h, Math.max(1, bw - 0.4), v / 255 * b.h);
     }
-    return "dmx u" + u;
+    return lab;
   }
 
   function quadro(c, b, t) {
