@@ -114,11 +114,11 @@ fn def_timeout() -> f64 {
 
 fn dacs(a: DacsArgs) -> Result<Value, String> {
     let t = Duration::from_secs_f64(a.timeout.clamp(0.1, 30.0));
-    let mut out: Vec<Value> = netscan::scan_etherdream(t)
+    let mut out: Vec<Value> = netscan::scan_etherdream(t, &netscan::interfaces())
         .iter()
         .map(|d| {
             json!({"type": "etherdream", "id": d.mac, "host": d.ip,
-                   "buffer": d.buffer_capacity, "max_pps": d.max_point_rate})
+                   "buffer": d.buffer_capacity, "max_pps": d.max_point_rate, "via": d.via})
         })
         .collect();
     // ponytail: sem Helios na lista ; o DAC USB entra quando o driver (hidapi/rusb) entrar —

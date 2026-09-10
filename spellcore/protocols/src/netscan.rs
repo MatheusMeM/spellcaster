@@ -2,8 +2,8 @@
 //! Ether Dream (beacon UDP 7654) e sugestoes de configuracao.
 //! Espelha `spellcaster/protocols/netscan.py`. Todo texto de saida e ASCII (console cp1252).
 
-use std::io;
-use std::net::{Ipv4Addr, SocketAddrV4, UdpSocket};
+use std::io::{self, Read};
+use std::net::{Ipv4Addr, SocketAddrV4, TcpStream, UdpSocket};
 use std::process::Command;
 use std::time::{Duration, Instant};
 
@@ -11,6 +11,10 @@ use serde::Serialize;
 use socket2::{Domain, Protocol, Socket, Type};
 
 pub const ETHERDREAM_PORT: u16 = 7654;
+/// Porta do stream de pontos, usada aqui so' para pedir o status quando o beacon nao chega.
+/// E' a mesma `laser::dac::etherdream::TCP_PORT` — o `laser` depende do `protocols`, nao o
+/// contrario, e o numero vem do protocolo, nao do outro crate.
+pub const ETHERDREAM_TCP_PORT: u16 = 7765;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Iface {
@@ -341,25 +345,40 @@ pub fn parse_artpollreply(data: &[u8]) -> Option<Node> {
     })
 }
 
-fn udp(port: u16, broadcast: bool) -> io::Result<UdpSocket> {
+fn udp_on(ip: Ipv4Addr, port: u16, broadcast: bool) -> io::Result<UdpSocket> {
     let s = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
     s.set_reuse_address(true)?;
     if broadcast {
         s.set_broadcast(true)?;
     }
-    if s.bind(&SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, port).into())
-        .is_err()
-    {
-        // porta ocupada: alguns nos respondem unicast ao remetente
-        s.bind(&SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0).into())?;
-    }
-    s.set_read_timeout(Some(Duration::from_millis(200)))?;
+    s.bind(&SocketAddrV4::new(ip, port).into())?;
+    s.set_read_timeout(Some(Duration::from_millis(50)))?;
     Ok(s.into())
+}
+
+/// IPs a tentar no bind, em ordem: o coringa (recebe de todas as placas) e depois o IP de cada
+/// placa. No Windows o bind coringa e' RECUSADO com WSAEACCES (10013) quando outro programa ja'
+/// tem a porta — o Ether Dream Sitter fica em `0.0.0.0:7654` — e `SO_REUSEADDR` do nosso lado
+/// nao resolve, porque o Windows so' compartilha se os DOIS sockets pedirem. O bind no IP da
+/// placa passa nesse caso E continua recebendo o broadcast do beacon (medido: Sitter aberto,
+/// bind em 169.254.86.236:7654, quatro beacons de 169.254.207.140 em 4 s).
+fn bind_ips(ifaces: &[Iface]) -> Vec<Ipv4Addr> {
+    std::iter::once(Ipv4Addr::UNSPECIFIED)
+        .chain(ifaces.iter().filter_map(|i| i.ip.parse().ok()))
+        .collect()
+}
+
+fn udp(port: u16, broadcast: bool, ifaces: &[Iface]) -> io::Result<UdpSocket> {
+    bind_ips(ifaces)
+        .into_iter()
+        .find_map(|ip| udp_on(ip, port, broadcast).ok())
+        // ultimo caso: porta efemera, onde so' chega resposta unicast ao remetente
+        .map_or_else(|| udp_on(Ipv4Addr::UNSPECIFIED, 0, broadcast), Ok)
 }
 
 /// ArtPoll em broadcast (global + 2.x + 10.x + subrede de cada interface) e coleta ArtPollReply.
 pub fn scan_artnet(timeout: Duration, ifaces: &[Iface]) -> Vec<Node> {
-    let Ok(sock) = udp(crate::artnet::PORT, true) else {
+    let Ok(sock) = udp(crate::artnet::PORT, true, ifaces) else {
         return Vec::new();
     };
     let mut targets: Vec<String> = ["255.255.255.255", "2.255.255.255", "10.255.255.255"]
@@ -511,6 +530,8 @@ pub struct Dac {
     pub buffer_capacity: u16,
     pub max_point_rate: u32,
     pub status: Status,
+    /// Como foi achado: `beacon` (UDP 7654) ou `tcp` (status pedido em 7765).
+    pub via: String,
 }
 
 /// Beacon Ether Dream: `<6sHHHI` (16 bytes) + status `<BBBBHHHHII` (20 bytes). Tudo little-endian.
@@ -556,32 +577,135 @@ pub fn parse_status(b: &[u8]) -> Option<Status> {
     })
 }
 
-/// Escuta beacons UDP 7654 (1 Hz por DAC).
-pub fn scan_etherdream(timeout: Duration) -> Vec<Dac> {
-    let Ok(sock) = udp(ETHERDREAM_PORT, true) else {
-        return Vec::new();
-    };
-    let mut found: Vec<Dac> = Vec::new();
-    let mut buf = [0u8; 256];
-    let end = Instant::now() + timeout;
-    while Instant::now() < end {
-        let Ok((n, addr)) = sock.recv_from(&mut buf) else {
+/// Vizinhos IPv4 `(ip, mac)` da tabela ARP: saida de `arp -a` (Windows, qualquer idioma) ou de
+/// `ip neigh` (Linux). Funcao pura — o texto e' LIDO, nunca executado com argumento de fora.
+/// A chave e' o endereco fisico na linha, e nao o nome da coluna: o cabecalho muda de idioma e
+/// chega com acento quebrado no console cp1252. Broadcast e multicast ficam de fora.
+pub fn parse_arp(text: &str) -> Vec<(String, String)> {
+    let mut out: Vec<(String, String)> = Vec::new();
+    for line in text.lines() {
+        let toks: Vec<&str> = line.split_whitespace().collect();
+        let Some(mac) = toks.iter().find_map(|t| mac_of(t)) else {
+            continue; // cabecalho, linha "Interface: ...", entrada sem endereco fisico
+        };
+        if mac == "ff:ff:ff:ff:ff:ff" || mac.starts_with("01:00:5e") {
+            continue;
+        }
+        let Some(ip) = toks.iter().find_map(|t| only_ipv4(t)) else {
             continue;
         };
-        if let Some((mac, hw, sw, cap, rate, status)) = parse_beacon(&buf[..n]) {
-            if let Some(d) = found.iter_mut().find(|d| d.mac == mac) {
-                d.status = status;
+        if !out.iter().any(|(i, _)| *i == ip) {
+            out.push((ip, mac));
+        }
+    }
+    out
+}
+
+/// `8a-9e-36-98-8c-ce` ou `8a:9e:36:98:8c:ce` -> forma com `:` minuscula.
+fn mac_of(tok: &str) -> Option<String> {
+    let sep = if tok.contains('-') { '-' } else { ':' };
+    let parts: Vec<&str> = tok.split(sep).collect();
+    (parts.len() == 6
+        && parts
+            .iter()
+            .all(|p| p.len() == 2 && p.bytes().all(|b| b.is_ascii_hexdigit())))
+    .then(|| tok.replace('-', ":").to_ascii_lowercase())
+}
+
+fn arp_table() -> String {
+    if cfg!(windows) {
+        run("arp", &["-a"])
+    } else {
+        run("ip", &["neigh"])
+    }
+}
+
+/// Pede o status por TCP a cada vizinho: um Ether Dream manda os 22 bytes (`ack` + comando
+/// ecoado + `dac_status`) assim que aceita a conexao. Acha o DAC quando o beacon nao chega —
+/// outro programa com a porta 7654, broadcast bloqueado, ou DAC ainda calado.
+/// Ate 32 conexoes por vez; cada uma desiste em `wait`.
+pub fn probe_etherdream(neigh: &[(String, String)], port: u16, wait: Duration) -> Vec<Dac> {
+    let mut out = Vec::new();
+    for lote in neigh.chunks(32) {
+        let achados: Vec<Option<Dac>> = std::thread::scope(|s| {
+            let hs: Vec<_> = lote
+                .iter()
+                .map(|(ip, mac)| s.spawn(move || probe_one(ip, mac, port, wait)))
+                .collect();
+            hs.into_iter().map(|h| h.join().unwrap_or(None)).collect()
+        });
+        out.extend(achados.into_iter().flatten());
+    }
+    out
+}
+
+fn probe_one(ip: &str, mac: &str, port: u16, wait: Duration) -> Option<Dac> {
+    let addr = SocketAddrV4::new(ip.parse().ok()?, port);
+    let mut s = TcpStream::connect_timeout(&addr.into(), wait).ok()?;
+    s.set_read_timeout(Some(wait)).ok()?;
+    let mut b = [0u8; 22];
+    s.read_exact(&mut b).ok()?;
+    if b[0] != b'a' {
+        return None; // outro servico na mesma porta
+    }
+    Some(Dac {
+        ip: ip.to_string(),
+        mac: mac.to_string(),
+        // ponytail: o status TCP nao carrega hw/sw/buffer/max_pps (so' o beacon carrega) e nao
+        // se inventa numero ; some quando `laser_open` puder pedir o `dac_status` estendido.
+        hw_rev: 0,
+        sw_rev: 0,
+        buffer_capacity: 0,
+        max_point_rate: 0,
+        status: parse_status(&b[2..])?,
+        via: "tcp".into(),
+    })
+}
+
+/// Escuta beacons UDP 7654 (1 Hz por DAC) em todas as placas; se nada chegar na metade do
+/// prazo, procura ativamente por TCP 7765 nos vizinhos da tabela ARP.
+pub fn scan_etherdream(timeout: Duration, ifaces: &[Iface]) -> Vec<Dac> {
+    let socks: Vec<UdpSocket> = bind_ips(ifaces)
+        .into_iter()
+        .filter_map(|ip| udp_on(ip, ETHERDREAM_PORT, true).ok())
+        .collect();
+    let mut found: Vec<Dac> = Vec::new();
+    let mut buf = [0u8; 256];
+    let inicio = Instant::now();
+    let end = inicio + timeout;
+    let mut tentou_tcp = false;
+    while Instant::now() < end {
+        for sock in &socks {
+            let Ok((n, addr)) = sock.recv_from(&mut buf) else {
                 continue;
+            };
+            if let Some((mac, hw, sw, cap, rate, status)) = parse_beacon(&buf[..n]) {
+                if let Some(d) = found.iter_mut().find(|d| d.mac == mac) {
+                    d.status = status;
+                    continue;
+                }
+                found.push(Dac {
+                    ip: addr.ip().to_string(),
+                    mac,
+                    hw_rev: hw,
+                    sw_rev: sw,
+                    buffer_capacity: cap,
+                    max_point_rate: rate,
+                    status,
+                    via: "beacon".into(),
+                });
             }
-            found.push(Dac {
-                ip: addr.ip().to_string(),
-                mac,
-                hw_rev: hw,
-                sw_rev: sw,
-                buffer_capacity: cap,
-                max_point_rate: rate,
-                status,
-            });
+        }
+        if !tentou_tcp && found.is_empty() && inicio.elapsed() * 2 >= timeout {
+            tentou_tcp = true;
+            found = probe_etherdream(
+                &parse_arp(&arp_table()),
+                ETHERDREAM_TCP_PORT,
+                Duration::from_millis(150),
+            );
+            if !found.is_empty() {
+                return found;
+            }
         }
     }
     found
@@ -672,7 +796,7 @@ pub fn scan_all(timeout: Duration) -> Scan {
     let (artnet, sacn, etherdream) = std::thread::scope(|s| {
         let a = s.spawn(|| scan_artnet(timeout, &ifaces));
         let b = s.spawn(|| scan_sacn(timeout + Duration::from_secs(1), &ifaces));
-        let c = s.spawn(|| scan_etherdream(timeout));
+        let c = s.spawn(|| scan_etherdream(timeout, &ifaces));
         (
             a.join().unwrap_or_default(),
             b.join().unwrap_or_default(),
@@ -753,19 +877,20 @@ pub fn report(s: &Scan) -> String {
             .collect(),
     );
     section(
-        "Ether Dream (beacon):",
+        "Ether Dream:",
         s.etherdream
             .iter()
             .map(|e| {
                 format!(
-                    "{}  mac {}  hw {} sw {}  buffer {}  max {} pps  playback {}",
+                    "{}  mac {}  hw {} sw {}  buffer {}  max {} pps  playback {}  via {}",
                     e.ip,
                     e.mac,
                     e.hw_rev,
                     e.sw_rev,
                     e.buffer_capacity,
                     e.max_point_rate,
-                    e.status.playback_state
+                    e.status.playback_state,
+                    e.via
                 )
             })
             .collect(),
