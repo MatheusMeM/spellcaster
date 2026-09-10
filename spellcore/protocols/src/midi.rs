@@ -1,26 +1,27 @@
-//! Entrada MIDI. `midir` e' a RtMidi em Rust: winmm no Windows, ALSA no Linux, CoreMIDI no mac —
-//! e' o que faz "qualquer teclado ou surface" funcionar sem driver do fabricante.
+//! MIDI input. `midir` is RtMidi in Rust: winmm on Windows, ALSA on Linux, CoreMIDI on mac -
+//! it is what makes "any keyboard or surface" work without a vendor driver.
 //!
-//! So' ENTRADA e so' mensagem de canal (note on/off, CC, program change, pitch bend). Saida MIDI,
-//! MTC/clock, MIDI Show Control e feedback de LED de superficie estao fora (design/DECISOES.md).
+//! INPUT only and channel messages only (note on/off, CC, program change, pitch bend). MIDI
+//! output, MTC/clock, MIDI Show Control and surface LED feedback are out of scope
+//! (design/DECISOES.md).
 //!
-//! Chave textual do evento (a mesma do no' `in.midi` do graph): `"<status>/<data1>"` —
-//! `144/60` = note on canal 1 nota 60, `176/1` = CC 1 do canal 1. O canal ja' esta' no status,
-//! entao um controlador em outro canal e' outra chave, sem campo a mais.
+//! Textual key of the event (the same one the graph node `in.midi` uses): `"<status>/<data1>"` -
+//! `144/60` = note on channel 1 note 60, `176/1` = CC 1 of channel 1. The channel is already
+//! in the status, so a controller on another channel is another key, with no extra field.
 
 #[cfg(not(target_env = "musl"))]
 use midir::{Ignore, MidiInput, MidiInputConnection};
 use std::sync::mpsc::Receiver;
 
-/// Fila entre a thread de callback do driver e quem consome (o frame). Cheia, o evento NOVO cai:
-/// o driver nunca bloqueia.
-// ponytail: 256 eventos e' fundo de sobra para um pump por frame (16 ms) ; so' subiria se alguem
-// mandasse SysEx grande — que o `Ignore::All` ja' descarta antes.
+/// Queue between the driver callback thread and the consumer (the frame). When full, the NEW
+/// event is dropped: the driver never blocks.
+// ponytail: 256 events is depth to spare for one pump per frame (16 ms) ; it would only grow
+// if someone sent large SysEx - which `Ignore::All` already discards first.
 #[cfg(not(target_env = "musl"))]
 const DEPTH: usize = 256;
 
-/// Nomes das portas de entrada, na ordem do driver. Maquina sem MIDI (ou sem servico) devolve
-/// lista vazia: procurar porta nunca e' erro.
+/// Names of the input ports, in driver order. A machine with no MIDI (or no service) returns
+/// an empty list: looking for a port is never an error.
 #[cfg(target_env = "musl")]
 pub fn ports() -> Vec<String> {
     Vec::new()
@@ -37,25 +38,25 @@ pub fn ports() -> Vec<String> {
         .collect()
 }
 
-/// Uma porta MIDI de entrada aberta. Fecha no `Drop`.
+/// One open MIDI input port. Closes on `Drop`.
 pub struct MidiIn {
     name: String,
     rx: Receiver<(u8, u8, u8)>,
-    /// A conexao viva: solta-la fecha a porta.
+    /// The live connection: dropping it closes the port.
     #[cfg(not(target_env = "musl"))]
     _conn: MidiInputConnection<()>,
 }
 
 impl MidiIn {
-    /// `port` = indice em texto ("0"), trecho do nome (sem diferenca de caixa) ou vazio = a
-    /// primeira porta.
+    /// `port` = index as text ("0"), part of the name (case-insensitive) or empty = the first
+    /// port.
     #[cfg(not(target_env = "musl"))]
     pub fn open(port: &str) -> Result<MidiIn, String> {
         let mut mi = MidiInput::new("spellcaster").map_err(|e| e.to_string())?;
-        mi.ignore(Ignore::All); // sysex, clock e active sensing nao viram evento
+        mi.ignore(Ignore::All); // sysex, clock and active sensing do not become events
         let ps = mi.ports();
         if ps.is_empty() {
-            return Err("nenhuma porta MIDI de entrada".into());
+            return Err("no MIDI input port".into());
         }
         let nomes: Vec<String> = ps
             .iter()
@@ -85,20 +86,21 @@ impl MidiIn {
 
     #[cfg(target_env = "musl")]
     pub fn open(_port: &str) -> Result<MidiIn, String> {
-        Err("MIDI indisponivel neste binario (estatico, sem ALSA)".into())
+        Err("MIDI unavailable in this binary (static, no ALSA)".into())
     }
 
     pub fn name(&self) -> &str {
         &self.name
     }
 
-    /// Proximo evento da fila, sem bloquear.
+    /// Next event from the queue, without blocking.
     pub fn try_recv(&self) -> Option<(u8, u8, u8)> {
         self.rx.try_recv().ok()
     }
 }
 
-/// Indice da porta pedida: vazio = a primeira, numero = indice, resto = trecho do nome.
+/// Index of the requested port: empty = the first, a number = index, anything else = part of
+/// the name.
 #[cfg_attr(target_env = "musl", allow(dead_code))]
 fn escolhe(nomes: &[String], port: &str) -> Result<usize, String> {
     let p = port.trim();
@@ -109,24 +111,24 @@ fn escolhe(nomes: &[String], port: &str) -> Result<usize, String> {
         return if i < nomes.len() {
             Ok(i)
         } else {
-            Err(format!("porta {} nao existe ({} portas)", i, nomes.len()))
+            Err(format!("port {} does not exist ({} ports)", i, nomes.len()))
         };
     }
     let alvo = p.to_lowercase();
     nomes
         .iter()
         .position(|n| n.to_lowercase().contains(&alvo))
-        .ok_or_else(|| format!("nenhuma porta MIDI casa com \"{}\"", port))
+        .ok_or_else(|| format!("no MIDI port matches \"{}\"", port))
 }
 
-/// Mensagem crua -> `(status, data1, data2)`, ou `None` se nao for mensagem de canal.
+/// Raw message -> `(status, data1, data2)`, or `None` if it is not a channel message.
 ///
-/// Note on com velocidade 0 e' o note off que meio teclado manda: vira status 0x8n, senao
-/// soltar a tecla dispararia o mesmo comando que aperta-la.
+/// Note on with velocity 0 is the note off half the keyboards send: it becomes status 0x8n,
+/// otherwise releasing the key would fire the same command as pressing it.
 pub fn evento(m: &[u8]) -> Option<(u8, u8, u8)> {
     let &status = m.first()?;
     if !(0x80..0xF0).contains(&status) {
-        return None; // system common / realtime: nao tem canal, nao vira chave
+        return None; // system common / realtime: no channel, does not become a key
     }
     let d1 = m.get(1).copied().unwrap_or(0) & 0x7F;
     let d2 = m.get(2).copied().unwrap_or(0) & 0x7F;
@@ -141,15 +143,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn evento_de_canal() {
+    fn channel_event() {
         assert_eq!(evento(&[144, 60, 100]), Some((144, 60, 100)));
         assert_eq!(evento(&[176, 1, 64]), Some((176, 1, 64)));
-        // program change e channel pressure tem dois bytes: data2 = 0
+        // program change and channel pressure have two bytes: data2 = 0
         assert_eq!(evento(&[192, 5]), Some((192, 5, 0)));
-        // note on com velocidade 0 = note off (senao soltar a tecla redispara o comando)
+        // note on with velocity 0 = note off (otherwise releasing the key refires the command)
         assert_eq!(evento(&[145, 60, 0]), Some((129, 60, 0)));
         assert_eq!(evento(&[129, 60, 0]), Some((129, 60, 0)));
-        // sem canal: clock, start, sysex, e byte de dado solto
+        // no channel: clock, start, sysex, and a stray data byte
         for m in [
             &[248u8][..],
             &[250][..],
@@ -162,7 +164,7 @@ mod tests {
     }
 
     #[test]
-    fn escolhe_por_indice_e_por_nome() {
+    fn chooses_by_index_and_by_name() {
         let n = vec!["MPK mini 3 0".to_string(), "nanoKONTROL2".to_string()];
         assert_eq!(escolhe(&n, ""), Ok(0));
         assert_eq!(escolhe(&n, "1"), Ok(1));
@@ -172,11 +174,11 @@ mod tests {
         assert!(escolhe(&n, "launchpad").is_err());
     }
 
-    /// Maquina sem dispositivo nenhum nao pode explodir: `ports()` devolve lista vazia.
+    /// A machine with no device at all must not blow up: `ports()` returns an empty list.
     #[test]
-    fn ports_nunca_falha() {
+    fn ports_never_fails() {
         let p = ports();
-        // abrir sem porta e' erro de texto, nunca panico
+        // opening with no port is a text error, never a panic
         if p.is_empty() {
             assert!(MidiIn::open("").is_err());
         }

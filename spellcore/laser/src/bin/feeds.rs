@@ -1,7 +1,7 @@
-// Aceite da R4: 4 feeds a 30 kpps contra 4 emuladores Ether Dream em loopback.
-// Mede CPU do processo com GetProcessTimes e a CPU de cada thread de feed com
-// GetThreadTimes (o emulador vive no MESMO processo e o seu custo nao e do feed).
-// Alvo do PRD: 4 feeds laser a 30 kpps < 1 % de um nucleo. Saida ASCII pura (cp1252).
+// R4 acceptance: 4 feeds at 30 kpps against 4 Ether Dream emulators on loopback.
+// Measures process CPU with GetProcessTimes and the CPU of each feed thread with
+// GetThreadTimes (the emulator lives in the SAME process and its cost is not the feed's).
+// PRD target: 4 laser feeds at 30 kpps < 1 % of a core. Pure ASCII output (cp1252).
 //
 //   cargo run --release -p laser --bin feeds -- --secs 10 --feeds 4 --pps 30000
 
@@ -25,7 +25,7 @@ extern "system" {
     fn timeEndPeriod(p: u32) -> u32;
 }
 
-/// Tempo de CPU do processo (usuario + kernel), em segundos.
+/// Process CPU time (user + kernel), in seconds.
 #[cfg(windows)]
 fn cpu_secs() -> Option<f64> {
     let (mut c, mut e, mut k, mut u) = (0u64, 0u64, 0u64, 0u64);
@@ -34,12 +34,12 @@ fn cpu_secs() -> Option<f64> {
             return None;
         }
     }
-    Some((k + u) as f64 * 1e-7) // FILETIME conta 100 ns
+    Some((k + u) as f64 * 1e-7) // FILETIME counts 100 ns
 }
 
 #[cfg(not(windows))]
 fn cpu_secs() -> Option<f64> {
-    // ponytail: campos 14/15 de /proc/self/stat, tick fixo em 100 Hz ; igual ao bench/throughput
+    // ponytail: fields 14/15 of /proc/self/stat, tick fixed at 100 Hz ; same as bench/throughput
     let s = std::fs::read_to_string("/proc/self/stat").ok()?;
     let f: Vec<&str> = s.rsplit(')').next()?.split_whitespace().collect();
     let ut: f64 = f.get(11)?.parse().ok()?;
@@ -56,7 +56,7 @@ fn arg(name: &str, default: f64) -> f64 {
         .unwrap_or(default)
 }
 
-/// Figura de `n` pontos que passa na safety (bbox bem maior que min_size) e tem vertices.
+/// Figure of `n` points that passes safety (bbox well above min_size) and has vertices.
 fn figura(n: usize) -> Vec<Point> {
     (0..n)
         .map(|i| {
@@ -74,7 +74,7 @@ fn main() {
     let npts = arg("--points", 1200.0).max(50.0) as usize;
     let capacity = arg("--capacity", 1800.0) as u16;
     let chunk = arg("--chunk", 0.0) as usize;
-    let fps = pps as f64 / npts as f64; // frames por segundo por feed
+    let fps = pps as f64 / npts as f64; // frames per second per feed
     let dt = Duration::from_secs_f64(1.0 / fps);
 
     #[cfg(windows)]
@@ -88,11 +88,11 @@ fn main() {
         let emu = match Emulator::start(capacity) {
             Ok(e) => e,
             Err(e) => {
-                println!("feeds: emulador nao subiu: {e} -> FALHA");
+                println!("feeds: emulator did not start: {e} -> FAIL");
                 std::process::exit(1);
             }
         };
-        emu.record(false); // guardar 1,2 M de pontos/s falseia a medida
+        emu.record(false); // keeping 1.2 M points/s would skew the measurement
         let dac = match EtherDream::connect(&format!("127.0.0.1:{}", emu.port), capacity) {
             Ok(mut d) => {
                 if chunk > 0 {
@@ -101,14 +101,14 @@ fn main() {
                 d
             }
             Err(e) => {
-                println!("feeds: conexao ao emulador falhou: {e} -> FALHA");
+                println!("feeds: connection to the emulator failed: {e} -> FAIL");
                 std::process::exit(1);
             }
         };
         match Feed::start(Box::new(dac), pps, 2, Safety::default()) {
             Ok(f) => feeds.push(f),
             Err(e) => {
-                println!("feeds: Feed::start falhou: {e} -> FALHA");
+                println!("feeds: Feed::start failed: {e} -> FAIL");
                 std::process::exit(1);
             }
         }
@@ -120,8 +120,8 @@ fn main() {
     let wall0 = Instant::now();
     let mut next = Instant::now();
     let mut pushed = 0u64;
-    // ponytail: pacer por sleep com timeBeginPeriod(1), sem spin ; quem tem que ser preciso
-    // e o Clock do engine, aqui so se precisa alimentar os feeds no ritmo certo.
+    // ponytail: sleep-based pacer with timeBeginPeriod(1), no spin ; the one that has to be
+    // precise is the engine Clock, here it is only about feeding the feeds at the right pace.
     while wall0.elapsed().as_secs_f64() < secs {
         next += dt;
         let rot = wall0.elapsed().as_secs_f64() * 45.0;
@@ -154,7 +154,7 @@ fn main() {
         .map(|f| (f.name().to_string(), f.stats()))
         .collect();
     let recebidos: u64 = emus.iter().map(|e| e.count()).sum();
-    // idas e voltas por comando: e o que custa CPU (cada uma e um ping-pong de contexto)
+    // round trips per command: that is what costs CPU (each one is a context ping-pong)
     let mut hist = std::collections::BTreeMap::new();
     for e in &emus {
         for c in e.commands() {
@@ -171,7 +171,7 @@ fn main() {
     }
 
     println!(
-        "feeds: {} DACs x {} pps x {} pontos/frame ({:.1} fps) por {:.1}s",
+        "feeds: {} DACs x {} pps x {} points/frame ({:.1} fps) for {:.1}s",
         nfeeds, pps, npts, fps, wall
     );
     let mut cpu_feeds = 0.0;
@@ -191,7 +191,7 @@ fn main() {
     }
     let pontos: u64 = stats.iter().map(|(_, s)| s.sent).sum::<u64>() * npts as u64;
     println!(
-        "push={} frames/feed  pontos entregues={} (emuladores receberam {})",
+        "push={} frames/feed  points delivered={} (emulators received {})",
         pushed, pontos, recebidos
     );
     let cmds: Vec<String> = hist
@@ -199,7 +199,7 @@ fn main() {
         .map(|(c, n)| format!("{}={}", *c as char, n))
         .collect();
     println!(
-        "comandos ao DAC: {}  total={} ({:.0}/s), {:.1} us de cpu de feed por ida e volta",
+        "commands to the DAC: {}  total={} ({:.0}/s), {:.1} us of feed cpu per round trip",
         cmds.join(" "),
         idas,
         idas as f64 / wall,
@@ -216,18 +216,18 @@ fn main() {
         None => ("n/a".to_string(), f64::NAN),
     };
     println!(
-        "cpu das {} threads de feed = {:.3}s = {:.2}% de um nucleo",
+        "cpu of the {} feed threads = {:.3}s = {:.2}% of a core",
         nfeeds, cpu_feeds, pct_feeds
     );
     println!(
-        "cpu do processo inteiro (GetProcessTimes, INCLUI os {} emuladores e o pacer) = {} = {:.2}%",
+        "cpu of the whole process (GetProcessTimes, INCLUDES the {} emulators and the pacer) = {} = {:.2}%",
         nfeeds, proc_txt, pct_proc
     );
     let erros: u64 = stats.iter().map(|(_, s)| s.errors).sum();
     let ok = pct_feeds < 1.0 && erros == 0 && pontos > 0;
     println!(
-        "alvo: cpu dos feeds < 1.00% de um nucleo, 0 erros -> {}",
-        if ok { "OK" } else { "FALHA" }
+        "target: feed cpu < 1.00% of a core, 0 errors -> {}",
+        if ok { "OK" } else { "FAIL" }
     );
     std::process::exit(if ok { 0 } else { 1 });
 }

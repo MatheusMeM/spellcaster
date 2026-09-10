@@ -162,7 +162,7 @@ fn handshake_tools_e_resources() {
     let c: Value = serde_json::from_str(&texto(&r)).expect("graph_check devolve JSON");
     let e = c["error"].as_str().unwrap_or("");
     assert!(
-        e.contains("ciclo") && e.contains('a') && e.contains('b'),
+        e.contains("cycle") && e.contains('a') && e.contains('b'),
         "{}",
         e
     );

@@ -1,9 +1,9 @@
 //! Art-Net 4 (Artistic Licence): ArtDmx out, ArtPoll/ArtPollReply, ArtSync.
 //!
-//! Universos no Spellcaster sao 1-based (como sACN). Conversao para Art-Net:
+//! Universes in Spellcaster are 1-based (like sACN). Conversion to Art-Net:
 //!     port_address = universe - 1   (15 bits: net[7] | subnet[4] | universe[4])
-//! Ex.: universe 1 -> port-address 0 (net 0, subnet 0, uni 0); universe 17 -> subnet 1, uni 0.
-//! OpCode e little-endian; ProtVer, Length e o resto do cabecalho sao big-endian.
+//! E.g.: universe 1 -> port-address 0 (net 0, subnet 0, uni 0); universe 17 -> subnet 1,
+//! uni 0. OpCode is little-endian; ProtVer, Length and the rest of the header are big-endian.
 
 use std::collections::HashMap;
 use std::io;
@@ -26,16 +26,17 @@ pub const OP_DMX: u16 = 0x5000;
 pub const OP_SYNC: u16 = 0x5200;
 pub const BROADCASTS: [&str; 3] = ["2.255.255.255", "10.255.255.255", "255.255.255.255"];
 
-/// Universo 1-based -> port-address de 15 bits.
+/// 1-based universe -> 15-bit port-address.
 ///
-/// Fora de faixa e erro (igual ao `ValueError` do Python): universo 0 ou > 0x8000 nao existe
-/// em Art-Net. A assinatura do README (`-> u16`) e mantida; o erro vira panic.
-// ponytail: panic em vez de Result para nao mudar o contrato do README ; a saida (`ArtNetOut`)
-// filtra o universo antes de chamar, entao a thread de I/O nunca panica com show valido.
+/// Out of range is an error (same as Python's `ValueError`): universe 0 or > 0x8000 does not
+/// exist in Art-Net. The README signature (`-> u16`) is kept; the error becomes a panic.
+// ponytail: panic instead of Result so the README contract does not change ; the output
+// (`ArtNetOut`) filters the universe before calling, so the I/O thread never panics with a
+// valid show.
 pub fn port_address(universe: u16) -> u16 {
     assert!(
         (1..=0x8000).contains(&universe),
-        "universo fora de faixa: {universe}"
+        "universe out of range: {universe}"
     );
     universe - 1
 }
@@ -44,8 +45,8 @@ fn valid(universe: u16) -> bool {
     (1..=0x8000).contains(&universe)
 }
 
-/// ArtDmx escrito em `out` (limpo antes). Sem alocacao com `out` ja dimensionado.
-/// `data`: 2..512 bytes, comprimento par (Art-Net exige).
+/// ArtDmx written into `out` (cleared first). No allocation when `out` is already sized.
+/// `data`: 2..512 bytes, even length (Art-Net requires it).
 pub fn artdmx_into(out: &mut Vec<u8>, universe: u16, data: &[u8], sequence: u8, physical: u8) {
     let pa = port_address(universe);
     let n = data.len().min(512);
@@ -61,7 +62,7 @@ pub fn artdmx_into(out: &mut Vec<u8>, universe: u16, data: &[u8], sequence: u8, 
     out.push((pa >> 8) as u8); // Net
     out.extend_from_slice(&(len as u16).to_be_bytes());
     out.extend_from_slice(&data[..n]);
-    out.resize(18 + len, 0); // impar -> um zero no fim; vazio -> dois zeros
+    out.resize(18 + len, 0); // odd -> one zero at the end; empty -> two zeros
 }
 
 pub fn artdmx(universe: u16, data: &[u8], sequence: u8) -> Vec<u8> {
@@ -70,7 +71,7 @@ pub fn artdmx(universe: u16, data: &[u8], sequence: u8) -> Vec<u8> {
     out
 }
 
-/// ArtPoll. O `netscan` manda `artpoll(0, 0)`; a saida manda TalkToMe 0x06, prioridade 0x10.
+/// ArtPoll. `netscan` sends `artpoll(0, 0)`; the output sends TalkToMe 0x06, priority 0x10.
 pub fn artpoll(flags: u8, priority: u8) -> Vec<u8> {
     let mut v = Vec::with_capacity(14);
     v.extend_from_slice(HEADER);
@@ -107,7 +108,7 @@ pub enum Packet {
     Other(u16),
 }
 
-/// Decodifica ArtDmx / ArtPoll / ArtSync. Quem le ArtPollReply e' o `netscan`.
+/// Decodes ArtDmx / ArtPoll / ArtSync. ArtPollReply is read by `netscan`.
 pub fn parse(pkt: &[u8]) -> Option<Packet> {
     if pkt.len() < 10 || &pkt[..8] != HEADER {
         return None;
@@ -154,8 +155,8 @@ fn resolve(t: &str, port: u16) -> Option<SocketAddrV4> {
 
 // ----------------------------------------------------------------- ArtNetOut
 
-/// Saida Art-Net por broadcast (2.x, 10.x, limited) ou unicast para `targets`.
-/// `send()` so enfileira; a thread interna monta o ArtDmx e fala com o socket.
+/// Art-Net output by broadcast (2.x, 10.x, limited) or unicast to `targets`.
+/// `send()` only enqueues; the internal thread builds the ArtDmx and talks to the socket.
 pub struct ArtNetOut {
     q: Arc<Queue>,
     th: Option<JoinHandle<()>>,
@@ -166,7 +167,7 @@ impl ArtNetOut {
         ArtNetOut::with_port(targets, broadcast, PORT)
     }
 
-    /// Porta alternativa (testes de loopback quando a 6454 esta ocupada).
+    /// Alternate port (loopback tests when 6454 is busy).
     pub fn with_port(
         targets: Option<Vec<String>>,
         broadcast: bool,
@@ -184,18 +185,18 @@ impl ArtNetOut {
         let th = std::thread::Builder::new()
             .name("artnet-out".into())
             .spawn(move || {
-                // ponytail: um buffer de ArtDmx reutilizado (um frame por vez na thread).
+                // ponytail: a single reused ArtDmx buffer (one frame at a time in the thread).
                 let mut buf = Vec::with_capacity(530);
                 let mut seq: HashMap<u16, u8> = HashMap::new();
                 while let Some((u, data)) = qt.pop() {
                     if !valid(u) {
-                        continue; // universo invalido: descarta em vez de derrubar a thread
+                        continue; // invalid universe: drop it instead of killing the thread
                     }
                     let s = seq.entry(u).or_insert(0);
-                    *s = *s % 255 + 1; // 1..255, 0 = sem sequencia
+                    *s = *s % 255 + 1; // 1..255, 0 = no sequence
                     artdmx_into(&mut buf, u, &data, *s, 0);
                     for t in &tt {
-                        let _ = sock.send_to(&buf, t); // rede sem rota para 2.x/10.x: ignora
+                        let _ = sock.send_to(&buf, t); // network with no route to 2.x/10.x: ignore
                     }
                 }
             })?;
@@ -224,8 +225,9 @@ impl Drop for ArtNetOut {
 
 // ------------------------------------------------------------------ ArtNetIn
 
-/// Escuta ArtDmx e guarda o ultimo frame de cada universo. Gemeo do `SacnIn`; Art-Net nao tem
-/// grupo multicast por universo (o frame chega por broadcast ou unicast), entao nada a declarar.
+/// Listens to ArtDmx and keeps the last frame of each universe. Twin of `SacnIn`; Art-Net has
+/// no multicast group per universe (the frame arrives by broadcast or unicast), so there is
+/// nothing to declare.
 pub struct ArtNetIn {
     last: Arc<Mutex<HashMap<u16, [u8; 512]>>>,
     run: Arc<AtomicBool>,
@@ -237,7 +239,7 @@ impl ArtNetIn {
         ArtNetIn::with_port(PORT)
     }
 
-    /// Porta alternativa (teste de loopback quando a 6454 esta ocupada).
+    /// Alternate port (loopback test when 6454 is busy).
     pub fn with_port(port: u16) -> io::Result<ArtNetIn> {
         let s = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
         s.set_reuse_address(true)?;
@@ -286,7 +288,7 @@ impl ArtNetIn {
     pub fn close(&mut self) {
         self.run.store(false, Ordering::Relaxed);
         if let Some(th) = self.th.take() {
-            let _ = th.join(); // sai em ate 200 ms (read timeout)
+            let _ = th.join(); // exits within 200 ms (read timeout)
         }
     }
 }
@@ -312,17 +314,17 @@ mod tests {
     }
 
     #[test]
-    fn artdmx_bate_com_o_fixture() {
+    fn artdmx_matches_the_fixture() {
         let want = std::fs::read(FIXTURE).expect("fixture artnet_packet.bin");
         let got = artdmx(1, &data512(), 0);
-        assert_eq!(got.len(), want.len(), "tamanho do ArtDmx");
-        assert_eq!(got, want, "bytes do ArtDmx");
+        assert_eq!(got.len(), want.len(), "ArtDmx size");
+        assert_eq!(got, want, "ArtDmx bytes");
     }
 
-    /// Cabecalho (18 bytes) gerado pelo Python para universo 17, seq 200:
-    /// SubUni 0x10, Net 0x00, Length 0x0200. Trava o par little/big-endian.
+    /// Header (18 bytes) generated by Python for universe 17, seq 200:
+    /// SubUni 0x10, Net 0x00, Length 0x0200. Locks the little/big-endian pair.
     #[test]
-    fn cabecalho_universo_17() {
+    fn header_universe_17() {
         let p = artdmx(17, &data512(), 200);
         assert_eq!(p.len(), 530);
         assert_eq!(
@@ -351,18 +353,18 @@ mod tests {
                 assert_eq!(physical, 0);
                 assert_eq!(data, d);
             }
-            _ => panic!("esperava ArtDmx"),
+            _ => panic!("expected ArtDmx"),
         }
         assert_eq!(parse(&artsync()), Some(Packet::Sync));
         assert_eq!(
             parse(&artpoll(0x06, 0x10)),
             Some(Packet::Poll { flags: 0x06 })
         );
-        assert!(parse(b"nao e art-net").is_none());
+        assert!(parse(b"not art-net").is_none());
     }
 
     #[test]
-    fn dados_impares_e_vazios() {
+    fn odd_and_empty_data() {
         let p = artdmx(1, &[1, 2, 3], 1);
         assert_eq!(u16::from_be_bytes([p[16], p[17]]), 4);
         assert_eq!(&p[18..], &[1, 2, 3, 0]);
@@ -380,27 +382,27 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "universo fora de faixa")]
-    fn port_address_zero_e_erro() {
+    #[should_panic(expected = "universe out of range")]
+    fn port_address_zero_is_an_error() {
         port_address(0);
     }
 
     #[test]
-    #[should_panic(expected = "universo fora de faixa")]
-    fn port_address_acima_da_faixa_e_erro() {
+    #[should_panic(expected = "universe out of range")]
+    fn port_address_above_range_is_an_error() {
         port_address(0x8001);
     }
 
-    /// ArtNetOut -> ArtNetIn em 127.0.0.1, porta livre: o ultimo frame chega inteiro.
+    /// ArtNetOut -> ArtNetIn on 127.0.0.1, free port: the last frame arrives whole.
     #[test]
     fn loopback_out_in() {
         let mut rx = match ArtNetIn::with_port(6456) {
             Ok(r) => r,
-            Err(e) => return println!("pulado: bind 6456 falhou: {:?}", e.kind()),
+            Err(e) => return println!("skipped: bind 6456 failed: {:?}", e.kind()),
         };
         let mut tx = match ArtNetOut::with_port(Some(vec!["127.0.0.1".into()]), false, 6456) {
             Ok(t) => t,
-            Err(e) => return println!("pulado: socket de saida falhou: {:?}", e.kind()),
+            Err(e) => return println!("skipped: output socket failed: {:?}", e.kind()),
         };
         let frame: [u8; 512] = std::array::from_fn(|i| (i as u8) ^ 0x33);
         for _ in 0..3 {
@@ -417,16 +419,16 @@ mod tests {
         tx.close();
         rx.close();
         match got {
-            None => println!("pulado: UDP em loopback nao entregou (firewall?)"),
-            Some(g) => assert_eq!(g, frame, "ultimo frame recebido byte a byte"),
+            None => println!("skipped: loopback UDP did not deliver (firewall?)"),
+            Some(g) => assert_eq!(g, frame, "last frame received byte for byte"),
         }
     }
 
     #[test]
-    fn send_nao_bloqueia() {
+    fn send_does_not_block() {
         let mut tx = match ArtNetOut::with_port(Some(vec!["127.0.0.1".into()]), false, 6455) {
             Ok(t) => t,
-            Err(e) => return println!("pulado: socket de saida falhou: {:?}", e.kind()),
+            Err(e) => return println!("skipped: output socket failed: {:?}", e.kind()),
         };
         let frame = [3u8; 512];
         let t0 = Instant::now();
@@ -435,6 +437,6 @@ mod tests {
         }
         let dt = t0.elapsed();
         tx.close();
-        assert!(dt < Duration::from_millis(500), "100 sends levaram {dt:?}");
+        assert!(dt < Duration::from_millis(500), "100 sends took {dt:?}");
     }
 }

@@ -9,12 +9,13 @@ path = "src/main.rs"
 
 [dependencies]
 cli = { workspace = true }
-engine = { workspace = true }   # so para `midi::builder`: o mapa MIDI usa o registry da CLI
+engine = { workspace = true }   # only for `midi::builder`: the MIDI map uses the CLI registry
 serve = { workspace = true }
 
-# A janela so' existe no Windows (WebView2 ja' vem no 11); no Pi a Lite abre a GUI pelo
-# navegador. Fora do Windows o binario nao arrasta `wry`/`tao` nem o webkit2gtk que eles pedem,
-# e o `cargo build --workspace` do CI (ubuntu, aarch64-musl) continua passando.
+# The window only exists on Windows (WebView2 already ships with 11); on the Pi the Lite opens
+# the GUI in the browser. Outside Windows the binary drags in neither `wry`/`tao` nor the
+# webkit2gtk they need, and the CI `cargo build --workspace` (ubuntu, aarch64-musl) keeps
+# passing.
 [target.'cfg(windows)'.dependencies]
 tao = "0.37"
 wry = "0.57"

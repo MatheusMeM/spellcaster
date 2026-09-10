@@ -1,9 +1,9 @@
-//! Leitura/escrita de arquivos .ild (ILDA Image Data Transfer Format).
+//! Reading/writing of .ild files (ILDA Image Data Transfer Format).
 //!
-//! Formatos: 0 3D indexado, 1 2D indexado, 2 paleta, 4 3D true color, 5 2D true color.
-//! Header de 32 bytes big-endian; status bit7 = ultimo ponto, bit6 = apagado.
-//! Porte 1:1 de `spellcaster/protocols/ilda/ild.py` — `shows/medgrupo_laser.ild` lido e
-//! regravado tem que dar os MESMOS bytes (teste `ild_medgrupo_byte_a_byte`).
+//! Formats: 0 indexed 3D, 1 indexed 2D, 2 palette, 4 true color 3D, 5 true color 2D.
+//! 32-byte big-endian header; status bit7 = last point, bit6 = blanked.
+//! 1:1 port of `spellcaster/protocols/ilda/ild.py` - `shows/medgrupo_laser.ild` read and
+//! written back must give the SAME bytes (test `ild_medgrupo_byte_by_byte`).
 
 use std::path::Path;
 
@@ -13,7 +13,7 @@ pub const LAST: u8 = 0x80;
 pub const BLANK: u8 = 0x40;
 const HDR: usize = 32;
 
-/// Tamanho do registro de cada formato. `None` = formato invalido.
+/// Record size of each format. `None` = invalid format.
 pub fn rec_size(fmt: u8) -> Option<usize> {
     match fmt {
         0 => Some(8),  // >hhhBB
@@ -25,7 +25,7 @@ pub fn rec_size(fmt: u8) -> Option<usize> {
     }
 }
 
-/// Paleta padrao ILDA (64 cores).
+/// Default ILDA palette (64 colors).
 pub const DEFAULT_PALETTE: [(u8, u8, u8); 64] = [
     (255, 0, 0),
     (255, 16, 0),
@@ -103,7 +103,7 @@ fn bei16(b: &[u8], i: usize) -> i16 {
     i16::from_be_bytes([b[i], b[i + 1]])
 }
 
-/// `name.rstrip(b"\0 ").decode("ascii", "replace")` do Python.
+/// Python's `name.rstrip(b"\0 ").decode("ascii", "replace")`.
 fn decode_name(b: &[u8]) -> String {
     let end = b
         .iter()
@@ -121,8 +121,8 @@ fn decode_name(b: &[u8]) -> String {
         .collect()
 }
 
-/// `s.encode("ascii", "replace")[:8].ljust(8)` do Python: nao-ASCII vira '?', corta em 8,
-/// completa com espaco.
+/// Python's `s.encode("ascii", "replace")[:8].ljust(8)`: non-ASCII becomes '?', cut at 8,
+/// padded with spaces.
 fn encode_name(s: &str) -> [u8; 8] {
     let mut out = [b' '; 8];
     for (i, c) in s.chars().take(8).enumerate() {
@@ -131,7 +131,7 @@ fn encode_name(s: &str) -> [u8; 8] {
     out
 }
 
-/// Le .ild. Secao de paleta (fmt 2) troca a paleta dos frames indexados seguintes.
+/// Reads .ild. A palette section (fmt 2) replaces the palette of the following indexed frames.
 pub fn read(path: &Path) -> Result<Vec<Frame>, String> {
     let data = std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
     read_bytes(&data)
@@ -151,16 +151,16 @@ pub fn read_bytes(data: &[u8]) -> Result<Vec<Frame>, String> {
             Some(s) if data[h..h + 4] == *b"ILDA" => s,
             _ => {
                 return Err(format!(
-                    "header invalido em {h}: {:?} fmt={fmt}",
+                    "invalid header at {h}: {:?} fmt={fmt}",
                     &data[h..h + 4]
                 ))
             }
         };
         if n == 0 {
-            break; // frame final vazio = fim
+            break; // empty final frame = end
         }
         if pos + n * rsize > data.len() {
-            return Err(format!("registros truncados em {pos}"));
+            return Err(format!("truncated records at {pos}"));
         }
         let recs = &data[pos..pos + n * rsize];
         pos += n * rsize;
@@ -174,7 +174,7 @@ pub fn read_bytes(data: &[u8]) -> Result<Vec<Frame>, String> {
         for i in 0..n {
             let r = &recs[i * rsize..];
             let (x, y) = (bei16(r, 0), bei16(r, 2));
-            let z = if fmt == 0 || fmt == 4 { 2 } else { 0 }; // fmt 3D tem Z antes do status
+            let z = if fmt == 0 || fmt == 4 { 2 } else { 0 }; // 3D fmt has Z before the status
             let (st, col) = match fmt {
                 0 | 1 => {
                     let ci = r[5 + z] as usize;
@@ -215,7 +215,8 @@ fn section(
     out.extend_from_slice(&[0, 0]); // projector + pad
 }
 
-/// Indice da cor mais proxima na paleta (menor distancia quadratica; empate fica no menor indice).
+/// Index of the nearest color in the palette (smallest squared distance; a tie keeps the
+/// smallest index).
 fn index_of(col: (u8, u8, u8), pal: &[(u8, u8, u8)]) -> u8 {
     let d = |c: &(u8, u8, u8)| {
         let f = |a: u8, b: u8| (a as i32 - b as i32).pow(2);
@@ -239,8 +240,8 @@ pub fn write(
     std::fs::write(path, bytes).map_err(|e| format!("{}: {e}", path.display()))
 }
 
-/// Grava frames em .ild. fmt 0/1 indexado usa `palette` (gravada antes como secao fmt 2)
-/// ou a padrao.
+/// Writes frames to .ild. Indexed fmt 0/1 uses `palette` (written first as an fmt 2 section)
+/// or the default one.
 pub fn write_bytes(
     frames: &[Frame],
     fmt: u8,
@@ -249,7 +250,7 @@ pub fn write_bytes(
     palette: Option<&[(u8, u8, u8)]>,
 ) -> Result<Vec<u8>, String> {
     if !matches!(fmt, 0 | 1 | 4 | 5) {
-        return Err("fmt deve ser 0, 1, 4 ou 5".into());
+        return Err("fmt must be 0, 1, 4 or 5".into());
     }
     let rsize = rec_size(fmt).unwrap();
     let total = frames.len();
@@ -263,7 +264,7 @@ pub fn write_bytes(
             out.extend_from_slice(&[c.0, c.1, c.2]);
         }
     }
-    // frame vazio: 1 ponto apagado (n=0 seria fim de arquivo)
+    // empty frame: 1 blanked point (n=0 would be end of file)
     let empty = [Point {
         blank: true,
         ..Point::default()
@@ -291,7 +292,7 @@ pub fn write_bytes(
             }
         }
     }
-    section(&mut out, fmt, name, company, 0, total, total); // terminador
+    section(&mut out, fmt, name, company, 0, total, total); // terminator
     Ok(out)
 }
 
@@ -334,7 +335,7 @@ mod tests {
             };
             assert_eq!(key(a), key(b));
         }
-        assert_eq!(back[2].len(), 1); // frame vazio vira 1 ponto apagado
+        assert_eq!(back[2].len(), 1); // an empty frame becomes 1 blanked point
         assert!(back[2].points[0].blank);
         back
     }
@@ -353,7 +354,7 @@ mod tests {
     }
 
     #[test]
-    fn fmt1_paleta_padrao() {
+    fn fmt1_default_palette() {
         let b = roundtrip(1, None);
         assert_eq!(
             (b[0].points[0].r, b[0].points[0].g, b[0].points[0].b),
@@ -362,7 +363,7 @@ mod tests {
     }
 
     #[test]
-    fn fmt1_com_secao_de_paleta() {
+    fn fmt1_with_palette_section() {
         let pal = [(1u8, 2u8, 3u8), (255, 0, 0), (0, 255, 0)];
         let b = roundtrip(1, Some(&pal));
         assert_eq!(
@@ -372,14 +373,14 @@ mod tests {
     }
 
     #[test]
-    fn fmt0_e_4() {
+    fn fmt0_and_4() {
         roundtrip(0, None);
         roundtrip(4, None);
     }
 
     #[test]
-    fn layout_do_seed() {
-        // identico ao tests/test_ilda.py::test_seed_layout_matches
+    fn seed_layout() {
+        // identical to tests/test_ilda.py::test_seed_layout_matches
         let f = Frame::new(
             vec![
                 Point::new(1.0, -2.0, 10, 20, 30, false),
@@ -397,7 +398,7 @@ mod tests {
     }
 
     #[test]
-    fn fmt_invalido_recusado() {
+    fn invalid_fmt_refused() {
         assert!(write_bytes(&[], 2, "", "", None).is_err());
         assert!(read_bytes(b"NOPE\0\0\0\x05aaaaaaaabbbbbbbb\0\x01\0\0\0\x01\0\0").is_err());
     }

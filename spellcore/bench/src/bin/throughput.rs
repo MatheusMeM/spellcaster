@@ -1,6 +1,6 @@
-// bench `throughput`: 16 universos sACN + 16 Art-Net a 60 Hz, %CPU de um nucleo, RSS e
-// boot ate o primeiro frame DMX. Gate do PRD: cpu < 3 %, rss < 60 MB, boot < 2 s.
-// Saida ASCII pura (console cp1252).
+// bench `throughput`: 16 sACN universes + 16 Art-Net at 60 Hz, %CPU of a core, RSS and boot
+// until the first DMX frame. PRD gate: cpu < 3 %, rss < 60 MB, boot < 2 s.
+// Pure ASCII output (cp1252 console).
 
 use bench::arg_f64;
 use engine::clock::Clock;
@@ -11,7 +11,7 @@ use protocols::Output;
 use std::net::Ipv4Addr;
 use std::time::{Duration, Instant};
 
-// ---- CPU e RSS do proprio processo, sem dependencia extra ----
+// ---- CPU and RSS of the process itself, with no extra dependency ----
 
 #[cfg(windows)]
 #[link(name = "kernel32")]
@@ -22,8 +22,8 @@ extern "system" {
 
 #[cfg(windows)]
 #[repr(C)]
-// PROCESS_MEMORY_COUNTERS: so' `cb` (tamanho) e `working_set_size` sao lidos; o resto e' o
-// tamanho certo da struct para a API nao escrever fora.
+// PROCESS_MEMORY_COUNTERS: only `cb` (size) and `working_set_size` are read; the rest is the
+// right struct size so the API does not write past it.
 struct ProcessMemoryCounters {
     cb: u32,
     _page_faults: u32,
@@ -38,7 +38,7 @@ extern "system" {
     fn GetProcessMemoryInfo(h: isize, c: *mut ProcessMemoryCounters, cb: u32) -> i32;
 }
 
-/// Tempo de CPU do processo (usuario + kernel), em segundos.
+/// Process CPU time (user + kernel), in seconds.
 #[cfg(windows)]
 fn cpu_secs() -> Option<f64> {
     let (mut c, mut e, mut k, mut u) = (0u64, 0u64, 0u64, 0u64);
@@ -47,7 +47,7 @@ fn cpu_secs() -> Option<f64> {
             return None;
         }
     }
-    Some((k + u) as f64 * 1e-7) // FILETIME conta 100 ns
+    Some((k + u) as f64 * 1e-7) // FILETIME counts 100 ns
 }
 
 #[cfg(windows)]
@@ -64,8 +64,8 @@ fn rss_bytes() -> Option<u64> {
 
 #[cfg(not(windows))]
 fn cpu_secs() -> Option<f64> {
-    // ponytail: campos 14 (utime) e 15 (stime) do /proc/self/stat, tick fixo em 100 Hz ;
-    // trocar por sysconf(_SC_CLK_TCK) se aparecer kernel com HZ diferente.
+    // ponytail: fields 14 (utime) and 15 (stime) of /proc/self/stat, tick fixed at 100 Hz ;
+    // switch to sysconf(_SC_CLK_TCK) if a kernel with a different HZ shows up.
     let s = std::fs::read_to_string("/proc/self/stat").ok()?;
     let f: Vec<&str> = s.rsplit(')').next()?.split_whitespace().collect();
     let ut: f64 = f.get(11)?.parse().ok()?;
@@ -91,14 +91,14 @@ fn main() {
     let mut sacn = match SacnOut::new(&sacn_u, Some(vec![Ipv4Addr::LOCALHOST])) {
         Ok(o) => o,
         Err(e) => {
-            println!("throughput: sACN nao abriu: {} -> FALHA", e);
+            println!("throughput: sACN did not open: {} -> FAIL", e);
             std::process::exit(1);
         }
     };
     let mut art = match ArtNetOut::new(Some(vec!["127.0.0.1".to_string()]), false) {
         Ok(o) => o,
         Err(e) => {
-            println!("throughput: Art-Net nao abriu: {} -> FALHA", e);
+            println!("throughput: Art-Net did not open: {} -> FAIL", e);
             std::process::exit(1);
         }
     };
@@ -117,8 +117,8 @@ fn main() {
     let cpu0 = cpu_secs();
     let wall0 = Instant::now();
 
-    // ponytail: laco sem alocacao - iter() sobre buffers ja preenchidos, send() copia p/ a fila ;
-    // se um dia o show mudar por frame, entra Timeline::apply aqui antes dos sends.
+    // ponytail: allocation-free loop - iter() over already filled buffers, send() copies to the
+    // queue ; if some day the show changes per frame, Timeline::apply goes here before the sends.
     Clock::new(fps).run(
         |_t| {
             for (i, u) in universes.iter().enumerate() {
@@ -162,7 +162,7 @@ fn main() {
     let boot_s = boot.map(|b| b.as_secs_f64()).unwrap_or(f64::INFINITY);
 
     println!(
-        "throughput {} sacn + {} artnet @{}Hz {}s: frames={} cpu={} wall={:.3}s = {} de um nucleo",
+        "throughput {} sacn + {} artnet @{}Hz {}s: frames={} cpu={} wall={:.3}s = {} of a core",
         half,
         nu - half,
         fps,
@@ -172,12 +172,12 @@ fn main() {
         wall,
         pct_txt
     );
-    println!("rss={}  boot_ate_primeiro_frame={:.3}s", rss_txt, boot_s);
+    println!("rss={}  boot_to_first_frame={:.3}s", rss_txt, boot_s);
 
     let ok = ok_cpu && ok_rss && boot_s < 2.0;
     println!(
-        "alvo: cpu < 3.00%, rss < 60MB, boot < 2.000s  -> {}",
-        if ok { "OK" } else { "FALHA" }
+        "target: cpu < 3.00%, rss < 60MB, boot < 2.000s  -> {}",
+        if ok { "OK" } else { "FAIL" }
     );
     std::process::exit(if ok { 0 } else { 1 });
 }

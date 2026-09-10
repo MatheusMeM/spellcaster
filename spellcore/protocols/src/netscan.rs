@@ -1,6 +1,6 @@
-//! Analise de rede: interfaces, nos Art-Net (ArtPoll), fontes sACN (discovery),
-//! Ether Dream (beacon UDP 7654) e sugestoes de configuracao.
-//! Espelha `spellcaster/protocols/netscan.py`. Todo texto de saida e ASCII (console cp1252).
+//! Network analysis: network interfaces, Art-Net nodes (ArtPoll), sACN sources (discovery),
+//! Ether Dream (UDP beacon 7654) and configuration suggestions.
+//! Mirrors `spellcaster/protocols/netscan.py`. All output text is ASCII (cp1252 console).
 
 use std::io::{self, Read};
 use std::net::{Ipv4Addr, SocketAddrV4, TcpStream, UdpSocket};
@@ -11,16 +11,16 @@ use serde::Serialize;
 use socket2::{Domain, Protocol, Socket, Type};
 
 pub const ETHERDREAM_PORT: u16 = 7654;
-/// Porta do stream de pontos, usada aqui so' para pedir o status quando o beacon nao chega.
-/// E' a mesma `laser::dac::etherdream::TCP_PORT` — o `laser` depende do `protocols`, nao o
-/// contrario, e o numero vem do protocolo, nao do outro crate.
+/// Point stream port, used here only to ask for the status when the beacon does not arrive.
+/// It is the same as `laser::dac::etherdream::TCP_PORT` - `laser` depends on `protocols`, not
+/// the other way around, and the number comes from the protocol, not from the other crate.
 pub const ETHERDREAM_TCP_PORT: u16 = 7765;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Iface {
     pub name: String,
     pub ip: String,
-    /// Vazio quando o sistema nao informou (o `suggest` assume /24, como o Python).
+    /// Empty when the system did not report it (`suggest` assumes /24, like Python).
     pub mask: String,
     pub gateway: Option<String>,
 }
@@ -35,7 +35,7 @@ fn from_u32(v: u32) -> String {
     Ipv4Addr::from(v).to_string()
 }
 
-/// Prefixo CIDR -> mascara pontilhada.
+/// CIDR prefix -> dotted mask.
 pub fn mask_from_prefix(prefix: u32) -> String {
     let m = if prefix == 0 {
         0
@@ -45,17 +45,17 @@ pub fn mask_from_prefix(prefix: u32) -> String {
     from_u32(m)
 }
 
-/// Endereco de rede.
+/// Network address.
 pub fn net_of(ip: &str, mask: &str) -> String {
     from_u32(to_u32(ip) & to_u32(mask))
 }
 
-/// Endereco de broadcast da subrede.
+/// Broadcast address of the subnet.
 pub fn bcast_of(ip: &str, mask: &str) -> String {
     from_u32(to_u32(ip) | !to_u32(mask))
 }
 
-/// Primeiro literal IPv4 do texto (equivalente ao `\d{1,3}(\.\d{1,3}){3}` do Python).
+/// First IPv4 literal in the text (equivalent to Python's `\d{1,3}(\.\d{1,3}){3}`).
 fn first_ipv4(s: &str) -> Option<String> {
     for tok in s.split(|c: char| !c.is_ascii_digit() && c != '.') {
         let parts: Vec<&str> = tok.split('.').collect();
@@ -91,7 +91,7 @@ fn skip_words(s: &str, n: usize) -> &str {
     r
 }
 
-/// Nome da interface a partir da linha de cabecalho do `ipconfig`
+/// Network interface name taken from the `ipconfig` header line
 /// ("Ethernet adapter X:", "Adaptador de Rede sem Fio X:", "Adaptador Ethernet X:").
 fn iface_name(line: &str) -> String {
     let t = line.trim();
@@ -107,7 +107,7 @@ fn iface_name(line: &str) -> String {
         let n = if let Some(r) = rest.strip_prefix("de Rede sem Fio ") {
             r
         } else if rest.starts_with("de T") {
-            skip_words(rest, 2) // "de Tunel <nome>" (acento pode vir quebrado)
+            skip_words(rest, 2) // "de Tunel <name>" (the accent may arrive mangled)
         } else {
             skip_words(rest, 1)
         };
@@ -119,7 +119,7 @@ fn iface_name(line: &str) -> String {
     body.to_string()
 }
 
-/// Saida de `ipconfig` (pt-BR ou en, acentos podem vir quebrados) -> interfaces com IPv4.
+/// `ipconfig` output (pt-BR or en, accents may arrive mangled) -> interfaces with IPv4.
 pub fn parse_ipconfig(text: &str) -> Vec<Iface> {
     let mut ifaces: Vec<Iface> = Vec::new();
     let mut want_gw = false;
@@ -142,7 +142,7 @@ pub fn parse_ipconfig(text: &str) -> Vec<Iface> {
         };
         if want_gw {
             if let Some(ip) = only_ipv4(line) {
-                cur.gateway = Some(ip); // IPv4 na linha depois do gateway IPv6
+                cur.gateway = Some(ip); // IPv4 on the line after the IPv6 gateway
                 want_gw = false;
                 continue;
             }
@@ -168,7 +168,7 @@ pub fn parse_ipconfig(text: &str) -> Vec<Iface> {
     ifaces
 }
 
-/// Fallback Linux: saida de `ip addr` (+ `ip route` para o gateway).
+/// Linux fallback: `ip addr` output (+ `ip route` for the gateway).
 pub fn parse_ip_addr(text: &str, route_text: &str) -> Vec<Iface> {
     let mut ifaces = Vec::new();
     let mut cur = String::new();
@@ -265,7 +265,7 @@ fn interfaces_linux() -> Option<Vec<Iface>> {
     Some(out)
 }
 
-/// Interfaces IPv4 ativas (sem loopback).
+/// Active IPv4 network interfaces (loopback excluded).
 pub fn interfaces() -> Vec<Iface> {
     let mut ifaces = if cfg!(windows) {
         parse_ipconfig(&run("ipconfig", &[]))
@@ -296,8 +296,8 @@ pub struct Node {
     pub from: String,
 }
 
-/// String NUL-terminada dos anuncios (Art-Net e E1.31): latin-1 na letra do padrao, mas o que
-/// os nos mandam na pratica e' UTF-8 quando sai do ASCII.
+/// NUL-terminated string of the announcements (Art-Net and E1.31): latin-1 by the letter of
+/// the standard, but what the nodes send in practice is UTF-8 once it leaves ASCII.
 fn latin1(b: &[u8]) -> String {
     let end = b.iter().position(|&c| c == 0).unwrap_or(b.len());
     String::from_utf8_lossy(&b[..end]).into_owned()
@@ -356,14 +356,16 @@ fn udp_on(ip: Ipv4Addr, port: u16, broadcast: bool) -> io::Result<UdpSocket> {
     Ok(s.into())
 }
 
-/// IPs a tentar no bind, em ordem: o coringa (recebe de todas as placas) e depois o IP de cada
-/// placa. No Windows o bind coringa e' RECUSADO com WSAEACCES (10013) quando outro programa ja'
-/// tem a porta — o Ether Dream Sitter fica em `0.0.0.0:7654` — e `SO_REUSEADDR` do nosso lado
-/// nao resolve, porque o Windows so' compartilha se os DOIS sockets pedirem. O bind no IP da
-/// placa passa nesse caso E continua recebendo o broadcast do beacon (medido: Sitter aberto,
-/// bind em 169.254.86.236:7654, quatro beacons de 169.254.207.140 em 4 s).
-/// O loopback fecha a lista (`interfaces()` nao o devolve): e' por onde chega o beacon de um DAC
-/// emulado no proprio PC, que o bind coringa pegaria e o bind de placa nao pega.
+/// IPs to try on bind, in order: the wildcard (receives from every network interface) and then
+/// the IP of each interface. On Windows the wildcard bind is REFUSED with WSAEACCES (10013)
+/// when another program already holds the port - Ether Dream Sitter sits on `0.0.0.0:7654` -
+/// and `SO_REUSEADDR` on our side does not help, because Windows only shares if BOTH sockets
+/// ask for it. Binding to the interface IP works in that case AND still receives the beacon
+/// broadcast (measured: Sitter open, bind on 169.254.86.236:7654, four beacons from
+/// 169.254.207.140 in 4 s).
+/// Loopback closes the list (`interfaces()` does not return it): it is where the beacon of a
+/// DAC emulated on the PC itself arrives, which the wildcard bind would catch and the
+/// interface bind does not.
 fn bind_ips(ifaces: &[Iface]) -> Vec<Ipv4Addr> {
     std::iter::once(Ipv4Addr::UNSPECIFIED)
         .chain(ifaces.iter().filter_map(|i| i.ip.parse().ok()))
@@ -375,11 +377,11 @@ fn udp(port: u16, broadcast: bool, ifaces: &[Iface]) -> io::Result<UdpSocket> {
     bind_ips(ifaces)
         .into_iter()
         .find_map(|ip| udp_on(ip, port, broadcast).ok())
-        // ultimo caso: porta efemera, onde so' chega resposta unicast ao remetente
+        // last resort: ephemeral port, where only a unicast reply to the sender arrives
         .map_or_else(|| udp_on(Ipv4Addr::UNSPECIFIED, 0, broadcast), Ok)
 }
 
-/// ArtPoll em broadcast (global + 2.x + 10.x + subrede de cada interface) e coleta ArtPollReply.
+/// Broadcast ArtPoll (global + 2.x + 10.x + subnet of each interface) and collect ArtPollReply.
 pub fn scan_artnet(timeout: Duration, ifaces: &[Iface]) -> Vec<Node> {
     let Ok(sock) = udp(crate::artnet::PORT, true, ifaces) else {
         return Vec::new();
@@ -456,7 +458,7 @@ pub fn parse_sacn_discovery(data: &[u8]) -> Option<Discovery> {
     })
 }
 
-/// Entra no multicast de discovery (239.255.250.214:5568) e lista as fontes anunciadas.
+/// Joins the discovery multicast group (239.255.250.214:5568) and lists the announced sources.
 pub fn scan_sacn(timeout: Duration, ifaces: &[Iface]) -> Vec<Source> {
     let s = match Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP)) {
         Ok(s) => s,
@@ -533,11 +535,12 @@ pub struct Dac {
     pub buffer_capacity: u16,
     pub max_point_rate: u32,
     pub status: Status,
-    /// Como foi achado: `beacon` (UDP 7654) ou `tcp` (status pedido em 7765).
+    /// How it was found: `beacon` (UDP 7654) or `tcp` (status asked on 7765).
     pub via: String,
 }
 
-/// Beacon Ether Dream: `<6sHHHI` (16 bytes) + status `<BBBBHHHHII` (20 bytes). Tudo little-endian.
+/// Ether Dream beacon: `<6sHHHI` (16 bytes) + status `<BBBBHHHHII` (20 bytes). All
+/// little-endian.
 pub fn parse_beacon(b: &[u8]) -> Option<(String, u16, u16, u16, u32, Status)> {
     if b.len() < 36 {
         return None;
@@ -559,7 +562,7 @@ pub fn parse_beacon(b: &[u8]) -> Option<(String, u16, u16, u16, u32, Status)> {
     ))
 }
 
-/// `dac_status`, 20 bytes little-endian — o mesmo bloco no beacon UDP e na resposta TCP.
+/// `dac_status`, 20 little-endian bytes - the same block in the UDP beacon and in the TCP reply.
 pub fn parse_status(b: &[u8]) -> Option<Status> {
     if b.len() < 20 {
         return None;
@@ -580,16 +583,17 @@ pub fn parse_status(b: &[u8]) -> Option<Status> {
     })
 }
 
-/// Vizinhos IPv4 `(ip, mac)` da tabela ARP: saida de `arp -a` (Windows, qualquer idioma) ou de
-/// `ip neigh` (Linux). Funcao pura — o texto e' LIDO, nunca executado com argumento de fora.
-/// A chave e' o endereco fisico na linha, e nao o nome da coluna: o cabecalho muda de idioma e
-/// chega com acento quebrado no console cp1252. Broadcast e multicast ficam de fora.
+/// IPv4 neighbors `(ip, mac)` from the ARP table: output of `arp -a` (Windows, any language) or
+/// of `ip neigh` (Linux). Pure function - the text is READ, never run with an outside argument.
+/// The key is the physical address on the line, not the column name: the header changes with
+/// the language and arrives with mangled accents on a cp1252 console. Broadcast and multicast
+/// are left out.
 pub fn parse_arp(text: &str) -> Vec<(String, String)> {
     let mut out: Vec<(String, String)> = Vec::new();
     for line in text.lines() {
         let toks: Vec<&str> = line.split_whitespace().collect();
         let Some(mac) = toks.iter().find_map(|t| mac_of(t)) else {
-            continue; // cabecalho, linha "Interface: ...", entrada sem endereco fisico
+            continue; // header, "Interface: ..." line, entry with no physical address
         };
         if mac == "ff:ff:ff:ff:ff:ff" || mac.starts_with("01:00:5e") {
             continue;
@@ -604,7 +608,7 @@ pub fn parse_arp(text: &str) -> Vec<(String, String)> {
     out
 }
 
-/// `8a-9e-36-98-8c-ce` ou `8a:9e:36:98:8c:ce` -> forma com `:` minuscula.
+/// `8a-9e-36-98-8c-ce` or `8a:9e:36:98:8c:ce` -> lowercase `:` form.
 fn mac_of(tok: &str) -> Option<String> {
     let sep = if tok.contains('-') { '-' } else { ':' };
     let parts: Vec<&str> = tok.split(sep).collect();
@@ -623,10 +627,10 @@ fn arp_table() -> String {
     }
 }
 
-/// Pede o status por TCP a cada vizinho: um Ether Dream manda os 22 bytes (`ack` + comando
-/// ecoado + `dac_status`) assim que aceita a conexao. Acha o DAC quando o beacon nao chega —
-/// outro programa com a porta 7654, broadcast bloqueado, ou DAC ainda calado.
-/// Ate 32 conexoes por vez; cada uma desiste em `wait`.
+/// Asks each neighbor for the status over TCP: an Ether Dream sends the 22 bytes (`ack` +
+/// echoed command + `dac_status`) as soon as it accepts the connection. Finds the DAC when the
+/// beacon does not arrive - another program holding port 7654, blocked broadcast, or a DAC
+/// still silent. Up to 32 connections at a time; each one gives up after `wait`.
 pub fn probe_etherdream(neigh: &[(String, String)], port: u16, wait: Duration) -> Vec<Dac> {
     let mut out = Vec::new();
     for lote in neigh.chunks(32) {
@@ -649,13 +653,14 @@ fn probe_one(ip: &str, mac: &str, port: u16, wait: Duration) -> Option<Dac> {
     let mut b = [0u8; 22];
     s.read_exact(&mut b).ok()?;
     if b[0] != b'a' {
-        return None; // outro servico na mesma porta
+        return None; // another service on the same port
     }
     Some(Dac {
         ip: ip.to_string(),
         mac: mac.to_string(),
-        // ponytail: o status TCP nao carrega hw/sw/buffer/max_pps (so' o beacon carrega) e nao
-        // se inventa numero ; some quando `laser_open` puder pedir o `dac_status` estendido.
+        // ponytail: the TCP status does not carry hw/sw/buffer/max_pps (only the beacon does)
+        // and no number is invented ; goes away when `laser_open` can ask for the extended
+        // `dac_status`.
         hw_rev: 0,
         sw_rev: 0,
         buffer_capacity: 0,
@@ -665,8 +670,8 @@ fn probe_one(ip: &str, mac: &str, port: u16, wait: Duration) -> Option<Dac> {
     })
 }
 
-/// Escuta beacons UDP 7654 (1 Hz por DAC) em todas as placas; se nada chegar na metade do
-/// prazo, procura ativamente por TCP 7765 nos vizinhos da tabela ARP.
+/// Listens for UDP 7654 beacons (1 Hz per DAC) on every network interface; if nothing arrives
+/// by half the deadline, actively probes TCP 7765 on the ARP table neighbors.
 pub fn scan_etherdream(timeout: Duration, ifaces: &[Iface]) -> Vec<Dac> {
     let socks: Vec<UdpSocket> = bind_ips(ifaces)
         .into_iter()
@@ -714,17 +719,17 @@ pub fn scan_etherdream(timeout: Duration, ifaces: &[Iface]) -> Vec<Dac> {
     found
 }
 
-// -------------------------------------------------------------- sugestoes
+// ------------------------------------------------------------- suggestions
 
-/// Regras: Art-Net prefere 2.x/8 ou 10.x/8; sACN qualquer; aviso de interfaces na mesma subrede.
-/// No Windows inclui o comando `netsh` pronto — TEXTO, nunca executado.
+/// Rules: Art-Net prefers 2.x/8 or 10.x/8; sACN takes any; warning for interfaces on the same
+/// subnet. On Windows it includes the ready `netsh` command - TEXT, never executed.
 pub fn suggest(ifaces: &[Iface]) -> Vec<String> {
     suggest_with(ifaces, cfg!(windows))
 }
 
 pub fn suggest_with(ifaces: &[Iface], windows: bool) -> Vec<String> {
     if ifaces.is_empty() {
-        return vec!["Nenhuma interface IPv4 ativa: conecte o cabo ou fixe um IP.".into()];
+        return vec!["No active IPv4 network interface: plug the cable or set a static IP.".into()];
     }
     let mut out = Vec::new();
     let mut nets: Vec<(String, Vec<String>)> = Vec::new();
@@ -742,20 +747,20 @@ pub fn suggest_with(ifaces: &[Iface], windows: bool) -> Vec<String> {
         let first = i.ip.split('.').next().unwrap_or("");
         if first == "2" || first == "10" {
             out.push(format!(
-                "{} {}/{}: Art-Net ok (rede {}.x.x.x), sACN ok.",
+                "{} {}/{}: Art-Net ok (network {}.x.x.x), sACN ok.",
                 i.name, i.ip, mask, first
             ));
         } else {
             out.push(format!(
-                "{} {}/{}: sACN ok; Art-Net prefere 2.x.x.x/8 ou 10.x.x.x/8 \
-                 (nos de fabrica em 2.x nao enxergam esta placa).",
+                "{} {}/{}: sACN ok; Art-Net prefers 2.x.x.x/8 or 10.x.x.x/8 \
+                 (factory nodes on 2.x cannot see this interface).",
                 i.name, i.ip, mask
             ));
             if windows {
                 let last = i.ip.rsplit('.').next().unwrap_or("1");
                 out.push(format!(
                     "  netsh interface ip set address name=\"{}\" static 2.0.0.{} 255.0.0.0\
-                     \x20  (como administrador; nao executado)",
+                     \x20  (as administrator; not executed)",
                     i.name, last
                 ));
             }
@@ -764,8 +769,8 @@ pub fn suggest_with(ifaces: &[Iface], windows: bool) -> Vec<String> {
     for (net, names) in &nets {
         if names.len() > 1 {
             out.push(format!(
-                "Aviso: {} na mesma subrede {}: o sistema envia por uma so; \
-                 desligue a outra ou fixe o IP de origem.",
+                "Warning: {} on the same subnet {}: the system sends through one only; \
+                 disable the other or set the source IP.",
                 names.join(", "),
                 net
             ));
@@ -773,15 +778,15 @@ pub fn suggest_with(ifaces: &[Iface], windows: bool) -> Vec<String> {
     }
     if ifaces.len() > 1 {
         out.push(
-            "sACN multicast sai pela interface da rota padrao (gateway); \
-             para outra placa, fixe o IP de origem (IP_MULTICAST_IF)."
+            "sACN multicast leaves through the default route interface (gateway); \
+             for another interface, set the source IP (IP_MULTICAST_IF)."
                 .into(),
         );
     }
     out
 }
 
-// -------------------------------------------------------------- relatorio
+// ----------------------------------------------------------------- report
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Scan {
@@ -792,7 +797,7 @@ pub struct Scan {
     pub etherdream: Vec<Dac>,
 }
 
-/// Os tres scans rodam em paralelo; cada um tem seu proprio prazo.
+/// The three scans run in parallel; each one has its own deadline.
 pub fn scan_all(timeout: Duration) -> Scan {
     let ifaces = interfaces();
     let suggestions = suggest(&ifaces);
@@ -815,11 +820,11 @@ pub fn scan_all(timeout: Duration) -> Scan {
     }
 }
 
-/// Relatorio de texto, so ASCII.
+/// Text report, ASCII only.
 pub fn report(s: &Scan) -> String {
     let mut ln: Vec<String> = Vec::new();
     if s.interfaces.is_empty() {
-        ln.push("Interfaces: (nenhuma)".into());
+        ln.push("Interfaces: (none)".into());
     } else {
         ln.push("Interfaces:".into());
         for i in &s.interfaces {
@@ -836,14 +841,14 @@ pub fn report(s: &Scan) -> String {
         }
     }
     ln.push(String::new());
-    ln.push("Sugestoes:".into());
+    ln.push("Suggestions:".into());
     ln.extend(s.suggestions.iter().map(|x| format!("  {x}")));
 
     let mut section = |title: &str, items: Vec<String>| {
         ln.push(String::new());
         ln.push(title.into());
         if items.is_empty() {
-            ln.push("  (nada encontrado)".into());
+            ln.push("  (nothing found)".into());
         } else {
             ln.extend(items.into_iter().map(|x| format!("  {x}")));
         }
@@ -864,7 +869,7 @@ pub fn report(s: &Scan) -> String {
                     n.short_name,
                     n.long_name,
                     if ports.is_empty() {
-                        "sem portas".to_string()
+                        "no ports".to_string()
                     } else {
                         ports.join(", ")
                     }
@@ -876,7 +881,7 @@ pub fn report(s: &Scan) -> String {
         "sACN (discovery):",
         s.sacn
             .iter()
-            .map(|x| format!("{}  '{}'  universos {:?}", x.ip, x.source_name, x.universes))
+            .map(|x| format!("{}  '{}'  universes {:?}", x.ip, x.source_name, x.universes))
             .collect(),
     );
     section(
@@ -899,7 +904,7 @@ pub fn report(s: &Scan) -> String {
             .collect(),
     );
     let txt = ln.join("\n");
-    debug_assert!(txt.is_ascii(), "relatorio tem que ser ASCII");
+    debug_assert!(txt.is_ascii(), "the report must be ASCII");
     txt
 }
 
@@ -962,7 +967,7 @@ Wireless LAN adapter Wi-Fi:
         );
         assert_eq!(ifs[0].ip, "192.168.0.132");
         assert_eq!(ifs[0].mask, "255.255.255.0");
-        // gateway IPv4 na linha seguinte ao IPv6
+        // IPv4 gateway on the line after the IPv6 one
         assert_eq!(ifs[0].gateway.as_deref(), Some("192.168.0.1"));
         assert_eq!(
             ifs[1],
@@ -976,8 +981,8 @@ Wireless LAN adapter Wi-Fi:
     }
 
     #[test]
-    fn ipconfig_ptbr_com_acento_quebrado() {
-        // console cp1252 lido como utf-8: acento vira U+FFFD; o parser tem que aguentar
+    fn ipconfig_ptbr_with_mangled_accent() {
+        // cp1252 console read as utf-8: the accent becomes U+FFFD; the parser must cope
         let txt = IPCONFIG_PTBR
             .replace("Mascara", "M\u{fffd}scara")
             .replace("Endereco", "Endere\u{fffd}o")
@@ -1031,7 +1036,7 @@ Wireless LAN adapter Wi-Fi:
     }
 
     #[test]
-    fn suggest_regras() {
+    fn suggest_rules() {
         let ifs = [
             iface(
                 "Wi-Fi",
@@ -1048,7 +1053,7 @@ Wireless LAN adapter Wi-Fi:
             "{txt}"
         );
         assert!(
-            txt.contains("Wi-Fi 192.168.0.10/255.255.255.0: sACN ok; Art-Net prefere"),
+            txt.contains("Wi-Fi 192.168.0.10/255.255.255.0: sACN ok; Art-Net prefers"),
             "{txt}"
         );
         assert!(
@@ -1056,7 +1061,7 @@ Wireless LAN adapter Wi-Fi:
             "{txt}"
         );
         assert!(
-            txt.contains("Wi-Fi, Ethernet na mesma subrede 192.168.0.0"),
+            txt.contains("Wi-Fi, Ethernet on the same subnet 192.168.0.0"),
             "{txt}"
         );
         assert!(!suggest_with(&ifs, false).join("\n").contains("netsh"));
@@ -1065,7 +1070,7 @@ Wireless LAN adapter Wi-Fi:
     }
 
     #[test]
-    fn mascaras_e_broadcast() {
+    fn masks_and_broadcast() {
         assert_eq!(mask_from_prefix(24), "255.255.255.0");
         assert_eq!(mask_from_prefix(8), "255.0.0.0");
         assert_eq!(net_of("192.168.0.132", "255.255.255.0"), "192.168.0.0");
@@ -1081,10 +1086,10 @@ Wireless LAN adapter Wi-Fi:
         p[18] = 0;
         p[19] = 1;
         p[26..31].copy_from_slice(b"Node1");
-        p[44..57].copy_from_slice(b"Nodo de teste");
+        p[44..53].copy_from_slice(b"Test node");
         p[172..174].copy_from_slice(&2u16.to_be_bytes());
-        p[174] = 0x80 | 0x40; // porta 0: out e in
-        p[175] = 0x80; // porta 1: so out
+        p[174] = 0x80 | 0x40; // port 0: out and in
+        p[175] = 0x80; // port 1: out only
         p[186] = 5;
         p[190] = 2;
         p[191] = 3;
@@ -1097,7 +1102,7 @@ Wireless LAN adapter Wi-Fi:
         let r = parse_artpollreply(&artpollreply()).expect("parse");
         assert_eq!(r.ip, "2.0.0.50");
         assert_eq!(r.short_name, "Node1");
-        assert_eq!(r.long_name, "Nodo de teste");
+        assert_eq!(r.long_name, "Test node");
         assert_eq!(r.mac.as_deref(), Some("aa:bb:cc:dd:ee:ff"));
         assert_eq!(
             r.ports,
@@ -1130,14 +1135,14 @@ Wireless LAN adapter Wi-Fi:
             *b = i as u8;
         }
         p[40..44].copy_from_slice(&2u32.to_be_bytes());
-        p[44..51].copy_from_slice(b"Fonte X");
+        p[44..52].copy_from_slice(b"Source X");
         p[112..114].copy_from_slice(&(0x7000u16 | (8 + 2 * universes.len() as u16)).to_be_bytes());
         p[114..118].copy_from_slice(&1u32.to_be_bytes());
         for u in universes {
             p.extend_from_slice(&u.to_be_bytes());
         }
         let r = parse_sacn_discovery(&p).expect("parse");
-        assert_eq!(r.source_name, "Fonte X");
+        assert_eq!(r.source_name, "Source X");
         assert_eq!(r.universes, universes);
         assert!(parse_sacn_discovery(&[b'x'; 200]).is_none());
     }
@@ -1159,13 +1164,13 @@ Wireless LAN adapter Wi-Fi:
         let txt = report(&s);
         assert!(txt.is_ascii());
         assert!(txt.contains("2.0.0.50  'Node1'"), "{txt}");
-        assert!(txt.contains("(nada encontrado)"), "{txt}");
+        assert!(txt.contains("(nothing found)"), "{txt}");
         assert!(serde_json::to_string(&s)
             .unwrap()
             .contains("\"interfaces\""));
     }
 
-    // `arp -a` desta maquina, lido do console cp1252 (acento vira U+FFFD).
+    // `arp -a` on this machine, read from the cp1252 console (the accent becomes U+FFFD).
     const ARP_PTBR: &str = "\
 Interface: 169.254.86.236 --- 0xc
   Endere\u{fffd}o IP           Endere\u{fffd}o f\u{fffd}sico       Tipo
@@ -1184,8 +1189,9 @@ Interface: 192.168.0.132 --- 0xe
 ";
 
     #[test]
-    fn arp_ptbr_ingles_e_linux() {
-        // a coluna muda de nome com o idioma; a chave e' o endereco fisico, nao o cabecalho
+    fn arp_ptbr_english_and_linux() {
+        // the column changes name with the language; the key is the physical address, not the
+        // header
         assert_eq!(
             parse_arp(ARP_PTBR),
             [(
@@ -1197,7 +1203,7 @@ Interface: 192.168.0.132 --- 0xe
             parse_arp(ARP_EN),
             [("192.168.0.1".to_string(), "74:3a:ef:76:d2:66".to_string())]
         );
-        // `ip neigh` do Linux, mesma funcao
+        // Linux `ip neigh`, same function
         let n = parse_arp(
             "169.254.207.140 dev eth0 lladdr 8a:9e:36:98:8c:ce REACHABLE\n\
              10.0.0.9 dev eth0  FAILED\n",
@@ -1208,8 +1214,9 @@ Interface: 192.168.0.132 --- 0xe
     }
 
     #[test]
-    fn interfaces_nao_trava() {
-        // sem placa ativa a lista vem vazia; o que nao pode e panicar nem travar
+    fn interfaces_does_not_hang() {
+        // with no active interface the list comes back empty; what it must not do is panic or
+        // hang
         let _ = interfaces();
     }
 }

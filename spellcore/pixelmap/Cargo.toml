@@ -4,9 +4,10 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-# ~600 universos independentes por frame: paralelismo de dados puro, sem thread pool propria
+# ~600 independent universes per frame: pure data parallelism, no thread pool of our own
 rayon = "1"
-# o bloco "pixelmaps" do .spell e JSON (serde_json fica no chamador; o crate so declara os tipos)
+# the "pixelmaps" block of the .spell is JSON (serde_json stays in the caller; the crate only
+# declares the types)
 serde = { workspace = true }
 
 [dev-dependencies]

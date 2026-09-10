@@ -4,9 +4,10 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-# beacon Ether Dream (UDP 7654) ja existe em protocols::netscan; reusar em vez de reimplementar
+# the Ether Dream beacon (UDP 7654) already exists in protocols::netscan; reuse instead of
+# reimplementing
 protocols = { workspace = true }
-# Safety/Transform sao lidos do bloco "safety"/"keys" do track de laser no .spell
+# Safety/Transform are read from the "safety"/"keys" block of the laser track in the .spell
 serde = { workspace = true }
 
 [dev-dependencies]

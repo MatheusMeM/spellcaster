@@ -1,5 +1,6 @@
-//! sACN (ANSI E1.31): saida multicast por interface + unicast localhost, entrada.
-//! Bytes identicos a `spellcaster/protocols/sacn.py` (fixture tests/conformance/sacn_packet.bin).
+//! sACN (ANSI E1.31): multicast output per interface + localhost unicast, input.
+//! Bytes identical to `spellcaster/protocols/sacn.py` (fixture
+//! tests/conformance/sacn_packet.bin).
 
 use std::collections::HashMap;
 use std::io;
@@ -14,7 +15,7 @@ use socket2::{Domain, Protocol, Socket, Type};
 use crate::{random16, Output, Queue};
 
 pub const PORT: u16 = 5568;
-/// Grupo multicast de discovery (E1.31 §8): quem escuta e' o `netscan`.
+/// Discovery multicast group (E1.31 §8): the listener is `netscan`.
 pub const DISCOVERY_IP: Ipv4Addr = Ipv4Addr::new(239, 255, 250, 214);
 
 /// `>HH12s` 0x10, 0, "ASC-E1.17\0\0\0"
@@ -22,13 +23,13 @@ const ROOT: [u8; 16] = [
     0x00, 0x10, 0x00, 0x00, b'A', b'S', b'C', b'-', b'E', b'1', b'.', b'1', b'7', 0, 0, 0,
 ];
 
-/// Grupo multicast do universo: 239.255.{u>>8}.{u&255}.
+/// Multicast group of the universe: 239.255.{u>>8}.{u&255}.
 pub fn mcast(universe: u16) -> Ipv4Addr {
     Ipv4Addr::new(239, 255, (universe >> 8) as u8, (universe & 255) as u8)
 }
 
-/// Pacote E1.31 data (start code 0), escrito em `out` (que e limpo antes). Sem alocacao se
-/// `out` ja tiver capacidade — e o caminho quente da thread de I/O.
+/// E1.31 data packet (start code 0), written into `out` (which is cleared first). No
+/// allocation if `out` already has capacity - this is the hot path of the I/O thread.
 pub fn packet_into(
     out: &mut Vec<u8>,
     universe: u16,
@@ -39,7 +40,7 @@ pub fn packet_into(
     priority: u8,
 ) {
     let n = data.len();
-    let dmp_len = 11 + n; // 10 do cabecalho DMP + start code + dados
+    let dmp_len = 11 + n; // 10 of the DMP header + start code + data
     let fr_len = 77 + dmp_len;
     let root_len = 22 + fr_len;
 
@@ -52,7 +53,7 @@ pub fn packet_into(
     out.extend_from_slice(&(0x7000u16 | fr_len as u16).to_be_bytes());
     out.extend_from_slice(&2u32.to_be_bytes());
     let name = source_name.as_bytes();
-    let name = &name[..name.len().min(63)]; // igual ao Python: corta em 63, preenche 64
+    let name = &name[..name.len().min(63)]; // same as Python: cut at 63, pad to 64
     out.extend_from_slice(name);
     out.resize(out.len() + (64 - name.len()), 0);
     out.push(priority);
@@ -71,7 +72,7 @@ pub fn packet_into(
     out.extend_from_slice(data);
 }
 
-/// Pacote E1.31 data. Funcao pura: mesmos bytes do gerador Python.
+/// E1.31 data packet. Pure function: same bytes as the Python generator.
 pub fn packet(
     universe: u16,
     data: &[u8],
@@ -110,7 +111,7 @@ fn cstr(b: &[u8]) -> String {
     String::from_utf8_lossy(&b[..end]).into_owned()
 }
 
-/// Pacote data (vector 4); `None` se nao for E1.31. Quem le discovery e' o `netscan`.
+/// Data packet (vector 4); `None` if it is not E1.31. Discovery is read by `netscan`.
 pub fn parse(pk: &[u8]) -> Option<Packet> {
     if pk.len() < 48 || pk[..16] != ROOT {
         return None;
@@ -118,8 +119,8 @@ pub fn parse(pk: &[u8]) -> Option<Packet> {
     let vec = be32(pk, 18);
     let mut cid = [0u8; 16];
     cid.copy_from_slice(&pk[22..38]);
-    // datagrama truncado na rede: o `get` cobre o resto da camada framing (ate 108);
-    // os dois ramos abaixo ja checam o tamanho antes de fatiar o que vem depois.
+    // datagram truncated on the network: the `get` covers the rest of the framing layer
+    // (up to 108); the two branches below already check the size before slicing what follows.
     let name = cstr(pk.get(44..108)?);
     if vec == 4 && pk.len() >= 126 {
         return Some(Packet::Data {
@@ -134,8 +135,8 @@ pub fn parse(pk: &[u8]) -> Option<Packet> {
     None
 }
 
-/// IPv4 locais (resolvendo o hostname, como o `getaddrinfo` do Python) + loopback.
-/// Ordenado por texto, igual ao `sorted()` do Python: o primeiro e o que manda o unicast.
+/// Local IPv4 addresses (resolving the hostname, like Python's `getaddrinfo`) + loopback.
+/// Sorted as text, same as Python's `sorted()`: the first one sends the unicast.
 pub fn interfaces() -> Vec<Ipv4Addr> {
     let mut set: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     set.insert("127.0.0.1".to_string());
@@ -152,14 +153,14 @@ fn out_socket(ip: Ipv4Addr) -> io::Result<UdpSocket> {
     Ok(s.into())
 }
 
-/// Socket de escuta em 0.0.0.0:PORT com SO_REUSEADDR, inscrito nos grupos pedidos.
+/// Listening socket on 0.0.0.0:PORT with SO_REUSEADDR, joined to the requested groups.
 fn listener(groups: &[Ipv4Addr]) -> io::Result<UdpSocket> {
     let s = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
     s.set_reuse_address(true)?;
     s.bind(&SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, PORT).into())?;
     for g in groups {
-        // ponytail: falha de IP_ADD_MEMBERSHIP e ignorada ; maquina sem placa ativa ainda
-        // recebe o unicast em 127.0.0.1, que e o que os testes usam.
+        // ponytail: an IP_ADD_MEMBERSHIP failure is ignored ; a machine with no active network
+        // interface still receives the unicast on 127.0.0.1, which is what the tests use.
         let _ = s.join_multicast_v4(g, &Ipv4Addr::UNSPECIFIED);
     }
     s.set_read_timeout(Some(Duration::from_millis(200)))?;
@@ -168,7 +169,8 @@ fn listener(groups: &[Ipv4Addr]) -> io::Result<UdpSocket> {
 
 // ------------------------------------------------------------------ SacnOut
 
-/// Saida sACN. `send()` so enfileira; a thread interna monta o pacote e fala com os sockets.
+/// sACN output. `send()` only enqueues; the internal thread builds the packet and talks to
+/// the sockets.
 pub struct SacnOut {
     cid: [u8; 16],
     q: Arc<Queue>,
@@ -191,7 +193,7 @@ impl SacnOut {
         for ip in &ips {
             match out_socket(*ip) {
                 Ok(s) => socks.push(s),
-                // interface sumiu entre o scan e o bind: as outras seguem
+                // interface vanished between the scan and the bind: the others carry on
                 Err(_) if ips.len() > 1 => {}
                 Err(e) => return Err(e),
             }
@@ -199,7 +201,7 @@ impl SacnOut {
         if socks.is_empty() {
             return Err(io::Error::new(
                 io::ErrorKind::AddrNotAvailable,
-                "nenhuma interface utilizavel para sACN",
+                "no usable network interface for sACN",
             ));
         }
         let cid = random16();
@@ -210,17 +212,17 @@ impl SacnOut {
         let th = std::thread::Builder::new()
             .name("sacn-out".into())
             .spawn(move || {
-                // ponytail: um unico buffer de pacote reutilizado (a thread envia um frame por vez)
-                // ; um buffer por universo so faria falta se o envio virasse paralelo.
+                // ponytail: a single reused packet buffer (the thread sends one frame at a time)
+                // ; a buffer per universe would only be needed if sending became parallel.
                 let mut buf = Vec::with_capacity(638);
                 let local = SocketAddrV4::new(Ipv4Addr::LOCALHOST, PORT);
                 while let Some((u, data)) = qt.pop() {
                     let s = seq.entry(u).or_insert(0);
-                    *s = s.wrapping_add(1); // incrementa antes do envio, & 0xFF
+                    *s = s.wrapping_add(1); // increment before sending, & 0xFF
                     packet_into(&mut buf, u, &data, &cid, *s, &name, priority);
                     let dst = SocketAddrV4::new(mcast(u), PORT);
                     for sk in &socks {
-                        let _ = sk.send_to(&buf, dst); // sem rota para o grupo: ignora
+                        let _ = sk.send_to(&buf, dst); // no route to the group: ignore
                     }
                     let _ = socks[0].send_to(&buf, local);
                 }
@@ -258,7 +260,7 @@ impl Drop for SacnOut {
 
 // ------------------------------------------------------------------- SacnIn
 
-/// Escuta os universos e guarda o ultimo frame de cada um.
+/// Listens to the universes and keeps the last frame of each one.
 pub struct SacnIn {
     last: Arc<Mutex<HashMap<u16, [u8; 512]>>>,
     run: Arc<AtomicBool>,
@@ -311,7 +313,7 @@ impl SacnIn {
     pub fn close(&mut self) {
         self.run.store(false, Ordering::Relaxed);
         if let Some(th) = self.th.take() {
-            let _ = th.join(); // sai em ate 200 ms (read timeout)
+            let _ = th.join(); // exits within 200 ms (read timeout)
         }
     }
 }
@@ -337,16 +339,16 @@ mod tests {
     }
 
     #[test]
-    fn packet_bate_com_o_fixture() {
+    fn packet_matches_the_fixture() {
         let want = std::fs::read(FIXTURE).expect("fixture sacn_packet.bin");
         let cid: [u8; 16] = std::array::from_fn(|i| i as u8);
         let got = packet(1, &data512(), &cid, 0, "Spellcaster", 100);
-        assert_eq!(got.len(), want.len(), "tamanho do pacote");
-        assert_eq!(got, want, "bytes do pacote E1.31");
+        assert_eq!(got.len(), want.len(), "packet size");
+        assert_eq!(got, want, "E1.31 packet bytes");
     }
 
-    /// Cabecalho (126 bytes) gerado pelo Python para universo 300, seq 42, prio 77,
-    /// nome "Fonte X", CID `i ^ 0x5A`: trava os campos que o fixture (defaults) nao cobre.
+    /// Header (126 bytes) generated by Python for universe 300, seq 42, priority 77,
+    /// name "Fonte X", CID `i ^ 0x5A`: locks the fields the default fixture does not cover.
     const HDR_300: &str = "001000004153432d45312e3137000000726e000000045a5b58595e5f5c5d5253505156575455725800000002466f6e746520580000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004d00002a00012c720b02a100000001020100";
 
     fn unhex(s: &str) -> Vec<u8> {
@@ -356,7 +358,7 @@ mod tests {
     }
 
     #[test]
-    fn cabecalho_com_valores_nao_padrao() {
+    fn header_with_non_default_values() {
         let cid: [u8; 16] = std::array::from_fn(|i| (i as u8) ^ 0x5A);
         let pk = packet(300, &data512(), &cid, 42, "Fonte X", 77);
         assert_eq!(pk.len(), 638);
@@ -382,33 +384,33 @@ mod tests {
         assert_eq!(seq, 42);
         assert_eq!(universe, 300);
         assert_eq!(data, d);
-        assert!(parse(b"nao e e1.31").is_none());
+        assert!(parse(b"not e1.31").is_none());
     }
 
-    /// Datagrama E1.31 truncado (o que a rede entrega) nao pode panicar a thread do SacnIn.
+    /// A truncated E1.31 datagram (what the network delivers) must not panic the SacnIn thread.
     #[test]
-    fn truncado_nao_panica() {
+    fn truncated_does_not_panic() {
         let cid: [u8; 16] = std::array::from_fn(|i| (i as u8) ^ 0x5A);
         let pk = packet(300, &data512(), &cid, 42, "Fonte X", 77);
         for n in [0, 16, 47, 48, 60, 100, 107, 108, 119, 125] {
             assert!(
                 parse(&pk[..n]).is_none(),
-                "truncado em {} devia dar None",
+                "truncated at {} should give None",
                 n
             );
         }
-        assert!(parse(&pk).is_some(), "pacote completo continua parseando");
+        assert!(parse(&pk).is_some(), "a complete packet still parses");
     }
 
     #[test]
-    fn mcast_do_universo() {
+    fn mcast_of_the_universe() {
         assert_eq!(mcast(1), Ipv4Addr::new(239, 255, 0, 1));
         assert_eq!(mcast(256), Ipv4Addr::new(239, 255, 1, 0));
         assert_eq!(mcast(300), Ipv4Addr::new(239, 255, 1, 44));
     }
 
     #[test]
-    fn interfaces_tem_loopback() {
+    fn interfaces_have_loopback() {
         assert!(interfaces().contains(&Ipv4Addr::LOCALHOST));
     }
 
@@ -416,18 +418,18 @@ mod tests {
     fn loopback_out_in() {
         let mut rx = match SacnIn::new(&[1]) {
             Ok(r) => r,
-            Err(e) => return println!("pulado: bind 5568 falhou: {:?}", e.kind()),
+            Err(e) => return println!("skipped: bind 5568 failed: {:?}", e.kind()),
         };
         let mut tx = match SacnOut::new(&[1], Some(vec![Ipv4Addr::LOCALHOST])) {
             Ok(t) => t,
-            Err(e) => return println!("pulado: socket de saida falhou: {:?}", e.kind()),
+            Err(e) => return println!("skipped: output socket failed: {:?}", e.kind()),
         };
         let mut ultimo = [0u8; 512];
         for f in 1..=3u8 {
             let frame: [u8; 512] = std::array::from_fn(|i| (i as u8).wrapping_add(f));
             tx.send(1, &frame);
             ultimo = frame;
-            std::thread::sleep(Duration::from_millis(30)); // frames distintos, sem descarte
+            std::thread::sleep(Duration::from_millis(30)); // distinct frames, nothing dropped
         }
         for _ in 0..60 {
             if rx.get(1) == Some(ultimo) {
@@ -439,16 +441,16 @@ mod tests {
         tx.close();
         rx.close();
         match got {
-            None => println!("pulado: UDP em loopback nao entregou (firewall?)"),
+            None => println!("skipped: loopback UDP did not deliver (firewall?)"),
             Some(g) => {
-                assert_eq!(g, ultimo, "ultimo frame recebido byte a byte");
+                assert_eq!(g, ultimo, "last frame received byte for byte");
             }
         }
     }
 
     #[test]
-    fn send_nao_bloqueia_nem_cresce() {
-        // sem consumidor real: 100 frames de uma vez, a fila fica em 2 por universo
+    fn send_neither_blocks_nor_grows() {
+        // no real consumer: 100 frames at once, the queue stays at 2 per universe
         let q = crate::Queue::new(1);
         let t0 = Instant::now();
         for i in 0..100u16 {
@@ -456,16 +458,16 @@ mod tests {
             d[0] = i as u8;
             q.push(1, &d);
         }
-        assert!(t0.elapsed() < Duration::from_millis(200), "send bloqueou");
+        assert!(t0.elapsed() < Duration::from_millis(200), "send blocked");
         assert_eq!(q.len(), crate::DEPTH);
         q.stop();
     }
 
     #[test]
-    fn saida_nao_bloqueia_com_100_frames() {
+    fn output_does_not_block_with_100_frames() {
         let mut tx = match SacnOut::new(&[1], Some(vec![Ipv4Addr::LOCALHOST])) {
             Ok(t) => t,
-            Err(e) => return println!("pulado: socket de saida falhou: {:?}", e.kind()),
+            Err(e) => return println!("skipped: output socket failed: {:?}", e.kind()),
         };
         let frame = [7u8; 512];
         let t0 = Instant::now();
@@ -474,6 +476,6 @@ mod tests {
         }
         let dt = t0.elapsed();
         tx.close();
-        assert!(dt < Duration::from_millis(500), "100 sends levaram {dt:?}");
+        assert!(dt < Duration::from_millis(500), "100 sends took {dt:?}");
     }
 }

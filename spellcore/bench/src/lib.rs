@@ -1,6 +1,6 @@
-//! Nada alem do que os dois binarios de bench compartilham.
+//! Nothing beyond what the two bench binaries share.
 
-/// `--nome valor` no argv; `default` se faltar ou nao for numero.
+/// `--name value` in argv; `default` if it is missing or not a number.
 pub fn arg_f64(name: &str, default: f64) -> f64 {
     let a: Vec<String> = std::env::args().collect();
     a.iter()
@@ -13,7 +13,7 @@ pub fn arg_f64(name: &str, default: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn ausente_cai_no_default() {
-        assert_eq!(super::arg_f64("--nao-existe", 7.5), 7.5);
+    fn a_missing_one_falls_back_to_the_default() {
+        assert_eq!(super::arg_f64("--does-not-exist", 7.5), 7.5);
     }
 }

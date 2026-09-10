@@ -1,28 +1,28 @@
-// ponytail: fora do Windows a janela nao existe e os helpers do caminho ficam sem uso ; tirar
-// quando a janela ganhar Linux/mac
+// ponytail: outside Windows the window does not exist and the path helpers go unused ; drop
+// this when the window gets Linux/mac
 #![cfg_attr(not(windows), allow(dead_code))]
-//! `spellcaster.exe` — o Spellcaster como programa, nao como aba do navegador.
+//! `spellcaster.exe` - the Spellcaster as a program, not as a browser tab.
 //!
-//!   spellcaster [show.spell] [--dir RAIZ]
+//!   spellcaster [show.spell] [--dir ROOT]
 //!
-//! Sobe o barramento (`serve::serve`, o MESMO do `spellcore serve`) numa thread em
-//! `127.0.0.1:0`, com o registry completo da CLI, e abre UMA janela no `index.html`. Fechar a
-//! janela mata o processo, e com ele o barramento.
+//! Starts the bus (`serve::serve`, the SAME one as `spellcore serve`) in a thread on
+//! `127.0.0.1:0`, with the full CLI registry, and opens ONE window on `index.html`. Closing the
+//! window kills the process, and with it the bus.
 //!
-//! ponytail: `tao` + `wry` (a janela e o WebView2 que o Windows 11 ja' tem), nao o Tauri
-//! inteiro ; virar Tauri quando fizer falta menu nativo, updater, tray ou icone assinado — nada
-//! disso existe aqui.
+//! ponytail: `tao` + `wry` (the window and the WebView2 that Windows 11 already has), not the
+//! whole Tauri ; go Tauri when a native menu, an updater, a tray or a signed icon is missed -
+//! none of that exists here.
 
 use std::path::{Path, PathBuf};
 
-/// A pagina que a janela abre. E' a vista 3D do laser (`design/laser/` virou produto na frente
-/// `ui-3d`), por pedido do dono: o programa e' o modelo do aparelho, nao uma aba com uma timeline.
-/// Enquanto a frente `ui-3d` nao entrar, este caminho e' 404 e a janela abre em branco — trocar
-/// por `/spellgui/web/index.html` para voltar a timeline.
+/// The page the window opens. It is the 3D laser view (`design/laser/` became a product in the
+/// `ui-3d` front), by the owner's request: the program is the model of the device, not a tab
+/// with a timeline. Until the `ui-3d` front lands, this path is a 404 and the window opens
+/// blank - switch it to `/spellgui/web/index.html` to get the timeline back.
 const PAGINA: &str = "/spellgui/web/laser3d/app.html";
 
-/// `spellcaster [show.spell] [--dir RAIZ]`. Devolve `(show, dir)`.
-// ponytail: dois argumentos, parser a mao ; clap entra quando houver o terceiro.
+/// `spellcaster [show.spell] [--dir ROOT]`. Returns `(show, dir)`.
+// ponytail: two arguments, hand-written parser ; clap comes in when there is a third one.
 fn args(it: impl Iterator<Item = String>) -> (Option<String>, Option<String>) {
     let (mut show, mut dir, mut espera_dir) = (None, None, false);
     for a in it {
@@ -40,15 +40,15 @@ fn args(it: impl Iterator<Item = String>) -> (Option<String>, Option<String>) {
     (show, dir)
 }
 
-/// O primeiro diretorio de `d` para cima que contem `spellgui/web`.
+/// The first directory from `d` upwards that contains `spellgui/web`.
 fn acima(d: &Path) -> Option<PathBuf> {
     d.ancestors()
         .find(|p| p.join("spellgui").join("web").is_dir())
         .map(Path::to_path_buf)
 }
 
-/// Raiz do estatico: o argumento, senao a arvore do exe, senao a do diretorio corrente, senao o
-/// proprio diretorio corrente (que dara' 404, e a janela mostra o que falta).
+/// Static root: the argument, else the exe tree, else the current directory tree, else the
+/// current directory itself (which will 404, and the window shows what is missing).
 fn raiz(dir: Option<String>, exe: Option<&Path>, cwd: &Path) -> PathBuf {
     if let Some(d) = dir {
         return PathBuf::from(d);
@@ -58,9 +58,9 @@ fn raiz(dir: Option<String>, exe: Option<&Path>, cwd: &Path) -> PathBuf {
         .unwrap_or_else(|| cwd.to_path_buf())
 }
 
-/// O `.spell` da linha de comando visto da raiz: o argumento e' relativo ao diretorio de onde o
-/// usuario chamou, e o processo passa a rodar na raiz do repo (e' de la' que o engine resolve
-/// `shows/`, `profiles/` e `faces/`).
+/// The command line `.spell` seen from the root: the argument is relative to the directory the
+/// user called from, and the process then runs at the repo root (that is where the engine
+/// resolves `shows/`, `profiles/` and `faces/`).
 fn show_abs(show: Option<String>, cwd: &Path) -> Option<String> {
     let s = show?;
     let p = cwd.join(&s);
@@ -87,7 +87,7 @@ fn janela() -> Result<(), String> {
     let show = show_abs(show, &cwd);
     std::env::set_current_dir(&raiz).map_err(|e| format!("{}: {}", raiz.display(), e))?;
 
-    // O mapa MIDI chama o registry COMPLETO, o mesmo que o `spellcore` monta (cli/src/lib.rs).
+    // The MIDI map calls the FULL registry, the same one `spellcore` builds (cli/src/lib.rs).
     engine::midi::builder(cli::registry);
 
     let (tx, rx) = mpsc::channel();
@@ -96,12 +96,12 @@ fn janela() -> Result<(), String> {
         if let Err(e) = serve::serve(cli::registry(), 0, r, show, move |a| {
             let _ = tx.send(a);
         }) {
-            eprintln!("barramento: {}", e);
+            eprintln!("bus: {}", e);
         }
     });
     let addr = rx
         .recv_timeout(Duration::from_secs(10))
-        .map_err(|_| "o barramento nao ligou em 10 s".to_string())?;
+        .map_err(|_| "the bus did not come up in 10 s".to_string())?;
     let url = format!("http://127.0.0.1:{}{}", addr.port(), PAGINA);
 
     let ev = EventLoop::new();
@@ -122,7 +122,7 @@ fn janela() -> Result<(), String> {
             ..
         } = e
         {
-            // fechar a janela encerra o processo, e com ele o barramento e as saidas
+            // closing the window ends the process, and with it the bus and the outputs
             *fluxo = ControlFlow::Exit;
         }
     });
@@ -136,12 +136,13 @@ fn main() {
     }
 }
 
-// ponytail: a janela e' so' Windows (WebView2 ja' vem no 11) ; o Pi roda `spellcore serve` e abre
-// a GUI pelo navegador, que e' o que a Lite promete. `tao`/`wry` tambem servem macOS e Linux —
-// trocar o cfg (e as dependencias, hoje so' de `cfg(windows)`) quando alguem pedir.
+// ponytail: the window is Windows only (WebView2 already ships with 11) ; the Pi runs
+// `spellcore serve` and opens the GUI in the browser, which is what the Lite promises.
+// `tao`/`wry` also serve macOS and Linux - switch the cfg (and the dependencies, today only
+// under `cfg(windows)`) when someone asks.
 #[cfg(not(windows))]
 fn main() {
-    eprintln!("spellcaster: a janela e' Windows; aqui use `spellcore serve` e abra no navegador.");
+    eprintln!("spellcaster: the window is Windows only; here use `spellcore serve` and open it in a browser.");
     std::process::exit(1);
 }
 
@@ -150,7 +151,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn argumentos_show_e_dir() {
+    fn show_and_dir_arguments() {
         let a = |v: &[&str]| args(v.iter().map(|s| s.to_string()));
         assert_eq!(a(&[]), (None, None));
         assert_eq!(
@@ -164,13 +165,13 @@ mod tests {
         assert_eq!(
             a(&["--dir=D:/repo", "x.spell", "y.spell"]),
             (Some("x.spell".into()), Some("D:/repo".into())),
-            "o segundo positional e' ignorado, nao vira --dir"
+            "the second positional is ignored, it does not become --dir"
         );
     }
 
-    /// A regra que faz o exe achar as paginas: argumento, arvore do exe, arvore do cwd, cwd.
+    /// The rule that makes the exe find the pages: argument, exe tree, cwd tree, cwd.
     #[test]
-    fn raiz_acha_spellgui_web() {
+    fn root_finds_spellgui_web() {
         let base = std::env::temp_dir().join("spellcaster_gui_raiz");
         let fundo = base.join("spellcore").join("gui");
         std::fs::create_dir_all(base.join("spellgui").join("web")).unwrap();
@@ -178,20 +179,24 @@ mod tests {
         let outro = std::env::temp_dir().join("spellcaster_gui_outro");
         std::fs::create_dir_all(&outro).unwrap();
 
-        assert_eq!(raiz(None, Some(&fundo), &outro), base, "sobe do exe");
-        assert_eq!(raiz(None, None, &fundo), base, "sobe do cwd");
-        assert_eq!(raiz(None, None, &outro), outro, "sem raiz, fica no cwd");
+        assert_eq!(
+            raiz(None, Some(&fundo), &outro),
+            base,
+            "climbs from the exe"
+        );
+        assert_eq!(raiz(None, None, &fundo), base, "climbs from the cwd");
+        assert_eq!(raiz(None, None, &outro), outro, "no root, stays in the cwd");
         assert_eq!(
             raiz(Some("D:/repo".into()), Some(&fundo), &outro),
             PathBuf::from("D:/repo"),
-            "o argumento manda"
+            "the argument wins"
         );
         std::fs::remove_dir_all(&base).ok();
         std::fs::remove_dir_all(&outro).ok();
     }
 
     #[test]
-    fn show_vira_absoluto_quando_existe_no_cwd() {
+    fn show_becomes_absolute_when_it_exists_in_the_cwd() {
         let d = std::env::temp_dir().join("spellcaster_gui_show");
         std::fs::create_dir_all(&d).unwrap();
         let f = d.join("x.spell");
@@ -200,7 +205,8 @@ mod tests {
             show_abs(Some("x.spell".into()), &d),
             Some(f.to_string_lossy().into_owned())
         );
-        // nao existe no cwd: fica como veio, para o engine resolver a partir da raiz
+        // it does not exist in the cwd: it stays as it came, for the engine to resolve from the
+        // root
         assert_eq!(
             show_abs(Some("shows/medgrupo.spell".into()), &d),
             Some("shows/medgrupo.spell".into())

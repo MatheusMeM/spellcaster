@@ -1,6 +1,6 @@
-// bench `jitter`: gate do PRD sobre o Clock -- p99 < 1 ms e drift 0 frames. Os numeros vem de
-// Clock::stats() (o proprio Clock ja mede o desvio de cada tick); aqui so mora o gate.
-// Saida ASCII pura (console cp1252).
+// bench `jitter`: PRD gate on the Clock -- p99 < 1 ms and drift 0 frames. The numbers come from
+// Clock::stats() (the Clock itself already measures the deviation of each tick); only the gate
+// lives here. Pure ASCII output (cp1252 console).
 
 use bench::arg_f64;
 use engine::clock::Clock;
@@ -26,8 +26,8 @@ fn main() {
 
     let ok = s.frames >= 2 && s.p99 < 1e-3 && s.drift == 0;
     println!(
-        "alvo: p99 < 1.000ms, drift = 0  -> {}",
-        if ok { "OK" } else { "FALHA" }
+        "target: p99 < 1.000ms, drift = 0  -> {}",
+        if ok { "OK" } else { "FAIL" }
     );
     std::process::exit(if ok { 0 } else { 1 });
 }
