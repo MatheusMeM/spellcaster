@@ -362,9 +362,12 @@ fn udp_on(ip: Ipv4Addr, port: u16, broadcast: bool) -> io::Result<UdpSocket> {
 /// nao resolve, porque o Windows so' compartilha se os DOIS sockets pedirem. O bind no IP da
 /// placa passa nesse caso E continua recebendo o broadcast do beacon (medido: Sitter aberto,
 /// bind em 169.254.86.236:7654, quatro beacons de 169.254.207.140 em 4 s).
+/// O loopback fecha a lista (`interfaces()` nao o devolve): e' por onde chega o beacon de um DAC
+/// emulado no proprio PC, que o bind coringa pegaria e o bind de placa nao pega.
 fn bind_ips(ifaces: &[Iface]) -> Vec<Ipv4Addr> {
     std::iter::once(Ipv4Addr::UNSPECIFIED)
         .chain(ifaces.iter().filter_map(|i| i.ip.parse().ok()))
+        .chain(std::iter::once(Ipv4Addr::LOCALHOST))
         .collect()
 }
 
