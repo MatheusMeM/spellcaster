@@ -13,11 +13,14 @@ O repo tem duas camadas:
 - `spellcore/` — o core do produto em Rust (PRD v1.1 em `PRD.md`). Fases R0 (engine, protocolos,
   bench), R1 (cues, `.spell` completo, `fx` em Rhai, Graph runtime, player com transporte OSC),
   R3 (pixel mapping), R4 (laser multi-feed com safety), R7 (MCP em stdio) e R8 (empacotamento)
-  concluídas e conformes byte a byte com o Python. `spellgui/web/` tem a base da GUI (R5).
+  concluídas e conformes byte a byte com o Python. `spellgui/web/` é a GUI (R5): a página
+  principal é o projetor laser em 3D (`laser3d/`), servida pelo `spellcore serve` ou aberta
+  pela janela nativa `spellcaster.exe`.
 
 Arquivo de show: `.spell` (JSON, versão 1), o mesmo para os dois lados.
 
-Instalação (pendrive Windows, Lite no Pi, código-fonte): `INSTALL.md`. Licença MIT (`LICENSE`).
+Instalação (pendrive Windows, Lite no Pi, código-fonte): `INSTALL.md`. Manual do operador:
+`MANUAL.md`. O que entrou em cada release: `CHANGELOG.md`. Licença MIT (`LICENSE`).
 
 ## Estado atual
 
@@ -28,7 +31,7 @@ Instalação (pendrive Windows, Lite no Pi, código-fonte): `INSTALL.md`. Licen�
 | R1 (Rust) | cues, `.spell` completo, `fx` Rhai, Graph, player + OSC, CLI headless | concluída, conformidade ao vivo 89/89 |
 | R3 (Rust) | `pixelmap`: amostragem nearest/bilinear com rayon, 100 000 px | concluída, 0,316 ms p99 por frame |
 | R4 (Rust) | `laser`: optimize/safety, `.ild`, Ether Dream/IDN, 4 feeds | concluída, 0,83 % de cpu |
-| R5 base | `spellgui/web`: `canvaskit.js` (pan, zoom, seleção, hit-test) e timeline em canvas | base pronta; falta Tauri, painéis, Theme/Face |
+| R5 GUI | `spellgui/web`: página 3D do projetor (`laser3d/`: câmera SolidWorks, HUD, gaveta LASER/DMX/NET/INTERLOCK/BINDINGS/VÍDEO/INFO, Pino, bindings tecla+MIDI, menu de vídeo), timeline com previz 2D, patchbay, teatro, Face, MIDI, ajuda; `spellcaster.exe` (janela nativa) | em uso; falta Theme e os editores de Face/Graph (R9) |
 | R7 (Rust) | `mcp`: rmcp em stdio, uma tool por comando do registry, `spellcore mcp install` | concluída em stdio |
 | R8 | onedir Windows, Linux, `spellcore` estático para Pi (musl), CI com bench como gate | concluída |
 | R2 mídia, R6 previz Godot, R9 editores | ver `PRD.md` §6 | pendentes (SDKs, Godot, R5) |
@@ -38,7 +41,19 @@ seis rodadas de protótipo do departamento de design, em que o programa é o mod
 aparelho (rodadas 4–6: o projetor de laser em three.js, traseira como menu, bindings de tecla e MIDI,
 Pino como menu, e o laser como módulo `laser/1` do orquestrador). Estado por rodada em `ROADMAP.md` §8.
 
-## Como rodar no Windows
+## Como abrir o programa
+
+```powershell
+$env:CARGO_TARGET_DIR = "$env:TEMP\spellcore_target"
+cargo build --release -p cli --manifest-path spellcore\Cargo.toml
+& "$env:TEMP\spellcore_target\release\spellcore.exe" serve --port 8000 --dir . --show shows\medgrupo.spell
+# http://127.0.0.1:8000/spellgui/web/laser3d/app.html
+```
+
+Ou `spellcaster.exe shows\medgrupo.spell` (crate `spellcore/gui`), que abre a mesma página numa
+janela do programa. Uso completo em `MANUAL.md`.
+
+## Protótipo Python
 
 Sem venv. Use o interpretador global.
 
@@ -65,7 +80,8 @@ Com o pacote instalado (`pip install -e .`), `spell` substitui `C:\Python313\pyt
 C:\Python313\python.exe -m unittest discover -s tests -v
 ```
 
-102 testes Python e 120 Rust (`cargo test --workspace`). Não rodar os dois ao mesmo tempo: ambos
+102 testes Python, 168 Rust (`cargo test --workspace`) e 118 das páginas web
+(`node --test spellgui/web/test/*.test.js`). Não rodar Python e Rust ao mesmo tempo: ambos
 usam sACN em loopback na porta 5568 e um rouba os pacotes do outro. Loopback UDP em 127.0.0.1 faz o papel de mock. Os testes não imprimem caracteres fora de ASCII.
 
 ## Contratos fixos
@@ -123,10 +139,12 @@ Linux x64, Linux aarch64).
 Release = tag. O mesmo workflow, ao receber uma tag `v*`, cria a GitHub Release com esses
 artefatos anexados e notas geradas do histórico:
 
-```bash
-git tag -a v0.1.0 -m "Spellcaster 0.1.0: R0, R1 e R4 do spellcore; protótipo Python F0–F6"
+```powershell
+git tag -a v0.1.0 -m "Spellcaster 0.1.0"
 git push origin main --tags
 ```
+
+A entrada do `CHANGELOG.md` da versão vira as notas da release (`gh release edit vX.Y.Z --notes-file`).
 
 Regras: commits e pushes só na conta do dono do repo, mensagem em português, sem crédito a
 ferramenta nenhuma; nunca commitar `target/`, `build/`, `dist/`; o bench é o gate.
@@ -137,6 +155,8 @@ ferramenta nenhuma; nunca commitar `target/`, `build/`, `dist/`; o bench é o ga
 - `ARCHITECTURE.md`: árvore, fluxo de dados, contratos, conformidade e números medidos.
 - `ROADMAP.md`: decisões de stack, fases F0–F7 do protótipo, estado das fases R0–R9, design e o que falta.
 - `INSTALL.md`: pendrive Windows, Lite no Raspberry Pi, build a partir do código.
+- `MANUAL.md`: manual de uso e capacidades para o operador (tela, câmera, teclado e MIDI, vídeo, laser, DMX, CLI e MCP).
+- `CHANGELOG.md`: uma entrada por release.
 - `design/`: `DECISOES.md`, `PRINCIPIOS.md`, `SHORTCUTS.md`, `TEMAS.md`, `tokens/`, `canvas/`; protótipos nas branches `design/*`.
 - `CLAUDE.md`: regras do repositório.
 - `LICENSE`: MIT.

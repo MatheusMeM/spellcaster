@@ -34,7 +34,8 @@ spellcore serve --port 8000 --dir . --show shows/medgrupo.spell
 ```
 
 `laser3d/app.html` abre pela splash; os hashes `#tras`, `#dentro` e `#laser` pulam direto para o
-menu, as preferências e a vista do show. A navegação entre as telas é o Pino: clique nele.
+menu, as preferências e a vista do show. `Tab` abre a gaveta de abas; o Pino fica preso à câmera.
+Manual do operador: `MANUAL.md` na raiz do repo.
 
 Sem engine (só para desenhar a página; nada de saída DMX):
 

@@ -138,7 +138,7 @@ Timecode LTC/MTC in, MIDI in/out, GDTF/MVR import, LaserCube/outros DACs proprie
 ## 6. Primeiro passo
 F0 começa extraindo `protocols/sacn.py` e `core/clock.py` de `show_medgrupo.py`, com o show do MED GRUPO como teste de regressão: mesma saída, byte a byte.
 
-## 7. Fases Rust (PRD v1.1) — estado em 09/09/2026
+## 7. Fases Rust (PRD v1.1) — estado em 10/09/2026
 
 O plano acima (F0–F7) foi o do protótipo Python e está concluído até F6. O produto segue o
 `PRD.md`: core em Rust, previz em Godot, GUI Tauri com Theme/Face/Graph.
@@ -150,13 +150,13 @@ O plano acima (F0–F7) foi o do protótipo Python e está concluído até F6. O
 | R2 mídia (GStreamer, NDI, RTSP, Spout) | 1080p60 no alvo de CPU | pendente | SDKs não instalados (GStreamer, NDI) |
 | R3 pixel mapping (rayon; wgpu depois) | 100 000 px a 60 Hz < 2 ms | concluída (0,105 ms p50 / 0,316 ms p99 por frame; bilinear 0,196 / 0,493) | crate autônomo: ligar a fonte de frame ao player espera a R2 |
 | R4 laser multi-feed | Ether Dream, IDN; safety no engine; 4 feeds | concluída (0,83 % cpu) | — |
-| R5 GUI (janela própria) | show de 3 min do zero; Face em modo performance | janela nativa pronta: `spellcaster.exe` (crate `spellcore/gui`, `tao` + `wry`/WebView2, sem Tauri) sobe o barramento em processo e abre em `spellgui/web/laser3d/app.html` — o programa é o projetor laser em 3D, ligado ao registry por `bus.js`, com three.js e as fontes vendorizados para rodar sem rede; as outras páginas de `spellgui/web` ligadas pela barra `nav.js`; falta painéis, Theme/Face | voto das rodadas 5 e 6 do design |
+| R5 GUI (janela própria) | show de 3 min do zero; Face em modo performance | em uso desde a v0.1.0: `spellcaster.exe` (crate `spellcore/gui`, `tao` + `wry`/WebView2, sem Tauri) sobe o barramento em processo e abre em `spellgui/web/laser3d/app.html` — o projetor laser em 3D (modelo PBR completo, câmera SolidWorks por vista, HUD com LEDs, gaveta de abas, Pino na câmera, bindings tecla+MIDI, menu de VÍDEO com predefinições, parede em WebGL), ligado ao registry por `bus.js`, sem rede; as outras páginas ligadas pela barra `nav.js`; falta Theme e os editores (R9) | inglês da UI e seletor de idioma; passada de usabilidade |
 | R6 previz Godot | 60 fps, 64 fixtures, 2 LED walls | pendente | Godot não instalado |
 | R7 MCP com rmcp | sessão de IA monta e toca um show sem GUI | concluída em stdio; edição de show (patch, track, key, cue) no registry (`engine::edit`) | `spell://face`/`spell://graph` pendentes; transporte HTTP streamable em `/mcp` entregue pela F1 (`serve`) |
 | R8 empacotamento | onedir, Linux, Pi estático; CI com bench como gate | concluída | — |
 | R9 editores de Face/Graph + painel Agent | operador monta uma Face em 10 min | pendente | depende de R5 |
 
-## 8. Design — rodadas e branches (09/09/2026)
+## 8. Design — rodadas e branches (10/09/2026)
 
 O departamento de design trabalha em branches próprias e publica cada rodada como protótipo
 HTML (three.js) num artifact; o voto do dono decide o que entra. Regra: função antes de UI, e
@@ -178,8 +178,13 @@ tudo-ou-nada, devolve as ops de `undo` e a revisão `rev`), `graph_get`/`face_ge
 `graph_check` na CLI e os resources `spell://graph` e `spell://face` no MCP. O graph passa a ser
 editável por IA antes de existir canvas.
 
+Rodadas de integração em `main` (branches `integracao-2`, `integracao-4`, 09–10/09/2026): as
+rodadas 5 e 6 viraram código de produto em `spellgui/web/laser3d/`, frente por frente (câmera, chassi,
+óptica, HUD, Pino, DAC, desempenho do `.ild`, charset, vídeo), cada uma com portão headless nas três
+vistas e testes `node --test`. Detalhe por release em `CHANGELOG.md`.
+
 Pendência de design: rodada 7 = FÓSFORO (conversor NDI/Spout → ILDA na porta NET) e PATCHBAY
-(UI do orquestrador), após o voto das rodadas 5 e 6.
+(UI do orquestrador).
 
 ## 9. O que falta, e o que roda em paralelo agora
 

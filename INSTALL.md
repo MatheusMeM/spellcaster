@@ -80,6 +80,10 @@ cargo build --release --workspace
 # binário em %TEMP%\spellcore_target\release\spellcore.exe
 ```
 
+Para abrir o programa a partir do código: `spellcore serve --port 8000 --dir . --show shows/medgrupo.spell`
+na raiz do repo e `http://127.0.0.1:8000/spellgui/web/laser3d/app.html` no navegador
+(uso em `MANUAL.md`).
+
 Detalhes, bench e conformidade: `spellcore/README.md` e `ARCHITECTURE.md`.
 
 ### Empacotar
