@@ -7,8 +7,11 @@ const { test } = require("node:test");
 const assert = require("node:assert");
 
 // bind.js e ilda.js sao arquivos de navegador: dois stubs bastam (loopback do DOM).
+// O stub guarda o handler de keydown: e' por ele que o teste do teclado dispara tecla sem browser.
 global.window = {};
-global.document = { addEventListener() {} };
+const KEYDOWN = [];
+global.document = { addEventListener(t, f) { if (t === "keydown") KEYDOWN.push(f); } };
+function press(key, target) { let stopped = false; KEYDOWN[0]({ key: key, target: target || { tagName: "BODY" }, ctrlKey: false, shiftKey: false, altKey: false, metaKey: false, preventDefault() { stopped = true; } }); return stopped; }
 
 const Bind = require("../laser3d/bind.js");
 const ILDA = require("../laser3d/ilda.js");
@@ -103,4 +106,28 @@ test("CONTROLS: um controle, uma familia; energia e interlock num ponto so'", ()
   const toggles = Object.keys(CONTROLS).filter(k => CONTROLS[k][0] === "toggle");
   assert.deepStrictEqual(toggles.sort(), ["interlock", "keyswitch", "power"], "cada toggle e' uma funcao unica");
   assert.strictEqual(kindOf("fusivel"), "", "nao existe fusivel");
+});
+
+// O teclado e' do aparelho: um <input type=range> focado (o fader do painel) so' pode ficar com as
+// teclas que ele usa. Antes qualquer input focado devolvia cedo e matava o teclado inteiro.
+test("teclado: fader focado nao mata as teclas do aparelho; Escape cancela o learn de MIDI", () => {
+  let n = 0;
+  Bind.def("teste.tecla", "teste", () => { n++; }, { key: "Q" });
+  assert.ok(press("q"), "tecla do aparelho responde e consome o evento");
+  assert.strictEqual(n, 1);
+  press("q", { tagName: "INPUT", type: "range" });
+  assert.strictEqual(n, 2, "fader focado nao mata o teclado do aparelho");
+  assert.strictEqual(press("ArrowUp", { tagName: "INPUT", type: "range" }), false, "seta e' do fader");
+  press("q", { tagName: "INPUT", type: "text" });
+  assert.strictEqual(n, 2, "campo de texto engole a tecla");
+  press("q", { tagName: "DIV", isContentEditable: true });
+  assert.strictEqual(n, 2, "campo editavel tambem");
+
+  Bind.click({ target: { closest: () => ({ dataset: { learn: "midi", id: "teste.tecla" } }) } });
+  assert.ok(Bind.learnState(), "learn de MIDI armado");
+  press("Q");
+  assert.ok(Bind.learnState(), "no learn de MIDI a tecla nao vira binding");
+  assert.strictEqual(n, 2, "nem dispara a acao");
+  press("Escape");
+  assert.strictEqual(Bind.learnState(), null, "Escape cancela o learn de MIDI");
 });
