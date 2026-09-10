@@ -98,14 +98,39 @@ test("oledLines: campo em edicao leva '>' e a pagina ERRO mostra o ultimo erro",
   assert.ok(oledLines({ power: true, page: 0 }, {}).every(l => /^[\x20-\x7e]*$/.test(l)), "display so' ASCII");
 });
 
-test("CONTROLS: um controle, uma familia; energia e interlock num ponto so'", () => {
-  const fam = new Set(["toggle", "momentary", "valor", "conector", "navegacao"]);
+test("CONTROLS: um controle, uma familia; energia num ponto so'", () => {
+  const fam = new Set(["toggle", "momentary", "valor", "navegacao", "mapear", "peca"]);
   for (const k in CONTROLS) assert.ok(fam.has(CONTROLS[k][0]), k + " tem familia conhecida");
-  assert.strictEqual(kindOf("acin"), "conector", "powerCON e' plugue");
   assert.strictEqual(kindOf("power"), "toggle", "rocker liga e desliga");
   const toggles = Object.keys(CONTROLS).filter(k => CONTROLS[k][0] === "toggle");
-  assert.deepStrictEqual(toggles.sort(), ["interlock", "keyswitch", "power"], "cada toggle e' uma funcao unica");
+  assert.deepStrictEqual(toggles.sort(), ["keyswitch", "power"], "cada toggle e' uma funcao unica");
   assert.strictEqual(kindOf("fusivel"), "", "nao existe fusivel");
+});
+
+// ---- hover so' em controle, e o interlock como entrada (frente hud-4) ----
+const { inert, labelOf } = require("../laser3d/engine.js");
+
+test("peca sem funcao: sem rotulo, inerte, e a USB nao existe mais", () => {
+  // o dono: "nao quero que tenham menus de hover na frente tampa e aletas", "nao quero ter menu
+  // hover no ac", "nao quero hover menu na ventoinha", "quero que vc apague a entrada USB".
+  for (const k of ["lid", "side", "front", "aperture", "acin", "fan", "bench", "dichro", "fold", "psu", "pcb", "dac"])
+    assert.strictEqual(CONTROLS[k][1], "", k + " nao tem tooltip");
+  for (const k of ["side", "front", "aperture", "acin", "fan", "bench", "dichro", "fold", "psu", "pcb", "dac"])
+    assert.ok(inert(k), k + " e' peca: nao acende e o clique nao faz nada");
+  assert.strictEqual(CONTROLS.usb, undefined, "a porta USB saiu do aparelho");
+  assert.ok(inert("usb"), "chave fora da tabela e' peca inerte");
+  assert.strictEqual(labelOf("usb"), "", "chave desconhecida nao vira tooltip com o nome dela");
+  // a tampa continua clicavel (abrir = preferencias), so' que sem tooltip
+  assert.strictEqual(kindOf("lid"), "navegacao");
+  assert.ok(!inert("lid"), "a tampa abre no clique");
+  assert.ok(!inert("pino.ilda"), "os pinos do Pino tem dono e rotulo proprios");
+  assert.ok(!inert("enc") && !inert("power") && !inert("rj45"), "controle continua controle");
+});
+
+test("interlock e' uma entrada: familia 'mapear', nao toggle", () => {
+  assert.strictEqual(kindOf("interlock"), "mapear", "clicar abre onde se mapeia quem aciona");
+  assert.ok(!inert("interlock"));
+  assert.ok(CONTROLS.interlock[1], "o interlock ainda diz o que e' no tooltip");
 });
 
 // O teclado e' do aparelho: um <input type=range> focado (o fader do painel) so' pode ficar com as
