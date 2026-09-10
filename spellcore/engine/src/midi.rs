@@ -107,13 +107,15 @@ pub fn expande(v: &Value, valor: f64) -> Value {
     }
 }
 
-/// Chave valida: `<status 128..255>/<data1 0..127>`.
+/// Chave valida: `<status 128..239>/<data1 0..127>`. O teto e' 239 (0xEF) porque so' mensagem de
+/// CANAL vira evento (`protocols::midi::canal` recusa 0xF0..0xFF, que e' system common e realtime):
+/// aceitar `240/0` seria aceitar uma chave que nunca dispara.
 fn chave_ok(k: &str) -> Result<(), String> {
     let erro = || format!("chave \"{}\": esperava <status>/<data1>, ex. 144/60", k);
     let (s, d) = k.split_once('/').ok_or_else(erro)?;
     let s: u16 = s.parse().map_err(|_| erro())?;
     let d: u16 = d.parse().map_err(|_| erro())?;
-    if !(128..256).contains(&s) || d > 127 {
+    if !(128..240).contains(&s) || d > 127 {
         return Err(erro());
     }
     Ok(())
@@ -355,11 +357,12 @@ mod tests {
 
     #[test]
     fn chave_valida() {
-        for k in ["144/60", "128/0", "176/1", "255/127"] {
+        for k in ["144/60", "128/0", "176/1", "239/127"] {
             assert!(chave_ok(k).is_ok(), "{}", k);
         }
+        // 240 (0xF0) para cima e' system common/realtime: `protocols::midi::canal` nao emite
         for k in [
-            "", "144", "60/144", "144/128", "x/1", "144/", "-1/1", "256/1",
+            "", "144", "60/144", "144/128", "x/1", "144/", "-1/1", "240/0", "255/127", "256/1",
         ] {
             assert!(chave_ok(k).is_err(), "{}", k);
         }

@@ -485,7 +485,10 @@ Com o transporte tocando, cada frame lê os canais do track no universo de entra
 o valor muda**, escreve keyframe por `edit::key_put` — o mesmo funil do comando `key_set`, então
 `rev` sobe e todo cliente do barramento recebe `show {rev}`. A largura (quantos canais) vem do
 primeiro keyframe em lista do track; sem lista, um canal. Curva do keyframe gravado: `linear`.
-Parar o transporte desarma, na borda de entrada em Stop (a thread de transporte) e no `Player::close`. Armar com o transporte parado sobrevive ate o play — e' o caminho normal do operador.
+Parar o transporte desarma, na borda de entrada em Stop (a thread de transporte) e no
+`Player::close`. Armar com o transporte parado sobrevive até o play — é o caminho normal do
+operador. Se a escrita do keyframe falhar (o track sumiu num `track_del`, ou o show trocou), o
+track é desarmado ali mesmo, em vez de repetir o erro a cada frame.
 
 O arme mora no processo, não no `.spell`: `rec_arm` não é edição e não sobe `rev`.
 

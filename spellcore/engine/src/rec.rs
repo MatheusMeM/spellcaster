@@ -84,7 +84,8 @@ pub fn tick(t: f64, inputs: &Inputs) {
         return;
     }
     let mut g = lock(&ARMED);
-    for a in g.iter_mut() {
+    let mut caiu: Vec<usize> = Vec::new();
+    for (n, a) in g.iter_mut().enumerate() {
         let Some(frame) = inputs.get(a.universe) else {
             continue;
         };
@@ -101,8 +102,18 @@ pub fn tick(t: f64, inputs: &Inputs) {
             json!(novo)
         };
         if let Err(e) = edit::key_put(a.track, t, v, "linear") {
-            eprintln!("gravacao do track {}: {}", a.track, e);
+            // Falhar aqui e' o track ter sumido (`track_del`) ou o show ter trocado: o indice
+            // guardado no arme nao existe mais. Desarma UMA vez, em vez de repetir o erro a cada
+            // frame com um indice velho.
+            eprintln!("gravacao do track {}: {} - desarmado", a.track, e);
+            caiu.push(n);
         }
+    }
+    if !caiu.is_empty() {
+        for n in caiu.into_iter().rev() {
+            g.remove(n);
+        }
+        N.store(g.len(), Ordering::Relaxed);
     }
 }
 
