@@ -167,3 +167,23 @@ Seis documentos novos em `design/FUNCOES/` (`daw-arranjo`, `daw-sessao`, `browse
 **Defeito provado, para a frente que corrigir**
 
 - `spellgui/web/timeline.js:308-312`: `commit()` reescreve `spec.mute` a partir de **cada** lane, e as lanes de parâmetro do mesmo track carregam a cópia velha — a última escrita vence e desfaz o mute que o operador acabou de ligar. Vale igual para `solo`. Reproduzido com `shows/medgrupo.spell` (o track laser tem lanes `.rot` e `.scale` sobre o mesmo `spec`). A correção é uma fonte só: `L.mute` vira leitura de `L.spec.mute`.
+
+## 09/09/2026 · integração da rodada 2
+
+- 2026-09-09 — **Roda pura do mouse rola o conteúdo também no PATCHBAY**, e o `graph.js` passa a
+  escrever `k.ymax` (`desenha()`, a partir da caixa mais baixa). Motivo: um gesto só nas duas telas
+  (`roda` rola, `Shift`+roda anda, `Ctrl`+roda dá zoom), e escrever `ymax` custa duas linhas contra
+  o listener de captura que seria preciso para devolver o zoom à roda pura no graph. Decisão de
+  integração, **reversível**: se o voto disser que graph de nós tem que dar zoom na roda pura (como
+  Blender e TouchDesigner), o `canvaskit.js` ganha o desvio e o `ymax` continua servindo ao clamp.
+
+## 09/09/2026 · Loop In-Out com track armado reescreve o take — aguarda voto
+
+- Loop de transporte (`loop_set`, In–Out) e gravação (`rec_arm`) são estados independentes: com os
+  dois ligados, cada volta do loop grava por cima do que a volta anterior gravou. Não há erro; há
+  duas semânticas possíveis e nenhuma está escolhida.
+- **O que o voto decide:** (a) a volta do loop **desarma** o track (uma passada, um take, como o
+  punch do Pro Tools), ou (b) fica como está e a documentação diz que loop + arme sobrescreve
+  (como o overdub destrutivo), ou (c) cada volta vira um take novo — que é campo novo no `.spell` e
+  não sai de graça.
+- Não implementado e não removido até o voto: hoje é (b), sem aviso na tela.

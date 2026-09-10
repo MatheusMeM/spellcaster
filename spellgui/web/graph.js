@@ -480,6 +480,10 @@ function caminho(p) {
 function desenha(k) {
   const cx = k.cx, z = k.view.zoom;
   PB.monta();
+  // Roda pura rola o conteudo (canvaskit.js), e quem sabe onde o graph acaba e' o graph: sem
+  // `ymax` o `Infinity` do canvaskit deixa rolar para o vazio sem fim.
+  const fundo = PB.vis.nodes.reduce((m, n) => Math.max(m, PB.caixa(n).y + PB.caixa(n).h), 0);
+  k.ymax = Math.max(0, (fundo + 40) * z - k.h);
   cx.clearRect(0, 0, k.w, k.h);
   cx.fillStyle = PB.col.well;
   cx.fillRect(0, 0, k.w, k.h);
