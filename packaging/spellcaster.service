@@ -1,5 +1,5 @@
 [Unit]
-Description=Spellcaster show control (GUI web + registry de comandos)
+Description=Spellcaster show control (web GUI + command registry)
 After=network-online.target
 Wants=network-online.target
 
@@ -11,8 +11,8 @@ Environment=PYTHONUNBUFFERED=1
 ExecStart=/usr/bin/python3 -m spellcaster.cli serve --port 8000
 Restart=on-failure
 RestartSec=2
-# ponytail: roda como root (default do systemd) ; criar usuario spellcaster se o Pi deixar de ser dedicado.
-# sACN/Art-Net/OSC usam portas > 1024, entao nao ha necessidade tecnica de root.
+# ponytail: runs as root (systemd default) ; create a spellcaster user if the Pi stops being dedicated.
+# sACN/Art-Net/OSC use ports > 1024, so there is no technical need for root.
 
 [Install]
 WantedBy=multi-user.target

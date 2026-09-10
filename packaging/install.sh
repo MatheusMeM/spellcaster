@@ -1,7 +1,8 @@
 #!/bin/sh
-# Instala o Spellcaster Lite no Raspberry Pi OS: copia para /opt/spellcaster, cria o comando `spell`
-# e liga o servico systemd. Sem pip, sem venv, sem dependencia: e stdlib do python3 do sistema.
-# Uso: sudo ./install.sh [destino]
+# Installs Spellcaster Lite on Raspberry Pi OS: copies to /opt/spellcaster, creates the `spell`
+# command and enables the systemd service. No pip, no venv, no dependency: it is the system
+# python3 stdlib.
+# Usage: sudo ./install.sh [destination]
 set -e
 DEST=${1:-/opt/spellcaster}
 [ "$(id -u)" = 0 ] || exec sudo sh "$0" "$@"
