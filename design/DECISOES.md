@@ -201,3 +201,14 @@ Seis documentos novos em `design/FUNCOES/` (`daw-arranjo`, `daw-sessao`, `browse
 - **Os cinco pinos continuam sendo as cinco telas** (1 laser · 2 fósforo · 3 patchbay · 4 teatro · 5 info). O balão ganhou **dois itens que não são pino**: o **GRAVADOR** (a timeline, `index.html`) e a **MESA** (a Face, `face.html`). Cada um leva a frase que justifica a peça: a timeline é a fita do aparelho, a Face são os botões grandes que o operador aperta no show.
 - **O que o voto decide:** se peça sem pino pode morar no balão, ou se cada uma precisa virar um pino — o que exigiria um Pino com sete pinos (XLR-7 não existe) ou um segundo cabo.
 - Motivo: a regra é "nada aparece por conveniência de software". Dois itens sem pino são a exceção que o balão está abrindo; ou ela é aceita com a justificativa, ou o aparelho precisa crescer um conector.
+
+## 10/09/2026 · `Z` e `Shift+Z` trocados de lado, para bater com o manual do SolidWorks
+
+- Estava `Z` = zoom **+** e `Shift+Z` = zoom **−**. A referência rápida oficial da Dassault
+  (`quick_reference.pdf`, p. 1, `SWQRCENG06060`) diz o contrário: **`Z` afasta, `Shift+Z` aproxima**.
+  Como a câmera da vista SHOW passou a copiar o SolidWorks inteiro (`design/FUNCOES/camera-solidworks.md`),
+  ficar com metade do mapa invertida seria a pior das duas opções: quem conhece o CAD erra, e quem não
+  conhece não ganha nada. Os dois continuam sendo endereços (`cam.zoomIn`, `cam.zoomOut`), remapeáveis.
+- Não estava no pedido; foi decidido aqui porque o pedido mandou seguir o manual e o manual discorda
+  do que havia. **Reversível em uma linha** (as duas teclas no `Bind.def` de `app.js`) se o voto disser
+  que a intuição "Z aproxima" vale mais que a compatibilidade com o CAD.
