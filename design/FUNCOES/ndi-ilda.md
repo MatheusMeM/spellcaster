@@ -1,100 +1,100 @@
-# NDI → ILDA — `spell ilda from-ndi` (tema FÓSFORO)
+# NDI → ILDA — `spell ilda from-ndi` (FÓSFORO theme)
 
-Receber vídeo por NDI, vetorizar cada quadro em caminhos e entregar frames ILDA à mesma saída laser do `ilda-player.md`. Tudo que é saída (PPS, blanking, cor, segurança, armar, shutter) está lá e não se repete aqui; este arquivo cobre a entrada e a conversão.
+Receive video over NDI, vectorize each frame into paths and deliver ILDA frames to the same laser output as `ilda-player.md`. Everything that is output (PPS, blanking, color, safety, arm, shutter) is there and is not repeated here; this file covers the input and the conversion.
 
-| Item | Quem resolveu melhor | Por quê |
+| Item | Who solved it best | Why |
 |---|---|---|
-| Objetos e verbos | MadMapper | Os dois algoritmos (contornos vs esqueleto), o filtro de comprimento, o limite "fique com os N mais longos" e o campo de erro da vetorização são o conjunto completo, com chaves reais no projeto salvo |
-| Estados | TouchDesigner | O NDI In não tem parâmetro de FPS: tem seis canais de leitura que são o painel de saúde do link; e `updatemethod` nomeia o flicker |
-| Zonas da tela | MadMapper, com o Monitor do Resolume | Um preview só, com quatro modos (fonte, processada, processada + polilinhas, só polilinhas); preview e saída são o mesmo widget |
-| Atalhos | Blender | Toggle com seta para os parâmetros de Canny; nada modal |
-| Arquivo | MadMapper, com o `failovername` do TouchDesigner | A saída vetorizada é publicada como mídia interna (loopback), consumível pelo resto do graph; a fonte NDI tem nome de contingência |
+| Objects and verbs | MadMapper | The two algorithms (contours vs skeleton), the length filter, the "keep the N longest" limit and the vectorization error field are the complete set, with real keys in the saved project |
+| States | TouchDesigner | The NDI In has no FPS parameter: it has six read channels that are the health panel of the link; and `updatemethod` names the flicker |
+| Screen zones | MadMapper, with the Resolume Monitor | A single preview, with four modes (source, processed, processed + polylines, polylines only); preview and output are the same widget |
+| Shortcuts | Blender | Toggle with an arrow for the Canny parameters; nothing modal |
+| File | MadMapper, with the `failovername` of TouchDesigner | The vectorized output is published as internal media (loopback), consumable by the rest of the graph; the NDI source has a failover name |
 
-## 1. Objetos e verbos
+## 1. Objects and verbs
 
-**Fonte NDI.** Parâmetros, do NDI In TOP [fontes/touchdesigner.md § Laser e NDI]:
+**NDI source.** Parameters, from the NDI In TOP [fontes/touchdesigner.md § Laser and NDI]:
 
-| Parâmetro | Tipo | Nota |
+| Parameter | Type | Note |
 |---|---|---|
-| Fonte/Nome | enum auto-populado pelos streams descobertos | descoberta por mDNS, "costuma ser limitada a redes locais" |
-| Fonte/IPs extras | lista de IP | para fontes fora do multicast |
-| Fonte/Banda | enum alta, baixa | dois valores só; baixa é o modo de ensaio no Pi |
-| Fonte/Contingência | nome no formato `MÁQUINA (Fonte)` | do NDI Out `failovername`, lido aqui do lado do receptor: para onde migrar se a fonte cair |
-| Fonte/Grupos | lista | filtra as fontes listadas |
+| Source/Name | enum auto-populated by the discovered streams | discovery by mDNS, "usually limited to local networks" |
+| Source/Extra IPs | list of IP | for sources outside multicast |
+| Source/Bandwidth | enum high, low | two values only; low is the rehearsal mode on the Pi |
+| Source/Failover | name in the format `MACHINE (Source)` | from the NDI Out `failovername`, read here on the receiver side: where to migrate if the source drops |
+| Source/Groups | list | filters the listed sources |
 
-Sem parâmetro de FPS: o frame rate chega como leitura (ver Estados). Decodificação por hardware só vale para NDI|HX, e "soluções em software só enviam NDI nativo", então o toggle fica escondido até a fonte ser HX. Multicast configura-se fora, no NDI Access Manager; jumbo frames de 9014 bytes resolveram queda de frames em gigabit, e isso é frase do Aprendiz, não parâmetro.
+No FPS parameter: the frame rate arrives as a reading (see States). Hardware decoding only applies to NDI|HX, and "software solutions only send native NDI", so the toggle stays hidden until the source is HX. Multicast is configured outside, in the NDI Access Manager; jumbo frames of 9014 bytes fixed frame drops on gigabit, and that is a sentence from the Aprendiz, not a parameter.
 
-**Vetorizador.** Dois algoritmos, com as chaves do grupo `Process` do `Laser Example.mad` [fontes/madmapper.md § Laser]:
+**Vectorizer.** Two algorithms, with the keys of the `Process` group of `Laser Example.mad` [fontes/madmapper.md § Laser]:
 
-- **Contornos** (Canny): `Limiar`, `Tamanho`, `Desfoque`. Bordas de forma cheia.
-- **Caminhos** (esqueleto): `Limiar`, `Espessura` (do traço no material de origem), `Redução de ruído`, `Resolução máxima`; por baixo, thinning Zhang-Suen e recomposição por tolerância de ângulo, cor e distância. Traço de linha.
+- **Contours** (Canny): `Threshold`, `Size`, `Blur`. Edges of a filled shape.
+- **Paths** (skeleton): `Threshold`, `Thickness` (of the stroke in the source material), `Noise reduction`, `Maximum resolution`; underneath, Zhang-Suen thinning and recomposition by angle, color and distance tolerance. Line stroke.
 
-O TouchDesigner tem um terceiro caminho, raster: o Scan CHOP converte a imagem em varredura de osciloscópio, com `largura`, `altura`, `níveis` de brilho, redução automática para manter o frame rate, ordem por brilho e entrelaçamento `sweep | evenodd | max` "para minimizar o flicker" [fontes/touchdesigner.md § Laser e NDI]. Está depreciado lá, mas é o único raster→vetor documentado nos seis apps. Fica como terceiro valor do enum `Algoritmo`, para quando a fonte é texto ou logotipo cheio.
+TouchDesigner has a third path, raster: the Scan CHOP converts the image into an oscilloscope sweep, with `width`, `height`, brightness `levels`, automatic reduction to hold the frame rate, ordering by brightness and interlacing `sweep | evenodd | max` "to minimize flicker" [fontes/touchdesigner.md § Laser and NDI]. It is deprecated there, but it is the only documented raster→vector in the six apps. It stays as the third value of the `Algorithm` enum, for when the source is text or a filled logo.
 
-**Filtro de caminhos.** `Comprimento mínimo` e `máximo` em porcentagem da maior dimensão da mídia; `Limite: manter os N mais longos` [fontes/madmapper.md § Laser]. O engine desiste acima de 2 000 caminhos; esse teto é constante visível, não surpresa.
+**Path filter.** `Minimum` and `maximum length` as a percentage of the largest dimension of the media; `Limit: keep the N longest` [fontes/madmapper.md § Laser]. The engine gives up above 2 000 paths; that ceiling is a visible constant, not a surprise.
 
-**Suavização.** Entre o contorno e o frame entram filtros da cadeia de mapping do Chataigne: `Damping`, `Lag`, `OneEuro`, `Speed`, `CurveMap`, cada um devolvendo `CHANGED | UNCHANGED | STOP_HERE` [fontes/chataigne.md § Mappings e Actions]. São nós do graph (`orquestrador.md`), não parâmetros escondidos do vetorizador; aqui só se declara que a saída do vetorizador é uma porta de tipo `frame`.
+**Smoothing.** Between the contour and the frame come filters from the Chataigne mapping chain: `Damping`, `Lag`, `OneEuro`, `Speed`, `CurveMap`, each returning `CHANGED | UNCHANGED | STOP_HERE` [fontes/chataigne.md § Mappings and Actions]. They are graph nodes (`orquestrador.md`), not hidden parameters of the vectorizer; here we only declare that the vectorizer output is a port of type `frame`.
 
-**Frame de saída.** O que sai do vetorizador é o mesmo objeto que o player entrega: lista de pontos com `id` de forma. O Laser CHOP agrupa pontos por canal `id`, e sem ele "cada ponto é solto e desconectado" [fontes/touchdesigner.md § Laser e NDI]; o MadMapper faz igual com `shapeNumber`, "toda vez que muda, começa um path novo" [fontes/madmapper.md § Laser]. Um caminho = um `id`.
+**Output frame.** What comes out of the vectorizer is the same object the player delivers: a list of points with a shape `id`. The Laser CHOP groups points by the `id` channel, and without it "each point is loose and disconnected" [fontes/touchdesigner.md § Laser and NDI]; MadMapper does the same with `shapeNumber`, "every time it changes, a new path starts" [fontes/madmapper.md § Laser]. One path = one `id`.
 
-Verbos: conectar, desconectar, escolher algoritmo, congelar quadro, gravar (o snapshot do Capture grava DMX, vídeo, laser e câmera juntos, e na reprodução sobrepõe a entrada externa) [fontes/capture.md § O que copiar], publicar a saída como mídia interna (MadMapper loopback, `Dispatch Count` reparte em N mídias, uma por projetor) [fontes/madmapper.md § Laser].
+Verbs: connect, disconnect, choose algorithm, freeze frame, record (the Capture snapshot records DMX, video, laser and camera together, and on playback it overlays the external input) [fontes/capture.md § What to copy], publish the output as internal media (MadMapper loopback, `Dispatch Count` splits it into N media, one per projector) [fontes/madmapper.md § Laser].
 
-## 2. Estados
+## 2. States
 
-**Saúde do link**, seis leituras do NDI In, sempre visíveis quando a fonte está escolhida [fontes/touchdesigner.md § Laser e NDI]:
+**Link health**, six readings of the NDI In, always visible when the source is chosen [fontes/touchdesigner.md § Laser and NDI]:
 
-| Leitura | Estado que gera |
+| Reading | State it generates |
 |---|---|
-| `connected` | desconectado / conectado |
-| `receive_fps` | FPS recebido; comparado ao FPS real do laser dá "o galvo não acompanha" |
-| `num_source` | zero = "nenhuma fonte na rede", frase do Aprendiz |
-| `queue_size` | fila crescendo = latência subindo |
-| `received_frames` | contador |
-| `missed_frames` | subindo = `warning`, a frase "perdendo quadros" |
+| `connected` | disconnected / connected |
+| `receive_fps` | received FPS; compared to the actual laser FPS it gives "the galvo can't keep up" |
+| `num_source` | zero = "no source on the network", a sentence from the Aprendiz |
+| `queue_size` | growing queue = rising latency |
+| `received_frames` | counter |
+| `missed_frames` | rising = `warning`, the sentence "dropping frames" |
 
-Mais os do Capture, `Requesting` e `Receiving`: a mídia diz o que pediu e o que está recebendo, dois estados antes de "conectado" [fontes/capture.md § Estados e mensagens].
+Plus the ones from Capture, `Requesting` and `Receiving`: the media says what it asked for and what it is receiving, two states before "connected" [fontes/capture.md § States and messages].
 
-**Vetorização**: caminhos encontrados / limite; pontos necessários / `PPS ÷ FPS`; `Monitor/Info` do MadMapper como campo de erro em texto [fontes/madmapper.md § Laser]. Quando pontos necessários > pontos disponíveis, o estado é o mesmo `warning` "galvo não acompanha" do player, com a causa "vetorização" em vez de "clipe".
+**Vectorization**: paths found / limit; points needed / `PPS ÷ FPS`; MadMapper's `Monitor/Info` as an error field in text [fontes/madmapper.md § Laser]. When points needed > points available, the state is the same `warning` "the galvo can't keep up" as the player, with the cause "vectorization" instead of "clip".
 
-**Congelado**: o quadro atual fica, a fonte continua chegando. Independente do shutter e do transporte (MadMapper separa congelar engine de congelar saída) [fontes/madmapper.md § Estados].
+**Frozen**: the current frame stays, the source keeps arriving. Independent of the shutter and of the transport (MadMapper separates freezing the engine from freezing the output) [fontes/madmapper.md § States].
 
-**Pendente**: mudar de algoritmo aplica no próximo quadro; vermelho até lá [fontes/touchdesigner.md § Estados].
+**Pending**: changing the algorithm applies on the next frame; red until then [fontes/touchdesigner.md § States].
 
-**Latência**: `queue_size` do NDI mais `Delay` por saída (Resolume: 0–150 ms por dispositivo, "hardware real chega fora de fase") [fontes/resolume.md § O que copiar]. O delay é da saída DMX e da saída laser separadamente; é assim que o laser vetorizado se alinha com o DMX que veio do mesmo vídeo.
+**Latency**: NDI `queue_size` plus `Delay` per output (Resolume: 0–150 ms per device, "real hardware arrives out of phase") [fontes/resolume.md § What to copy]. The delay belongs to the DMX output and to the laser output separately; that is how the vectorized laser lines up with the DMX that came from the same video.
 
-## 3. Zonas da tela
+## 3. Screen zones
 
-- **Esquerda**: lista de fontes NDI descobertas, com `receive_fps` ao lado do nome. Lista longa vira busca.
-- **Centro, viewer**: um só, com o seletor de modo do MadMapper: `Imagem fonte`, `Imagem processada`, `Processada + polilinhas`, `Só polilinhas` [fontes/madmapper.md § Laser]. Mais o modo diagnóstico por ponto do player. Máscaras e área segura por cima em todos os modos.
-- **Direita, Inspector**: `Fonte/`, `Vetorização/`, `Filtro/`, `Saída/` (o mesmo grupo do player). O toggle `Vetorizar` com seta: liga e abre os parâmetros do algoritmo escolhido; trocar de algoritmo troca o conteúdo do popover [fontes/blender.md § Anatomia de um editor].
-- **Embaixo**: sem timeline própria; a régua é a do show. O painel de saúde (as seis leituras + caminhos + pontos + FPS real) fica na status bar, no slot de estatísticas [fontes/blender.md § Estados].
+- **Left**: list of discovered NDI sources, with `receive_fps` next to the name. A long list becomes a search.
+- **Center, viewer**: a single one, with MadMapper's mode selector: `Source image`, `Processed image`, `Processed + polylines`, `Polylines only` [fontes/madmapper.md § Laser]. Plus the player's per-point diagnostic mode. Masks and safe area on top in every mode.
+- **Right, Inspector**: `Source/`, `Vectorization/`, `Filter/`, `Output/` (the same group as the player). The `Vectorize` toggle with an arrow: it turns on and opens the parameters of the chosen algorithm; switching algorithm switches the content of the popover [fontes/blender.md § Anatomy of an editor].
+- **Bottom**: no timeline of its own; the ruler is the show's. The health panel (the six readings + paths + points + actual FPS) sits in the status bar, in the statistics slot [fontes/blender.md § States].
 
-Menu do painel: `View, Select, Add, Fonte`.
+Panel menu: `View, Select, Add, Source`.
 
-## 4. Atalhos
+## 4. Shortcuts
 
-Tudo do player vale. O que entra:
+Everything from the player applies. What is added:
 
-| Ação | Tecla | Origem | Conflito |
+| Action | Key | Origin | Conflict |
 |---|---|---|---|
-| Ciclar modo do viewer | `V` | (nosso; MadMapper tem o seletor sem tecla) | nenhum em `SHORTCUTS.md` |
-| Congelar quadro | `F` | (nosso) | nenhum; `Shift+F` é tela cheia |
-| Ligar/desligar vetorização | `Shift+V` | (nosso) | nenhum |
-| Parâmetros de Canny | popover pela seta ao lado do toggle | Blender | gesto |
-| Limiar por escada de valor | segurar botão do meio | TD Value Ladder | gesto |
+| Cycle the viewer mode | `V` | (ours; MadMapper has the selector with no key) | none in `SHORTCUTS.md` |
+| Freeze frame | `F` | (ours) | none; `Shift+F` is full screen |
+| Turn vectorization on/off | `Shift+V` | (ours) | none |
+| Canny parameters | popover from the arrow next to the toggle | Blender | gesture |
+| Threshold by value ladder | hold the middle button | TD Value Ladder | gesture |
 
-Regra: nenhum atalho de fonte muda estado de saída. Armar, shutter e blackout são os do player.
+Rule: no source shortcut changes output state. Arm, shutter and blackout are the player's.
 
-## 5. Arquivo
+## 5. File
 
-No `.spell`:
+In the `.spell`:
 
-- `sources[]`: `{uid, kind: "ndi", name, extra_ips[], bandwidth, failover, groups[]}`. Nome de fonte é identidade fraca (muda com a máquina que emite); `failover` é a segunda tentativa declarada, nunca heurística.
-- `vectorizer`: `{source, algorithm (id estável: contours | paths | raster), params completos dos três algoritmos, filter: {min_len, max_len, keep_longest}, publish_as: "media/<nome>"}`. Guardar os parâmetros dos três algoritmos, mesmo o inativo, para trocar sem perder ajuste; é o que o TouchDesigner faz com os quatro modos de parâmetro guardados ao mesmo tempo [fontes/touchdesigner.md § O que copiar].
-- `outputs[]`: os do player, com `delay_ms` por saída.
+- `sources[]`: `{uid, kind: "ndi", name, extra_ips[], bandwidth, failover, groups[]}`. A source name is a weak identity (it changes with the machine that emits it); `failover` is the declared second attempt, never a heuristic.
+- `vectorizer`: `{source, algorithm (stable id: contours | paths | raster), complete params of the three algorithms, filter: {min_len, max_len, keep_longest}, publish_as: "media/<name>"}`. Keep the parameters of all three algorithms, even the inactive one, to switch without losing the tuning; that is what TouchDesigner does with the four parameter modes kept at the same time [fontes/touchdesigner.md § What to copy].
+- `outputs[]`: the player's, with `delay_ms` per output.
 
-Fora do `.spell`: lista de fontes vista na rede, `receive_fps`, contadores, quadro congelado.
+Outside the `.spell`: list of sources seen on the network, `receive_fps`, counters, frozen frame.
 
-O que a saída publica: um `frame` no graph, endereçável como `media/<nome>` (o loopback do MadMapper publica os paths de um output sem destino como Live Input, e `Dispatch Count` reparte em N mídias) [fontes/madmapper.md § O que copiar]. Assim o orquestrador roteia o mesmo vetor para dois lasers sem duplicar o vetorizador.
+What the output publishes: a `frame` in the graph, addressable as `media/<name>` (the MadMapper loopback publishes the paths of an output with no destination as Live Input, and `Dispatch Count` splits it into N media) [fontes/madmapper.md § What to copy]. That way the orchestrator routes the same vector to two lasers without duplicating the vectorizer.
 
-Gravação: um só gravador para os quatro fluxos (DMX, vídeo, laser, câmera), e "Recall DMX" para congelar um estado quando não há sinal [fontes/capture.md § O que copiar]; o arquivo gravado é o do `ilda-player.md § 5` no modo "a FPS fixo".
+Recording: a single recorder for the four streams (DMX, video, laser, camera), and "Recall DMX" to freeze a state when there is no signal [fontes/capture.md § What to copy]; the recorded file is the one from `ilda-player.md § 5` in the "at fixed FPS" mode.

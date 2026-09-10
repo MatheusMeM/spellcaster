@@ -1,86 +1,86 @@
-# Câmera no padrão SolidWorks — o manual, e o que o Spellcaster usa
+# Camera in the SolidWorks standard — the manual, and what Spellcaster uses
 
-O pedido do Matheus (09/09/2026): *"estude os comandos de movimentação e navegação de câmera do solidworks, ache o manual descrevendo o que os alt shift ctrl fazem ao interagir com click esq e click do meio e o scroll do mouse."*
+Matheus's request (2026-09-09): *"study the camera movement and navigation commands of solidworks, find the manual describing what alt shift ctrl do when interacting with left click and middle click and the mouse scroll."*
 
-Fonte: **SOLIDWORKS Design Help 2026** (help.solidworks.com), lido em 10/09/2026, uma URL por linha da tabela; e o **SolidWorks Quick Reference — Keyboard Shortcuts**, documento oficial da Dassault (`SWQRCENG06060`), para a tabela de teclado: https://files.solidworks.com/supportfiles/Release_Notes/2007/English/quick_reference.pdf
+Source: **SOLIDWORKS Design Help 2026** (help.solidworks.com), read on 2026-09-10, one URL per table row; and the **SolidWorks Quick Reference — Keyboard Shortcuts**, an official Dassault document (`SWQRCENG06060`), for the keyboard table: https://files.solidworks.com/supportfiles/Release_Notes/2007/English/quick_reference.pdf
 
-O motivo de copiar o SolidWorks e não o Blender: o objeto na tela é **um aparelho**, não uma cena. Quem opera CAD passa o dia girando uma peça em torno do ponto que clicou, e é exatamente esse gesto que a vista SHOW precisa. As outras duas vistas do programa não são CAD — e por isso não recebem o mapa inteiro (§3).
+The reason for copying SolidWorks and not Blender: the object on screen is **a device**, not a scene. Whoever operates CAD spends the day rotating a part around the point they clicked, and that is exactly the gesture the SHOW view needs. The program's other two views are not CAD — and that is why they do not get the whole map (§3).
 
-## 1. Mouse — o que o manual diz
+## 1. Mouse — what the manual says
 
-| Gesto | Efeito no SolidWorks | Página do manual |
+| Gesture | Effect in SolidWorks | Manual page |
 |---|---|---|
-| Arrastar com o **botão do meio** | Rotate View (só peça e montagem) | https://help.solidworks.com/2026/english/SolidWorks/Sldworks/r_Middle_Mouse_Button.htm |
-| **Clicar com o meio** num vértice, aresta ou face, depois arrastar com o meio | gira **em torno daquele ponto**, não do centro da tela | https://help.solidworks.com/2026/english/SolidWorks/Sldworks/r_Middle_Mouse_Button.htm |
-| **Ctrl** + arrastar com o meio | Pan (em desenho 2D ativo o Ctrl não é preciso) | https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_pan_fundamentals.htm |
-| **Shift** + arrastar com o meio | Zoom In/Out | https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_zoom_in_out.htm |
-| **Alt** + arrastar com o meio | **Roll View** — gira a vista no plano da tela, em torno do centroide | https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_roll_view.htm |
-| **Roda** para frente e para trás | Zoom **na posição do cursor**. Com o cursor fora da área gráfica, o zoom é no centro do modelo | https://help.solidworks.com/2026/english/SolidWorks/Sldworks/r_Middle_Mouse_Button.htm |
-| **Roda**, com `View > Modify > Zoom About Screen Center` ligado | Zoom no centro da tela em vez de no cursor | https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_zoom_in_out.htm |
-| **Roda**, com `Reverse mouse wheel zoom direction` ligado | inverte o sentido da roda | https://help.solidworks.com/2026/english/SolidWorks/sldworks/HIDD_OPTIONS_VIEW_ROTATION_display.htm |
-| Arrastar com o **botão esquerdo**, com a ferramenta Rotate / Pan / Zoom ativa | o mesmo que o meio faz direto — o esquerdo só gira depois de escolher a ferramenta na barra View | https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_rotate_view.htm |
-| **Zoom to Area**: arrastar uma caixa | enquadra a caixa | https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_zoom_to_area.htm |
-| Botão **direito** na área gráfica → `Rotate about scene floor` | trava o eixo vertical: o modelo não tomba no horizonte | https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_rotate_view.htm |
+| Drag with the **middle button** | Rotate View (part and assembly only) | https://help.solidworks.com/2026/english/SolidWorks/Sldworks/r_Middle_Mouse_Button.htm |
+| **Middle-click** on a vertex, edge or face, then drag with the middle | rotates **around that point**, not around the screen center | https://help.solidworks.com/2026/english/SolidWorks/Sldworks/r_Middle_Mouse_Button.htm |
+| **Ctrl** + drag with the middle | Pan (in an active 2D drawing the Ctrl is not needed) | https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_pan_fundamentals.htm |
+| **Shift** + drag with the middle | Zoom In/Out | https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_zoom_in_out.htm |
+| **Alt** + drag with the middle | **Roll View** — rotates the view in the screen plane, around the centroid | https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_roll_view.htm |
+| **Wheel** forward and backward | Zoom **at the cursor position**. With the cursor outside the graphics area, the zoom is at the model center | https://help.solidworks.com/2026/english/SolidWorks/Sldworks/r_Middle_Mouse_Button.htm |
+| **Wheel**, with `View > Modify > Zoom About Screen Center` on | Zoom at the screen center instead of at the cursor | https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_zoom_in_out.htm |
+| **Wheel**, with `Reverse mouse wheel zoom direction` on | inverts the wheel direction | https://help.solidworks.com/2026/english/SolidWorks/sldworks/HIDD_OPTIONS_VIEW_ROTATION_display.htm |
+| Drag with the **left button**, with the Rotate / Pan / Zoom tool active | the same as the middle does directly — the left one only rotates after you pick the tool in the View bar | https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_rotate_view.htm |
+| **Zoom to Area**: drag a box | frames the box | https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_zoom_to_area.htm |
+| **Right** button in the graphics area → `Rotate about scene floor` | locks the vertical axis: the model does not tip over the horizon | https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_rotate_view.htm |
 
-Dois ajustes que o manual trata como opção de sistema e que aqui viram **calibração**, não constante escondida: `Mouse speed` ("para controle mais fino e rotação mais lenta, mova o slider para a esquerda") e `Arrow keys` (o incremento angular das setas), ambos em https://help.solidworks.com/2026/english/SolidWorks/sldworks/HIDD_OPTIONS_VIEW_ROTATION_display.htm
+Two settings the manual treats as a system option and that here become **calibration**, not a hidden constant: `Mouse speed` ("for finer control and slower rotation, move the slider to the left") and `Arrow keys` (the angular increment of the arrows), both at https://help.solidworks.com/2026/english/SolidWorks/sldworks/HIDD_OPTIONS_VIEW_ROTATION_display.htm
 
-## 2. Teclado — o que o manual diz
+## 2. Keyboard — what the manual says
 
-Da referência rápida oficial (`quick_reference.pdf`, p. 1), verbatim na coluna do meio:
+From the official quick reference (`quick_reference.pdf`, p. 1), verbatim in the middle column:
 
-| Tecla | Efeito | Origem |
+| Key | Effect | Origin |
 |---|---|---|
-| Setas | `Rotate horizontally or vertically` (incremento configurável, 15° de fábrica) | quick_reference.pdf p.1 · https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_rotate_view.htm |
-| `Shift`+setas | `Rotate 90º` | quick_reference.pdf p.1 · https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_rotate_view.htm |
-| `Alt`+setas | `Rotate about screen center` = **roll** (o manual atual: "Hold down Alt and press the left-right arrow keys") | quick_reference.pdf p.1 · https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_roll_view.htm |
-| `Ctrl`+setas | `Pan` | quick_reference.pdf p.1 · https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_pan_fundamentals.htm |
-| `Z` / `Shift+Z` | `Zoom in/out` — **`Z` afasta, `Shift+Z` aproxima** | quick_reference.pdf p.1 · https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_zoom_in_out.htm |
-| `Ctrl+Shift+Z` | `Previous view` (desfaz até 10 mudanças de vista) | quick_reference.pdf p.1 · https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_previous_view.htm |
+| Arrows | `Rotate horizontally or vertically` (configurable increment, 15° from the factory) | quick_reference.pdf p.1 · https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_rotate_view.htm |
+| `Shift`+arrows | `Rotate 90º` | quick_reference.pdf p.1 · https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_rotate_view.htm |
+| `Alt`+arrows | `Rotate about screen center` = **roll** (the current manual: "Hold down Alt and press the left-right arrow keys") | quick_reference.pdf p.1 · https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_roll_view.htm |
+| `Ctrl`+arrows | `Pan` | quick_reference.pdf p.1 · https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_pan_fundamentals.htm |
+| `Z` / `Shift+Z` | `Zoom in/out` — **`Z` moves away, `Shift+Z` moves closer** | quick_reference.pdf p.1 · https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_zoom_in_out.htm |
+| `Ctrl+Shift+Z` | `Previous view` (undoes up to 10 view changes) | quick_reference.pdf p.1 · https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_previous_view.htm |
 | `F` | `Zoom to fit` | quick_reference.pdf p.1 · https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_zoom_to_fit.htm |
 | `Ctrl+1` … `Ctrl+7` | Front, Back, Left, Right, Top, Bottom, Isometric | quick_reference.pdf p.1 · https://help.solidworks.com/2026/english/SolidWorks/sldworks/r_standard_views_toolbar_2.htm |
-| `Ctrl+8` | `Normal To` — olha perpendicular à face selecionada; de novo, vira 180° | quick_reference.pdf p.1 · https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_viewing_models_normal_to.htm |
-| `Espaço` | abre a caixa Orientation (vistas padrão e vistas nomeadas) | quick_reference.pdf p.1 · https://help.solidworks.com/2026/english/SolidWorks/sldworks/c_orientation_dialog_box.htm |
-| `Ctrl+Espaço` | View Selector: o cubo de vistas; `Alt` seleciona as faces de trás | https://help.solidworks.com/2026/english/SolidWorks/sldworks/c_view_selector.htm |
+| `Ctrl+8` | `Normal To` — looks perpendicular to the selected face; again, turns 180° | quick_reference.pdf p.1 · https://help.solidworks.com/2026/english/SolidWorks/sldworks/t_viewing_models_normal_to.htm |
+| `Space` | opens the Orientation box (standard views and named views) | quick_reference.pdf p.1 · https://help.solidworks.com/2026/english/SolidWorks/sldworks/c_orientation_dialog_box.htm |
+| `Ctrl+Space` | View Selector: the view cube; `Alt` selects the back faces | https://help.solidworks.com/2026/english/SolidWorks/sldworks/c_view_selector.htm |
 
-## 3. O mapa que **este** programa usa
+## 3. The map **this** program uses
 
-A regra 2 do `README.md` desta pasta vale aqui: cada gesto é um endereço textual (`cam.rotL`, `cam.fit`, `cam.front`), registrado em `Bind.def`, remapeável por tecla e por MIDI, e listado em `Bind.manifest()`. O que muda por vista **não é o teclado, é a lei da câmera** — `CAM.mode("free" | "rear" | "inside")`, em `cam.js`.
+Rule 2 of this folder's `README.md` holds here: every gesture is a textual address (`cam.rotL`, `cam.fit`, `cam.front`), registered in `Bind.def`, remappable by key and by MIDI, and listed in `Bind.manifest()`. What changes per view **is not the keyboard, it is the camera law** — `CAM.mode("free" | "rear" | "inside")`, in `cam.js`.
 
-Três vistas, três leis. O aparelho é o modelo; a vista diz o que se pode fazer com ele.
+Three views, three laws. The device is the model; the view says what you can do with it.
 
-| Gesto | `show` = **free** (o visualizador) | `rear` = **fixo** (a traseira é o menu) | `inside` = **restrito** (tampa aberta) |
+| Gesture | `show` = **free** (the viewer) | `rear` = **fixed** (the rear panel is the menu) | `inside` = **restricted** (lid open) |
 |---|---|---|---|
-| Arrastar meio | gira em torno do ponto clicado | — | gira dentro dos limites |
-| Ctrl+meio | pan | — | — |
-| Shift+meio | zoom | — | — |
-| Alt+meio | **roll** | — | — |
-| Arrastar esquerdo no vazio | gira (notebook sem botão do meio) | — | gira dentro dos limites |
-| Arrastar esquerdo **numa peça** | é da peça, nunca da câmera (o knob: §4 de `FUNCOES/README` regra 3 — valor é um tipo, e o gesto de valor é o do TouchDesigner) | idem | idem |
-| Roda no vazio | zoom no cursor, passo pequeno | — | — |
-| Roda sobre o encoder | gira o encoder | gira o encoder | — |
-| Setas / `Shift`+setas / `Ctrl`+setas / `Alt`+setas | 15° · 90° · pan · roll | — | — |
-| `F`, `Ctrl+1..7`, `Z`, `Shift+Z` | como o SolidWorks | — | — |
-| `1` `2` `3` | troca de vista (é do programa, não do SolidWorks) | idem | idem |
+| Drag middle | rotates around the clicked point | — | rotates within the limits |
+| Ctrl+middle | pan | — | — |
+| Shift+middle | zoom | — | — |
+| Alt+middle | **roll** | — | — |
+| Drag left in empty space | rotates (laptop with no middle button) | — | rotates within the limits |
+| Drag left **on a part** | belongs to the part, never to the camera (the knob: §4 of `FUNCOES/README` rule 3 — a value is a type, and the value gesture is TouchDesigner's) | same | same |
+| Wheel in empty space | zoom at the cursor, small step | — | — |
+| Wheel over the encoder | turns the encoder | turns the encoder | — |
+| Arrows / `Shift`+arrows / `Ctrl`+arrows / `Alt`+arrows | 15° · 90° · pan · roll | — | — |
+| `F`, `Ctrl+1..7`, `Z`, `Shift+Z` | like SolidWorks | — | — |
+| `1` `2` `3` | view switch (it is the program's, not SolidWorks's) | same | same |
 
-**`show` — free.** O SolidWorks inteiro, com três coisas que o SolidWorks não precisa ter e um visualizador de laser precisa:
+**`show` — free.** The whole of SolidWorks, plus three things SolidWorks does not need to have and a laser viewer does:
 
-- **Amortecimento crítico** em vez do `lerp` de fator fixo. `lerp(k = dt·5)` depende do frame rate e nunca chega: a câmera "nada" atrás do mouse e continua andando depois que o botão soltou. Mola com `ζ = 1` (`x += v·dt ; v += (−2ω·v − ω²·(x−alvo))·dt`, `ω = 18`) chega ao alvo sem passar dele e para.
-- **Sensibilidade proporcional à distância**: girar e pan com a câmera a 20 cm do aparelho não pode andar o mesmo tanto que a 3 m. É o `Mouse speed` do manual, só que automático.
-- **Limites**: `d ≥ R + folga` (R = raio da caixa do aparelho), `d ≤` metade da sala, `|pitch| ≤ 85°`, alvo dentro da sala. A câmera nunca entra no aparelho nem atravessa a parede.
+- **Critical damping** instead of a fixed-factor `lerp`. `lerp(k = dt·5)` depends on the frame rate and never arrives: the camera "swims" behind the mouse and keeps moving after the button is released. A spring with `ζ = 1` (`x += v·dt ; v += (−2ω·v − ω²·(x−alvo))·dt`, `ω = 18`) reaches the target without overshooting and stops.
+- **Sensitivity proportional to distance**: rotating and panning with the camera 20 cm from the device cannot move the same amount as at 3 m. It is the manual's `Mouse speed`, only automatic.
+- **Limits**: `d ≥ R + folga` (R = radius of the device's box), `d ≤` half the room, `|pitch| ≤ 85°`, target inside the room. The camera never enters the device nor goes through the wall.
 
-**`rear` — fixo.** A traseira **é o menu**; câmera solta em cima de um menu é a mesma coisa que um menu que anda quando você passa o mouse. A pose é calculada da normal do painel traseiro, enquadrando os 400 × 180 mm com folga, e **recalculada quando a janela muda de tamanho** (o enquadramento depende do aspect). Sem arrasto, sem meio, sem roda-zoom, sem setas. O único movimento é um respiro de ±2° que segue o mouse, e ele **não muda a distância**: é paralaxe, não navegação.
+**`rear` — fixed.** The rear panel **is the menu**; a loose camera over a menu is the same thing as a menu that moves when you hover it. The pose is computed from the rear panel's normal, framing the 400 × 180 mm with margin, and **recomputed when the window changes size** (the framing depends on the aspect). No drag, no middle, no wheel-zoom, no arrows. The only movement is a ±2° breathing that follows the mouse, and it **does not change the distance**: it is parallax, not navigation.
 
-**`inside` — restrito.** Órbita em torno do centro da mesa óptica, `yaw ∈ [−60°, +60°]` em relação à **pose de entrada da vista**, `pitch ∈ [20°, 80°]`, **distância fixa**. A referência do yaw é a pose de entrada e não a normal da tampa aberta porque a tampa aberta aponta para **cima**: ±60° em torno de um vetor vertical não limita yaw nenhum. A pose de entrada já é a que olha a mesa pela abertura, e é dela que os ±60° fazem sentido. É a mesma ideia do `Rotate about scene floor` do manual (travar um eixo para o modelo não tombar), levada ao limite: aqui o que se trava é a caixa inteira, para a tampa aberta nunca entrar no quadro por trás da câmera.
+**`inside` — restricted.** Orbit around the center of the optical bench, `yaw ∈ [−60°, +60°]` relative to the **view's entry pose**, `pitch ∈ [20°, 80°]`, **fixed distance**. The yaw reference is the entry pose and not the open lid's normal because the open lid points **up**: ±60° around a vertical vector limits no yaw at all. The entry pose is already the one looking at the bench through the aperture, and it is from that one that the ±60° make sense. It is the same idea as the manual's `Rotate about scene floor` (lock an axis so the model does not tip), taken to the limit: here what is locked is the whole box, so the open lid never enters the frame from behind the camera.
 
-## 4. O que fica de fora, e por quê
+## 4. What stays out, and why
 
-| Do SolidWorks | Por quê não |
+| From SolidWorks | Why not |
 |---|---|
-| `Zoom to Area` (caixa de seleção) | o arrasto com o esquerdo já é gira-no-vazio; dar duas funções ao mesmo botão pede uma ferramenta modal, e ferramenta modal em cima de um aparelho é exatamente o que este programa não é |
-| `Previous view` (`Ctrl+Shift+Z`) com pilha de 10 | as vistas do programa são três, nomeadas, com tecla: `1`, `2`, `3`. Uma pilha de vistas anônimas por cima disso é estado escondido |
-| `Espaço` = caixa Orientation, `Ctrl+Espaço` = View Selector | `Espaço` já é play (regra 11 do `FUNCOES/README`: "Space é play, e ponto"). As vistas padrão continuam em `Ctrl+1..7` |
-| `Ctrl+8` Normal To | precisa de face selecionada, e aqui clicar numa peça é abrir a tela dela, não selecioná-la |
-| `Zoom About Screen Center` como opção | uma opção a menos: a roda sempre vai no cursor (regra do ponytail — sem config para valor que não muda) |
-| `Rotate about scene floor` como toggle | o `pitch` limitado já impede o tombo, nas três vistas, sem toggle |
-| Trimetric / Dimetric | `Ctrl+7` isométrico basta |
-| `Reverse mouse wheel zoom direction` | **fica**, e continua ligado por padrão (`cam.reverse`, persistido em `localStorage`), porque é a única opção do manual que existe justamente porque metade das pessoas quer o contrário da outra metade |
+| `Zoom to Area` (selection box) | dragging with the left is already rotate-in-empty-space; giving two functions to the same button asks for a modal tool, and a modal tool on top of a device is exactly what this program is not |
+| `Previous view` (`Ctrl+Shift+Z`) with a stack of 10 | the program's views are three, named, with a key: `1`, `2`, `3`. A stack of anonymous views on top of that is hidden state |
+| `Space` = Orientation box, `Ctrl+Space` = View Selector | `Space` is already play (rule 11 of `FUNCOES/README`: "Space is play, full stop"). The standard views stay on `Ctrl+1..7` |
+| `Ctrl+8` Normal To | it needs a selected face, and here clicking a part opens its screen, it does not select it |
+| `Zoom About Screen Center` as an option | one option fewer: the wheel always goes to the cursor (the ponytail rule — no config for a value that does not change) |
+| `Rotate about scene floor` as a toggle | the limited `pitch` already prevents tipping, in all three views, with no toggle |
+| Trimetric / Dimetric | `Ctrl+7` isometric is enough |
+| `Reverse mouse wheel zoom direction` | **it stays**, and stays on by default (`cam.reverse`, persisted in `localStorage`), because it is the only option in the manual that exists precisely because half the people want the opposite of the other half |

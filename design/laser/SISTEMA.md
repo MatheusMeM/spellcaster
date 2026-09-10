@@ -1,162 +1,162 @@
 # Spellcaster LASER — design system
 
-Sistema da ferramenta de laser e ILDA. Não é o design system da Feitiçaria Industrial: vale só aqui, dentro do módulo de laser. Fonte de verdade dos valores: `tokens.css` nesta pasta. Este documento diz o que cada token significa e quando usar.
+System of the laser and ILDA tool. This is not the Feiticaria Industrial design system: it applies only here, inside the laser module. Source of truth for the values: `tokens.css` in this folder. This document says what each token means and when to use it.
 
 ---
 
-## 1. Princípio
+## 1. Principle
 
-O programa **é** o modelo 3D fotorrealista do próprio projetor RGB 10 W. Não é uma janela com um viewport 3D dentro: a interface é o aparelho.
+The program **is** the photorealistic 3D model of the RGB 10 W projector itself. It is not a window with a 3D viewport inside: the interface is the device.
 
-- **Traseira do aparelho = menu.** Todo controle vive num conector, botão, chave ou display que existe no equipamento real. Clicar no painel traseiro é operar o painel traseiro.
-- **Tampa aberta = preferências.** Ajuste fino, calibração, kpps, limites de scan, ILDA in/out: coisas que num laser de verdade se mexe com a tampa fora.
-- **A parede é o output.** O que sai do aparelho aparece projetado na parede da sala, em névoa. Preview de ILDA não é um retângulo de UI: é feixe.
-- Nada aparece na tela por conveniência de software. Se não tem função no aparelho, não existe.
+- **Rear of the device = menu.** Every control lives in a connector, button, switch or display that exists on the real equipment. Clicking the rear panel is operating the rear panel.
+- **Lid open = preferences.** Fine adjustment, calibration, kpps, scan limits, ILDA in/out: things that on a real laser you touch with the lid off.
+- **The wall is the output.** What leaves the device appears projected on the wall of the room, in haze. An ILDA preview is not a UI rectangle: it is a beam.
+- Nothing appears on screen out of software convenience. If it has no function on the device, it does not exist.
 
-Consequência prática: **função antes de UI**. Cada elemento novo precisa responder "que peça do laser é essa e o que ela faz". Se a resposta é "é um card", corta.
+Practical consequence: **function before UI**. Every new element has to answer "which part of the laser is this and what does it do". If the answer is "it is a card", cut it.
 
-## 2. Material único
+## 2. Single material
 
-Um material, um acento, dois semáforos.
+One material, one accent, two traffic lights.
 
-- **Alumínio anodizado preto** — todo o corpo, todo painel, todo fundo. `--bg:#050608`, `--panel:#07090C`, arestas `--line:#1A2026` e `--line-2:#2A333C`. Superfície fosca, sem gradiente decorativo, sem vidro por cima da UI.
-- **Feixe em névoa** — a única fonte de luz da cena. Todo glow do sistema vem do feixe, nunca de sombra de card.
-- **Acento verde do feixe `#38FF5C` (`--las`)** — ativo, LIVE, armado, selecionado, valor numérico corrente. Verde na tela significa "isto está emitindo ou pronto para emitir".
-- **Âmbar `#FFB000` (`--amb`)** — aviso, ação pendente, LEARN em curso, CLI ecoado. Âmbar nunca é um estado final.
-- **Vermelho `#FF2A1A` (`--red`)** — perigo, desarmado, e-stop, interlock aberto, SCAN FAIL.
-- **OLED `#9FF5D0` (`--oled`)** — e só — o displayzinho do painel traseiro. Nenhum outro elemento usa essa cor; ela identifica "isto é a tela física do aparelho".
-- **Azul `#3A6BFF` (`--blue`)** — reservado para ILDA/DMX externo (sinal que vem de fora). Uso raro; não é um segundo acento.
+- **Black anodized aluminium** — the whole body, every panel, every background. `--bg:#050608`, `--panel:#07090C`, edges `--line:#1A2026` and `--line-2:#2A333C`. Matte surface, no decorative gradient, no glass on top of the UI.
+- **Beam in haze** — the only light source of the scene. Every glow in the system comes from the beam, never from a card shadow.
+- **Green accent of the beam `#38FF5C` (`--las`)** — active, LIVE, armed, selected, current numeric value. Green on the screen means "this is emitting or ready to emit".
+- **Amber `#FFB000` (`--amb`)** — warning, pending action, LEARN in progress, echoed CLI. Amber is never a final state.
+- **Red `#FF2A1A` (`--red`)** — danger, disarmed, e-stop, interlock open, SCAN FAIL.
+- **OLED `#9FF5D0` (`--oled`)** — and only that — the little display on the rear panel. No other element uses this color; it identifies "this is the physical screen of the device".
+- **Blue `#3A6BFF` (`--blue`)** — reserved for external ILDA/DMX (a signal coming from outside). Rare use; it is not a second accent.
 
-Texto: `--fg:#E6EBEF` para leitura, `--dim:#7C8791` para rótulo e metadado.
+Text: `--fg:#E6EBEF` for reading, `--dim:#7C8791` for label and metadata.
 
 ## 3. Tokens (`tokens.css`)
 
-Ler o arquivo, não decorar valores. Resumo do contrato:
+Read the file, do not memorise values. Summary of the contract:
 
-**Cor** — `--bg --panel --fg --dim --line --line-2 --las --amb --red --oled --blue --pino-on`.
+**Color** — `--bg --panel --fg --dim --line --line-2 --las --amb --red --oled --blue --pino-on`.
 
-**Tipografia** — `--font-disp: Michroma` (título, HUD de título, `h1/h2/h3`, botão de salvar) e `--font-mono: Share Tech Mono` (todo o resto: rótulo, valor, CLI, tabela, botão). Duas famílias, sem terceira.
+**Typography** — `--font-disp: Michroma` (title, title HUD, `h1/h2/h3`, save button) and `--font-mono: Share Tech Mono` (everything else: label, value, CLI, table, button). Two families, no third.
 
-**Escala** — `--fs-0:10px --fs-1:11px --fs-2:12px --fs-3:13px --fs-4:15px --fs-5:18px --fs-6:34px`. 10 e 11 são para rótulo de painel e HUD de aviso; 12–13 é o corpo da UI do aparelho; 15 é texto lido de longe; 34 só para título de tela.
+**Scale** — `--fs-0:10px --fs-1:11px --fs-2:12px --fs-3:13px --fs-4:15px --fs-5:18px --fs-6:34px`. 10 and 11 are for panel label and warning HUD; 12-13 is the body of the device UI; 15 is text read from a distance; 34 only for a screen title.
 
-**Espaçamento** — `--s1:4 --s2:8 --s3:12 --s4:16 --s6:24 --s8:32`. Nada de 6, 10, 18 improvisados.
+**Spacing** — `--s1:4 --s2:8 --s3:12 --s4:16 --s6:24 --s8:32`. No improvised 6, 10, 18.
 
-**Chanfro** — `--chamfer:14px` em painel (`clip-path` cortando cantos opostos) e `--chamfer-room:30px` na sala. Painel retangular está errado; é peça usinada.
+**Chamfer** — `--chamfer:14px` on a panel (`clip-path` cutting opposite corners) and `--chamfer-room:30px` in the room. A rectangular panel is wrong; it is a machined part.
 
-**Glow** — `--glow` (repouso do acento), `--glow-on` (ativo), `--glow-red` (perigo). Glow é do material, não é `box-shadow` de elevação.
+**Glow** — `--glow` (accent at rest), `--glow-on` (active), `--glow-red` (danger). Glow belongs to the material, it is not an elevation `box-shadow`.
 
-**Tempo** — `--t-fast:120ms` (feedback de botão), `--t-ui:220ms` (abrir/fechar painel, troca de estado), `--t-cam:700ms` (movimento de câmera). Três tempos, sem quarto.
+**Time** — `--t-fast:120ms` (button feedback), `--t-ui:220ms` (open/close panel, state change), `--t-cam:700ms` (camera movement). Three timings, no fourth.
 
-## 4. Componentes
+## 4. Components
 
-**HUD `.hud`** — texto sobre a cena, `pointer-events:none`, `text-shadow:0 0 8px currentColor`. Variantes: `.title` (Michroma, cor de texto), `.cli` (âmbar, ecoa o comando `spell` equivalente), `.warn` (10px, âmbar), `.danger` (vermelho). HUD nunca recebe clique — quem recebe clique é a peça do aparelho.
+**HUD `.hud`** — text over the scene, `pointer-events:none`, `text-shadow:0 0 8px currentColor`. Variants: `.title` (Michroma, text color), `.cli` (amber, echoes the equivalent `spell` command), `.warn` (10px, amber), `.danger` (red). A HUD never receives a click — what receives a click is the part of the device.
 
-**Botão laser `.lb`** — contorno do acento, fundo quase preto, preenchimento só quando ativo.
-- padrão: borda e texto verdes, `--glow`;
-- `.on`: preenchido `rgba(56,255,92,.18)`, `--glow-on` — o estado ligado é visível de longe;
-- `.red` / `.red.on`: perigo e perigo acionado;
-- `.amb`: aviso/pendente;
-- `:disabled`: `opacity:.35`, sem glow, `cursor:not-allowed` — desabilitado não brilha;
-- `:focus-visible`: outline branco 2px, offset 2px;
-- `small` dentro do botão = atalho ou unidade, `opacity:.6`.
+**Laser button `.lb`** — accent outline, near-black background, fill only when active.
+- default: green border and text, `--glow`;
+- `.on`: filled `rgba(56,255,92,.18)`, `--glow-on` — the on state is visible from a distance;
+- `.red` / `.red.on`: danger and danger triggered;
+- `.amb`: warning/pending;
+- `:disabled`: `opacity:.35`, no glow, `cursor:not-allowed` — disabled does not glow;
+- `:focus-visible`: white 2px outline, 2px offset;
+- `small` inside the button = shortcut or unit, `opacity:.6`.
 
-**Painel `.panel`** — opaco (nunca translúcido), borda do acento, chanfro 14px, `z-index:5`. Estrutura fixa: `h3` (Michroma) + `.sub` (11px, dim) + linhas `.row` no grid **rótulo · controle · valor** (`96px 1fr 58px`), valor alinhado à direita, verde, `tabular-nums`. `.x` fecha no canto superior direito. `.btns` agrupa `.lb` menores no rodapé do painel. `pre` dentro do painel = bloco de CLI.
+**Panel `.panel`** — opaque (never translucent), accent border, 14px chamfer, `z-index:5`. Fixed structure: `h3` (Michroma) + `.sub` (11px, dim) + `.row` lines on the grid **label · control · value** (`96px 1fr 58px`), value aligned right, green, `tabular-nums`. `.x` closes at the top right corner. `.btns` groups smaller `.lb` at the panel footer. `pre` inside the panel = CLI block.
 
-**Tooltip `.tip`** — fundo verde sólido, texto preto, sem borda, sem seta, 11px, `display:none` até o hover. É etiqueta de bancada, não balão.
+**Tooltip `.tip`** — solid green background, black text, no border, no arrow, 11px, `display:none` until hover. It is a bench label, not a balloon.
 
-**Balão do Pino `.bal`** — Win98 literal: `#FFFFE1`, borda preta 1px, sombra dura `2px 2px 0 #000`, Tahoma 12px, seta em `::after`, `x` no canto. É o único elemento "de software" da cena, e isso é proposital — o Pino é o mascote-menu, não faz parte do aparelho. Lista de opções em `ul/li` com hover `#0A246A` invertido, `small` para o atalho. Voz curta.
+**Pino's balloon `.bal`** — literal Win98: `#FFFFE1`, 1px black border, hard shadow `2px 2px 0 #000`, Tahoma 12px, arrow in `::after`, `x` in the corner. It is the only "software" element of the scene, and that is deliberate — Pino is the menu mascot, it is not part of the device. Option list in `ul/li` with hover `#0A246A` inverted, `small` for the shortcut. Short voice.
 
-**Tabela de bindings** — dentro de `.panel`, `td.k` (ação, cor de texto), `td.b` (binding atual, dim, `nowrap`) e um `.lb.learn` âmbar com `animation:pulse 1s infinite`. Enquanto pulsa, o próximo evento de teclado ou MIDI captura. `prefers-reduced-motion` desliga o pulso — o botão continua âmbar.
+**Bindings table** — inside `.panel`, `td.k` (action, text color), `td.b` (current binding, dim, `nowrap`) and an amber `.lb.learn` with `animation:pulse 1s infinite`. While it pulses, the next keyboard or MIDI event is captured. `prefers-reduced-motion` turns the pulse off — the button stays amber.
 
-**Sala `.room`** — fundo preto puro `#000`, `overflow:hidden`, `clip-path` **não retangular**: chanfro de 30px nos quatro cantos e um recorte trapezoidal na base central (a marca do aparelho no chão). Tudo que é cena vive dentro dela.
+**Room `.room`** — pure black background `#000`, `overflow:hidden`, **non-rectangular** `clip-path`: a 30px chamfer on the four corners and a trapezoidal cutout at the center of the base (the mark of the device on the floor). Everything that is scene lives inside it.
 
-## 5. Estados do aparelho
+## 5. States of the device
 
-Quatro estados, e nada entre eles. O estado é lido simultaneamente no feixe, no OLED e no LED de emissão.
+Four states, and nothing between them. The state is read simultaneously in the beam, in the OLED and in the emission LED.
 
-| Estado | Feixe | OLED (`--oled`) | LED de emissão | UI |
+| State | Beam | OLED (`--oled`) | Emission LED | UI |
 |---|---|---|---|---|
-| **DESLIGADO** | ausente | apagado | apagado | painéis `disabled`; sala escura; só a chave de força responde |
-| **STANDBY** | ausente | `STANDBY / INTERLOCK OK` | âmbar piscando lento | controles editáveis, ARM disponível; HUD âmbar "sem emissão" |
-| **SCAN FAIL** | cortado imediatamente | `SCAN FAIL` invertido | vermelho fixo | `.lb.red.on` no ARM, todo output travado até reset; balão do Pino explica |
-| **LIVE** | visível, verde/RGB na névoa | `LIVE · 30 kpps` | verde fixo | HUD verde, CLI ecoando, e-stop sempre alcançável |
+| **OFF** | absent | dark | dark | panels `disabled`; dark room; only the power switch responds |
+| **STANDBY** | absent | `STANDBY / INTERLOCK OK` | amber blinking slowly | controls editable, ARM available; amber HUD "no emission" |
+| **SCAN FAIL** | cut immediately | `SCAN FAIL` inverted | steady red | `.lb.red.on` on ARM, all output locked until reset; Pino's balloon explains |
+| **LIVE** | visible, green/RGB in the haze | `LIVE · 30 kpps` | steady green | green HUD, CLI echoing, e-stop always reachable |
 
-Regras: nunca ir de DESLIGADO direto a LIVE; SCAN FAIL só sai por reset explícito; qualquer perda de interlock cai para SCAN FAIL, não para STANDBY.
+Rules: never go from OFF straight to LIVE; SCAN FAIL is only left by an explicit reset; any loss of interlock falls to SCAN FAIL, not to STANDBY.
 
-## 6. Câmera — padrão SolidWorks
+## 6. Camera — SolidWorks standard
 
-A órbita é a do SolidWorks, sem invenção:
+The orbit is the SolidWorks one, with no invention:
 
-- **MMB arrasta** — gira em torno do **ponto clicado** (não do centro da cena).
+- **MMB drag** — orbits around the **clicked point** (not around the center of the scene).
 - **Ctrl + MMB** — pan.
 - **Shift + MMB** — zoom.
-- **Roda** — zoom no cursor, **direção invertida por padrão**, com toggle nas preferências.
-- **Setas** — gira 15°; **Shift + setas** — 90°; **Ctrl + setas** — pan.
-- **F** — enquadra a seleção (ou a cena, se nada selecionado).
-- **Ctrl + 1..7** — vistas padrão (frente, trás, esquerda, direita, topo, base, isométrica).
-- **Arrastar com o botão esquerdo no vazio** também gira — quem não tem botão do meio não fica de fora.
+- **Wheel** — zoom at the cursor, **inverted direction by default**, with a toggle in the preferences.
+- **Arrows** — orbit 15°; **Shift + arrows** — 90°; **Ctrl + arrows** — pan.
+- **F** — frames the selection (or the scene, if nothing is selected).
+- **Ctrl + 1..7** — standard views (front, rear, left, right, top, bottom, isometric).
+- **Dragging with the left button on empty space** also orbits — whoever has no middle button is not left out.
 
-Todo movimento de câmera usa `--t-cam` (700 ms) com ease-out. Sem inércia infinita, sem "flutuar".
+Every camera movement uses `--t-cam` (700 ms) with ease-out. No infinite inertia, no "floating".
 
 ## 7. Key binding
 
-Qualquer ação do sistema vira tecla **ou** evento MIDI, in e out.
+Any action of the system becomes a key **or** a MIDI event, in and out.
 
-- Botão **LEARN** por linha da tabela; ao pulsar, captura o próximo evento (tecla, note on, CC).
-- **MIDI out** existe: o estado do controle volta para a superfície (LED do pad acende quando ARM está ligado). Binding é bidirecional por padrão.
-- Persistência em `localStorage`, chave **`sc-laser-bind`**, JSON `{ acao: {key, midi} }`.
-- Ação sem binding é válida; binding sem ação não existe.
-- Toda ação bindável tem CLI equivalente — é o mesmo verbo do registry.
+- A **LEARN** button per table row; while it pulses, it captures the next event (key, note on, CC).
+- **MIDI out** exists: the state of the control goes back to the surface (the pad LED lights up when ARM is on). A binding is bidirectional by default.
+- Persistence in `localStorage`, key **`sc-laser-bind`**, JSON `{ action: {key, midi} }`.
+- An action without a binding is valid; a binding without an action does not exist.
+- Every bindable action has an equivalent CLI — it is the same verb as the registry.
 
-## 8. Movimento
+## 8. Movement
 
-Splash, uma vez, na abertura:
+Splash, once, at startup:
 
-1. O foco da câmera **sai do ponto estático** onde estava e **vai para a parede** — o output — ignorando o laser e a traseira dele. Sala em névoa, aparelho fora de quadro (ou desfocado em primeiro plano).
-2. O laser **contorna** `SPELLCASTER LASER` na parede, em movimento dinâmico e contínuo — sem ILDA, sem show, só o outline.
-3. As letras vão sendo **reveladas** conforme o feixe passa e **ficam** na parede.
-4. Todas **brilham** juntas ao fechar o contorno.
-5. Só então a câmera **voa para a traseira** (o menu) — ou para a tampa aberta (preferências), `--t-cam`.
-6. O laser **apaga** e a luz da sala **baixa** um pouco. A partir daqui, interatividade.
+1. The camera focus **leaves the static point** where it was and **goes to the wall** — the output — ignoring the laser and its rear panel. Room in haze, device out of frame (or out of focus in the foreground).
+2. The laser **outlines** `SPELLCASTER LASER` on the wall, in a dynamic, continuous movement — no ILDA, no show, only the outline.
+3. The letters are **revealed** as the beam passes and **stay** on the wall.
+4. They all **glow** together when the outline closes.
+5. Only then does the camera **fly to the rear panel** (the menu) — or to the open lid (preferences), `--t-cam`.
+6. The laser **goes dark** and the room light **drops** a little. From here on, interactivity.
 
-Fora da splash: transição de painel em `--t-ui`, feedback de botão em `--t-fast`. `prefers-reduced-motion` corta a splash para o quadro final e remove pulsos.
+Outside the splash: panel transition in `--t-ui`, button feedback in `--t-fast`. `prefers-reduced-motion` cuts the splash to the final frame and removes pulses.
 
-## 9. Som
+## 9. Sound
 
-- **Jingle** de onda quadrada na splash — curto, chiptune, sem sample.
-- **Blip** ao revelar cada letra e ao capturar um LEARN.
-- **Clique** seco de botão físico em `.lb`.
-- **Acorde descendente** ao desarmar / entrar em SCAN FAIL.
-Som é confirmação de ação física, nunca trilha. Mudo é padrão respeitado e persistido.
+- **Jingle** of square wave in the splash — short, chiptune, no sample.
+- **Blip** when each letter is revealed and when a LEARN is captured.
+- **Click** of a dry physical button on `.lb`.
+- **Descending chord** when disarming / entering SCAN FAIL.
+Sound is confirmation of a physical action, never a soundtrack. Mute is a default that is respected and persisted.
 
-## 10. Texto
+## 10. Text
 
-Voz do **Pino**: curto, técnico, humor seco. Frase de uma linha. Sem "Ops!", sem exclamação dupla, sem tutorial.
+**Pino's** voice: short, technical, dry humour. One-line sentence. No "Oops!", no double exclamation mark, no tutorial.
 
-- Bom: `Interlock aberto. Sem interlock, sem feixe.`
-- Ruim: `Ops! Parece que algo deu errado com o seu interlock :(`
+- Good: `Interlock open. No interlock, no beam.`
+- Bad: `Oops! Looks like something went wrong with your interlock :(`
 
-**CLI sempre visível.** Todo controle mostra o comando equivalente em HUD `.cli` ou em `pre` dentro do painel:
+**CLI always visible.** Every control shows the equivalent command in a `.cli` HUD or in a `pre` inside the panel:
 
 ```
 spell ilda play show.ild --kpps 30
 ```
 
-Quem aprende a GUI aprende o CLI de graça. Nomes na tela = nomes no registry.
+Whoever learns the GUI learns the CLI for free. Names on the screen = names in the registry.
 
-## 11. Acessibilidade
+## 11. Accessibility
 
-- **Foco visível** obrigatório: `:focus-visible` com outline branco 2px e offset 2px em todo controle, inclusive dentro da cena 3D. Ordem de tab segue a leitura do painel.
-- **`prefers-reduced-motion`**: sem splash animada, sem pulso do LEARN, sem transição de painel; a informação continua toda presente por cor e texto.
-- **Contraste** — pares aprovados sobre `--bg`/`--panel`: `--fg`, `--las`, `--amb`, `--oled` e `--dim` (só para rótulo, nunca para informação crítica). `--red` sobre preto é aprovado para ícone e borda; texto longo em vermelho, não. Estado **nunca** é comunicado só por cor: sempre cor + rótulo (LIVE, STANDBY, SCAN FAIL) + posição.
-- Alvo de clique mínimo 24px na cena, mesmo quando a peça modelada é menor.
+- **Visible focus** is mandatory: `:focus-visible` with a white 2px outline and 2px offset on every control, including inside the 3D scene. Tab order follows the reading of the panel.
+- **`prefers-reduced-motion`**: no animated splash, no LEARN pulse, no panel transition; all the information remains present through color and text.
+- **Contrast** — approved pairs over `--bg`/`--panel`: `--fg`, `--las`, `--amb`, `--oled` and `--dim` (only for a label, never for critical information). `--red` over black is approved for icon and border; long text in red, no. State is **never** communicated by color alone: always color + label (LIVE, STANDBY, SCAN FAIL) + position.
+- Minimum click target of 24px in the scene, even when the modelled part is smaller.
 
-## 12. O que NÃO fazer
+## 12. What NOT to do
 
-- **Software quadradão** — grid de cards, sidebar, barra de título de app. Se parece com um dashboard, está errado.
-- **Painel transparente** — vidro, blur, translucidez na UI. O único material que transmite luz é a névoa. Painel é alumínio: opaco.
-- **Elemento sem função** — dois interlocks, fusível decorativo, LED que não indica nada, conector que não conecta. Um interlock. Sem fusível.
-- **Cartoon** — traço grosso, cor pastel, ícone arredondado, mascote fofo. O Pino é Win98 seco, não é bichinho.
-- Terceira fonte, quarta cor de acento, valor de espaçamento fora da escala, tempo fora dos três.
-- Glow como elevação de card. Glow é feixe.
-- Cor sozinha carregando estado.
+- **Boxy software** — a grid of cards, a sidebar, an app title bar. If it looks like a dashboard, it is wrong.
+- **Transparent panel** — glass, blur, translucency in the UI. The only material that transmits light is the haze. A panel is aluminium: opaque.
+- **Element without a function** — two interlocks, a decorative fuse, an LED that indicates nothing, a connector that connects nothing. One interlock. No fuse.
+- **Cartoon** — thick stroke, pastel color, rounded icon, cute mascot. Pino is dry Win98, it is not a critter.
+- A third font, a fourth accent color, a spacing value outside the scale, a timing outside the three.
+- Glow as card elevation. Glow is beam.
+- Color alone carrying state.

@@ -1,100 +1,100 @@
-# Atalhos e gramática de interface
+# Shortcuts and interface grammar
 
-Referência para R5 (GUI) e R9 (editores). Fonte: Adobe Premiere Pro e DaVinci Resolve; desde `design/FUNCOES/timeline-daw.md`, **Ableton Live** também é origem válida, para o que uma DAW resolve melhor que um NLE (automação, follow, loop na seleção). Regra: quem edita vídeo opera o Spellcaster sem aprender nada novo; o que não existe lá (cues, saídas, laser) segue a mesma lógica de modificadores. Atalhos remapeáveis em `config.json` (`"keys": {...}`), mas o mapa abaixo é o padrão e o que a documentação ensina.
+Reference for R5 (GUI) and R9 (editors). Source: Adobe Premiere Pro and DaVinci Resolve; since `design/FUNCOES/timeline-daw.md`, **Ableton Live** is a valid origin too, for what a DAW solves better than an NLE (automation, follow, loop on the selection). Rule: whoever edits video operates Spellcaster without learning anything new; what does not exist there (cues, outputs, laser) follows the same modifier logic. Shortcuts are remappable in `config.json` (`"keys": {...}`), but the map below is the default and what the documentation teaches.
 
-## Gramática (herdada dos dois)
+## Grammar (inherited from both)
 
-- Espaço toca e para. J/K/L é o shuttle: J recua, L avança, repetir acelera (×2, ×4, ×8), K para; K+J / K+L avança quadro a quadro (Premiere).
-- Um par I/O define o intervalo de trabalho; tudo que é "loop", "render", "export" usa esse intervalo.
-- Setas movem 1 quadro; Shift multiplica por 5 (Premiere) — aqui 1 quadro = 1/fps do show.
-- Ctrl = comando, Shift = estende/amplia, Alt = variante/limpa. Nunca inventar quarta combinação.
-- Painéis têm foco; o atalho age no painel focado (Premiere). Painel com foco tem borda de 1 px no accent (design/PRINCIPIOS.md §2).
-- Zoom com `=` / `-`, ajustar tudo com `Shift+Z` (Premiere) ou `\` (Resolve: ambos valem).
-- Marcadores: `M` cria no playhead, `Shift+M` edita, `Ctrl+Shift+←/→` navega (Resolve). Marcadores importados de corte de vídeo são marcadores comuns, cor cinza.
-- Roda anda nos tracks, `Ctrl`+roda dá zoom, `Shift`+roda anda de lado, `Alt`+roda muda a altura das faixas (Ableton; o Resolve usa `Option` para zoom e `Command` para andar, e isso brigaria com `Ctrl` = comando). Nunca há scroll de página.
-- Durante um arrasto, `Alt` solta o snap e `Shift` afina o valor (Ableton). O snap volta sozinho ao soltar o botão (Resolve).
+- Space plays and stops. J/K/L is the shuttle: J rewinds, L goes forward, repeating speeds up (×2, ×4, ×8), K stops; K+J / K+L steps frame by frame (Premiere).
+- One I/O pair defines the work range; everything that is "loop", "render", "export" uses that range.
+- Arrows move 1 frame; Shift multiplies by 5 (Premiere) — here 1 frame = 1/fps of the show.
+- Ctrl = command, Shift = extends/widens, Alt = variant/clears. Never invent a fourth combination.
+- Panels have focus; the shortcut acts on the focused panel (Premiere). A focused panel has a 1 px border in the accent (design/PRINCIPIOS.md §2).
+- Zoom with `=` / `-`, fit everything with `Shift+Z` (Premiere) or `\` (Resolve: both are valid).
+- Markers: `M` creates one at the playhead, `Shift+M` edits, `Ctrl+Shift+←/→` navigates (Resolve). Markers imported from a video edit are ordinary markers, gray.
+- The wheel scrolls the tracks, `Ctrl`+wheel zooms, `Shift`+wheel scrolls sideways, `Alt`+wheel changes track height (Ableton; Resolve uses `Option` for zoom and `Command` for scroll, and that would clash with `Ctrl` = command). There is never page scroll.
+- During a drag, `Alt` releases the snap and `Shift` fine-tunes the value (Ableton). The snap comes back on its own when the button is released (Resolve).
 
-## Mapa padrão
+## Default map
 
-A coluna **estado** é o que o código faz hoje (base `dac3e0a`, páginas de `spellgui/web`), não o
-que se pretende: `feito` = a tecla está ligada na página dona da ação; `falta` = a ação existe no
-produto e a tecla não; `n.a.` = a tela ou o modo que a tecla controla ainda não existe. Quem
-mantém a coluna é quem mexe na tecla — `spellgui/web/help.html` lê esta tabela e a mostra ao
-operador.
+The **state** column is what the code does today (base `dac3e0a`, pages under `spellgui/web`), not
+what is intended: `done` = the key is wired on the page that owns the action; `missing` = the action
+exists in the product and the key does not; `n/a` = the screen or the mode the key controls does not
+exist yet. Whoever touches the key maintains the column — `spellgui/web/help.html` reads this table
+and shows it to the operator.
 
-| Ação | Tecla | Origem | Estado |
+| Action | Key | Origin | State |
 |---|---|---|---|
-| Play / pause | `Space` | ambos | feito |
-| Shuttle recuar / parar / avançar | `J` / `K` / `L` | ambos | feito |
-| Quadro anterior / próximo | `←` / `→` | ambos | feito |
-| 5 quadros | `Shift+←` / `Shift+→` | Premiere | feito |
-| Início / fim | `Home` / `End` | ambos | feito |
-| Keyframe anterior / próximo (track focado) | `↑` / `↓` | Premiere (edit points) | feito |
-| Marcar In / Out | `I` / `O` | ambos | feito |
-| Limpar In / Out / ambos | `Alt+I` / `Alt+O` / `Alt+X` | Premiere | feito |
-| Ir para In / Out | `Shift+I` / `Shift+O` | Premiere | feito |
-| Loop no intervalo In–Out | `Ctrl+L` | Premiere | feito |
-| Loop na seleção de tempo (In/Out viram a seleção) | `Ctrl+L` com seleção ativa | Ableton (Loop Selection) | falta |
-| Follow: a vista acompanha o playhead | `Alt+Shift+F` | Ableton | falta |
-| Marcador no playhead | `M` | ambos | feito |
-| Editar marcador | `Shift+M` | ambos | falta |
-| Editar o marcador sob o playhead | `M` de novo | Resolve (manual p.548, p.781) | falta |
-| Marcador anterior / próximo | `Ctrl+Shift+←` / `Ctrl+Shift+→` | Resolve | feito |
-| Previz do playhead: DMX do track focado (entrada quando armado), quadro ILDA e planta do patch | `Alt+M` | (nosso; `M` já é marcador, `Ctrl+M` já é exportar) | feito |
-| Zoom in / out / ajustar | `=` / `-` / `Shift+Z` ou `\` | Premiere / Resolve | feito |
-| Voltar ao zoom anterior | `Shift+Z` de novo | Resolve (manual p.647) | falta |
-| Enquadrar tudo na faixa de visão geral | duplo-clique na faixa | Ableton §6.1 | falta |
-| Rolar as tracks (vertical) | roda | (nosso; a página não rola — quem rola são as tracks) | feito |
-| Pan na timeline (horizontal) | `Shift`+roda, ou arrastar com botão do meio | ambos | feito |
-| Zoom no cursor | `Ctrl`+roda | ambos | feito |
-| Altura das faixas | `Alt`+roda, ou `Alt++` / `Alt+-` | Resolve p.648 (lá é `Shift`) / Ableton | falta |
-| Dobrar / desdobrar as lanes do track focado | `U` | Ableton (Fold/Unfold) | falta |
-| Travar / destravar o track focado | `Shift+L` | (nosso; par de `Shift+D` e `Shift+S`) | falta |
-| Keyframe no playhead (track focado) | `Ctrl+K` | Premiere (add edit) | feito |
-| Keyframe na curva, no tempo do clique | duplo-clique na lane | Ableton (Automação) | falta |
-| Adicionar / remover keyframe por parâmetro | `Ctrl+Click` no losango | Resolve | falta |
-| Empurrar a seleção 1 quadro / 5 quadros | `,` / `.` e `Shift+,` / `Shift+.` | Resolve (manual p.533, p.625) | falta |
-| Duplicar a seleção | `Alt` + arrastar | Resolve / MadMapper | falta |
-| Soltar o snap no meio do arrasto | segurar `Alt` | Ableton (Automação) | falta |
-| Ajuste fino do valor ao arrastar | segurar `Shift` | Ableton (Automação) | falta |
-| Desenhar automação (draw mode) | segurar `B` | Ableton | falta |
-| Selecionar tudo / nada | `Ctrl+A` / `Ctrl+Shift+A` | ambos | feito |
-| Buscar e criar nó no cursor (PATCHBAY) | `Shift+A` | Blender (Add) | feito |
-| Copiar / colar / cortar / apagar | `Ctrl+C` / `Ctrl+V` / `Ctrl+X` / `Delete` | ambos | feito |
-| Desfazer / refazer | `Ctrl+Z` / `Ctrl+Shift+Z` | ambos | feito |
-| Easing do keyframe selecionado: menu | `Ctrl+E` | (nosso) | falta |
-| Easing do keyframe selecionado: ciclar linear→in→out→inout→hold | `Ctrl+Shift+E` | (nosso) | feito |
-| Mute / solo do track focado | `Shift+D` / `Shift+S` | Premiere (disable) / (nosso) | feito |
-| Snapping liga/desliga | `S` | Premiere | feito |
-| Record arm do track focado | `R` | Resolve (Fairlight) | feito |
-| Novo / abrir / salvar como | `Ctrl+N` / `Ctrl+O` / `Ctrl+Shift+S` | ambos | falta |
-| Salvar | `Ctrl+S` | ambos | feito |
-| Importar marcadores de vídeo/áudio | `Ctrl+I` | Premiere (import) | falta |
-| Exportar (render do show) | `Ctrl+M` | Premiere | n.a. |
-| Ajuda (esta tabela + os comandos do registry) | `?` | (nosso) | feito |
-| Página: TIMELINE, PATCHBAY, TEATRO, FACE, LASER | `Shift+1` … `Shift+5` | Resolve (Shift+2..7 páginas) | feito |
-| Página AJUDA | `Shift+6` | Resolve (páginas) | feito |
-| Foco de painel dentro da página | `Shift+7` … | Premiere (Shift+1..9) | n.a. |
-| Maximizar painel focado | `` Ctrl+` `` | Premiere | n.a. |
-| Workspace (Face `editor`) 1..9 | `Alt+Shift+1` … `Alt+Shift+9` | Premiere | n.a. |
-| Alternar Face `editor` ↔ `performance` | `Tab` (segurar para espiar, toque para trocar) | (nosso, PRD §10) | n.a. |
-| Tela cheia / kiosk | `Shift+F` | Resolve | falta |
-| Cue GO | `Enter` | (nosso; consoles de luz) | feito |
-| Cue voltar / pular para cue | `Backspace` / `Ctrl+G` | (nosso; consoles de luz) | falta |
-| Armar saídas reais / modo ensaio | `Ctrl+Shift+Enter` / `Ctrl+Shift+R` | (nosso, PRD §10) | n.a. |
-| Blackout (segurar) | `Esc` segurado 0,5 s | (nosso) | falta |
-| Fechar sem sair (volta ao editor) | `Esc` | ambos | n.a. |
+| Play / pause | `Space` | both | done |
+| Shuttle rewind / stop / forward | `J` / `K` / `L` | both | done |
+| Previous / next frame | `←` / `→` | both | done |
+| 5 frames | `Shift+←` / `Shift+→` | Premiere | done |
+| Start / end | `Home` / `End` | both | done |
+| Previous / next keyframe (focused track) | `↑` / `↓` | Premiere (edit points) | done |
+| Mark In / Out | `I` / `O` | both | done |
+| Clear In / Out / both | `Alt+I` / `Alt+O` / `Alt+X` | Premiere | done |
+| Go to In / Out | `Shift+I` / `Shift+O` | Premiere | done |
+| Loop on the In–Out range | `Ctrl+L` | Premiere | done |
+| Loop on the time selection (In/Out become the selection) | `Ctrl+L` with an active selection | Ableton (Loop Selection) | missing |
+| Follow: the view tracks the playhead | `Alt+Shift+F` | Ableton | missing |
+| Marker at the playhead | `M` | both | done |
+| Edit marker | `Shift+M` | both | missing |
+| Edit the marker under the playhead | `M` again | Resolve (manual p.548, p.781) | missing |
+| Previous / next marker | `Ctrl+Shift+←` / `Ctrl+Shift+→` | Resolve | done |
+| Previz of the playhead: DMX of the focused track (input when armed), ILDA frame and patch plan | `Alt+M` | (ours; `M` is already marker, `Ctrl+M` is already export) | done |
+| Zoom in / out / fit | `=` / `-` / `Shift+Z` or `\` | Premiere / Resolve | done |
+| Back to the previous zoom | `Shift+Z` again | Resolve (manual p.647) | missing |
+| Fit everything in the overview strip | double-click on the strip | Ableton §6.1 | missing |
+| Scroll the tracks (vertical) | wheel | (ours; the page does not scroll — the tracks do) | done |
+| Pan the timeline (horizontal) | `Shift`+wheel, or drag with the middle button | both | done |
+| Zoom at the cursor | `Ctrl`+wheel | both | done |
+| Track height | `Alt`+wheel, or `Alt++` / `Alt+-` | Resolve p.648 (there it is `Shift`) / Ableton | missing |
+| Fold / unfold the lanes of the focused track | `U` | Ableton (Fold/Unfold) | missing |
+| Lock / unlock the focused track | `Shift+L` | (ours; pairs with `Shift+D` and `Shift+S`) | missing |
+| Keyframe at the playhead (focused track) | `Ctrl+K` | Premiere (add edit) | done |
+| Keyframe on the curve, at the time of the click | double-click on the lane | Ableton (Automation) | missing |
+| Add / remove keyframe per parameter | `Ctrl+Click` on the diamond | Resolve | missing |
+| Nudge the selection 1 frame / 5 frames | `,` / `.` and `Shift+,` / `Shift+.` | Resolve (manual p.533, p.625) | missing |
+| Duplicate the selection | `Alt` + drag | Resolve / MadMapper | missing |
+| Release the snap in the middle of a drag | hold `Alt` | Ableton (Automation) | missing |
+| Fine value adjustment while dragging | hold `Shift` | Ableton (Automation) | missing |
+| Draw automation (draw mode) | hold `B` | Ableton | missing |
+| Select all / none | `Ctrl+A` / `Ctrl+Shift+A` | both | done |
+| Search and create a node at the cursor (PATCHBAY) | `Shift+A` | Blender (Add) | done |
+| Copy / paste / cut / delete | `Ctrl+C` / `Ctrl+V` / `Ctrl+X` / `Delete` | both | done |
+| Undo / redo | `Ctrl+Z` / `Ctrl+Shift+Z` | both | done |
+| Easing of the selected keyframe: menu | `Ctrl+E` | (ours) | missing |
+| Easing of the selected keyframe: cycle linear→in→out→inout→hold | `Ctrl+Shift+E` | (ours) | done |
+| Mute / solo of the focused track | `Shift+D` / `Shift+S` | Premiere (disable) / (ours) | done |
+| Snapping on/off | `S` | Premiere | done |
+| Record arm of the focused track | `R` | Resolve (Fairlight) | done |
+| New / open / save as | `Ctrl+N` / `Ctrl+O` / `Ctrl+Shift+S` | both | missing |
+| Save | `Ctrl+S` | both | done |
+| Import video/audio markers | `Ctrl+I` | Premiere (import) | missing |
+| Export (show render) | `Ctrl+M` | Premiere | n/a |
+| Help (this table + the registry commands) | `?` | (ours) | done |
+| Page: TIMELINE, PATCHBAY, THEATER, FACE, LASER | `Shift+1` … `Shift+5` | Resolve (Shift+2..7 pages) | done |
+| HELP page | `Shift+6` | Resolve (pages) | done |
+| Panel focus inside the page | `Shift+7` … | Premiere (Shift+1..9) | n/a |
+| Maximize the focused panel | `` Ctrl+` `` | Premiere | n/a |
+| Workspace (Face `editor`) 1..9 | `Alt+Shift+1` … `Alt+Shift+9` | Premiere | n/a |
+| Toggle Face `editor` ↔ `performance` | `Tab` (hold to peek, tap to switch) | (ours, PRD §10) | n/a |
+| Fullscreen / kiosk | `Shift+F` | Resolve | missing |
+| Cue GO | `Enter` | (ours; lighting consoles) | done |
+| Cue back / jump to cue | `Backspace` / `Ctrl+G` | (ours; lighting consoles) | missing |
+| Arm real outputs / rehearsal mode | `Ctrl+Shift+Enter` / `Ctrl+Shift+R` | (ours, PRD §10) | n/a |
+| Blackout (hold) | `Esc` held 0.5 s | (ours) | missing |
+| Close without quitting (back to the editor) | `Esc` | both | n/a |
 
-Onde a leitura da coluna não é óbvia:
+Where reading the column is not obvious:
 
-- **Página `Shift+1..6`** é do `spellgui/web/nav.js`, a barra que está no topo das seis páginas; a
-  tecla `?` funciona em todas porque essa mesma barra carrega o `help.js`.
-- **Exportar** está `n.a.` porque não há render de show no registry; `Ctrl+M` continua reservado.
-- **Blackout** está `falta`, e não `n.a.`, porque a ação existe: é o widget `blackout` da Face,
-  que manda `input {key:"widget:blackout"}` ao Graph. O que falta é a tecla.
+- **Page `Shift+1..6`** belongs to `spellgui/web/nav.js`, the bar at the top of the six pages; the
+  `?` key works on all of them because that same bar loads `help.js`.
+- **Export** is `n/a` because there is no show render in the registry; `Ctrl+M` stays reserved.
+- **Blackout** is `missing`, not `n/a`, because the action exists: it is the Face's `blackout`
+  widget, which sends `input {key:"widget:blackout"}` to the Graph. What is missing is the key.
 
-## Interface (o que copiar de cada um)
+## Interface (what to copy from each)
 
-- **Premiere**: timeline com régua no topo, tracks empilhados com cabeçalho à esquerda (nome, mute, solo, lock, record arm), playhead vermelho que atravessa tudo, marcadores na régua, In/Out como barra cinza, painel Inspector ("Effect Controls") com keyframes ao lado do valor. Workspaces nomeados com abas no topo.
-- **Resolve**: páginas como abas fixas no rodapé (aqui: Patch, Timeline, Graph, Outputs, Network, Log), viewer central grande (aqui: previz ou VU dos universos), Inspector à direita, "Media Pool" à esquerda (aqui: shows, perfis, clipes laser, faces). Botões de página são texto em caixa alta, sem ícone — combina com design/PRINCIPIOS.md §4.
-- **Dos dois**: zero modal para operação; diálogo só para abrir/salvar. Tudo que muda estado tem atalho e aparece no menu com o atalho ao lado.
+- **Premiere**: timeline with a ruler on top, stacked tracks with a header on the left (name, mute, solo, lock, record arm), red playhead crossing everything, markers on the ruler, In/Out as a gray bar, Inspector panel ("Effect Controls") with keyframes next to the value. Named workspaces as tabs at the top.
+- **Resolve**: pages as fixed tabs in the footer (here: Patch, Timeline, Graph, Outputs, Network, Log), a large central viewer (here: previz or universe VU), Inspector on the right, "Media Pool" on the left (here: shows, profiles, laser clips, faces). Page buttons are uppercase text, no icon — matches design/PRINCIPIOS.md §4.
+- **From both**: zero modals for operation; a dialog only for open/save. Everything that changes state has a shortcut and shows up in the menu with the shortcut next to it.

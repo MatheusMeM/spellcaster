@@ -1,130 +1,130 @@
-# Timeline como Arrangement View — `spell timeline` (painel `Shift+2`)
+# Timeline as an Arrangement View — `spell timeline` (panel `Shift+2`)
 
-Pedido do Matheus (09/09/2026): *"quero uma interface de uso e funcionalidade e usabilidade e interface que nem o ABLETON, profissional e com features e segmentos pensados"*, e *"quero drag n drop de elementos e saídas e mídias e laser e áudio e vídeo"*.
+Request from Matheus (2026-09-09): *"I want an interface of use and functionality and usability and interface just like ABLETON, professional and with features and segments that were thought through"*, and *"I want drag n drop of elements and outputs and media and laser and audio and video"*.
 
-`timeline-daw.md` (branch `frente/timeline-daw`) já leu os dois manuais para **navegar, marcar e automatizar**: roda/zoom/pan, follow, loop, snap, marcador, nudge, lane de parâmetro. Aquele documento tem 38 comportamentos e não se repete aqui. O buraco que ele mesmo declara é o item 37: *"a nossa timeline não tem clip com borda"*. **Este arquivo é o clipe.** O que ele acrescenta: faixa de visão geral, régua com brace e locators, cabeçalho de track de verdade (nome, arm/solo/mute, lock, dobra, altura, reordenar, cor), clipe como objeto de primeira classe (laser, áudio, vídeo, fx, osc), seletor de lane de automação, seleção de tempo × seleção de objeto, Inspector à direita e transporte.
+`timeline-daw.md` (branch `frente/timeline-daw`) has already read both manuals for **navigating, marking and automating**: wheel/zoom/pan, follow, loop, snap, marker, nudge, parameter lane. That document has 38 behaviors and they are not repeated here. The hole it declares itself is item 37: *"our timeline has no clip with an edge"*. **This file is the clip.** What it adds: overview strip, ruler with brace and locators, a real track header (name, arm/solo/mute, lock, fold, height, reorder, color), the clip as a first-class object (laser, audio, video, fx, osc), automation lane selector, time selection x object selection, Inspector on the right and transport.
 
-Fontes. **Ableton Live 12**, manual oficial online (`ableton.com/en/live-manual/12/`), citado por seção. **DaVinci Resolve 20**, manual local `C:\Program Files\Blackmagic Design\DaVinci Resolve\Documents\DaVinci Resolve.pdf` (4140 páginas), citado por página. Nada de memória.
+Sources. **Ableton Live 12**, official online manual (`ableton.com/en/live-manual/12/`), cited by section. **DaVinci Resolve 20**, local manual `C:\Program Files\Blackmagic Design\DaVinci Resolve\Documents\DaVinci Resolve.pdf` (4140 pages), cited by page. Nothing from memory.
 
-Código. Linhas de `spellgui/web/*` e `spellcore/*` no commit base `dac3e0a`. A coluna **hoje** descreve o que existe; `pontos-falhos.md` traz a auditoria com screenshot.
+Code. Lines of `spellgui/web/*` and `spellcore/*` at base commit `dac3e0a`. The **today** column describes what exists; `pontos-falhos.md` carries the audit with screenshots.
 
-| Item | Quem resolveu melhor | Por quê |
+| Item | Who solved it best | Why |
 |---|---|---|
-| Clipe na timeline | Resolve | Clipe é mídia com In/Out de origem e In/Out de linha; `Ctrl+E` corta no ponto do clique, arrastar a borda apara. O Ableton tem o mesmo, com warp e compasso atrás, que não entram (`timeline-daw.md` item 38) |
-| Cabeçalho de track | Resolve | Nome editável (p.645), cor por menu (p.621), lock/R/S/M com arraste sobre vários (p.3681), Tracks Index como lista paralela (p.646, p.649) |
-| Reordenar track | Resolve | Arrastar no Index com uma linha branca mostrando onde entra (p.3681) — sem isso, "mover track" vira menu Up/Down (p.3574), que é pior |
-| Faixa de visão geral | Ableton | §6.1: arrastar horizontal rola, vertical dá zoom, duplo-clique enquadra tudo. O Resolve não tem overview, tem Zoom Slider |
-| Seletor de lane de automação | Ableton | §25.5: dois seletores (device, parâmetro), LED no que está automatizado, "Show Automated Parameters Only". É exatamente o nosso problema de cinco lanes por track |
-| Loop brace e locators | Ableton | §6.6 e §6.4: brace arrastável nas bordas e no meio; locator dispara playback e é mapeável |
-| Seleção de tempo × objeto | Ableton | §6.9: "Arrangement editing is selection-based"; clique no fundo põe insert marker, arrasto faz intervalo |
-| Inspector | Resolve | p.412: painéis por aspecto (Video, Audio, Effects, Transition, Image, File), painel que não se aplica fica cinza — não some |
-| Consolidate | nenhum | **Não entra.** Ableton §6.13 grava um sample novo por track em `Samples/Processed/Consolidate`; nós não renderizamos mídia e não vamos escrever arquivo derivado no show |
+| Clip on the timeline | Resolve | A clip is media with a source In/Out and a timeline In/Out; `Ctrl+E` cuts at the click point, dragging the edge trims. Ableton has the same, with warp and bars behind it, which do not come in (`timeline-daw.md` item 38) |
+| Track header | Resolve | Editable name (p.645), color by menu (p.621), lock/R/S/M with a drag over several (p.3681), Tracks Index as a parallel list (p.646, p.649) |
+| Reorder track | Resolve | Drag in the Index with a white line showing where it lands (p.3681) — without that, "move track" becomes an Up/Down menu (p.3574), which is worse |
+| Overview strip | Ableton | §6.1: dragging horizontally scrolls, vertically zooms, double-click frames everything. Resolve has no overview, it has a Zoom Slider |
+| Automation lane selector | Ableton | §25.5: two selectors (device, parameter), an LED on whatever is automated, "Show Automated Parameters Only". It is exactly our problem of five lanes per track |
+| Loop brace and locators | Ableton | §6.6 and §6.4: brace draggable at the edges and in the middle; a locator launches playback and is mappable |
+| Time selection x object selection | Ableton | §6.9: "Arrangement editing is selection-based"; clicking the background puts an insert marker, dragging makes a range |
+| Inspector | Resolve | p.412: panels per aspect (Video, Audio, Effects, Transition, Image, File), a panel that does not apply goes gray — it does not disappear |
+| Consolidate | none | **Does not come in.** Ableton §6.13 records a new sample per track in `Samples/Processed/Consolidate`; we do not render media and we are not going to write a derived file into the show |
 
-## 1. Objetos e verbos
+## 1. Objects and verbs
 
-**Clipe** — um pedaço de mídia posto no tempo. É o objeto que falta. Quatro campos: `t0` (onde começa na linha), `len` (quanto dura na linha), `src` (arquivo, relativo à pasta do show) e `offset` (de que ponto do arquivo se lê). Verbos: **inserir** (drop), **mover**, **aparar** (trim das duas bordas), **cortar** (`Ctrl+E`), **duplicar** (`Ctrl+D`), **copiar/colar**, **apagar** (`Delete`). Um clipe não tem envelope próprio: automação é do track (§3.4).
+**Clip** — a piece of media placed in time. It is the object that is missing. Four fields: `t0` (where it starts on the timeline), `len` (how long it lasts on the timeline), `src` (file, relative to the show folder) and `offset` (from which point of the file it is read). Verbs: **insert** (drop), **move**, **trim** (both edges), **cut** (`Ctrl+E`), **duplicate** (`Ctrl+D`), **copy/paste**, **delete** (`Delete`). A clip has no envelope of its own: automation belongs to the track (§3.4).
 
-**Track** — a linha do `.spell` (`tracks[]`). Ganha verbos que hoje não tem: **renomear**, **reordenar**, **travar**, **dobrar**, **mudar altura**. Tipos que desenham clipe: `laser` (`.ild`), `audio` (`.wav/.mp3/.flac`), `video` (`.mp4/.webm`), `fx` (`.rhai`), `osc`. Tipos que desenham só keyframes: `dmx`, `artnet`, `fixture`. Tipo `cue` desenha marca vertical (`timeline-daw.md` item 36).
+**Track** — the line of the `.spell` (`tracks[]`). It gains verbs it does not have today: **rename**, **reorder**, **lock**, **fold**, **change height**. Types that draw a clip: `laser` (`.ild`), `audio` (`.wav/.mp3/.flac`), `video` (`.mp4/.webm`), `fx` (`.rhai`), `osc`. Types that draw keyframes only: `dmx`, `artnet`, `fixture`. Type `cue` draws a vertical mark (`timeline-daw.md` item 36).
 
-**Lane** — linha desenhada. Um track dá uma lane principal e uma lane por parâmetro automatizado (`timeline.js:157-196`). Novo: as lanes de parâmetro **dobram** e existem sob demanda, não as cinco fixas de `LANE_PARAMS` (`timeline.js:190-196`).
+**Lane** — a drawn line. A track gives one main lane and one lane per automated parameter (`timeline.js:157-196`). New: the parameter lanes **fold** and exist on demand, not the five fixed ones of `LANE_PARAMS` (`timeline.js:190-196`).
 
-**Seleção de tempo** — intervalo sem objeto. Hoje não existe: `CK.sel()` guarda keyframes (`canvaskit.js:152-168`).
+**Time selection** — a range with no object. It does not exist today: `CK.sel()` stores keyframes (`canvaskit.js:152-168`).
 
-**Locator** — marcador que dispara. No Ableton §6.4 locator é ponto na scrub area que lança o playback; nós já temos `markers[]` e o track `cue`. **Locator não vira objeto novo**: ver §5.
+**Locator** — a marker that fires. In Ableton §6.4 a locator is a point in the scrub area that launches playback; we already have `markers[]` and the `cue` track. **A locator does not become a new object**: see §5.
 
-## 2. Segmentos da tela
+## 2. Screen segments
 
-De cima para baixo, largura total, sem sobreposição (é a queixa 4 de `pontos-falhos.md`):
+From top to bottom, full width, no overlap (that is complaint 4 of `pontos-falhos.md`):
 
-| Segmento | Altura | Conteúdo | Origem |
+| Segment | Height | Content | Origin |
 |---|---|---|---|
-| Barra de transporte | 32 px fixos, com quebra ou overflow em menu | posição (timecode + segundos), play/stop, rec, loop, follow, snap, nome do show editável | Ableton (Control Bar) / Resolve p.625 (toolbar) |
-| Faixa de visão geral | 24 px | o show inteiro em miniatura, contorno da janela atual | Ableton §6.1 |
-| Régua | 24 px (`TL.rulerH`, `timeline.js:33`) | timecode adaptativo, brace de loop, marcadores, In/Out | Ableton §6.1 / Resolve p.484 |
-| Tracks | o que sobra, rolável | cabeçalho de 192 px (`TL.headW`) + lanes | ambos |
-| Inspector | 280 px à direita, dobrável | do que está selecionado | Resolve p.412 |
-| Rodapé | 20 px | espaçamento da grade + estado do bus | Ableton §6.10 ("displayed above the time ruler in the lower right corner") |
+| Transport bar | 32 px fixed, with wrapping or overflow into a menu | position (timecode + seconds), play/stop, rec, loop, follow, snap, editable show name | Ableton (Control Bar) / Resolve p.625 (toolbar) |
+| Overview strip | 24 px | the whole show in miniature, outline of the current window | Ableton §6.1 |
+| Ruler | 24 px (`TL.rulerH`, `timeline.js:33`) | adaptive timecode, loop brace, markers, In/Out | Ableton §6.1 / Resolve p.484 |
+| Tracks | whatever is left, scrollable | 192 px header (`TL.headW`) + lanes | both |
+| Inspector | 280 px on the right, collapsible | of whatever is selected | Resolve p.412 |
+| Footer | 20 px | grid spacing + bus state | Ableton §6.10 ("displayed above the time ruler in the lower right corner") |
 
-O Inspector à direita e o browser à esquerda (`browser-dnd.md`) formam o layout que `SHORTCUTS.md § Interface` já descreve: *"Inspector à direita, Media Pool à esquerda"*.
+The Inspector on the right and the browser on the left (`browser-dnd.md`) form the layout that `SHORTCUTS.md § Interface` already describes: *"Inspector on the right, Media Pool on the left"*.
 
-## 3. Tabela de comportamentos
+## 3. Behavior table
 
-`hoje` = commit base `dac3e0a`. P1 = falta no primeiro minuto. Nenhuma linha repete `timeline-daw.md`.
+`today` = base commit `dac3e0a`. P1 = missing in the first minute. No line repeats `timeline-daw.md`.
 
-### 3.1 Visão geral e régua
+### 3.1 Overview and ruler
 
-| # | Comportamento | Origem | Gesto | Efeito no nosso modelo | Hoje | P |
+| # | Behavior | Origin | Gesture | Effect on our model | Today | P |
 |---|---|---|---|---|---|---|
-| A1 | Faixa de visão geral: arrastar horizontal rola, vertical dá zoom, duplo-clique dentro do contorno enquadra tudo | Ableton §6.1 ("drag left or right to scroll... drag vertically to zoom in or out... double-click anywhere within the black outline") | arraste / duplo-clique | Só a vista (`CK.view`), nada no `.spell` | falta | **P1** |
-| A2 | Contorno marca a janela atual dentro da faixa | Ableton §6.1 | — | Idem | falta | **P1** |
-| A3 | Clicar na régua toca dali | Ableton §6.1 ("Clicking anywhere in the scrub area launches playback from that point") | clique | `locate {t}` + `resume` | parcial — o clique na régua só arrasta o playhead (`timeline.js:704-712,747`) | P2 |
-| A4 | Brace de loop com três alças: borda esquerda, borda direita, meio | Ableton §6.6 ("dragging from the left or right edge adjusts the loop start/end points, while dragging the brace bar horizontally moves the loop without changing its length") | arrastar | As alças são In/Out (`timeline-daw.md` item 7); o meio é o item 8 de lá. **Novo aqui**: desenhar como brace (duas serifas e uma barra), não como risco | falta o desenho — `timeline.js:622-623` faz um retângulo cinza de 3 px que some contra a grade (`pontos-falhos.md` item 27) | P2 |
-| A5 | Clicar no brace seleciona o que está dentro | Ableton §6.9 ("Clicking on the loop brace is a shortcut for executing the Edit menu's Select Loop command") | clique no brace | Seleciona keyframes e clipes entre In e Out | falta | P3 |
-| A6 | Setas movem o brace pela grade; `Ctrl+←/→` encurta/alonga; `Ctrl+↑/↓` dobra/divide | Ableton §6.6 | teclado | Reescreve `in`/`out` | falta | P3 |
-| A7 | Timecode adaptativo: com o show inteiro na tela o rótulo é `mm:ss`; com um segundo na tela é `ss:ff` | ambos (Ableton §6.10 mostra o espaçamento; Resolve p.647 tem os três presets de zoom) | automático | Só desenho | errado — `tc()` sempre imprime `hh:mm:ss:ff` (`timeline.js:56-57`): 11 caracteres para dizer 10 segundos | P2 |
-| A8 | A escada de grade tem degrau de quadro | ambos | automático | `STEPS` ganha `1/fps` e `5/fps` como primeiros degraus, lidos de `show.fps` | falta — menor degrau é 0,04 s (`timeline.js:28`), que a 30 fps não é quadro nem múltiplo de quadro | P2 |
+| A1 | Overview strip: dragging horizontally scrolls, vertically zooms, double-click inside the outline frames everything | Ableton §6.1 ("drag left or right to scroll... drag vertically to zoom in or out... double-click anywhere within the black outline") | drag / double-click | Only the view (`CK.view`), nothing in the `.spell` | missing | **P1** |
+| A2 | The outline marks the current window inside the strip | Ableton §6.1 | — | Same | missing | **P1** |
+| A3 | Clicking the ruler plays from there | Ableton §6.1 ("Clicking anywhere in the scrub area launches playback from that point") | click | `locate {t}` + `resume` | partial — clicking the ruler only drags the playhead (`timeline.js:704-712,747`) | P2 |
+| A4 | Loop brace with three handles: left edge, right edge, middle | Ableton §6.6 ("dragging from the left or right edge adjusts the loop start/end points, while dragging the brace bar horizontally moves the loop without changing its length") | drag | The handles are In/Out (`timeline-daw.md` item 7); the middle is item 8 over there. **New here**: draw it as a brace (two serifs and a bar), not as a scratch | the drawing is missing — `timeline.js:622-623` makes a 3 px gray rectangle that disappears against the grid (`pontos-falhos.md` item 27) | P2 |
+| A5 | Clicking the brace selects what is inside it | Ableton §6.9 ("Clicking on the loop brace is a shortcut for executing the Edit menu's Select Loop command") | click on the brace | Selects keyframes and clips between In and Out | missing | P3 |
+| A6 | Arrows move the brace along the grid; `Ctrl+←/→` shortens/lengthens; `Ctrl+↑/↓` doubles/halves | Ableton §6.6 | keyboard | Rewrites `in`/`out` | missing | P3 |
+| A7 | Adaptive timecode: with the whole show on screen the label is `mm:ss`; with one second on screen it is `ss:ff` | both (Ableton §6.10 shows the spacing; Resolve p.647 has the three zoom presets) | automatic | Drawing only | wrong — `tc()` always prints `hh:mm:ss:ff` (`timeline.js:56-57`): 11 characters to say 10 seconds | P2 |
+| A8 | The grid ladder has a frame step | both | automatic | `STEPS` gains `1/fps` and `5/fps` as its first steps, read from `show.fps` | missing — the smallest step is 0.04 s (`timeline.js:28`), which at 30 fps is neither a frame nor a multiple of a frame | P2 |
 
 ### 3.2 Track
 
-| # | Comportamento | Origem | Gesto | Efeito no nosso modelo | Hoje | P |
+| # | Behavior | Origin | Gesture | Effect on our model | Today | P |
 |---|---|---|---|---|---|---|
-| B1 | Nome do track editável no cabeçalho | Resolve p.645 ("click the default 'Video X' or 'Audio X' track name to select it, then type your preferred name and press the Return key") | duplo-clique, digitar, `Enter` | `show_patch {ops:[{op:"add", path:"/tracks/3/name", value:"..."}]}`. O campo `name` já é escrito por `track_add` quando vem `label` (`edit.rs:692-694`) | falta — o nome é `spec.file`/`spec.clip` cortado em 22 caracteres (`timeline.js:503`) | **P1** |
-| B2 | Arm / Solo / Mute valem de verdade | ambos (Resolve p.3681: *"you can use the Lock, Record, Solo, and Mute controls to quickly enable or disable multiple tracks by clicking and dragging up or down"*) | clique em R/S/M, ou arrastar sobre vários | `mute` vai para o `.spell` e o player Rust obedece (`timeline-daw.md` item 30, já em `DECISOES.md`) | **quebrado** — `commit()` reescreve `spec.mute` a partir de cada lane e a lane de parâmetro desfaz o mute (`timeline.js:308-312`; `pontos-falhos.md` item 10) | **P1** |
-| B3 | Lock trava o track | Resolve p.3635 ("Click any track's lock control and drag over the lock controls of other tracks") | `Shift+L`, ou arrastar sobre os cadeados | `tracks[i].lock` (proposto em `timeline-daw.md §3`, aguarda voto) | falta | P2 |
-| B4 | Dobrar as lanes de parâmetro | Ableton §6.9 (`U`) e §25.5 ("Using the left and right arrow keys on a main track will fold/unfold its automation lanes") | `U`, ou `←`/`→` no cabeçalho focado | Estado de janela. **Correção de rumo**: as lanes passam a existir só para parâmetro que tem keyframe | falta — cinco lanes fixas por track (`timeline.js:190-196`) | **P1** |
-| B5 | Altura por track, arrastando a divisória | Resolve p.643 ("any track in the Timeline can be individually resized by dragging its top divider in the Track Header area") | arrastar a borda de cima do cabeçalho | Estado de janela. **Divergência**: `timeline-daw.md` item 19 propôs altura global (`TL.rowH`); o Resolve p.643 é por track, e é o que se espera de um track de áudio ao lado de um de DMX. Fica por track, com `Alt`+arrastar aplicando a todos (Ableton §6.9: *"hold Alt while resizing a single track"* redimensiona todos) | falta | P2 |
-| B6 | Reordenar arrastando, com linha no destino | Resolve p.3681 ("As you drag, a white line shows you where that track will be inserted when you release it") | arrastar o cabeçalho | **Reescreve a ordem de `tracks[]`.** Não há campo de ordem: a ordem do array é a ordem da tela. Precisa de `track_move` (§6) | falta | P2 |
-| B7 | Cor por família de track | Resolve p.621 ("Each track can be color-coded with one of 16 different colors") | — | **Rejeitado como cor livre** (`PRINCIPIOS.md §2`; já decidido em `timeline-daw.md` item 31). Entra derivada do `type`: `dmx`/`artnet` âmbar, `laser` vermelho, `audio` verde, `video` azul, `fx`/`osc` cinza. Não é campo do `.spell` | falta | P3 |
-| B8 | Track novo pelo drop no vazio abaixo dos tracks | Ableton §4.10 ("Dragging and dropping content from the browser into the space... below Arrangement View tracks will create a new track and place the new item(s) there") e §6.1 (Mixer Drop Area) | soltar mídia abaixo do último track | `track_add {kind, label}` + o clipe. Contrato completo em `browser-dnd.md §3` | falta | **P1** |
-| B9 | Apagar tracks vazios de uma vez | Resolve p.511 ("Delete Empty Tracks") | menu do cabeçalho | `track_del` em série | falta | P3 |
+| B1 | Track name editable in the header | Resolve p.645 ("click the default 'Video X' or 'Audio X' track name to select it, then type your preferred name and press the Return key") | double-click, type, `Enter` | `show_patch {ops:[{op:"add", path:"/tracks/3/name", value:"..."}]}`. The `name` field is already written by `track_add` when `label` comes in (`edit.rs:692-694`) | missing — the name is `spec.file`/`spec.clip` truncated at 22 characters (`timeline.js:503`) | **P1** |
+| B2 | Arm / Solo / Mute actually take effect | both (Resolve p.3681: *"you can use the Lock, Record, Solo, and Mute controls to quickly enable or disable multiple tracks by clicking and dragging up or down"*) | click on R/S/M, or drag over several | `mute` goes into the `.spell` and the Rust player obeys it (`timeline-daw.md` item 30, already in `DECISOES.md`) | **broken** — `commit()` rewrites `spec.mute` from each lane and the parameter lane undoes the mute (`timeline.js:308-312`; `pontos-falhos.md` item 10) | **P1** |
+| B3 | Lock locks the track | Resolve p.3635 ("Click any track's lock control and drag over the lock controls of other tracks") | `Shift+L`, or drag over the padlocks | `tracks[i].lock` (proposed in `timeline-daw.md §3`, awaiting vote) | missing | P2 |
+| B4 | Fold the parameter lanes | Ableton §6.9 (`U`) and §25.5 ("Using the left and right arrow keys on a main track will fold/unfold its automation lanes") | `U`, or `←`/`→` on the focused header | Window state. **Course correction**: the lanes now exist only for a parameter that has a keyframe | missing — five fixed lanes per track (`timeline.js:190-196`) | **P1** |
+| B5 | Height per track, by dragging the divider | Resolve p.643 ("any track in the Timeline can be individually resized by dragging its top divider in the Track Header area") | drag the top edge of the header | Window state. **Divergence**: `timeline-daw.md` item 19 proposed a global height (`TL.rowH`); Resolve p.643 is per track, and that is what you expect from an audio track next to a DMX one. It stays per track, with `Alt`+drag applying it to all (Ableton §6.9: *"hold Alt while resizing a single track"* resizes all of them) | missing | P2 |
+| B6 | Reorder by dragging, with a line at the destination | Resolve p.3681 ("As you drag, a white line shows you where that track will be inserted when you release it") | drag the header | **Rewrites the order of `tracks[]`.** There is no order field: the order of the array is the order on screen. It needs `track_move` (§6) | missing | P2 |
+| B7 | Color per track family | Resolve p.621 ("Each track can be color-coded with one of 16 different colors") | — | **Rejected as free color** (`PRINCIPIOS.md §2`; already decided in `timeline-daw.md` item 31). It comes in derived from the `type`: `dmx`/`artnet` amber, `laser` red, `audio` green, `video` blue, `fx`/`osc` gray. It is not a field of the `.spell` | missing | P3 |
+| B8 | New track by dropping into the empty space below the tracks | Ableton §4.10 ("Dragging and dropping content from the browser into the space... below Arrangement View tracks will create a new track and place the new item(s) there") and §6.1 (Mixer Drop Area) | drop media below the last track | `track_add {kind, label}` + the clip. Full contract in `browser-dnd.md §3` | missing | **P1** |
+| B9 | Delete empty tracks in one go | Resolve p.511 ("Delete Empty Tracks") | header menu | `track_del` in series | missing | P3 |
 
-### 3.3 Clipe
+### 3.3 Clip
 
-| # | Comportamento | Origem | Gesto | Efeito no nosso modelo | Hoje | P |
+| # | Behavior | Origin | Gesture | Effect on our model | Today | P |
 |---|---|---|---|---|---|---|
-| C1 | Clipe desenhado como retângulo com barra de título, nome do arquivo e conteúdo | Resolve p.625 (Filmstrip / Thumbnail / Minimized) / Ableton §6.7 | — | Um `clips[]` por track (§4). Conteúdo: forma de onda para `audio` (`audio-video.md §2`), miniatura de quadro para `laser`/`video`, cor sólida para `fx`/`osc` | **falta inteiro** — o track `{"type":"laser","clip":"medgrupo_laser.ild"}` de `shows/medgrupo.spell` desenha uma lane vazia (`timeline.js:157-181` só conhece `keys` e `spec.<param>`; `pontos-falhos.md` item 14) | **P1** |
-| C2 | Só a barra de título arrasta o clipe | Ableton §6.7 ("only the clip bar is draggable, it is not possible to drag from the clip's waveform or MIDI display") | arrastar a barra | Muda `t0`, e o track se mudar de linha | falta | **P1** |
-| C3 | Arrastar a borda apara | Ableton §6.7 ("Dragging a clip's left or right edge changes the clip's length") | arrastar borda | Borda direita muda `len`; borda esquerda muda `t0` **e** `offset` na mesma quantidade | falta | **P1** |
-| C4 | Deslizar o conteúdo dentro do clipe | Ableton §6.7 (`Ctrl+Shift`+arrastar no waveform) | `Ctrl+Shift`+arrastar no corpo | Muda só `offset` | falta | P3 |
-| C5 | Clipe gruda na grade **e** na borda de outro clipe, em marcador e no playhead | Ableton §6.7 ("Clips snap to the editing grid, as well as... the edges of other clips, locators and time signature changes") / Resolve p.546 | automático | `TL.snaps` ganha as bordas de clipe. `Alt` solta (já em `timeline-daw.md` item 11) | parcial — `snapT` existe e só conhece grade e marcador | P2 |
-| C6 | Cortar no ponto clicado | Ableton §6.12 (`Ctrl+E`: *"click anywhere within a clip's waveform or MIDI display and then use the shortcut"*) | `Ctrl+E` | Um clipe vira dois: `{t0,len,src,offset}` → `{t0, d, src, offset}` + `{t0+d, len-d, src, offset+d}`. Corta no **clique**, não no playhead: evita mover o transporte para editar | falta | **P1** |
-| C7 | Duplicar | Ableton §41.5 (`Ctrl+D`) | `Ctrl+D` | Cópia logo depois: `t0' = t0 + len` | falta | P2 |
-| C8 | Duplicar arrastando com `Alt` | Resolve / MadMapper (gesto já fixado em `timeline-daw.md` item 15) | `Alt`+arrastar | Idem, onde soltar. **Colisão consciente**: `Alt` também solta a grade (item 11 de lá); num arrasto de clipe as duas coisas valem juntas, e é assim no Ableton |falta | P2 |
-| C9 | Copiar / colar | ambos | `Ctrl+C` / `Ctrl+V` | Cola no playhead, no track focado | falta | P2 |
-| C10 | Desativar sem apagar | Ableton §6.9 ("Pressing the 0 key deactivates a selection of material") | `0` | `clips[i].mute: true`. **Divergência**: `SHORTCUTS.md` usa `Shift+D` para mute de track; `0` fica só para o clipe selecionado | falta | P3 |
-| C11 | Consolidar clipes adjacentes num só | Ableton §6.13 (`Ctrl+J`) | — | **NÃO ENTRA.** No Ableton *"a new sample is created for every track in the selection"*, gravado em `Samples/Processed/Consolidate`. Nós não renderizamos mídia, e arquivo derivado dentro do show contraria o espírito de `FUNCOES/README.md §12` (o `.spell` referencia originais, não produtos) | — | — |
-| C12 | Comandos "…Time" (inserir/apagar tempo em todos os tracks) | Ableton §6.11 (`Ctrl+Shift+X/C/V/Delete`; `Ctrl+I` insere silêncio) | — | **Não entra agora.** Exige ripple em `keys[]` de todos os tracks e não há pedido. Registrado porque é a diferença entre editar clipe e editar linha | — | P3 |
-| C13 | Fade in/out no clipe de áudio | Ableton §6.8 (`Ctrl+Alt+F`; `F` sobre a lane alterna os controles) | — | **Não entra agora.** Volume de áudio é lane de automação como qualquer outra; fade seria atalho para dois keyframes. Reavaliar com `audio-video.md` | — | P3 |
+| C1 | Clip drawn as a rectangle with a title bar, file name and content | Resolve p.625 (Filmstrip / Thumbnail / Minimized) / Ableton §6.7 | — | One `clips[]` per track (§4). Content: waveform for `audio` (`audio-video.md §2`), frame thumbnail for `laser`/`video`, solid color for `fx`/`osc` | **entirely missing** — the track `{"type":"laser","clip":"medgrupo_laser.ild"}` of `shows/medgrupo.spell` draws an empty lane (`timeline.js:157-181` only knows `keys` and `spec.<param>`; `pontos-falhos.md` item 14) | **P1** |
+| C2 | Only the title bar drags the clip | Ableton §6.7 ("only the clip bar is draggable, it is not possible to drag from the clip's waveform or MIDI display") | drag the bar | Changes `t0`, and the track if it moves to another line | missing | **P1** |
+| C3 | Dragging the edge trims | Ableton §6.7 ("Dragging a clip's left or right edge changes the clip's length") | drag the edge | The right edge changes `len`; the left edge changes `t0` **and** `offset` by the same amount | missing | **P1** |
+| C4 | Slide the content inside the clip | Ableton §6.7 (`Ctrl+Shift`+drag on the waveform) | `Ctrl+Shift`+drag on the body | Changes `offset` only | missing | P3 |
+| C5 | The clip snaps to the grid **and** to the edge of another clip, to a marker and to the playhead | Ableton §6.7 ("Clips snap to the editing grid, as well as... the edges of other clips, locators and time signature changes") / Resolve p.546 | automatic | `TL.snaps` gains the clip edges. `Alt` releases it (already in `timeline-daw.md` item 11) | partial — `snapT` exists and only knows the grid and markers | P2 |
+| C6 | Cut at the clicked point | Ableton §6.12 (`Ctrl+E`: *"click anywhere within a clip's waveform or MIDI display and then use the shortcut"*) | `Ctrl+E` | One clip becomes two: `{t0,len,src,offset}` → `{t0, d, src, offset}` + `{t0+d, len-d, src, offset+d}`. It cuts at the **click**, not at the playhead: it avoids moving the transport in order to edit | missing | **P1** |
+| C7 | Duplicate | Ableton §41.5 (`Ctrl+D`) | `Ctrl+D` | A copy right after: `t0' = t0 + len` | missing | P2 |
+| C8 | Duplicate by dragging with `Alt` | Resolve / MadMapper (gesture already fixed in `timeline-daw.md` item 15) | `Alt`+drag | Same, wherever you drop it. **Conscious collision**: `Alt` also releases the grid (item 11 over there); in a clip drag both things apply together, and that is how it is in Ableton |missing | P2 |
+| C9 | Copy / paste | both | `Ctrl+C` / `Ctrl+V` | Pastes at the playhead, on the focused track | missing | P2 |
+| C10 | Deactivate without deleting | Ableton §6.9 ("Pressing the 0 key deactivates a selection of material") | `0` | `clips[i].mute: true`. **Divergence**: `SHORTCUTS.md` uses `Shift+D` for track mute; `0` stays only for the selected clip | missing | P3 |
+| C11 | Consolidate adjacent clips into one | Ableton §6.13 (`Ctrl+J`) | — | **DOES NOT COME IN.** In Ableton *"a new sample is created for every track in the selection"*, written to `Samples/Processed/Consolidate`. We do not render media, and a derived file inside the show goes against the spirit of `FUNCOES/README.md §12` (the `.spell` references originals, not products) | — | — |
+| C12 | "…Time" commands (insert/delete time on all tracks) | Ableton §6.11 (`Ctrl+Shift+X/C/V/Delete`; `Ctrl+I` inserts silence) | — | **Does not come in now.** It requires a ripple in the `keys[]` of every track and there is no request for it. Recorded because it is the difference between editing a clip and editing the timeline | — | P3 |
+| C13 | Fade in/out on the audio clip | Ableton §6.8 (`Ctrl+Alt+F`; `F` over the lane toggles the controls) | — | **Does not come in now.** Audio volume is an automation lane like any other; a fade would be a shortcut for two keyframes. Re-evaluate with `audio-video.md` | — | P3 |
 
-### 3.4 Automação
+### 3.4 Automation
 
-| # | Comportamento | Origem | Gesto | Efeito no nosso modelo | Hoje | P |
+| # | Behavior | Origin | Gesture | Effect on our model | Today | P |
 |---|---|---|---|---|---|---|
-| D1 | Modo automação liga/desliga com `A` | Ableton §25.5 ("enable Automation Mode by clicking the toggle button above the track headers, or using the A shortcut") | `A` | Mostra/esconde todas as lanes de parâmetro. Estado de janela | falta | P2 |
-| D2 | Seletor de lane com dois campos e LED no que está automatizado | Ableton §25.5 (Device chooser + Automation Control chooser; *"showing an LED next to their labels"*) | menu no cabeçalho da lane | Primeiro campo é o **alvo** (o track, ou o módulo do graph), segundo é o **parâmetro** — e o par é o endereço textual da regra 2 de `FUNCOES/README.md`: `track/3/scale`, `laser/1/kpps`. É o mesmo endereço que `mapping.md` mapeia | falta — as cinco lanes fixas de `LANE_PARAMS` (`timeline.js:190`) são um seletor sem menu | **P1** |
-| D3 | "Show Automated Parameters Only" | Ableton §25.5 | opção do seletor | Padrão **ligado**: só aparece lane de parâmetro que tem keyframe. É o que corrige B4 | falta | **P1** |
-| D4 | Botão que manda o envelope para lane própria; com `Alt`, manda todos os automatizados | Ableton §25.5 | clique / `Alt`+clique | Estado de janela | falta | P3 |
-| D5 | Esconder a lane não desativa o envelope | Ableton §25.5 ("hiding a lane from view does not deactivate its envelope") | — | Regra, não gesto: dobrar nunca mexe em `keys`. É a regra que impede repetir o defeito B2 | — | **P1** |
-| D6 | Envelope preso à música ou ao clipe (Lock Envelopes) | Ableton §6.1 | toggle | **Não entra.** Nossos keyframes são do track e vivem em tempo absoluto; não há segundo modo | — | — |
-| D7 | Automação vermelha, modulação azul | Ableton §26.3 | — | **Rejeitado.** `PRINCIPIOS.md §2`: um acento só, cor significa estado. As duas se distinguem pela lane em que estão | — | — |
-| D8 | Simplificar envelope | Ableton §25.5.4 ("calculates the optimal number of breakpoints... and removes any unnecessary breakpoints") | menu | Vira necessário quando `gravar-dmx` gravar 30 keyframes por segundo. Registrado para aquela frente, não para esta | falta | P3 |
-| D9 | Formas prontas de automação (seno, rampa, ADSR) sobre a seleção de tempo | Ableton §25.5.5 | menu de contexto | **Não entra**: é o que o `fx` (`.rhai`) e o graph fazem melhor. Registrado para não ser reinventado | — | — |
+| D1 | Automation mode toggles with `A` | Ableton §25.5 ("enable Automation Mode by clicking the toggle button above the track headers, or using the A shortcut") | `A` | Shows/hides all the parameter lanes. Window state | missing | P2 |
+| D2 | Lane selector with two fields and an LED on whatever is automated | Ableton §25.5 (Device chooser + Automation Control chooser; *"showing an LED next to their labels"*) | menu in the lane header | The first field is the **target** (the track, or the graph module), the second is the **parameter** — and the pair is the textual address of rule 2 of `FUNCOES/README.md`: `track/3/scale`, `laser/1/kpps`. It is the same address that `mapping.md` maps | missing — the five fixed lanes of `LANE_PARAMS` (`timeline.js:190`) are a selector with no menu | **P1** |
+| D3 | "Show Automated Parameters Only" | Ableton §25.5 | selector option | Default **on**: only a parameter lane that has a keyframe shows up. It is what fixes B4 | missing | **P1** |
+| D4 | A button that sends the envelope to its own lane; with `Alt`, sends all the automated ones | Ableton §25.5 | click / `Alt`+click | Window state | missing | P3 |
+| D5 | Hiding the lane does not deactivate the envelope | Ableton §25.5 ("hiding a lane from view does not deactivate its envelope") | — | A rule, not a gesture: folding never touches `keys`. It is the rule that prevents repeating defect B2 | — | **P1** |
+| D6 | Envelope locked to the music or to the clip (Lock Envelopes) | Ableton §6.1 | toggle | **Does not come in.** Our keyframes belong to the track and live in absolute time; there is no second mode | — | — |
+| D7 | Automation red, modulation blue | Ableton §26.3 | — | **Rejected.** `PRINCIPIOS.md §2`: one accent only, color means state. The two are told apart by the lane they are in | — | — |
+| D8 | Simplify envelope | Ableton §25.5.4 ("calculates the optimal number of breakpoints... and removes any unnecessary breakpoints") | menu | It becomes necessary when `gravar-dmx` records 30 keyframes per second. Recorded for that workstream, not for this one | missing | P3 |
+| D9 | Ready-made automation shapes (sine, ramp, ADSR) over the time selection | Ableton §25.5.5 | context menu | **Does not come in**: it is what `fx` (`.rhai`) and the graph do better. Recorded so it is not reinvented | — | — |
 
-### 3.5 Seleção, transporte e Inspector
+### 3.5 Selection, transport and Inspector
 
-| # | Comportamento | Origem | Gesto | Efeito no nosso modelo | Hoje | P |
+| # | Behavior | Origin | Gesture | Effect on our model | Today | P |
 |---|---|---|---|---|---|---|
-| E1 | Clicar no fundo põe um insert marker; arrastar faz seleção de tempo | Ableton §6.9 | clique / arraste no vazio | Seleção de tempo é `{t0, t1, tracks[]}`, separada da seleção de objetos. `Ctrl+L` faz loop nela (`timeline-daw.md` item 6) | falta — arrastar no vazio faz marquee de keyframes (`canvaskit.js:152-168`) | **P1** |
-| E2 | Edição baseada em seleção | Ableton §6.9 ("you select something and then execute a command") | — | Regra: todo comando de edição pergunta "seleção de tempo ou seleção de objeto?", nunca as duas ao mesmo tempo | — | **P1** |
-| E3 | `Z` enquadra a seleção de tempo, `X` volta o zoom | Ableton §6.2 | `Z` / `X` | **Divergência**: `SHORTCUTS.md` já tem `Shift+Z` (enquadrar tudo) e `timeline-daw.md` item 22 já fixou a segunda batida do `Shift+Z` como voltar. `Z`/`X` ficam de fora; enquadrar a seleção é `Shift+Z` com seleção ativa, mesma lógica do `Ctrl+L` | falta | P2 |
-| E4 | Transporte: posição em timecode **e** em segundos, play/stop, rec, loop, follow, snap | ambos | — | `locate`, `resume`, `pause`, `stop` já existem no registry (`registry.rs:243,251,257`) | parcial — `index.html` tem os botões e nenhum campo de posição editável | **P1** |
-| E5 | Parar duas vezes volta ao início | Ableton §7.1 ("pressing the Control Bar's Stop button twice") | `Space` duas vezes parado | `stop` + `locate {t:0}` | falta | P3 |
-| E6 | Inspector à direita, em painéis por aspecto; painel inaplicável fica cinza e não some | Resolve p.412 ("Inspector panels that are not applicable to your clip or selection are grayed out") | `Shift+7` (já em `SHORTCUTS.md`) | Mostra o selecionado: track (nome, tipo, universo, endereço, saída), clipe (`src`, `t0`, `len`, `offset`), keyframe (t, valor, curva). Todo campo mostra **o endereço textual** ao lado do rótulo — é o que `mapping.md` mapeia e o que `Shift+Ctrl+C` copia (`FUNCOES/README.md §7`) | falta — nenhum Inspector no `index.html` (`pontos-falhos.md` item 25) | **P1** |
-| E7 | Alternar Arrangement ↔ Session | Ableton §41.1 (`Tab`) | — | Resolvido em `daw-sessao.md §4`: `Tab` já é a troca de Face em `SHORTCUTS.md` | — | — |
+| E1 | Clicking the background puts an insert marker; dragging makes a time selection | Ableton §6.9 | click / drag on empty space | The time selection is `{t0, t1, tracks[]}`, separate from the object selection. `Ctrl+L` loops over it (`timeline-daw.md` item 6) | missing — dragging on empty space makes a keyframe marquee (`canvaskit.js:152-168`) | **P1** |
+| E2 | Selection-based editing | Ableton §6.9 ("you select something and then execute a command") | — | Rule: every editing command asks "time selection or object selection?", never both at the same time | — | **P1** |
+| E3 | `Z` frames the time selection, `X` goes back on the zoom | Ableton §6.2 | `Z` / `X` | **Divergence**: `SHORTCUTS.md` already has `Shift+Z` (frame everything) and `timeline-daw.md` item 22 already fixed the second press of `Shift+Z` as going back. `Z`/`X` stay out; framing the selection is `Shift+Z` with an active selection, the same logic as `Ctrl+L` | missing | P2 |
+| E4 | Transport: position in timecode **and** in seconds, play/stop, rec, loop, follow, snap | both | — | `locate`, `resume`, `pause`, `stop` already exist in the registry (`registry.rs:243,251,257`) | partial — `index.html` has the buttons and no editable position field | **P1** |
+| E5 | Stopping twice goes back to the start | Ableton §7.1 ("pressing the Control Bar's Stop button twice") | `Space` twice while stopped | `stop` + `locate {t:0}` | missing | P3 |
+| E6 | Inspector on the right, in panels per aspect; an inapplicable panel goes gray and does not disappear | Resolve p.412 ("Inspector panels that are not applicable to your clip or selection are grayed out") | `Shift+7` (already in `SHORTCUTS.md`) | Shows the selected item: track (name, type, universe, address, output), clip (`src`, `t0`, `len`, `offset`), keyframe (t, value, curve). Every field shows **the textual address** next to the label — it is what `mapping.md` maps and what `Shift+Ctrl+C` copies (`FUNCOES/README.md §7`) | missing — no Inspector in `index.html` (`pontos-falhos.md` item 25) | **P1** |
+| E7 | Switch Arrangement ↔ Session | Ableton §41.1 (`Tab`) | — | Solved in `daw-sessao.md §4`: `Tab` is already the Face switch in `SHORTCUTS.md` | — | — |
 
-## 4. Modelo de dados
+## 4. Data model
 
-### 4.1 O clipe entra no `.spell`
+### 4.1 The clip enters the `.spell`
 
 ```json
 {"type": "laser", "universe": 1,
@@ -132,80 +132,80 @@ O Inspector à direita e o browser à esquerda (`browser-dnd.md`) formam o layou
  "scale": [[0, 1.0], [46.8, 1.0]]}
 ```
 
-Regras:
+Rules:
 
-- `clips[]` **convive com** `keys[]` e com as lanes de parâmetro. Não substitui nada: `keys` é o valor no tempo de um track `dmx`; `clips` é a mídia no tempo de um track que tem arquivo.
-- `t0`, `len` e `offset` em **segundos**, como `duration` e como as chaves de `keys` (`timeline.rs`, `parse_key`). Não em quadros: `fps` é do show, e um `.ild` de 30 fps num show de 25 pode existir.
-- `src` é caminho **relativo à pasta do show**, sempre com `/` e nunca com `\`, como o `estatico()` do serve já exige (`serve/src/lib.rs:106-108`).
-- `offset` ausente vale 0; `len` ausente vale "até o fim do arquivo", resolvido pela GUI ao carregar.
-- Track de áudio e de vídeo são tipos novos: `{"type":"audio","clips":[...]}` e `{"type":"video","clips":[...]}` — sem `universe`, sem `address`. Contrato em `audio-video.md §1`.
-- **Migração do que já existe**: o track laser de hoje é `{"type":"laser","clip":"x.ild","fps":30}`. O engine ignora o tipo `laser` (`timeline.rs:404-410`), então `clip` (singular) só vive na GUI. `migrate()` (`show.rs`) converte `clip` → `clips:[{t0:0, len:<duração do arquivo>, src:<clip>, offset:0}]` **sem** subir `VERSION`: é acréscimo compatível, e quem lê `clips` e não acha lê `clip`.
+- `clips[]` **coexists with** `keys[]` and with the parameter lanes. It replaces nothing: `keys` is the value in time of a `dmx` track; `clips` is the media in time of a track that has a file.
+- `t0`, `len` and `offset` in **seconds**, like `duration` and like the keys of `keys` (`timeline.rs`, `parse_key`). Not in frames: `fps` belongs to the show, and a 30 fps `.ild` in a 25 fps show can exist.
+- `src` is a path **relative to the show folder**, always with `/` and never with `\`, as the `estatico()` of serve already requires (`serve/src/lib.rs:106-108`).
+- An absent `offset` is 0; an absent `len` is "to the end of the file", resolved by the GUI on loading.
+- Audio and video tracks are new types: `{"type":"audio","clips":[...]}` and `{"type":"video","clips":[...]}` — no `universe`, no `address`. Contract in `audio-video.md §1`.
+- **Migration of what already exists**: today's laser track is `{"type":"laser","clip":"x.ild","fps":30}`. The engine ignores the `laser` type (`timeline.rs:404-410`), so `clip` (singular) only lives in the GUI. `migrate()` (`show.rs`) converts `clip` → `clips:[{t0:0, len:<file duration>, src:<clip>, offset:0}]` **without** bumping `VERSION`: it is a compatible addition, and whoever reads `clips` and does not find it reads `clip`.
 
-### 4.2 O que é estado de janela e não vai para o show
+### 4.2 What is window state and does not go into the show
 
-`FUNCOES/README.md §12` proíbe estado de janela no `.spell`. Vão para o `config.json` da GUI: altura por track, dobra de lane, zoom e posição da vista, follow, snap ligado, modo automação (`A`), largura do Inspector e do browser, último show aberto. In/Out continua no `.spell` (`timeline.js:330-335` grava `show.in`/`show.out`) e loop continua fora, como `timeline-daw.md §3` já decidiu.
+`FUNCOES/README.md §12` forbids window state in the `.spell`. These go into the GUI's `config.json`: height per track, lane fold, zoom and view position, follow, snap on, automation mode (`A`), width of the Inspector and of the browser, last show opened. In/Out stays in the `.spell` (`timeline.js:330-335` writes `show.in`/`show.out`) and loop stays out, as `timeline-daw.md §3` already decided.
 
-### 4.3 Aguarda voto
+### 4.3 Awaiting vote
 
-Vai para `design/DECISOES.md`, sem implementar nem remover:
+Goes to `design/DECISOES.md`, without implementing or removing:
 
-1. **`clips[]` como campo de track** e a migração de `clip` → `clips`, no formato de §4.1.
-2. **Tipos `audio` e `video`** como tracks do show (a alternativa é serem saídas, e não são: têm posição no tempo).
-3. **Ordem de `tracks[]` é a ordem da tela** (B6): reordenar reescreve o array, e qualquer índice guardado em cue ou mapeamento passa a apontar para outro track. A alternativa é `uid` por track (`FUNCOES/README.md §12`: *"referência entre objetos por UID, nunca por nome curto"*), que resolve de vez e custa um campo.
-4. **Altura por track** (B5) contra a altura global proposta em `timeline-daw.md` item 19.
+1. **`clips[]` as a track field** and the migration from `clip` → `clips`, in the format of §4.1.
+2. **Types `audio` and `video`** as show tracks (the alternative is for them to be outputs, and they are not: they have a position in time).
+3. **The order of `tracks[]` is the order on screen** (B6): reordering rewrites the array, and any index stored in a cue or a mapping starts pointing at another track. The alternative is a `uid` per track (`FUNCOES/README.md §12`: *"reference between objects by UID, never by short name"*), which solves it once and for all and costs one field.
+4. **Height per track** (B5) against the global height proposed in `timeline-daw.md` item 19.
 
-## 5. Locator: por que não entra como objeto
+## 5. Locator: why it does not come in as an object
 
-Ableton §6.4 tem locator: dispara playback, é mapeável, tem nome, `Ctrl+R` renomeia. Nós já temos duas coisas que fazem isso: `markers[]` (ponto na régua com nome e nota, `timeline-daw.md` item 26) e o track `cue` (`timeline.rs:354`). Um terceiro objeto quebra a regra 9 de `FUNCOES/README.md` (*"um verbo por conceito"*).
+Ableton §6.4 has a locator: it launches playback, it is mappable, it has a name, `Ctrl+R` renames it. We already have two things that do that: `markers[]` (a point on the ruler with a name and a note, `timeline-daw.md` item 26) and the `cue` track (`timeline.rs:354`). A third object breaks rule 9 of `FUNCOES/README.md` (*"one verb per concept"*).
 
-Decisão proposta: **o marcador ganha um campo opcional `go`**, que é um endereço do registry.
+Proposed decision: **the marker gains an optional `go` field**, which is a registry address.
 
 ```json
 {"t": 12.5, "name": "pico", "note": "", "go": "cue/3/go"}
 ```
 
-Marcador sem `go` é marcador. Marcador com `go` é locator: triângulo na régua, dispara quando o transporte passa e quando recebe duplo-clique. O engine já tem a metade de baixo — `in.marker` é nó do graph e `input {key:"marker:pico"}` é a entrada (`script/src/graph.rs:280-290`). **Também aguarda voto**: é mudança de formato.
+A marker with no `go` is a marker. A marker with `go` is a locator: a triangle on the ruler, it fires when the transport passes and when it gets a double-click. The engine already has the bottom half — `in.marker` is a graph node and `input {key:"marker:pico"}` is the input (`script/src/graph.rs:280-290`). **It is also awaiting vote**: it is a format change.
 
-## 6. Comandos que faltam no registry
+## 6. Commands missing from the registry
 
-Os 30 comandos de hoje (`registry.rs` + `edit.rs`) não têm nenhum de clipe. O que esta função precisa, no padrão `<objeto>_<verbo>`:
+Today's 30 commands (`registry.rs` + `edit.rs`) have none for clips. What this function needs, in the `<object>_<verb>` pattern:
 
-| Comando | Argumentos | Faz |
+| Command | Arguments | Does |
 |---|---|---|
-| `clip_add` | `track, t0, len, src, offset` | Insere; devolve o índice |
-| `clip_set` | `track, index, t0?, len?, offset?, mute?` | Move, apara, desliza |
-| `clip_del` | `track, index` | Remove |
-| `clip_split` | `track, index, t` | Corta em dois (C6) |
-| `track_move` | `from, to` | Reordena `tracks[]` (B6) |
+| `clip_add` | `track, t0, len, src, offset` | Inserts; returns the index |
+| `clip_set` | `track, index, t0?, len?, offset?, mute?` | Moves, trims, slides |
+| `clip_del` | `track, index` | Removes |
+| `clip_split` | `track, index, t` | Cuts in two (C6) |
+| `track_move` | `from, to` | Reorders `tracks[]` (B6) |
 
-`track_set {index, name?, mute?, lock?}` não precisa existir: `show_patch` já faz (`edit.rs:824`) e o caminho é `/tracks/3/name`. A frente `comandos` decide se `clip_*` também vira `show_patch`; a diferença é que `clip_split` tem lógica (recalcular `offset`) e `show_patch` não tem onde pôr lógica.
+`track_set {index, name?, mute?, lock?}` does not need to exist: `show_patch` already does it (`edit.rs:824`) and the path is `/tracks/3/name`. The `comandos` workstream decides whether `clip_*` also becomes `show_patch`; the difference is that `clip_split` has logic (recomputing `offset`) and `show_patch` has nowhere to put logic.
 
-## 7. Atalhos
+## 7. Shortcuts
 
-O que este arquivo acrescenta a `SHORTCUTS.md` e a `timeline-daw.md §5`:
+What this file adds to `SHORTCUTS.md` and to `timeline-daw.md §5`:
 
-| Ação | Tecla | Origem | Conflito |
+| Action | Key | Origin | Conflict |
 |---|---|---|---|
-| Cortar o clipe no ponto do clique | `Ctrl+E` | Ableton §6.12 | **colide** com `Ctrl+E` de `SHORTCUTS.md` ("Easing do keyframe selecionado abre menu"). Resolução: `Ctrl+E` age no objeto selecionado — clipe corta, keyframe abre easing. Um atalho, dois objetos; é a regra E2 |
-| Duplicar a seleção | `Ctrl+D` | Ableton §41.5 | nenhum |
-| Renomear o track focado | `Ctrl+R` | Ableton §6.4 (lá é renomear locator) | nenhum |
-| Modo automação | `A` | Ableton §25.5 | nenhum; tecla nua no painel focado (`FUNCOES/README.md § Pontos abertos`) |
-| Desativar o clipe selecionado | `0` | Ableton §6.9 | nenhum |
-| Enquadrar a seleção de tempo | `Shift+Z` com seleção ativa | Ableton §6.2 (lá é `Z`) | nenhum; mesma tecla de enquadrar tudo, com seleção |
+| Cut the clip at the click point | `Ctrl+E` | Ableton §6.12 | **collides** with the `Ctrl+E` of `SHORTCUTS.md` ("Easing of the selected keyframe opens a menu"). Resolution: `Ctrl+E` acts on the selected object — a clip cuts, a keyframe opens easing. One shortcut, two objects; that is rule E2 |
+| Duplicate the selection | `Ctrl+D` | Ableton §41.5 | none |
+| Rename the focused track | `Ctrl+R` | Ableton §6.4 (there it is renaming a locator) | none |
+| Automation mode | `A` | Ableton §25.5 | none; bare key on the focused panel (`FUNCOES/README.md § Open issues`) |
+| Deactivate the selected clip | `0` | Ableton §6.9 | none |
+| Frame the time selection | `Shift+Z` with an active selection | Ableton §6.2 (there it is `Z`) | none; the same key as frame everything, with a selection |
 
-## 8. Testes que provam cada peça
+## 8. Tests that prove each piece
 
-Um por regra não trivial, no feitio de `timeline-daw.md §4` (função pura + `assert`, rodando em `node`):
+One per non-trivial rule, in the shape of `timeline-daw.md §4` (pure function + `assert`, running in `node`):
 
-| Função | Entrada | Saída esperada |
+| Function | Input | Expected output |
 |---|---|---|
 | `TL.clipSplit(c, t)` | `{t0:0,len:10,src:"a",offset:2}`, `t=4` | `[{t0:0,len:4,src:"a",offset:2}, {t0:4,len:6,src:"a",offset:6}]` |
-| `TL.clipTrim(c, "L", dt)` | mesmo clipe, `dt=+3` | `{t0:3,len:7,offset:5}` (a borda esquerda move `t0` e `offset` juntos) |
+| `TL.clipTrim(c, "L", dt)` | same clip, `dt=+3` | `{t0:3,len:7,offset:5}` (the left edge moves `t0` and `offset` together) |
 | `TL.clipTrim(c, "R", dt)` | `dt=-2` | `{t0:0,len:8,offset:2}` |
-| `TL.snapsDe(track)` | track com dois clipes | as quatro bordas, ordenadas |
-| `TL.lanesDe(spec)` | spec com `scale` e sem `rot` | uma lane principal e **uma** de parâmetro (prova D3) |
-| `TL.commit` com lane de parâmetro em mute divergente | o caso de `pontos-falhos.md` item 10 | `spec.mute === true`; o teste que falha hoje já existe em `scratchpad/prova_mute.js` |
+| `TL.snapsDe(track)` | track with two clips | the four edges, sorted |
+| `TL.lanesDe(spec)` | spec with `scale` and without `rot` | one main lane and **one** parameter lane (proves D3) |
+| `TL.commit` with a parameter lane in divergent mute | the case of `pontos-falhos.md` item 10 | `spec.mute === true`; the test that fails today already exists in `scratchpad/prova_mute.js` |
 | `TL.migraClip(track)` | `{"type":"laser","clip":"x.ild"}` | `clips:[{t0:0,src:"x.ild",offset:0}]` |
-| Rust, `timeline.rs` | track com `"mute": true` | nenhuma escrita no universo |
+| Rust, `timeline.rs` | track with `"mute": true` | no write to the universe |
 
-Prova visual, na forma de `pontos-falhos.md`: screenshot headless de `index.html` com `shows/medgrupo.spell`, mostrando `medgrupo_laser.ild` como retângulo de 46,8 s com nome, e a lane `scale` dobrada.
+Visual proof, in the shape of `pontos-falhos.md`: headless screenshot of `index.html` with `shows/medgrupo.spell`, showing `medgrupo_laser.ild` as a 46.8 s rectangle with a name, and the `scale` lane folded.

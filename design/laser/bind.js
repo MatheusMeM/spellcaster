@@ -1,11 +1,11 @@
-/* Registro de ações + key binding + MIDI learn (in e out), à la MadMapper/Resolume.
-   def(id, label, fn, {key, midi, type:"btn"|"cc", get, addr, ctx, arg, t, range, unit, needs}) registra; run(id, v) executa e manda o feedback MIDI.
-   LEARN: learn(id, "key"|"midi") e a próxima tecla / mensagem MIDI vira o binding. Persistido em localStorage.
-   Rodada 6: addr é o endereço do registry (laser/1/kpps); ctx é o CommandContext do Chataigne (action|mapping|both),
-   mais value (somente leitura, vira values do manifesto) e view (só do previz, vira o bloco view do .spell).
-   manifest() gera o module.json das definições; graph() gera o trecho graph do .spell com os bindings atuais como rotas.
-   ponytail: MIDI só note/cc, canal incluído na chave ("cc:1:7"); sem NRPN, sem MIDI clock.
-   ponytail: cc ligado a ação de disparo (btn) vira rota sem filtro; entra um filtro de limiar quando o PRD §10 tiver um. */
+/* Action registry + key binding + MIDI learn (in and out), MadMapper/Resolume style.
+   def(id, label, fn, {key, midi, type:"btn"|"cc", get, addr, ctx, arg, t, range, unit, needs}) registers; run(id, v) executes and sends the MIDI feedback.
+   LEARN: learn(id, "key"|"midi") and the next key / MIDI message becomes the binding. Persisted in localStorage.
+   Round 6: addr is the registry address (laser/1/kpps); ctx is Chataigne's CommandContext (action|mapping|both),
+   plus value (read-only, becomes the manifest's values) and view (previz only, becomes the .spell's view block).
+   manifest() generates the module.json from the definitions; graph() generates the .spell's graph section with the current bindings as routes.
+   ponytail: MIDI note/cc only, channel included in the key ("cc:1:7"); no NRPN, no MIDI clock.
+   ponytail: a cc bound to a trigger action (btn) becomes a route with no filter; a threshold filter goes in once PRD §10 has one. */
 window.Bind = (function () {
   "use strict";
   var A = {}, order = [], DEF = { key: {}, midi: {} }, USR = { key: {}, midi: {} }, learn = null, outs = [], ins = 0, api, onChange = function () {}, last = null;
@@ -25,12 +25,12 @@ window.Bind = (function () {
     var id = table("midi")[k], a = A[id]; if (!a || !a.fn) return; if (a.type === "cc") fire(id, d[2] / 127); else if (ty === 11 ? d[2] > 63 : ty === 9 && d[2] > 0) run(id); }
   function feedback(id) { var a = A[id], t = table("midi"); if (!outs.length || !a) return; Object.keys(t).forEach(function (k) { if (t[k] !== id) return; var p = k.split(":"), ch = +p[1] - 1, v = a.get ? a.get() : 1, val = typeof v === "number" ? Math.round(Math.max(0, Math.min(1, v)) * 127) : v ? 127 : 0; outs.forEach(function (o) { try { o.send([(p[0] === "cc" ? 0xB0 : 0x90) | ch, +p[2], val]); } catch (e) {} }); }); }
   function syncAll() { order.forEach(feedback); }
-  function connect() { if (!navigator.requestMIDIAccess) { api.midi = "sem Web MIDI"; onChange(); return; }
+  function connect() { if (!navigator.requestMIDIAccess) { api.midi = "no Web MIDI"; onChange(); return; }
     navigator.requestMIDIAccess({ sysex: false }).then(function (acc) { function wire() { ins = 0; outs = []; acc.inputs.forEach(function (i) { i.onmidimessage = onMidi; ins++; }); acc.outputs.forEach(function (o) { outs.push(o); }); api.midi = ins + " in · " + outs.length + " out"; onChange(); syncAll(); } acc.onstatechange = wire; wire(); }, function () { api.midi = "MIDI negado"; onChange(); }); }
   function html() { var tk = table("key"), tm = table("midi"), inv = function (t, id) { return Object.keys(t).filter(function (k) { return t[k] === id; })[0] || "—"; };
-    return "<table>" + order.filter(function (id) { return A[id].fn; }).map(function (id) { var a = A[id], lk = learn && learn.id === id && learn.src === "key", lm = learn && learn.id === id && learn.src === "midi"; return "<tr><td class='k'>" + a.label + (a.type === "cc" ? " <small>cc</small>" : "") + (a.addr ? " <small class='ad'>" + a.addr + "</small>" : "") + "</td><td class='b'><button class='lb" + (lk ? " learn" : "") + "' data-learn='key' data-id='" + id + "'>" + (lk ? "TECLA…" : inv(tk, id)) + "</button></td><td class='b'><button class='lb" + (lm ? " learn" : "") + "' data-learn='midi' data-id='" + id + "'>" + (lm ? "MIDI…" : inv(tm, id)) + "</button></td><td class='b'><button class='lb' data-clear='" + id + "'>×</button></td></tr>"; }).join("") + "</table>"; }
+    return "<table>" + order.filter(function (id) { return A[id].fn; }).map(function (id) { var a = A[id], lk = learn && learn.id === id && learn.src === "key", lm = learn && learn.id === id && learn.src === "midi"; return "<tr><td class='k'>" + a.label + (a.type === "cc" ? " <small>cc</small>" : "") + (a.addr ? " <small class='ad'>" + a.addr + "</small>" : "") + "</td><td class='b'><button class='lb" + (lk ? " learn" : "") + "' data-learn='key' data-id='" + id + "'>" + (lk ? "KEY…" : inv(tk, id)) + "</button></td><td class='b'><button class='lb" + (lm ? " learn" : "") + "' data-learn='midi' data-id='" + id + "'>" + (lm ? "MIDI…" : inv(tm, id)) + "</button></td><td class='b'><button class='lb' data-clear='" + id + "'>×</button></td></tr>"; }).join("") + "</table>"; }
   function click(e) { var b = e.target.closest("[data-learn],[data-clear]"); if (!b) return false; if (b.dataset.clear) { var id = b.dataset.clear; ["key", "midi"].forEach(function (src) { Object.keys(table(src)).forEach(function (k) { if (table(src)[k] === id) USR[src][k] = null; }); }); save(); learn = null; } else learn = learn && learn.id === b.dataset.id && learn.src === b.dataset.learn ? null : { id: b.dataset.id, src: b.dataset.learn }; onChange(); return true; }
-  /* ---------- orquestrador: manifesto e graph a partir das mesmas definições ---------- */
+  /* ---------- orchestrator: manifest and graph from the same definitions ---------- */
   function name(a) { return a.addr.replace(/^laser\/1\//, ""); }
   function val(a) { var v = a.get ? a.get() : undefined; if (typeof v === "number" && a.range) { v = a.range[0] + v * (a.range[1] - a.range[0]); if (a.t === "int") v = Math.round(v); else v = +v.toFixed(3); } return v; }
   function ptype(a) { if (a.t === "file") return "value"; if (a.type === "cc") return "value"; return typeof (a.get && a.get()) === "boolean" ? "toggle" : "trigger"; }
@@ -49,6 +49,6 @@ window.Bind = (function () {
       if (a.arg) w.args = a.arg; w.muted = false; wires.push(w); }); });
     var V = {}; Object.keys(pos).forEach(function (u) { V[u] = { x: pos[u][0], y: pos[u][1], collapsed: false }; }); if (view) Object.assign(V["laser/1"], view);
     return { nodes: nodes, wires: wires, states: [], view: V }; }
-  api = { def: def, run: run, has: function (id) { return !!A[id]; }, keyOf: keyOf, learnState: function () { return learn; }, last: function () { return last; }, connect: connect, html: html, click: click, feedback: feedback, syncAll: syncAll, manifest: manifest, graph: graph, midi: "desligado", onChange: function (f) { onChange = f; }, reset: function () { USR = { key: {}, midi: {} }; save(); onChange(); } };
+  api = { def: def, run: run, has: function (id) { return !!A[id]; }, keyOf: keyOf, learnState: function () { return learn; }, last: function () { return last; }, connect: connect, html: html, click: click, feedback: feedback, syncAll: syncAll, manifest: manifest, graph: graph, midi: "off", onChange: function (f) { onChange = f; }, reset: function () { USR = { key: {}, midi: {} }; save(); onChange(); } };
   return api;
 })();

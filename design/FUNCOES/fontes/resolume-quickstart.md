@@ -1,146 +1,146 @@
-# Resolume — Quickstart Tutorial oficial (o que o produto ensina primeiro)
+# Resolume — official Quickstart Tutorial (what the product teaches first)
 
-Complemento curto de `resolume.md`. Aquele arquivo é a auditoria dos arquivos do Arena 7.21.1
-instalado (composições `.avc`, `swagger.yaml`, atalhos, fixtures, ajuda contextual) e cobre o modelo
-de dados inteiro. Este aqui é outra coisa: **o texto do tutorial oficial de primeiros passos**, que
-diz não o que o produto tem, mas o que o fabricante escolheu ensinar nos primeiros cinco minutos —
-e nessa ordem. Nada é repetido de `resolume.md`; onde o assunto já está lá, este arquivo aponta.
+Short companion to `resolume.md`. That file is the audit of the files of the installed Arena 7.21.1
+(`.avc` compositions, `swagger.yaml`, shortcuts, fixtures, contextual help) and covers the whole data
+model. This one is something else: **the text of the official first-steps tutorial**, which
+says not what the product has, but what the manufacturer chose to teach in the first five minutes —
+and in that order. Nothing is repeated from `resolume.md`; where the subject is already there, this file points to it.
 
-## Fontes lidas
+## Sources read
 
-- `<scratchpad>/fontes/resolume-quickstart.txt` (4.818 bytes) — texto integral de
-  https://resolume.com/support/en/quickstart (versão v7), capturado em 09/09/2026.
-  O arquivo **não entra no repositório**.
-- Documento curto: uma página, cinco seções (`Trigger Clips`, `Mixing`, `Effects`, `Have a Play!`).
-  Foi lido inteiro. Não há atalho de teclado nenhum no texto, nenhuma menção a DMX, output, tela
-  cheia, mapeamento MIDI/OSC ou Advanced Output. Quem quiser isso: `resolume.md`.
+- `<scratchpad>/fontes/resolume-quickstart.txt` (4,818 bytes) — full text of
+  https://resolume.com/support/en/quickstart (v7 version), captured on 2026-09-09.
+  The file **does not go into the repository**.
+- Short document: one page, five sections (`Trigger Clips`, `Mixing`, `Effects`, `Have a Play!`).
+  It was read in full. There is not a single keyboard shortcut in the text, no mention of DMX, output, full
+  screen, MIDI/OSC mapping or Advanced Output. Whoever wants that: `resolume.md`.
 
-## O que o tutorial ensina, na ordem
+## What the tutorial teaches, in order
 
-### 1. Composition é a unidade de trabalho
+### 1. Composition is the unit of work
 
-Primeira definição dada: "uma composition é um setup completo do Resolume — cada composition pode
-incluir conjuntos de clips, efeitos pré-programados e todas as outras configurações necessárias para
-uma apresentação". Uma instalação nova **já vem com uma composition de exemplo** — o usuário nunca
-encara tela vazia.
+First definition given: "a composition is a complete Resolume setup — each composition can
+include sets of clips, pre-programmed effects and all the other settings needed for
+a performance". A fresh install **already comes with an example composition** — the user never
+faces an empty screen.
 
-Para nós: o `.spell` é a composition, e **o Spellcaster deve abrir com um show de exemplo carregado**,
-não com timeline vazia. Custo baixo, e é a diferença entre "clique num thumbnail e algo acontece" e
-"leia o manual".
+For us: the `.spell` is the composition, and **Spellcaster must open with an example show loaded**,
+not with an empty timeline. Low cost, and it is the difference between "click a thumbnail and something happens" and
+"read the manual".
 
-### 2. Layer é linha horizontal, e toca um clip por vez
+### 2. A Layer is a horizontal row, and it plays one clip at a time
 
-O texto apresenta o grid assim: abaixo da barra de menu há um conjunto de **linhas horizontais**, cada
-uma com controles à esquerda e uma fileira de thumbnails; cada thumbnail é um clip. Depois: "cada uma
-dessas linhas horizontais é um **layer**. Cada layer toca **um clip por vez**."
+The text introduces the grid like this: below the menu bar there is a set of **horizontal rows**, each
+one with controls on the left and a row of thumbnails; each thumbnail is a clip. Then: "each one
+of these horizontal rows is a **layer**. Each layer plays **one clip at a time**."
 
-A regra de mistura é ensinada por contraste, em dois cliques:
+The mixing rule is taught by contrast, in two clicks:
 
-- clicar outro thumbnail **no mesmo layer** → no início do próximo compasso, a saída troca;
-- clicar um thumbnail **em outro layer** → o clip antigo continua e os dois se misturam.
+- clicking another thumbnail **on the same layer** → at the start of the next bar, the output switches;
+- clicking a thumbnail **on another layer** → the old clip keeps playing and the two mix together.
 
-Ou seja: **exclusividade dentro da linha, soma entre linhas.** É a mesma regra que o Ableton usa no
-Session View (um clip por track, `ableton12.md` §4) e é a regra que o Spellcaster precisa para
-"um universo, uma cena por vez; universos diferentes somam".
+That is: **exclusivity within the row, sum across rows.** It is the same rule Ableton uses in the
+Session View (one clip per track, `ableton12.md` §4) and it is the rule Spellcaster needs for
+"one universe, one scene at a time; different universes sum".
 
-O modelo de dados por trás (`Layer`, `Clip`, `Column`, `Deck`, `connected` como enum de 5 estados)
-está em `resolume.md` § Objetos e verbos e § Estados.
+The data model behind it (`Layer`, `Clip`, `Column`, `Deck`, `connected` as a 5-state enum)
+is in `resolume.md` § Objects and verbs and § States.
 
-### 3. Disparo é quantizado por padrão, e o tutorial avisa antes de o usuário reclamar
+### 3. Triggering is quantized by default, and the tutorial warns before the user complains
 
-"esses clips estão configurados para sincronizar com o BPM, então o clip pode não começar
-instantaneamente — ele vai esperar o início do próximo compasso. Não se preocupe, se você quiser
-lançar clips instantaneamente, pode configurá-los para isso."
+"these clips are set to sync to the BPM, so the clip may not start
+instantly — it will wait for the start of the next bar. Don't worry, if you want to
+launch clips instantly, you can set them up for that."
 
-Duas coisas boas aqui, as duas de UX e não de função: o comportamento **padrão** é o sincronizado, e o
-tutorial **explica o atraso no exato parágrafo em que ele acontece**, antes de o usuário achar que
-travou. Um atraso não explicado lê como bug.
+Two good things here, both of UX and not of function: the **default** behavior is the synced one, and the
+tutorial **explains the delay in the exact paragraph where it happens**, before the user thinks it
+froze. An unexplained delay reads as a bug.
 
-### 4. Transport do clip: três botões e uma cunha arrastável
+### 4. Clip transport: three buttons and a draggable wedge
 
-Selecionar a aba **Clip** dá a seção **Transport**: ícones **Forwards, Backwards e Pause** para tocar
-e parar, e — o gesto que interessa — "você também pode agarrar a **cunha azul em movimento**
-diretamente para fazer scratch no clip".
+Selecting the **Clip** tab gives the **Transport** section: **Forwards, Backwards and Pause** icons to play
+and stop, and — the gesture that matters — "you can also grab the **moving blue wedge**
+directly to scratch the clip".
 
-E a consequência é declarada: mexer assim **tira o clip de fase com o BPM** — o andamento continua
-certo, a fase não. Para ressincronizar, **clicar o thumbnail de novo**: ele reinicia no começo do
-próximo compasso.
+And the consequence is stated: doing that **puts the clip out of phase with the BPM** — the tempo stays
+right, the phase does not. To resync, **click the thumbnail again**: it restarts at the beginning of the
+next bar.
 
-Para nós: (a) o indicador de posição do trecho é **agarrável**, não é só um desenho; (b) sair de
-sincronismo é um estado visível e reversível por um gesto óbvio, não um erro. O Ableton resolve o
-mesmo problema com Legato e com o Nudge (`ableton12.md` §4); o Resolume resolve com "clique de novo
-no clip".
+For us: (a) the segment's position indicator is **grabbable**, it is not just a drawing; (b) going out of
+sync is a visible state, reversible by an obvious gesture, not an error. Ableton solves the
+same problem with Legato and with Nudge (`ableton12.md` §4); Resolume solves it with "click the
+clip again".
 
-### 5. Sliders por layer: A, V e M
+### 5. Per-layer sliders: A, V and M
 
-À esquerda dos thumbnails de cada layer, dois sliders verticais **A** e **V**: o A faz fade do áudio
-do layer, o V faz o mesmo para o vídeo. E o **M (master)** controla os dois ao mesmo tempo.
+To the left of each layer's thumbnails, two vertical sliders **A** and **V**: A fades the layer's audio,
+V does the same for the video. And the **M (master)** controls both at the same time.
 
-Isto é o único ponto do quickstart que já está coberto em `resolume.md` (§ Objetos e verbos: os
-campos `audio`, `video` e `master` do `Layer` no swagger). O que o quickstart acrescenta é o
-posicionamento: **os três ficam na aresta esquerda da linha, ao lado do nome do layer**, sempre
-visíveis, sem abrir painel.
+This is the only point of the quickstart already covered in `resolume.md` (§ Objects and verbs: the
+`audio`, `video` and `master` fields of the `Layer` in the swagger). What the quickstart adds is the
+placement: **the three sit on the left edge of the row, next to the layer name**, always
+visible, without opening a panel.
 
-### 6. Browser: abas, não árvore — e o alvo do drop tem quatro cantos coloridos
+### 6. Browser: tabs, not a tree — and the drop target has four colored corners
 
-À direita da interface há as abas **Files**, **Compositions**, **Effects** e **Sources**
-(o `recentLayout.xml` mostra que há uma quinta, `Recording` — `resolume.md` § Anatomia da tela).
-Selecionar **Effects** lista os efeitos de vídeo instalados.
+On the right of the interface there are the **Files**, **Compositions**, **Effects** and **Sources** tabs
+(the `recentLayout.xml` shows there is a fifth, `Recording` — `resolume.md` § Screen anatomy).
+Selecting **Effects** lists the installed video effects.
 
-O gesto de drag and drop, que é o motivo de este arquivo existir para a frente `browser-dnd`:
+The drag and drop gesture, which is the reason this file exists for the `browser-dnd` workstream:
 
-1. escolher um efeito na lista da aba Effects;
-2. arrastar para a esquerda, até a aba **Composition**;
-3. soltar **na área que diz "Drop effect or mask here"**;
-4. "você sabe que está no lugar certo quando vê **quatro cantos coloridos** aparecerem em volta da aba
-   Composition".
+1. pick an effect from the list in the Effects tab;
+2. drag it to the left, up to the **Composition** tab;
+3. drop it **on the area that says "Drop effect or mask here"**;
+4. "you know you are in the right place when you see **four colored corners** appear around the
+   Composition tab".
 
-Três decisões numa frase: **a zona de drop é rotulada com texto quando está vazia**, o alvo válido
-acende **antes** de soltar, e o realce é **os quatro cantos**, não um contorno inteiro (funciona sobre
-qualquer conteúdo, sem tapar o que está por baixo).
+Three decisions in one sentence: **the drop zone is labeled with text when it is empty**, the valid target
+lights up **before** dropping, and the highlight is **the four corners**, not a full outline (it works over
+any content, without covering what is underneath).
 
-O efeito aparece imediatamente na saída. Efeitos empilham: "cada efeito pega a saída do anterior e
-processa" — a ordem da pilha é a cadeia. Remover: **clicar o `x` à direita do nome do efeito**.
+The effect appears in the output immediately. Effects stack: "each effect takes the output of the previous one and
+processes it" — the stack order is the chain. To remove: **click the `x` to the right of the effect name**.
 
-### 7. Todo efeito tem Opacity
+### 7. Every effect has Opacity
 
-"Todos os efeitos de vídeo têm o slider **Opacity** — ele serve para misturar o vídeo processado com o
-original." Além dele, a maioria tem parâmetros próprios (o exemplo é o Bendoscope, com um slider de
-número de divisões).
+"All video effects have the **Opacity** slider — it serves to mix the processed video with the
+original." Beyond that, most have their own parameters (the example is Bendoscope, with a slider for
+the number of divisions).
 
-Regra transversal, e barata: **todo módulo do patchbay do Spellcaster expõe um "quanto" além dos seus
-parâmetros próprios**, com o mesmo nome e no mesmo lugar em todos. Faz "desligar sem remover" e
-"metade do efeito" existirem sem que cada módulo invente o seu jeito.
+A cross-cutting rule, and a cheap one: **every Spellcaster patchbay module exposes a "how much" beyond its own
+parameters**, with the same name and in the same place in all of them. It makes "turn off without removing" and
+"half of the effect" exist without each module inventing its own way.
 
-### 8. Janela de Help contextual no canto inferior direito
+### 8. Contextual Help window in the bottom right corner
 
-"Um recurso útil é a janela **Help** no canto inferior direito da interface. Ela mostra dicas curtas
-sobre como usar aquilo sobre o que o ponteiro do mouse está no momento."
+"A useful feature is the **Help** window in the bottom right corner of the interface. It shows short tips
+about whatever the mouse pointer is currently over."
 
-É o mesmo mecanismo que `resolume.md` já identificou do outro lado, no disco: `docs\help\English.xml`
-com 412 verbetes `elemento → título + uma frase`. O quickstart mostra **onde isso aparece na tela** e
-que é o último item ensinado — depois de o usuário já ter feito algo funcionar.
+It is the same mechanism `resolume.md` already identified from the other side, on disk: `docs\help\English.xml`
+with 412 `element → title + one sentence` entries. The quickstart shows **where that appears on screen** and
+that it is the last item taught — after the user has already made something work.
 
 ---
 
-## Adaptação ao Spellcaster
+## Adaptation to Spellcaster
 
-| Quickstart do Resolume | Spellcaster | Frente |
+| Resolume quickstart | Spellcaster | Workstream |
 |---|---|---|
-| Instalação nova abre com composition de exemplo | `.spell` de exemplo carregado na primeira execução | — |
-| Layer = linha horizontal, **um clip por vez**; layers somam | uma cena por universo, universos somam | `daw-sessao` |
-| Clique no thumbnail dispara, quantizado, e o tutorial explica o atraso na hora | disparo de cue com grade de tempo, com o atraso mostrado (não silencioso) | `daw-sessao` |
-| **Cunha azul agarrável** = scratch | indicador de posição do trecho é agarrável | `daw-arranjo` |
-| Clicar o thumbnail de novo ressincroniza | um gesto óbvio para "volte à fase" | `daw-sessao` |
-| Sliders A / V / M na aresta esquerda do layer | nível por linha de show sempre visível, sem abrir painel | `daw-sessao` |
-| Abas Files / Compositions / Effects / Sources | browser em abas, não em árvore | `browser-dnd` |
-| **Zona de drop rotulada + quatro cantos coloridos ao passar por cima** | realce de alvo válido antes de soltar | `browser-dnd` |
-| Pilha de efeitos: cada um pega a saída do anterior; `x` remove | cadeia de módulos do patchbay | `mapping` |
-| **Opacity em todo efeito** | um "quanto" padrão em todo módulo | `mapping` |
-| Janela Help contextual no canto inferior direito | Aprendiz, uma frase por elemento sob o cursor | — |
+| A fresh install opens with an example composition | example `.spell` loaded on the first run | — |
+| Layer = horizontal row, **one clip at a time**; layers sum | one scene per universe, universes sum | `daw-sessao` |
+| Clicking the thumbnail triggers, quantized, and the tutorial explains the delay right there | cue triggering with a time grid, with the delay shown (not silent) | `daw-sessao` |
+| **Grabbable blue wedge** = scratch | the segment's position indicator is grabbable | `daw-arranjo` |
+| Clicking the thumbnail again resyncs | one obvious gesture for "get back in phase" | `daw-sessao` |
+| A / V / M sliders on the left edge of the layer | per-show-line level always visible, without opening a panel | `daw-sessao` |
+| Files / Compositions / Effects / Sources tabs | browser in tabs, not in a tree | `browser-dnd` |
+| **Labeled drop zone + four colored corners on hover** | valid target highlight before dropping | `browser-dnd` |
+| Effect stack: each one takes the output of the previous; `x` removes | patchbay module chain | `mapping` |
+| **Opacity on every effect** | a standard "how much" on every module | `mapping` |
+| Contextual Help window in the bottom right corner | Aprendiz, one sentence per element under the cursor | — |
 
-### O que o quickstart não cobre e não se deve inferir dele
+### What the quickstart does not cover and must not be inferred from it
 
-Sem atalho de teclado, sem cue, sem GO, sem DMX, sem armar saída, sem output/tela cheia, sem
-mapeamento MIDI/OSC. Esses assuntos estão auditados em `resolume.md`, inclusive as ausências reais do
-produto (§ "O que NÃO copiar": sem armar saída, sem modo ensaio, sem GO no teclado, sem cue de show).
+No keyboard shortcut, no cue, no GO, no DMX, no arming the output, no output/full screen, no
+MIDI/OSC mapping. Those subjects are audited in `resolume.md`, including the product's real
+absences (§ "What NOT to copy": no arming the output, no rehearsal mode, no GO on the keyboard, no show cue).

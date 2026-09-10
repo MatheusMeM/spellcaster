@@ -1,5 +1,5 @@
-/* ILDA: leitor/escritor (mesmo da rodada 3), frames demo, render 2D da parede e o contorno da splash.
-   ponytail: formato 2 (paleta) é pulado; 0/1/4/5 lidos. */
+/* ILDA: reader/writer (the same as round 3), demo frames, 2D render of the wall and the splash outline.
+   ponytail: format 2 (palette) is skipped; 0/1/4/5 are read. */
 window.ILDA = (function () {
   "use strict";
   function write(frames) { var recs = 0, i; for (i = 0; i < frames.length; i++) recs += frames[i].length; var buf = new Uint8Array((frames.length + 1) * 32 + recs * 8), o = 0, dv = new DataView(buf.buffer);
@@ -19,8 +19,8 @@ window.ILDA = (function () {
       for (k = 0; k < 90; k++) { var th = k / 90 * Math.PI * 2; f.push(P(Math.sin(3 * th + t * Math.PI * 2) * .82, Math.sin(4 * th) * .22 - .62, [Math.round(128 + 127 * Math.sin(th)), Math.round(128 + 127 * Math.sin(th + 2.1)), Math.round(128 + 127 * Math.sin(th + 4.2))], k === 0)); }
       F.push(f); } return F; }
 
-  /* contorno de texto: rasteriza, marching squares (ponto médio, grade de 3 px), encadeia em laços.
-     É o que o galvo desenha na splash: laços ordenados da esquerda para a direita. */
+  /* text outline: rasterize, marching squares (midpoint, 3 px grid), chained into loops.
+     It is what the galvo draws in the splash: loops ordered from left to right. */
   function outlines(lines, W, H) { var c = document.createElement("canvas"); c.width = W; c.height = H; var x = c.getContext("2d"); x.fillStyle = "#fff"; x.textAlign = "center"; x.textBaseline = "middle";
     lines.forEach(function (l) { x.font = l[1]; x.fillText(l[0], W / 2, l[2]); });
     var d = x.getImageData(0, 0, W, H).data, s = 3, gw = Math.floor(W / s), gh = Math.floor(H / s), bit = function (i, j) { return i < 0 || j < 0 || i >= gw || j >= gh ? 0 : d[((j * s) * W + i * s) * 4 + 3] > 128 ? 1 : 0; };

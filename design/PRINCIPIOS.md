@@ -1,46 +1,46 @@
-# Spellcaster — princípios de interface
+# Spellcaster — interface principles
 
-Uma página. Cada princípio tem o que ele proíbe. Revisão de qualquer tela, widget ou theme passa por esta lista antes de virar código.
+One page. Every principle carries what it forbids. A review of any screen, widget or theme goes through this list before it turns into code.
 
-Pessoa de referência: o operador na mesa às 23h do dia da montagem, sala escura, mão no GO, sem tempo para procurar.
+Reference person: the operator at the console at 11 p.m. on load-in day, dark room, hand on GO, no time to go looking.
 
-## 1. O graph é a interface
+## 1. The graph is the interface
 
-Todo widget é um nó visível. Uma Face é uma vista do Graph; o Graph vive no engine e roda igual no Pi sem tela.
+Every widget is a visible node. A Face is a view of the Graph; the Graph lives in the engine and runs the same on the Pi with no screen.
 
-Proíbe: botão que faz algo que não está no Graph; lógica na GUI; "atalho mágico" sem nó correspondente.
+Forbids: a button that does something that is not in the Graph; logic in the GUI; a "magic shortcut" with no matching node.
 
-## 2. Um accent, e ele significa estado
+## 2. One accent, and it means state
 
-Tudo parado é cinza. Cor aparece só quando algo acontece: armado, ao vivo, GO, ensaio, erro. Se a tela está colorida, o show está acontecendo. Isso vem da mesa de luz, não do Material Design.
+Everything idle is gray. Color shows up only when something happens: armed, live, GO, rehearsal, error. If the screen is colored, the show is happening. This comes from the lighting console, not from Material Design.
 
-Proíbe: cor decorativa; accent em ícone inativo; gradiente; mais de um accent por Theme; marca da firma (verde-lima) como accent do produto.
+Forbids: decorative color; accent on an inactive icon; gradient; more than one accent per Theme; the firm's brand color (lime green) as the product accent.
 
-## 3. Densidade de console
+## 3. Console density
 
-Grade de 8 px. Widgets em tamanhos discretos (1×1 = 48 px, 2×1, 4×4, ...). Nada elástico, nada que muda de lugar sozinho. O operador acha o botão de olhos fechados.
+8 px grid. Widgets in discrete sizes (1×1 = 48 px, 2×1, 4×4, ...). Nothing elastic, nothing that moves on its own. The operator finds the button with their eyes closed.
 
-Proíbe: layout responsivo que reorganiza; cantos arredondados por padrão; sombra; animação de layout; alvo de toque menor que 44 px.
+Forbids: responsive layout that reflows; rounded corners by default; shadow; layout animation; touch target smaller than 44 px.
 
-## 4. Texto primeiro
+## 4. Text first
 
-Paleta de comandos com busca (o F3 do Blender). Todo comando mostra o nome que a CLI e o MCP usam. A interface ensina o próprio vocabulário: quem aprende a GUI já sabe operar por SSH.
+Command palette with search (Blender's F3). Every command shows the name the CLI and the MCP use. The interface teaches its own vocabulary: whoever learns the GUI already knows how to operate over SSH.
 
-Proíbe: ícone sem rótulo em ação destrutiva; nome na GUI diferente do nome no registry; menu com mais de 8 itens sem busca.
+Forbids: an unlabeled icon on a destructive action; a name in the GUI different from the name in the registry; a menu with more than 8 items and no search.
 
-## 5. Themes são looks, Faces são superfícies
+## 5. Themes are looks, Faces are surfaces
 
-O selvagem fica no Theme: forma da janela por SVG, bisel, LCD, scope, cromo. O funcional fica na Face: quais widgets, onde, em que views. Um Theme veste qualquer Face. É isso que faz um Headspace de 2001 e um flat de 2026 operarem a mesma tela.
+The wild part lives in the Theme: window shape via SVG, bezel, LCD, scope, chrome. The functional part lives in the Face: which widgets, where, in which views. One Theme dresses any Face. That is what lets a 2001 Headspace and a 2026 flat operate the same screen.
 
-Proíbe: Theme que muda posição ou tamanho de widget; Face que fixa cor; widget que só existe em um Theme.
+Forbids: a Theme that changes a widget's position or size; a Face that pins a color; a widget that exists in only one Theme.
 
-## Filtro anti-slop (checklist de revisão)
+## Anti-slop filter (review checklist)
 
-- Sem gradiente decorativo. Sem sombra Material. Sem blur de vidro.
-- Sem cantos arredondados por padrão (raio 0; 2 px em chips, e só).
-- Sem ícone genérico de biblioteca na tela final; placeholder é aceito se estiver marcado.
-- Sem cor sem significado declarado em `tokens/spellcaster.css`.
-- Sem Inter, Roboto, Arial. Voz do produto é mono; rótulos em condensada.
-- Sem emoji. Sem "✨". Sem varinha, faísca, roxo místico. "Spell" é comando escrito.
-- Sem texto de exemplo genérico em mockup: nomes reais de show, fixture, universo.
-- Toda tela nova mostra, em algum canto, o comando equivalente da CLI.
+- No decorative gradient. No Material shadow. No glass blur.
+- No rounded corners by default (radius 0; 2 px on chips, and that is all).
+- No generic library icon in the final screen; a placeholder is accepted if it is marked as one.
+- No color without a meaning declared in `tokens/spellcaster.css`.
+- No Inter, Roboto, Arial. The product's voice is mono; labels in condensed.
+- No emoji. No "✨". No wand, no sparkle, no mystic purple. "Spell" is a written command.
+- No generic placeholder text in a mockup: real show, fixture and universe names.
+- Every new screen shows, in some corner, the equivalent CLI command.

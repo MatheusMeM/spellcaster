@@ -1,6 +1,6 @@
-/* Feixe em GLSL: cilindros instanciados (núcleo + halo), alfa cai da vista de frente para a silhueta
-   (dot(normal, view)), poeira animada por ruído 1D ao longo do comprimento, aditivo, sem depthWrite.
-   set(segs) recebe [[a,b,[r,g,b]], ...] em coordenadas de mundo. ponytail: sem raymarch de volume. */
+/* Beam in GLSL: instanced cylinders (core + halo), alpha falls from the head-on view to the silhouette
+   (dot(normal, view)), dust animated by 1D noise along the length, additive, no depthWrite.
+   set(segs) takes [[a,b,[r,g,b]], ...] in world coordinates. ponytail: no volume raymarch. */
 window.BEAM = function (THREE, scene, max, core, halo) {
   "use strict";
   var VS = "varying vec3 vN; varying vec3 vV; varying float vY; varying vec3 vC;\n" +

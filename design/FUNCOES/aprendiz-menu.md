@@ -1,105 +1,105 @@
-# Aprendiz — o menu principal (todos os temas)
+# Aprendiz — the main menu (all themes)
 
-O Aprendiz é a paleta de comandos, a ajuda contextual, o painel de avisos e a status bar, com uma voz. Não é um personagem que interrompe: é a superfície de texto que `PRINCIPIOS.md §4` exige de toda tela, e o lugar onde "o galvo não acompanha" (`TEMAS.md`) é dito.
+Aprendiz is the command palette, the contextual help, the warning panel and the status bar, with one voice. It is not a character that interrupts: it is the text surface that `PRINCIPIOS.md §4` demands of every screen, and the place where "the galvo cannot keep up" (`TEMAS.md`) is said.
 
-| Item | Quem resolveu melhor | Por quê |
+| Item | Who solved it best | Why |
 |---|---|---|
-| Objetos e verbos | Blender, com a tabela de ajuda do Resolume | Busca que indexa rótulos de menu (não operadores), favoritos, "ajustar última operação", "repetir última"; ajuda contextual como dado, uma frase por elemento |
-| Estados | Chataigne, com o TouchDesigner e o Capture | Avisos registrados por id com o culpado clicável; erro e aviso como contagem por nó; mensagem que nomeia a causa provável e põe o log a um clique |
-| Zonas da tela | Blender | Status bar com quatro coisas em ordem fixa; a mensagem nunca some, só muda de lugar; Playback e Keying como popovers |
-| Atalhos | Blender | `F3`, `Q`, `F9`, `Shift+R`, `F2`, `Shift+Ctrl+C`; qualquer menu vira busca ao digitar; ajuda com `Alt`+hover vem do TouchDesigner |
-| Arquivo | Resolume, com o `help` do TouchDesigner e o `.c2l` do Capture | Corpus de ajuda como arquivo de dados, chaveado pelo elemento; dica é texto puro; tradução é `Seção/Chave`; tudo gerado do registry, não paralelo a ele |
+| Objects and verbs | Blender, with Resolume's help table | Search that indexes menu labels (not operators), favorites, "adjust last operation", "repeat last"; contextual help as data, one sentence per element |
+| States | Chataigne, with TouchDesigner and Capture | Warnings registered by id with a clickable culprit; error and warning as a count per node; a message that names the probable cause and puts the log one click away |
+| Screen zones | Blender | Status bar with four things in fixed order; the message never disappears, it only moves; Playback and Keying as popovers |
+| Shortcuts | Blender | `F3`, `Q`, `F9`, `Shift+R`, `F2`, `Shift+Ctrl+C`; any menu becomes a search when you type; help with `Alt`+hover comes from TouchDesigner |
+| File | Resolume, with TouchDesigner's `help` and Capture's `.c2l` | Help corpus as a data file, keyed by element; a tip is plain text; translation is `Section/Key`; everything generated from the registry, not parallel to it |
 
-## 1. Objetos e verbos
+## 1. Objects and verbs
 
-**Comando.** O `@command` do registry, com `label`, `help` (uma frase), `menu` (caminho `Painel/Menu/Item`), `shortcut`. Um comando só é encontrável se estiver em um menu: no Blender, "o `text=` é a chave de busca" [fontes/blender.md § Paleta de comandos]. Aqui o rótulo do menu **é** o nome do registry (regra 10), então a paleta indexa os dois de uma vez.
+**Command.** The registry `@command`, with `label`, `help` (one sentence), `menu` (path `Panel/Menu/Item`), `shortcut`. A command is only findable if it is in a menu: in Blender, "the `text=` is the search key" [fontes/blender.md § Command palette]. Here the menu label **is** the registry name (rule 10), so the palette indexes both at once.
 
-**Menu.** `View, Select, Add, <objeto do painel>` em todo painel (regra 6); barra do app com `Arquivo, Editar, Show, Janela, Ajuda` (o topbar do Blender é `Blender, File, Edit, Render, Window, Help`) [fontes/blender.md § Anatomia de um editor]. Menu com mais de 8 itens vira busca ao primeiro caractere (`SEARCH_ON_KEY_PRESS`). Os 16 tool panes do Capture em coluna sem busca são o contra-exemplo [fontes/capture.md § O que NÃO copiar].
+**Menu.** `View, Select, Add, <panel object>` in every panel (rule 6); app bar with `File, Edit, Show, Window, Help` (Blender's topbar is `Blender, File, Edit, Render, Window, Help`) [fontes/blender.md § Anatomy of an editor]. A menu with more than 8 items becomes a search on the first character (`SEARCH_ON_KEY_PRESS`). Capture's 16 tool panes in a column with no search are the counter-example [fontes/capture.md § What NOT to copy].
 
-**Paleta.** `F3`. O resultado mostra o rótulo, o caminho do menu onde mora, o atalho e a frase de ajuda. A busca por nome interno de operador fica atrás de "modo desenvolvedor" no Blender [fontes/blender.md § Paleta de comandos]; aqui não há diferença entre os dois nomes, então não há modo.
+**Palette.** `F3`. The result shows the label, the menu path where it lives, the shortcut and the help sentence. Searching by the internal operator name sits behind "developer mode" in Blender [fontes/blender.md § Command palette]; here there is no difference between the two names, so there is no mode.
 
-**Favoritos.** `Q`, o menu que o usuário monta botão a botão [fontes/blender.md § Paleta de comandos]. Fica no perfil, não no show.
+**Favorites.** `Q`, the menu the user builds button by button [fontes/blender.md § Command palette]. It lives in the profile, not in the show.
 
-**Última operação.** `F9` abre o painel HUD com os parâmetros do último comando, editáveis: "depois de um GO, o operador quer corrigir o fade sem repetir o cue" [fontes/blender.md § O que copiar]. `Shift+R` repete.
+**Last operation.** `F9` opens the HUD panel with the parameters of the last command, editable: "after a GO, the operator wants to fix the fade without repeating the cue" [fontes/blender.md § What to copy]. `Shift+R` repeats.
 
-**Ajuda contextual.** Tabela `elemento → uma frase`: os 412 verbetes de `docs\help\English.xml` do Resolume são "o corpo do Aprendiz pronto" [fontes/resolume.md § O que copiar]. Cada parâmetro carrega `help` no esquema (TouchDesigner `TDJSON.py`) [fontes/touchdesigner.md § Arquivo]; `Alt`+hover sobre o rótulo mostra [fontes/touchdesigner.md § Parâmetros].
+**Contextual help.** Table `element → one sentence`: the 412 entries in Resolume's `docs\help\English.xml` are "Aprendiz's body, ready-made" [fontes/resolume.md § What to copy]. Every parameter carries `help` in the schema (TouchDesigner `TDJSON.py`) [fontes/touchdesigner.md § File]; `Alt`+hover over the label shows it [fontes/touchdesigner.md § Parameters].
 
-**Dica.** Texto puro, uma por linha, o `TouchDesignerTips.txt` [fontes/touchdesigner.md § Fontes lidas]. Aparece no splash e no slot de estatísticas quando não há aviso.
+**Tip.** Plain text, one per line, the `TouchDesignerTips.txt` [fontes/touchdesigner.md § Sources read]. It shows up in the splash and in the statistics slot when there is no warning.
 
-**Aviso.** `{alvo (endereço), id, mensagem, severidade}`, registrado por qualquer objeto com `setWarningMessage(msg, id)` e limpo por id [fontes/chataigne.md § Estados visuais]. A linha do painel resolve para o culpado. Exemplos, com a fonte de cada número:
+**Warning.** `{target (address), id, message, severity}`, registered by any object with `setWarningMessage(msg, id)` and cleared by id [fontes/chataigne.md § Visual states]. The panel line resolves to the culprit. Examples, with the source of each number:
 
-| Frase do Aprendiz | Origem do critério |
+| Aprendiz sentence | Origin of the criterion |
 |---|---|
-| "FPS real 28 Hz: o galvo não acompanha. PPS 30 000 ÷ 1 070 pontos." | MadMapper, `ILDA FPS = PPS / Point Count`, pisca abaixo de 35 [fontes/madmapper.md § Laser] |
-| "Perdendo quadros da fonte NDI (missed_frames subindo)." | TouchDesigner, canais de info do NDI In [fontes/touchdesigner.md § Laser e NDI] |
-| "Universo 3 sem resposta há 4 s. Possivelmente bloqueado por firewall. Abrir log." | Capture `PotentiallyBlocked` + `OpenLogFolder` [fontes/capture.md § Estados e mensagens] |
-| "Este patch consome 39 canais e transborda o universo 1 em 7. Continuar no 2?" | Capture `ChannelsRequired` + `OverflowWithContinue` [fontes/capture.md § O que copiar] |
-| "Aparelhos 4 e 5 sobrepõem os canais 40–48." | Resolume, painel DMX Output [fontes/resolume.md § O que copiar] |
-| "Taxa da saída Art-Net acima de 44 Hz." | TouchDesigner DMX Out [fontes/touchdesigner.md § Laser e NDI] |
-| "1 830 caminhos vetorizados, limite 2 000." | MadMapper `Monitor/Info` [fontes/madmapper.md § Laser] |
-| "Preset OSC 'OutputAllMessages' não existe; usando o padrão." | Resolume, referência por nome quebrada [fontes/resolume.md § O que NÃO copiar] |
+| "Real FPS 28 Hz: the galvo cannot keep up. PPS 30 000 / 1 070 points." | MadMapper, `ILDA FPS = PPS / Point Count`, blinks below 35 [fontes/madmapper.md § Laser] |
+| "Dropping frames from the NDI source (missed_frames rising)." | TouchDesigner, NDI In info channels [fontes/touchdesigner.md § Laser and NDI] |
+| "Universe 3 with no answer for 4 s. Possibly blocked by firewall. Open log." | Capture `PotentiallyBlocked` + `OpenLogFolder` [fontes/capture.md § States and messages] |
+| "This patch consumes 39 channels and overflows universe 1 by 7. Continue on 2?" | Capture `ChannelsRequired` + `OverflowWithContinue` [fontes/capture.md § What to copy] |
+| "Fixtures 4 and 5 overlap channels 40-48." | Resolume, DMX Output panel [fontes/resolume.md § What to copy] |
+| "Art-Net output rate above 44 Hz." | TouchDesigner DMX Out [fontes/touchdesigner.md § Laser and NDI] |
+| "1 830 vectorized paths, limit 2 000." | MadMapper `Monitor/Info` [fontes/madmapper.md § Laser] |
+| "OSC preset 'OutputAllMessages' does not exist; using the default." | Resolume, broken reference by name [fontes/resolume.md § What NOT to copy] |
 
-O aviso chega quando o custo sobe, não quando o teto estoura (`TooManySmokeObjects` do Capture chega tarde) [fontes/capture.md § O que NÃO copiar].
+The warning arrives when the cost rises, not when the ceiling bursts (Capture's `TooManySmokeObjects` arrives late) [fontes/capture.md § What NOT to copy].
 
-**Log.** `{hora, fonte, severidade, texto}`, 2 000 entradas em memória, gravação em arquivo opcional [fontes/chataigne.md § Estados visuais]. O Error DAT do TouchDesigner registra erros ao longo do tempo "para caçar intermitente" [fontes/touchdesigner.md § Estados].
+**Log.** `{time, source, severity, text}`, 2 000 entries in memory, optional file writing [fontes/chataigne.md § Visual states]. TouchDesigner's Error DAT records errors over time "to hunt intermittents" [fontes/touchdesigner.md § States].
 
-**Vigia.** "Vigie este parâmetro e plote o histórico" (Detective) [fontes/chataigne.md § Estados visuais]. Verbo de qualquer campo.
+**Watch.** "Watch this parameter and plot the history" (Detective) [fontes/chataigne.md § Visual states]. A verb of any field.
 
-Verbos: buscar e executar, explicar, avisar, ir ao culpado, repetir, ajustar, copiar comando CLI, favoritar, abrir pasta de log, vigiar, dispensar.
+Verbs: search and run, explain, warn, go to the culprit, repeat, adjust, copy CLI command, favorite, open log folder, watch, dismiss.
 
-## 2. Estados
+## 2. States
 
-As quatro tintas do bloco State do Blender, e só elas: `error`, `warning`, `info`, `success` [fontes/blender.md § Estados]. Um aviso é `warning`; o que para o show é `error`; "cue gravada" é `success` por dois segundos; dica é `info`.
+The four inks of Blender's State block, and only those: `error`, `warning`, `info`, `success` [fontes/blender.md § States]. A warning is `warning`; whatever stops the show is `error`; "cue recorded" is `success` for two seconds; a tip is `info`.
 
-- **Aviso ativo / limpo**: por id; quando o alvo conserta, o aviso some sozinho [fontes/chataigne.md § Estados visuais].
-- **Contagem por nó**: `warnings` e `errors` como número em cada nó, lidos pela GUI, pela CLI e pelo Aprendiz da mesma fonte (regra 5).
-- **Tarefa rodando**: barra de progresso no terceiro slot da status bar [fontes/blender.md § Estados].
-- **Atividade não é funcionamento**: verde é tráfego; o Aprendiz só diz "funciona" quando há resposta [fontes/capture.md § Estados e mensagens].
-- **Mensagem nunca some**: se a status bar está escondida, o banner de aviso e o de tarefa migram para o topo [fontes/blender.md § Estados].
-- **Falha cedo, com nome**: o Capture separa sete falhas de inicialização (configuração, licença, rede, vídeo, conectividade, recursos, tempo real) [fontes/capture.md § Estados e mensagens]. `spell` reporta o mesmo no boot do Pi.
+- **Warning active / cleared**: by id; when the target is fixed, the warning disappears on its own [fontes/chataigne.md § Visual states].
+- **Count per node**: `warnings` and `errors` as a number on each node, read by the GUI, by the CLI and by Aprendiz from the same source (rule 5).
+- **Task running**: progress bar in the third slot of the status bar [fontes/blender.md § States].
+- **Activity is not working**: green is traffic; Aprendiz only says "it works" when there is an answer [fontes/capture.md § States and messages].
+- **The message never disappears**: if the status bar is hidden, the warning banner and the task banner migrate to the top [fontes/blender.md § States].
+- **Fail early, with a name**: Capture separates seven startup failures (configuration, license, network, video, connectivity, resources, real time) [fontes/capture.md § States and messages]. `spell` reports the same at Pi boot.
 
-Não entra: diálogo que pede desculpa por bug (`DisableAdaptiveQualityWarning`) [fontes/capture.md § O que NÃO copiar]; modal de qualquer tipo para aviso (`SHORTCUTS.md`: diálogo só para abrir/salvar).
+Not included: a dialog apologizing for a bug (`DisableAdaptiveQualityWarning`) [fontes/capture.md § What NOT to copy]; a modal of any kind for a warning (`SHORTCUTS.md`: dialog only for open/save).
 
-## 3. Zonas da tela
+## 3. Screen zones
 
-- **Status bar** (rodapé, sempre): quatro coisas, nesta ordem, e nada mais [fontes/blender.md § Estados]: (1) o que os botões do mouse fazem agora, no contexto; (2) a última mensagem; (3) tarefa rodando; (4) estatísticas ou dica. O item 1 é a linha de aprendizado do software e ensina a gramática de modificadores de `cenario-interativo.md § 4` gesto a gesto.
-- **Painel Log (`Shift+6`)**: abas `Log | Avisos | Ajuda`, o canto inferior direito do Chataigne [fontes/chataigne.md § Anatomia da tela]. Avisos com o culpado clicável; Ajuda mostra a frase do elemento sob o mouse ou selecionado.
-- **Paleta**: flutuante no centro, só enquanto `F3` está aberta; fecha com `Esc` ou ao executar.
-- **HUD de última operação**: rodapé do painel focado, aparece com `F9`, some ao clicar fora (a região `HUD` do Blender) [fontes/blender.md § Anatomia de um editor].
-- **Popovers no header**: toggle com seta em vez de janela; Playback e Keying no Timeline do Blender são popovers [fontes/blender.md § O que copiar].
-- **Menu**: barra do app no topo; menus de painel no header de cada painel, colapsáveis.
+- **Status bar** (footer, always): four things, in this order, and nothing else [fontes/blender.md § States]: (1) what the mouse buttons do right now, in context; (2) the last message; (3) task running; (4) statistics or a tip. Item 1 is the software's learning line and teaches the modifier grammar of `cenario-interativo.md § 4` gesture by gesture.
+- **Log panel (`Shift+6`)**: tabs `Log | Warnings | Help`, Chataigne's bottom-right corner [fontes/chataigne.md § Anatomy of the screen]. Warnings with a clickable culprit; Help shows the sentence for the element under the mouse or selected.
+- **Palette**: floating in the center, only while `F3` is open; closes with `Esc` or on running.
+- **Last-operation HUD**: footer of the focused panel, appears with `F9`, disappears when you click outside (Blender's `HUD` region) [fontes/blender.md § Anatomy of an editor].
+- **Popovers in the header**: a toggle with an arrow instead of a window; Playback and Keying in Blender's Timeline are popovers [fontes/blender.md § What to copy].
+- **Menu**: app bar at the top; panel menus in each panel's header, collapsible.
 
-O Aprendiz como personagem (o Clippy do `TEMAS.md`) mora no slot 2 da status bar e na aba Ajuda. Nunca cobre o viewer, nunca bloqueia.
+Aprendiz as a character (the Clippy of `TEMAS.md`) lives in slot 2 of the status bar and in the Help tab. It never covers the viewer, never blocks.
 
-## 4. Atalhos
+## 4. Shortcuts
 
-| Ação | Tecla | Origem | Conflito com `SHORTCUTS.md` |
+| Action | Key | Origin | Conflict with `SHORTCUTS.md` |
 |---|---|---|---|
-| Paleta de comandos | `F3` | Blender `wm.search_menu` [fontes/blender.md § Atalhos] | nenhum |
-| Favoritos | `Q` | Blender `SCREEN_MT_user_menu` | nenhum |
-| Ajustar última operação | `F9` | Blender `screen.redo_last` | nenhum; TD usa `F9` para mostrar a rede sob o cursor, irrelevante |
-| Repetir última operação | `Shift+R` | Blender | nenhum; `R` é record arm |
-| Renomear item ativo / em lote | `F2` / `Ctrl+F2` | Blender | nenhum |
-| Copiar o comando CLI do campo sob o mouse | `Shift+Ctrl+C` | Blender `copy_data_path` | nenhum |
-| Ajuda do elemento sob o mouse | `Alt`+hover; `F1` fixa a ajuda na aba | TD [fontes/touchdesigner.md § Parâmetros]; `F1` nosso | TD usa `F1` para Perform Mode; aqui a Face troca por `Tab` |
-| Filtrar a lista sob o cursor | `Ctrl+F` | Blender | nenhum |
-| Qualquer menu vira busca | digitar com o menu aberto | Blender `SEARCH_ON_KEY_PRESS` | gesto |
-| Ir ao culpado do aviso | clique na linha, ou `Enter` com a linha selecionada no painel Avisos | Chataigne, TD Errors Dialog | `Enter` é GO fora do painel; painel focado decide |
-| Fechar paleta / HUD | `Esc` toque | `SHORTCUTS.md` | segurado é blackout |
-| Trocar o tipo de editor do painel | não entra | Blender `Shift+F1..F12` | Faces são presets nomeados, não painéis trocáveis |
+| Command palette | `F3` | Blender `wm.search_menu` [fontes/blender.md § Shortcuts] | none |
+| Favorites | `Q` | Blender `SCREEN_MT_user_menu` | none |
+| Adjust last operation | `F9` | Blender `screen.redo_last` | none; TD uses `F9` to show the network under the cursor, irrelevant |
+| Repeat last operation | `Shift+R` | Blender | none; `R` is record arm |
+| Rename active item / in batch | `F2` / `Ctrl+F2` | Blender | none |
+| Copy the CLI command of the field under the mouse | `Shift+Ctrl+C` | Blender `copy_data_path` | none |
+| Help for the element under the mouse | `Alt`+hover; `F1` pins the help in the tab | TD [fontes/touchdesigner.md § Parameters]; `F1` ours | TD uses `F1` for Perform Mode; here the Face switches with `Tab` |
+| Filter the list under the cursor | `Ctrl+F` | Blender | none |
+| Any menu becomes a search | type with the menu open | Blender `SEARCH_ON_KEY_PRESS` | gesture |
+| Go to the warning's culprit | click the line, or `Enter` with the line selected in the Warnings panel | Chataigne, TD Errors Dialog | `Enter` is GO outside the panel; the focused panel decides |
+| Close palette / HUD | `Esc` tap | `SHORTCUTS.md` | held is blackout |
+| Change the panel's editor type | not included | Blender `Shift+F1..F12` | Faces are named presets, not swappable panels |
 
-Desabilitar um atalho: manter a linha em `config.json`, apagar o comando (regra 8). O mapa de teclas precisa de um teste que o compare com o comportamento: o `TouchShortcuts.txt` traz `forward left` e `backward right` invertidos em relação ao wiki "desde sempre" [fontes/touchdesigner.md § O que NÃO copiar]; `spell keys check` lista o mapa e falha se um comando não existe no registry.
+Disabling a shortcut: keep the line in `config.json`, erase the command (rule 8). The key map needs a test that compares it with the behavior: `TouchShortcuts.txt` has `forward left` and `backward right` inverted relative to the wiki "since forever" [fontes/touchdesigner.md § What NOT to copy]; `spell keys check` lists the map and fails if a command does not exist in the registry.
 
-## 5. Arquivo
+## 5. File
 
-Tudo do Aprendiz é gerado do registry ou é texto ao lado dele; nada é paralelo.
+Everything in Aprendiz is generated from the registry or is text next to it; nothing is parallel.
 
-- **Ajuda**: o campo `help` de cada `@command` e de cada parâmetro é a fonte. `spell help --export` gera `help/pt-BR.json` no formato `{ "nome.do.registry": "uma frase" }`, o `elemento → frase` do Resolume [fontes/resolume.md § Fontes lidas], para revisão e tradução. Um verbete sem comando correspondente é erro de build.
-- **Tradução**: um arquivo por idioma, chaveado por nome do registry, o `Seção/Chave` do `.c2l` [fontes/capture.md § Fontes lidas]. Atalho nunca é string traduzível: no Capture "nenhuma Phrase contém Ctrl, Shift ou F1" [fontes/capture.md § Atalhos].
-- **Dicas**: `tips/pt-BR.txt`, uma por linha.
-- **Favoritos, mapa de teclas, layout das Faces**: `config.json` do perfil, nunca no `.spell`.
-- **Avisos**: não se salvam; renascem do estado ao abrir.
-- **Log**: `logs/<data>.log` quando ligado; "Abrir pasta de log" é um comando.
-- **Última operação**: memória de sessão; o `F9` edita o que ainda está na pilha de undo.
+- **Help**: the `help` field of each `@command` and of each parameter is the source. `spell help --export` generates `help/pt-BR.json` in the format `{ "registry.name": "one sentence" }`, Resolume's `element → sentence` [fontes/resolume.md § Sources read], for review and translation. An entry with no matching command is a build error.
+- **Translation**: one file per language, keyed by registry name, the `Section/Key` of the `.c2l` [fontes/capture.md § Sources read]. A shortcut is never a translatable string: in Capture "no Phrase contains Ctrl, Shift or F1" [fontes/capture.md § Shortcuts].
+- **Tips**: `tips/pt-BR.txt`, one per line.
+- **Favorites, key map, Face layout**: profile `config.json`, never in the `.spell`.
+- **Warnings**: are not saved; they are reborn from state on open.
+- **Log**: `logs/<date>.log` when enabled; "Open log folder" is a command.
+- **Last operation**: session memory; `F9` edits what is still on the undo stack.
 
-Corpus de origem para escrever as frases, já em disco: os 412 verbetes do Resolume, as 74 dicas do TouchDesigner, as mensagens nomeadas do Capture (`.c2l`, 1 885 linhas) e as páginas de Laser/NDI/DMX do wiki offline do TouchDesigner, todos citados em `fontes/`.
+Source corpus for writing the sentences, already on disk: Resolume's 412 entries, TouchDesigner's 74 tips, Capture's named messages (`.c2l`, 1 885 lines) and the Laser/NDI/DMX pages of TouchDesigner's offline wiki, all cited in `fontes/`.

@@ -1,7 +1,7 @@
-r"""Inlina os <script src="local.js"> e <link href="local.css"> de uma pagina e grava o HTML pronto
-para publicar (artifact = um arquivo so). Scripts de CDN (http...) ficam como estao.
-Uso: C:\Python313\python.exe design\build.py design\laser\app.html <saida.html>
-ponytail: regex sobre duas tags; vira bundler de verdade quando houver import/export."""
+r"""Inlines the <script src="local.js"> and <link href="local.css"> of a page and writes the HTML ready
+to publish (artifact = a single file). CDN scripts (http...) are left as they are.
+Usage: C:\Python313\python.exe design\build.py design\laser\app.html <output.html>
+ponytail: regex over two tags; becomes a real bundler once there is import/export."""
 import re, sys, pathlib
 src = pathlib.Path(sys.argv[1]); out = pathlib.Path(sys.argv[2])
 html = src.read_text(encoding="utf-8")
