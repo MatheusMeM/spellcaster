@@ -1,19 +1,19 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>laser3d · bench de vistas</title>
+<title>laser3d · view bench</title>
 <link rel="stylesheet" href="tokens.css">
 <style>
   html, body { height:100%; overflow:hidden; margin:0; background:#020306; }
   #gl { position:fixed; inset:0; width:100%; height:100%; display:block; }
   #lbl { position:fixed; left:8px; top:6px; font:12px 'Share Tech Mono', monospace; color:#9FF5D0; pointer-events:none; white-space:pre; }
 </style>
-<!-- Bench de vistas do modelo 3D: só o aparelho, sem app.js, sem splash, sem Pino, sem bus.
-     `bench.html`            grade com todas as vistas (uma passada de olho no modelo inteiro)
-     `bench.html?v=knob`     uma vista só, tela cheia (close-up para ver a peça)
-     `bench.html?v=a,b,c`    grade só dessas
-     `bench.html?list`       escreve os nomes no #lbl
-     Vista nova = uma linha em VIEWS: [pos, alvo, tampa aberta?]. Coordenadas de mundo em metros
-     (o corpo começa em y = .314; a traseira está em z = .15; a frente em z = −.15). -->
+<!-- View bench of the 3D model: the device only, no app.js, no splash, no Pino, no bus.
+     `bench.html`            grid with every view (one look at the whole model)
+     `bench.html?v=knob`     a single view, full screen (close-up to inspect one part)
+     `bench.html?v=a,b,c`    grid with those only
+     `bench.html?list`       writes the names into #lbl
+     A new view = one line in VIEWS: [pos, target, lid open?]. World coordinates in metres
+     (the body starts at y = .314; the rear is at z = .15; the front at z = -.15). -->
 <canvas id="gl"></canvas><div id="lbl"></div>
 <script src="../vendor/three/three.min.js"></script>
 <script src="engine.js"></script>
@@ -38,7 +38,7 @@
     fan:    [[.17, .43, .29], [.158, .416, .15], false],
     labels: [[.16, .36, .27], [.152, .34, .15], false],
     galvo:  [[.185, .60, .04], [.09, .38, -.10], true],
-    optica: [[-.01, .66, -.23], [-.006, .336, -.031], true],
+    optics: [[-.01, .66, -.23], [-.006, .336, -.031], true],
     pcbL:   [[-.02, .53, -.015], [-.186, .389, -.015], true],
     pcbR:   [[.02, .54, -.015], [.186, .399, -.015], true],
     psu:    [[-.06, .52, .02], [-.115, .343, .115], true],
@@ -47,12 +47,12 @@
     armed:  [[-.13, .40, .26], [-.150, .352, .15], false],
     xlr:    [[.028, .345, .21], [.022, .326, .15], false],
     plate:  [[.152, .325, .21], [.152, .318, .15], false],
-    tampa:  [[-.12, .62, -.048], [-.12, .50, -.048], false]
+    lid:    [[-.12, .62, -.048], [-.12, .50, -.048], false]
   };
   var q = new URLSearchParams(location.search), names = Object.keys(VIEWS), lbl = document.getElementById("lbl");
   if (q.has("list")) { lbl.textContent = names.join("\n"); }
   var want = q.get("v") ? q.get("v").split(",").filter(function (k) { return VIEWS[k]; }) : names;
-  if (!want.length) { lbl.textContent = "vista desconhecida; use ?list"; return; }
+  if (!want.length) { lbl.textContent = "unknown view; use ?list"; return; }
   Promise.all([document.fonts.load("700 58px Michroma"), document.fonts.load("700 34px 'Share Tech Mono'")]).then(function () {
   var gl = document.getElementById("gl"), R = new THREE.WebGLRenderer({ canvas: gl, antialias: true }), scene = new THREE.Scene(), pick = [];
   R.setPixelRatio(Math.min(2, devicePixelRatio)); scene.background = new THREE.Color(0x020306);
@@ -62,8 +62,8 @@
   var rim = new THREE.PointLight(0xa0c0ff, 8, 5, 2); rim.position.set(.4, 1.2, -1.6); scene.add(rim);
   var inLight = new THREE.PointLight(0xfff0dc, 0, 1.2, 2); inLight.position.set(.05, .62, 0); scene.add(inLight);
   var B = BODY(THREE, X, scene, pick); OPTICS(THREE, X, B.body, pick); B.rearLight.intensity = 14; B.wallLight.intensity = 14 * .55;
-  // display aceso com um texto fixo, para a vista `oled` mostrar a moldura com conteúdo
-  var oc = B.oled.c; oc.fillStyle = "#000"; oc.fillRect(0, 0, B.oled.w, B.oled.h); oc.fillStyle = "#9FF5D0"; oc.font = "700 120px 'Share Tech Mono'"; oc.fillText("BENCH", 40, 200); oc.font = "56px 'Share Tech Mono'"; oc.fillText("vistas do modelo", 40, 300); B.oled.tex.needsUpdate = true;
+  // display lit with a fixed text, so the `oled` view shows the bezel with content
+  var oc = B.oled.c; oc.fillStyle = "#000"; oc.fillRect(0, 0, B.oled.w, B.oled.h); oc.fillStyle = "#9FF5D0"; oc.font = "700 120px 'Share Tech Mono'"; oc.fillText("BENCH", 40, 200); oc.font = "56px 'Share Tech Mono'"; oc.fillText("model views", 40, 300); B.oled.tex.needsUpdate = true;
   function lid(open) { var sT = open ? 1 : 0; B.screws.forEach(function (s, i) { s.position.y = .004 + sT * .05; s.rotation.y = sT * 12 + i; }); B.lid.rotation.x = open ? -1.9 : 0; inLight.intensity = open ? .35 : 0; }
   var cam = new THREE.PerspectiveCamera(42, 1, .01, 60);
   function draw() {

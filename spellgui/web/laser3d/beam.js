@@ -1,12 +1,12 @@
-/* Feixe em GLSL: cilindros instanciados (núcleo + halo), alfa cai da vista de frente para a silhueta
-   (dot(normal, view)), poeira animada por ruído 1D ao longo do comprimento, aditivo, sem depthWrite.
-   set(segs) recebe [[a,b,[r,g,b]], ...] em coordenadas de mundo. ponytail: sem raymarch de volume. */
+/* Beam in GLSL: instanced cylinders (core + halo), alpha falls off from the head-on view to the
+   silhouette (dot(normal, view)), dust animated by 1D noise along the length, additive, no depthWrite.
+   set(segs) takes [[a,b,[r,g,b]], ...] in world coordinates. ponytail: no volume raymarch. */
 window.BEAM = function (THREE, scene, max, core, halo) {
   "use strict";
   var VS = "varying vec3 vN; varying vec3 vV; varying float vY; varying vec3 vC;\n" +
     "void main(){ vec4 wp = modelMatrix * instanceMatrix * vec4(position,1.); vN = normalize(mat3(modelMatrix*instanceMatrix) * normal); vV = normalize(cameraPosition - wp.xyz); vY = uv.y; vC = instanceColor; gl_Position = projectionMatrix * viewMatrix * wp; }";
-  // uD: a poeira do feixe virou linha do menu VÍDEO. Em 0 o ruído sai da conta (feixe liso) sem
-  // recompilar shader nem trocar de material — um `mix` custa menos que os dois.
+  // uD: the beam dust became a row of the VIDEO menu. At 0 the noise drops out of the maths (smooth
+  // beam) without recompiling the shader or swapping the material — a `mix` costs less than either.
   var FS = "uniform float uT; uniform float uA; uniform float uK; uniform float uD; varying vec3 vN; varying vec3 vV; varying float vY; varying vec3 vC;\n" +
     "float hash(float n){ return fract(sin(n)*43758.5453); } float noise(float x){ float i=floor(x), f=fract(x); f=f*f*(3.-2.*f); return mix(hash(i),hash(i+1.),f); }\n" +
     "void main(){ float d = abs(dot(normalize(vN), normalize(vV))); float core = pow(d, uK); float dust = mix(1., .7 + .3*noise(vY*60. + uT*3.)*noise(vY*9. - uT*.8), uD); gl_FragColor = vec4(vC * core * dust * uA, 1.); }";

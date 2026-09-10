@@ -1,5 +1,5 @@
-/* ILDA: leitor/escritor, frames demo, render 2D da parede e o contorno da splash.
-   ponytail: formato 2 (paleta) é pulado; 0/1/4/5 lidos. */
+/* ILDA: reader/writer, demo frames, 2D wall render and the splash outline.
+   ponytail: format 2 (palette) is skipped; 0/1/4/5 are read. */
 window.ILDA = (function () {
   "use strict";
   function write(frames) { var recs = 0, i; for (i = 0; i < frames.length; i++) recs += frames[i].length; var buf = new Uint8Array((frames.length + 1) * 32 + recs * 8), o = 0, dv = new DataView(buf.buffer);
@@ -7,8 +7,8 @@ window.ILDA = (function () {
     for (i = 0; i < frames.length; i++) { var f = frames[i]; head(f.length, i, frames.length); for (var j = 0; j < f.length; j++) { var p = f[j]; dv.setInt16(o, p.x); dv.setInt16(o + 2, p.y); buf[o + 4] = (p.bl ? 64 : 0) | (j === f.length - 1 ? 128 : 0); buf[o + 5] = p.b; buf[o + 6] = p.g; buf[o + 7] = p.r; o += 8; } }
     head(0, frames.length, frames.length); return buf; }
   function pal(i) { if (i === 0) return [255, 0, 0]; if (i >= 56) return [255, 255, 255]; var h = (i / 56) * 6, k = Math.floor(h), f = Math.round((h - k) * 255), c = [[255, f, 0], [255 - f, 255, 0], [0, 255, f], [0, 255 - f, 255], [f, 0, 255], [255, 0, 255 - f]]; return c[k % 6]; }
-  /* ponytail: Uint8Array e vetor pre-dimensionado; o ponto continua sendo {x,y,r,g,b,bl},
-     que e o que a parede e o viewer.js leem. So vira tipado se o custo do GC voltar a doer. */
+  /* ponytail: Uint8Array and a pre-sized array; the point is still {x,y,r,g,b,bl}, which is what the
+     wall and viewer.js read. It only becomes typed if the GC cost starts hurting again. */
   function parse(ab) { var b = new Uint8Array(ab), L = b.length, o = 0, frames = [], name = "";
     while (o + 32 <= L) { if (b[o] !== 73 || b[o + 1] !== 76 || b[o + 2] !== 68 || b[o + 3] !== 65) break;
       var fmt = b[o + 7], n = (b[o + 24] << 8) | b[o + 25];
@@ -33,8 +33,8 @@ window.ILDA = (function () {
       for (k = 0; k < 90; k++) { var th = k / 90 * Math.PI * 2; f.push(P(Math.sin(3 * th + t * Math.PI * 2) * .82, Math.sin(4 * th) * .22 - .62, [Math.round(128 + 127 * Math.sin(th)), Math.round(128 + 127 * Math.sin(th + 2.1)), Math.round(128 + 127 * Math.sin(th + 4.2))], k === 0)); }
       F.push(f); } return F; }
 
-  /* contorno de texto: rasteriza, marching squares (ponto médio, grade de 3 px), encadeia em laços.
-     É o que o galvo desenha na splash: laços ordenados da esquerda para a direita. */
+  /* text outline: rasterize, marching squares (midpoint, 3 px grid), chain into loops.
+     This is what the galvo draws in the splash: loops sorted from left to right. */
   function outlines(lines, W, H) { var c = document.createElement("canvas"); c.width = W; c.height = H; var x = c.getContext("2d"); x.fillStyle = "#fff"; x.textAlign = "center"; x.textBaseline = "middle";
     lines.forEach(function (l) { x.font = l[1]; x.fillText(l[0], W / 2, l[2]); });
     var d = x.getImageData(0, 0, W, H).data, s = 3, gw = Math.floor(W / s), gh = Math.floor(H / s), bit = function (i, j) { return i < 0 || j < 0 || i >= gw || j >= gh ? 0 : d[((j * s) * W + i * s) * 4 + 3] > 128 ? 1 : 0; };

@@ -1,9 +1,9 @@
-/* Corda de Verlet pura, sem three.js e sem DOM: o cabo DMX do Pino.
-   Os nós vivem num Float32Array [x, y, z, px, py, pz] por nó (px = posição do passo anterior — em
-   Verlet a velocidade é a diferença entre as duas, não um vetor guardado). As duas pontas são
-   fixas: quem chama escreve nelas com `pin` antes de cada `step`, e a restrição nunca as move.
-   ponytail: distância entre nós é a única restrição (sem rigidez à flexão, sem colisão); se o cabo
-   precisar bater no chassi um dia, entra uma passada de colisão depois das restrições. */
+/* Pure Verlet rope, no three.js and no DOM: the DMX cable of the Pino.
+   The nodes live in a Float32Array [x, y, z, px, py, pz] per node (px = position of the previous step —
+   in Verlet the velocity is the difference between the two, not a stored vector). Both ends are
+   fixed: the caller writes them with `pin` before every `step`, and the constraint never moves them.
+   ponytail: distance between nodes is the only constraint (no bending stiffness, no collision); if the
+   cable ever has to hit the chassis, a collision pass goes in after the constraints. */
 window.Rope = (function () {
   "use strict";
   function make(n, a, b) { var P = new Float32Array(n * 6), i, o, t;
@@ -13,13 +13,14 @@ window.Rope = (function () {
       P[o + 2] = P[o + 5] = a[2] + (b[2] - a[2]) * t; }
     return P; }
   function pin(P, i, x, y, z) { var o = i * 6; P[o] = P[o + 3] = x; P[o + 1] = P[o + 4] = y; P[o + 2] = P[o + 5] = z; }
-  /* dt entra fixo (o chamador prende em 1/60): Verlet com dt variável muda a energia do sistema e a
-     corda "explode" no primeiro quadro longo. `damp` < 1 é o arrasto do ar; sem ele ela nunca para.
-     `sub` divide o quadro em passos menores, e é ele que dá a corda inextensível: iterar a restrição
-     mais vezes no mesmo passo converge devagar num pêndulo de 24 nós (o segmento junto da ponta
-     presa carrega o peso de todos os outros). Medido, corda de 0,46 m entre pontas a 0,25 m, erro
-     máximo de comprimento depois de 2000 quadros: 1×3 = 45%, 1×20 = 5,4%, 1×40 = 2,2%,
-     4×3 = 2,9% e custa metade de 1×20. Por isso o app roda sub 4, iters 3. */
+  /* dt comes in fixed (the caller clamps it at 1/60): Verlet with a variable dt changes the energy of
+     the system and the rope "explodes" on the first long frame. `damp` < 1 is the air drag; without it
+     it never comes to rest. `sub` splits the frame into smaller steps, and that is what makes the rope
+     inextensible: iterating the constraint more times inside the same step converges slowly on a
+     24-node pendulum (the segment next to the pinned end carries the weight of all the others).
+     Measured, a 0.46 m rope between ends 0.25 m apart, worst length error after 2000 frames:
+     1x3 = 45%, 1x20 = 5.4%, 1x40 = 2.2%, 4x3 = 2.9% and costs half of 1x20. Hence the app runs
+     sub 4, iters 3. */
   function step(P, rest, dt, g, iters, sub) { var n = P.length / 6, s;
     for (s = (sub = sub || 1); s > 0; s--) step1(P, n, rest, dt / sub, g, iters);
     return P; }
