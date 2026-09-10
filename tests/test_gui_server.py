@@ -5,7 +5,7 @@ from spellcaster.gui import server as gs
 
 
 def ws_frame(op, data, mask=b"\x11\x22\x33\x44"):
-    """Frame do cliente: FIN=1, mascarado (o servidor exige mascara do lado do browser)."""
+    """Client frame: FIN=1, masked (the server requires the browser side to mask)."""
     n = len(data)
     h = bytes((0x80 | op, 0x80 | n)) if n < 126 else bytes((0x80 | op, 0x80 | 126)) + struct.pack(">H", n)
     return h + mask + bytes(b ^ mask[i & 3] for i, b in enumerate(data))
@@ -29,9 +29,9 @@ def recv_frame(sock):
     return op, (rd(n) if n else b"")
 
 
-@registry.command("gui_echo_teste", mcp=False)
-def _echo(msg: str = "oi", n: int = 1):
-    """Comando so para o teste da GUI."""
+@registry.command("gui_echo_test", mcp=False)
+def _echo(msg: str = "hi", n: int = 1):
+    """Command only for the GUI test."""
     return {"msg": msg * n}
 
 
@@ -66,17 +66,17 @@ class TestGuiServer(unittest.TestCase):
         self.assertIn(gs.accept_key(key).encode(), head)
         return s
 
-    # ---- HTTP estatico ----
-    def test_get_index_e_skin(self):
+    # ---- static HTTP ----
+    def test_get_index_and_skin(self):
         st, body = self.http_get("/index.html")
         self.assertEqual(st, 200)
         self.assertIn(b"SPELLCASTER", body)
         self.assertIn(b'data-panel="timeline"', body)
         st, body = self.http_get("/skins/feiticaria/skin.css")
         self.assertEqual(st, 200)
-        self.assertIn(b".chrome", body)                  # skin.css decora o cromo
+        self.assertIn(b".chrome", body)                  # skin.css decorates the chrome
 
-    def test_todas_as_skins_tem_json_e_css(self):
+    def test_every_skin_has_json_and_css(self):
         web = os.path.join(os.path.dirname(gs.__file__), "web", "skins")
         for name in ("feiticaria", "corporate", "headspace", "bluesky", "quicksilver", "xp"):
             with open(os.path.join(web, name, "skin.json"), encoding="utf-8") as f:
@@ -89,10 +89,10 @@ class TestGuiServer(unittest.TestCase):
             self.assertEqual(self.http_get("/skins/%s/skin.css" % name)[0], 200)
 
     # ---- WebSocket ----
-    def test_ws_handshake_e_comando(self):
+    def test_ws_handshake_and_command(self):
         s = self.open_ws()
         try:
-            s.sendall(ws_frame(gs.TEXT, json.dumps({"id": 7, "cmd": "gui_echo_teste",
+            s.sendall(ws_frame(gs.TEXT, json.dumps({"id": 7, "cmd": "gui_echo_test",
                                                     "args": {"msg": "ab", "n": "2"}}).encode()))
             op, data = recv_frame(s)
             self.assertEqual(op, gs.TEXT)
@@ -100,10 +100,10 @@ class TestGuiServer(unittest.TestCase):
 
             s.sendall(ws_frame(gs.TEXT, json.dumps({"id": 8, "cmd": "schema"}).encode()))
             op, data = recv_frame(s)
-            nomes = [c["name"] for c in json.loads(data)["result"]]
-            self.assertIn("gui_echo_teste", nomes)
+            names = [c["name"] for c in json.loads(data)["result"]]
+            self.assertIn("gui_echo_test", names)
 
-            s.sendall(ws_frame(gs.TEXT, json.dumps({"id": 9, "cmd": "nao_existe"}).encode()))
+            s.sendall(ws_frame(gs.TEXT, json.dumps({"id": 9, "cmd": "does_not_exist"}).encode()))
             op, data = recv_frame(s)
             self.assertIn("error", json.loads(data))
         finally:
@@ -118,11 +118,11 @@ class TestGuiServer(unittest.TestCase):
         finally:
             s.close()
 
-    def test_broadcast_binario(self):
+    def test_binary_broadcast(self):
         s = self.open_ws()
         try:
             s.sendall(ws_frame(gs.TEXT, json.dumps({"id": 1, "cmd": "schema"}).encode()))
-            recv_frame(s)                                  # garante o cliente registrado
+            recv_frame(s)                                  # makes sure the client is registered
             dmx = bytes(range(256)) * 2
             self.srv.push("dmx", dmx, universe=7)
             op, data = recv_frame(s)
@@ -132,10 +132,10 @@ class TestGuiServer(unittest.TestCase):
             self.assertEqual((tid, uni), (gs.TOPICS["dmx"], 7))
             self.assertEqual(data[3:], dmx)
 
-            self.srv.push("log", {"nivel": "info", "txt": "ok"})
+            self.srv.push("log", {"level": "info", "txt": "ok"})
             op, data = recv_frame(s)
             self.assertEqual(op, gs.TEXT)
-            self.assertEqual(json.loads(data), {"topic": "log", "payload": {"nivel": "info", "txt": "ok"}})
+            self.assertEqual(json.loads(data), {"topic": "log", "payload": {"level": "info", "txt": "ok"}})
         finally:
             s.close()
 

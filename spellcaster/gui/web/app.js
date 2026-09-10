@@ -1,10 +1,10 @@
-// Shell da GUI: cliente WebSocket (com reconexao), roteador de paineis, transporte e visualizador.
-// Nenhuma logica de produto aqui: tudo vai para App.rpc -> registry no servidor.
+// GUI shell: WebSocket client (with reconnect), panel router, transport and visualizer.
+// No product logic here: everything goes to App.rpc -> registry on the server.
 "use strict";
 
-const TOPIC_NAME = { 1: "dmx" };      // espelha TOPICS de server.py
+const TOPIC_NAME = { 1: "dmx" };      // mirrors TOPICS in server.py
 const BARS = 32, FPS = 30;
-const el = {};                        // ids -> elementos (getElementById: window.stop/status ja existem)
+const el = {};                        // ids -> elements (getElementById: window.stop/status already exist)
 
 const App = {
   ws: null, seq: 0, pending: new Map(), subs: {}, panels: {}, mounted: {}, cmds: new Set(),
@@ -28,14 +28,14 @@ const App = {
       this.online(true);
       this.rpc("schema").then(s => {
         for (const c of s) this.cmds.add(c.name);
-        this.log("registry: " + s.length + " comandos (" + s.map(c => c.name).join(", ") + ")");
+        this.log("registry: " + s.length + " commands (" + s.map(c => c.name).join(", ") + ")");
       });
     };
     ws.onclose = () => {
       this.online(false);
       for (const p of this.pending.values()) p.rej(new Error("offline"));
       this.pending.clear();
-      setTimeout(() => this.connect(Math.min(delay * 2, 5000)), delay);   // ponytail: backoff ate 5 s ; sem limite de tentativas
+      setTimeout(() => this.connect(Math.min(delay * 2, 5000)), delay);   // ponytail: backoff up to 5 s ; no attempt limit
     };
     ws.onmessage = e => {
       if (typeof e.data !== "string") return this.binary(e.data);
@@ -48,14 +48,14 @@ const App = {
       if (!p) return;
       this.pending.delete(m.id);
       if (m.error === undefined) p.res(m.result);
-      else { this.log("erro: " + m.error); p.rej(new Error(m.error)); }
+      else { this.log("error: " + m.error); p.rej(new Error(m.error)); }
     };
   },
 
   online(ok) {
     el.status.textContent = ok ? "online" : "offline";
     el.status.classList.toggle("on", ok);
-    this.log(ok ? "ws conectado" : "ws caiu; reconectando");
+    this.log(ok ? "ws connected" : "ws dropped; reconnecting");
   },
 
   binary(buf) {                                   // topic_id:u8 + universe:u16 + payload
@@ -65,7 +65,7 @@ const App = {
     this.emit(topic, u, data);
   },
 
-  // ---- transporte ------------------------------------------------------
+  // ---- transport -------------------------------------------------------
   now() {
     const tr = this.transport;
     return tr.state === "play" ? tr.t + (performance.now() - this._anchor) / 1000 : tr.t;
@@ -90,7 +90,7 @@ const App = {
     el.loop.classList.toggle("on", this.transport.loop);
   },
 
-  // ---- paineis (contrato descrito em index.html) -----------------------
+  // ---- panels (contract described in index.html) -----------------------
   panel(name, def) { this.panels[name] = def; if ((location.hash.slice(1) || "timeline") === name) this.route(); },
   route() {
     const name = location.hash.slice(1) || "timeline";
@@ -103,15 +103,15 @@ const App = {
   log(txt) {
     const p = el.log;
     p.textContent += new Date().toTimeString().slice(0, 8) + "  " + txt + "\n";
-    if (p.textContent.length > 20000) p.textContent = p.textContent.slice(-16000);  // ponytail: corte por tamanho ; buffer circular se o log virar telemetria
+    if (p.textContent.length > 20000) p.textContent = p.textContent.slice(-16000);  // ponytail: cut by size ; ring buffer if the log ever becomes telemetry
   },
 };
 
-// ---- visualizador (desenha no rAF, sem alocar por frame) ----------------
+// ---- visualizer (draws on rAF, without allocating per frame) ------------
 const vu = {
   cv: null, cx: null, accent: "#f2c300",
   lv: new Float32Array(BARS), peak: new Float32Array(BARS),
-  feed(data) {                                    // 512 canais -> BARS barras (pico do bloco)
+  feed(data) {                                    // 512 channels -> BARS bars (block peak)
     const n = (data.length / BARS) | 0 || 1;
     for (let b = 0; b < BARS; b++) {
       let m = 0;
@@ -145,7 +145,7 @@ const vu = {
   },
 };
 
-// ---- unico rAF: timecode, scrubber e VU ---------------------------------
+// ---- single rAF: timecode, scrubber and VU ------------------------------
 let lastFrame = -1, dragging = false;
 const pad = n => (n < 10 ? "0" : "") + n;
 

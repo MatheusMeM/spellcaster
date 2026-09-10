@@ -1,17 +1,17 @@
-// Timeline em canvas (Premiere/After Effects/Chataigne): regua com timecode, zoom, pan, playhead com
-// scrub, tracks com mute/solo, keyframes losango, selecao multipla, arrasto em tempo e valor,
-// copiar/colar, easing por keyframe, snapping, in/out e loop, markers vindos do comando `markers`.
+// Canvas timeline (Premiere/After Effects/Chataigne): ruler with timecode, zoom, pan, playhead with
+// scrub, tracks with mute/solo, diamond keyframes, multiple selection, dragging in time and value,
+// copy/paste, per-keyframe easing, snapping, in/out and loop, markers coming from the `markers` command.
 //
-// Modelo: cada lane e um array de keyframes do .spell — spec.keys, ou spec.<param> (scale, rot, dim...).
-// Os keyframes moram em Float64Array/Uint8Array paralelos: o desenho nao aloca nada por frame e o
-// hit-test e por bisect. Edicao acontece no modelo local e vai para o engine por show_set (um comando
-// so, debounce de 250 ms).
-// ponytail: commit manda o show inteiro ; usar key_set/key_del por keyframe se um show passar de ~1 MB.
+// Model: each lane is an array of .spell keyframes -- spec.keys, or spec.<param> (scale, rot, dim...).
+// The keyframes live in parallel Float64Array/Uint8Array: the drawing allocates nothing per frame and the
+// hit test is by bisect. Editing happens in the local model and goes to the engine through show_set (one
+// single command, debounced by 250 ms).
+// ponytail: commit sends the whole show ; use key_set/key_del per keyframe if a show ever passes ~1 MB.
 "use strict";
 
 const CURVES = ["linear", "hold", "in", "out", "inout", "bezier"];
 const STEPS = [0.04, 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1800];
-const LANE_PARAMS = ["x", "y", "scale", "rot", "color"];   // params de laser; fixture entra pelo mesmo teste
+const LANE_PARAMS = ["x", "y", "scale", "rot", "color"];   // laser params; fixture comes in through the same test
 
 const TL = {
   show: null, lanes: [], sel: new Map(), clip: null,
@@ -25,7 +25,7 @@ const TL = {
 };
 window.TL = TL;
 
-// ---- utilidades ---------------------------------------------------------
+// ---- utilities ----------------------------------------------------------
 const t2x = t => TL.headW + (t - TL.t0) * TL.pxs;
 const x2t = x => TL.t0 + (x - TL.headW) / TL.pxs;
 const laneY = i => TL.rulerH + i * TL.rowH - TL.scrollY;
@@ -38,7 +38,7 @@ function tc(t, fps) {
          pad2(Math.floor((t % 1) * fps));
 }
 
-function bisect(ts, n, t) {                       // primeiro indice com ts[i] >= t
+function bisect(ts, n, t) {                       // first index with ts[i] >= t
   let lo = 0, hi = n;
   while (lo < hi) { const m = (lo + hi) >> 1; if (ts[m] < t) lo = m + 1; else hi = m; }
   return lo;
@@ -47,7 +47,7 @@ function bisect(ts, n, t) {                       // primeiro indice com ts[i] >
 const isKeys = v => Array.isArray(v) && v.length > 0 && Array.isArray(v[0]) &&
                     v[0].length >= 2 && typeof v[0][0] === "number";
 
-// ---- modelo -------------------------------------------------------------
+// ---- model --------------------------------------------------------------
 function mkLane(spec, si, param) {
   const src = (param ? spec[param] : spec.keys) || [];
   const n = src.length;
@@ -68,7 +68,7 @@ function mkLane(spec, si, param) {
     if (L.vs[i] > mx) mx = L.vs[i];
     if (L.vs[i] < mn) mn = L.vs[i];
   }
-  // lane vazia nasce em 0..255 (DMX); param de laser (scale/rot/x/y) nasce em 0..1
+  // an empty lane starts at 0..255 (DMX); a laser param (scale/rot/x/y) starts at 0..1
   L.vmax = n === 0 ? (LANE_PARAMS.indexOf(param) >= 0 ? 1 : 255) : mx <= 1 ? 1 : mx <= 255 ? 255 : mx;
   L.vmin = Math.min(0, mn);
   return L;
@@ -80,7 +80,7 @@ function build(show) {
   TL.cur = -1;
   const lanes = TL.lanes = [];
   (show.tracks || []).forEach((spec, si) => {
-    lanes.push(mkLane(spec, si, null));                       // lane principal (spec.keys)
+    lanes.push(mkLane(spec, si, null));                       // main lane (spec.keys)
     for (const k of Object.keys(spec)) {
       if (k !== "keys" && isKeys(spec[k]) && (LANE_PARAMS.indexOf(k) >= 0 || spec.type === "fixture"))
         lanes.push(mkLane(spec, si, k));
@@ -145,9 +145,9 @@ let commitTimer = 0;
 function commit() {
   TL.dirty = true;
   for (const L of TL.lanes) {
-    const out = new Array(L.n), inteiro = L.vmax === 255;
+    const out = new Array(L.n), whole = L.vmax === 255;
     for (let i = 0; i < L.n; i++) {
-      const v = L.raw[i] !== null ? L.raw[i] : inteiro ? Math.round(L.vs[i]) : Math.round(L.vs[i] * 1e4) / 1e4;
+      const v = L.raw[i] !== null ? L.raw[i] : whole ? Math.round(L.vs[i]) : Math.round(L.vs[i] * 1e4) / 1e4;
       out[i] = [Math.round(L.ts[i] * 1e4) / 1e4, v, CURVES[L.cu[i]]];
     }
     if (L.param) L.spec[L.param] = out; else L.spec.keys = out;
@@ -160,8 +160,8 @@ function commit() {
   if (window.Inspector) Inspector.update();
 }
 
-// ---- selecao ------------------------------------------------------------
-TL.commit = commit;                                  // inspector.js edita o modelo e pede o commit por aqui
+// ---- selection ----------------------------------------------------------
+TL.commit = commit;                                  // inspector.js edits the model and asks for the commit here
 TL.resort = resort;
 
 const selHas = (li, ki) => { const s = TL.sel.get(li); return !!s && s.has(ki); };
@@ -194,7 +194,7 @@ function snapT(t) {
   return best;
 }
 
-// ---- desenho ------------------------------------------------------------
+// ---- drawing ------------------------------------------------------------
 function colors() {
   const cs = getComputedStyle(TL.cv);
   const g = n => cs.getPropertyValue(n).trim();
@@ -213,7 +213,7 @@ function draw() {
   const lo = TL.t0, hi = x2t(W), fps = TL.fps();
   c.fillStyle = col.panel; c.fillRect(0, 0, W, H);
 
-  // ---- faixas (fundo alternado + nome + mute/solo) ----
+  // ---- lanes (alternating background + name + mute/solo) ----
   const first = Math.max(0, Math.floor((TL.scrollY) / rh));
   const last = Math.min(TL.lanes.length - 1, Math.floor((TL.scrollY + H) / rh));
   c.font = "11px " + col.font;
@@ -228,7 +228,7 @@ function draw() {
     c.fillText(L.name.length > 20 ? L.name.slice(0, 19) + "…" : L.name, 8, y + rh / 2 - 5);
     c.fillStyle = col.muted;
     c.fillText(L.type + "  " + L.n + "k", 8, y + rh / 2 + 6);
-    for (let b = 0; b < 2; b++) {                                   // M e S
+    for (let b = 0; b < 2; b++) {                                   // M and S
       const on = b ? L.solo : L.mute, bx = hw - 40 + b * 20;
       c.fillStyle = on ? (b ? col.accent2 : col.accent) : col.bg;
       c.fillRect(bx, y + rh / 2 - 7, 16, 14);
@@ -239,7 +239,7 @@ function draw() {
     c.beginPath(); c.moveTo(0, y + rh - .5); c.lineTo(W, y + rh - .5); c.stroke();
   }
 
-  // ---- regiao in/out ----
+  // ---- in/out region ----
   c.save();
   c.beginPath(); c.rect(hw, TL.rulerH, W - hw, H - TL.rulerH); c.clip();
   const xi = t2x(TL.inT()), xo = t2x(TL.outT());
@@ -248,7 +248,7 @@ function draw() {
   if (xo < W) c.fillRect(xo, TL.rulerH, W - xo, H);
   c.globalAlpha = 1;
 
-  // ---- grade vertical ----
+  // ---- vertical grid ----
   let step = STEPS[STEPS.length - 1];
   for (const s of STEPS) if (s * TL.pxs >= 64) { step = s; break; }
   c.strokeStyle = col.bg; c.lineWidth = 1;
@@ -270,7 +270,7 @@ function draw() {
   // ---- keyframes ----
   const dragLanes = TL.drag && TL.drag.mode === "keys" ? TL.drag.lanes : null;
   c.strokeStyle = col.muted; c.lineWidth = 1;
-  c.beginPath();                                                     // linha de valor (uma so path)
+  c.beginPath();                                                     // value line (a single path)
   for (let li = first; li <= last; li++) {
     const L = TL.lanes[li], y = laneY(li), h = rh - 8, sc = h / ((L.vmax - L.vmin) || 1);
     const i0 = dragLanes && dragLanes.has(li) ? 0 : Math.max(0, bisect(L.ts, L.n, lo) - 1);
@@ -286,7 +286,7 @@ function draw() {
   }
   c.stroke();
 
-  for (let pass = 0; pass < 2; pass++) {                             // 0 = normais, 1 = selecionados
+  for (let pass = 0; pass < 2; pass++) {                             // 0 = normal, 1 = selected
     c.beginPath();
     for (let li = first; li <= last; li++) {
       const L = TL.lanes[li], y = laneY(li), h = rh - 8, sc = h / ((L.vmax - L.vmin) || 1);
@@ -300,7 +300,7 @@ function draw() {
         if (x < hw - 8) continue;
         const on = sel ? sel.has(i) : false;
         if (on !== !!pass) continue;
-        // ponytail: passo minimo de 3 px agrupa keyframes colados no zoom-out ; some so o desenho, o dado fica
+        // ponytail: a 3 px minimum step groups keyframes packed together when zoomed out ; only the drawing goes, the data stays
         if (!pass && x - lastX < 3) continue;
         lastX = x;
         diamond(c, x, y + rh - 4 - (L.vs[i] - L.vmin) * sc, pass ? 5 : 4);
@@ -311,7 +311,7 @@ function draw() {
   }
   c.restore();
 
-  // ---- regua ----
+  // ---- ruler ----
   c.fillStyle = col.chrome; c.fillRect(0, 0, W, TL.rulerH);
   c.strokeStyle = col.muted; c.lineWidth = 1; c.globalAlpha = .5;
   c.beginPath(); c.moveTo(0, TL.rulerH - .5); c.lineTo(W, TL.rulerH - .5); c.stroke(); c.globalAlpha = 1;
@@ -324,13 +324,13 @@ function draw() {
     c.fillText(tc(t, fps), x + 3, 9);
   }
   c.strokeStyle = col.muted; c.stroke();
-  for (const m of mk) {                                              // markers na regua
+  for (const m of mk) {                                              // markers on the ruler
     const x = t2x(m);
     if (x < TL.headW || x > W) continue;
     c.fillStyle = col.accent2;
     c.beginPath(); c.moveTo(x, TL.rulerH - 8); c.lineTo(x + 5, TL.rulerH - 1); c.lineTo(x - 5, TL.rulerH - 1); c.fill();
   }
-  for (let b = 0; b < 2; b++) {                                      // alcas de in/out
+  for (let b = 0; b < 2; b++) {                                      // in/out handles
     const x = b ? xo : xi;
     if (x < TL.headW - 6 || x > W) continue;
     c.fillStyle = col.accent2;
@@ -360,10 +360,10 @@ function draw() {
 
 function resize() {
   const r = TL.cv.getBoundingClientRect();
-  if (r.width < 1) return;                                                     // painel escondido: nao mexe na escala
+  if (r.width < 1) return;                                                     // panel hidden: do not touch the scale
   const w = Math.max(200, r.width | 0);
   TL.dpr = window.devicePixelRatio || 1;
-  if (TL.w > 200 && w !== TL.w) TL.pxs *= (w - TL.headW) / (TL.w - TL.headW);   // manter a janela de tempo
+  if (TL.w > 200 && w !== TL.w) TL.pxs *= (w - TL.headW) / (TL.w - TL.headW);   // keep the time window
   TL.w = w; TL.h = Math.max(120, r.height | 0);
   TL.cv.width = (TL.w * TL.dpr) | 0; TL.cv.height = (TL.h * TL.dpr) | 0;
   TL.cx.setTransform(TL.dpr, 0, 0, TL.dpr, 0, 0);
@@ -388,7 +388,7 @@ function keyAt(li, x, y) {
   return best;
 }
 
-// ---- interacao ----------------------------------------------------------
+// ---- interaction --------------------------------------------------------
 let spaceDown = false;
 
 function onDown(e) {
@@ -400,7 +400,7 @@ function onDown(e) {
     return e.preventDefault();
   }
   if (e.button === 2) return;
-  if (y < TL.rulerH) {                                          // regua: in/out ou scrub
+  if (y < TL.rulerH) {                                          // ruler: in/out or scrub
     if (x > TL.headW) {
       const d = t => Math.abs(t2x(t) - x);
       if (d(TL.inT()) < 7) { TL.drag = { mode: "in" }; return; }
@@ -415,7 +415,7 @@ function onDown(e) {
   if (li < 0) { if (!e.shiftKey) { TL.sel.clear(); TL.dirty = true; } return; }
   TL.cur = li;
   const L = TL.lanes[li];
-  if (x < TL.headW) {                                           // coluna de nomes: M / S
+  if (x < TL.headW) {                                           // name column: M / S
     const ly = laneY(li) + TL.rowH / 2;
     if (Math.abs(y - ly) < 8 && x > TL.headW - 42 && x < TL.headW - 4) {
       if (x < TL.headW - 22) L.mute = !L.mute; else L.solo = !L.solo;
@@ -455,7 +455,7 @@ function onMove(e) {
   else if (d.mode === "keys") {
     d.moved = true;
     let dt = (x - d.x) / TL.pxs;
-    if (!e.shiftKey) dt = snapT(d.anchor + dt) - d.anchor;         // Shift solta o snapping
+    if (!e.shiftKey) dt = snapT(d.anchor + dt) - d.anchor;         // Shift releases the snapping
     const dy = y - d.y;
     for (const it of d.items) {
       const L = TL.lanes[it.li];
@@ -481,7 +481,7 @@ function applyMarquee(add) {
       if (ky >= y0 - 4 && ky <= y1 + 4) selAdd(li, i);
     }
   }
-  for (const li of TL.sel.keys()) { TL.cur = li; break; }      // inspector segue o track do marquee
+  for (const li of TL.sel.keys()) { TL.cur = li; break; }      // the inspector follows the marquee track
   if (window.Inspector) Inspector.update();
 }
 
@@ -506,7 +506,7 @@ function onWheel(e) {
   TL.dirty = true;
 }
 
-// ---- menu de contexto (easing) -----------------------------------------
+// ---- context menu (easing) ---------------------------------------------
 function hideMenu() { if (TL.menuEl) TL.menuEl.style.display = "none"; }
 
 function onMenu(e) {
@@ -517,7 +517,7 @@ function onMenu(e) {
   if (ki >= 0 && !selHas(li, ki)) { TL.sel.clear(); selAdd(li, ki); TL.dirty = true; }
   if (!selCount()) return;
   const m = TL.menuEl;
-  m.style.display = "block";                                   // .tl-menu e position:fixed
+  m.style.display = "block";                                   // .tl-menu is position:fixed
   m.style.left = e.clientX + "px";
   m.style.top = e.clientY + "px";
 }
@@ -529,7 +529,7 @@ function setCurve(name) {
   commit();
 }
 
-// ---- teclado ------------------------------------------------------------
+// ---- keyboard -----------------------------------------------------------
 function onKey(e) {
   if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
   if (location.hash.slice(1) && location.hash !== "#timeline") return;
@@ -541,7 +541,7 @@ function onKey(e) {
     for (const [li, ks] of TL.sel) for (const i of ks) { const L = TL.lanes[li]; cl.push({ li, t: L.ts[i], v: L.vs[i], raw: L.raw[i], cu: L.cu[i] }); if (L.ts[i] < t0) t0 = L.ts[i]; }
     for (const k of cl) k.t -= t0;
     TL.clip = cl;
-    App.log("timeline: " + cl.length + " keyframes copiados");
+    App.log("timeline: " + cl.length + " keyframes copied");
   } else if (e.ctrlKey && e.key === "v" && TL.clip) {
     const t = App.now();
     TL.sel.clear();
@@ -551,7 +551,7 @@ function onKey(e) {
   else if (e.key === "o" && !e.ctrlKey) { TL.show.out = App.now(); commit(); }
 }
 
-// ---- laco de desenho ----------------------------------------------------
+// ---- drawing loop -------------------------------------------------------
 function tick() {
   if (App.transport.state === "play") {
     const t = App.now();
@@ -563,8 +563,8 @@ function tick() {
   requestAnimationFrame(tick);
 }
 
-// ---- medida de desempenho (usada na verificacao visual) -----------------
-// ponytail: gerador sintetico dentro do proprio painel ; sai daqui se virar suite de benchmark.
+// ---- performance measurement (used in the visual check) -----------------
+// ponytail: synthetic generator inside the panel itself ; it moves out of here if it becomes a benchmark suite.
 TL.measure = function (nTracks, nKeys, frames) {
   const save = { lanes: TL.lanes, show: TL.show, t0: TL.t0, pxs: TL.pxs, sel: TL.sel };
   const lanes = [];
@@ -578,11 +578,11 @@ TL.measure = function (nTracks, nKeys, frames) {
   TL.lanes = lanes;
   TL.sel = new Map();
   TL.show = { fps: 30, duration: nKeys * 0.05, markers: [] };
-  draw();                                            // aquece (compila o caminho, aloca o buffer)
+  draw();                                            // warm-up (compiles the path, allocates the buffer)
   const t0 = performance.now();
   for (let f = 0; f < frames; f++) {
-    TL.t0 = f * 0.13;                                // rola
-    TL.pxs = 40 + 30 * Math.sin(f / 7);              // e da zoom ao mesmo tempo
+    TL.t0 = f * 0.13;                                // scrolls
+    TL.pxs = 40 + 30 * Math.sin(f / 7);              // and zooms at the same time
     draw();
   }
   const ms = (performance.now() - t0) / frames;
@@ -592,21 +592,21 @@ TL.measure = function (nTracks, nKeys, frames) {
            fps: Math.round(1000 / ms) };
 };
 
-// ---- montagem -----------------------------------------------------------
-// O registro espera o DOMContentLoaded: App.route() usa elementos que app.js so pega la.
+// ---- mounting -----------------------------------------------------------
+// Registration waits for DOMContentLoaded: App.route() uses elements that app.js only grabs there.
 addEventListener("DOMContentLoaded", () => App.panel("timeline", {
   mount(el) {
     el.innerHTML =
       '<div class="tl-bar">' +
-      '  <input id="tl-file" value="shows/medgrupo.spell" title="caminho do .spell no servidor">' +
-      '  <button id="tl-open">Abrir</button><button id="tl-save">Salvar</button>' +
+      '  <input id="tl-file" value="shows/medgrupo.spell" title="path of the .spell on the server">' +
+      '  <button id="tl-open">Open</button><button id="tl-save">Save</button>' +
       '  <span class="sep"></span>' +
       '  <select id="tl-type"><option>dmx</option><option>fixture</option><option>osc</option>' +
       '<option>artnet</option><option>media</option><option>cue</option><option>laser</option></select>' +
       '  <button id="tl-add">+ Track</button><button id="tl-deltrack">- Track</button>' +
       '  <span class="sep"></span>' +
-      '  <input id="tl-video" placeholder="video ou .wav" title="arquivo para o comando markers">' +
-      '  <button id="tl-markers">Importar cortes de video</button>' +
+      '  <input id="tl-video" placeholder="video or .wav" title="file for the markers command">' +
+      '  <button id="tl-markers">Import video cuts</button>' +
       '  <span class="sep"></span>' +
       '  <button id="tl-in">In</button><button id="tl-out">Out</button><button id="tl-loop">Loop</button>' +
       '  <button id="tl-snap" class="on">Snap</button><button id="tl-fit">Fit</button>' +
@@ -626,7 +626,7 @@ addEventListener("DOMContentLoaded", () => App.panel("timeline", {
       TL.menuEl.appendChild(b);
     }
     const del = document.createElement("button");
-    del.textContent = "apagar";
+    del.textContent = "delete";
     del.onclick = () => { hideMenu(); delSelected(); };
     TL.menuEl.appendChild(del);
 
@@ -640,7 +640,7 @@ addEventListener("DOMContentLoaded", () => App.panel("timeline", {
     addEventListener("mouseup", onUp);
     TL.cv.addEventListener("wheel", onWheel, { passive: false });
     TL.cv.addEventListener("contextmenu", onMenu);
-    TL.cv.addEventListener("dblclick", e => {                    // duplo clique cria keyframe
+    TL.cv.addEventListener("dblclick", e => {                    // a double click creates a keyframe
       const li = laneAt(e.offsetY);
       if (li < 0 || e.offsetX < TL.headW) return;
       const L = TL.lanes[li], v = clamp(L.vmin + (laneY(li) + TL.rowH - 4 - e.offsetY) / (TL.rowH - 8) * (L.vmax - L.vmin), L.vmin, L.vmax);
@@ -655,17 +655,17 @@ addEventListener("DOMContentLoaded", () => App.panel("timeline", {
     const load = sh => { build(sh); fit(); msg.textContent = (sh.name || "") + "  " + (sh.tracks || []).length + " tracks"; };
     const fit = () => { TL.pxs = (TL.w - TL.headW) / (TL.dur() || 60); TL.t0 = 0; TL.dirty = true; };
     q("open").onclick = () => App.rpc("show_open", { file: q("file").value }).then(load).catch(e => msg.textContent = e.message);
-    q("save").onclick = () => App.rpc("show_save", { file: q("file").value }).then(p => msg.textContent = "gravado " + p).catch(e => msg.textContent = e.message);
+    q("save").onclick = () => App.rpc("show_save", { file: q("file").value }).then(p => msg.textContent = "saved " + p).catch(e => msg.textContent = e.message);
     q("add").onclick = () => App.rpc("track_add", { type: q("type").value }).then(() => App.rpc("show_get").then(load));
     q("deltrack").onclick = () => {
       if (TL.cur < 0) return;
       App.rpc("track_del", { index: TL.lanes[TL.cur].si }).then(() => App.rpc("show_get").then(load));
     };
     q("markers").onclick = () => {
-      msg.textContent = "lendo cortes...";
+      msg.textContent = "reading cuts...";
       App.rpc("markers", { video: q("video").value }).then(ts => {
         TL.show.markers = ts;
-        msg.textContent = ts.length + " cortes importados";
+        msg.textContent = ts.length + " cuts imported";
         commit();
       }).catch(e => msg.textContent = e.message);
     };

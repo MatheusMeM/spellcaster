@@ -1,3 +1,3 @@
-# GUI web: server.py (HTTP + WebSocket sobre stdlib), web/ (HTML/CSS/JS vanilla, skins), window.py (pywebview opcional).
-# Importar este pacote registra o comando `serve` no registry.
+# Web GUI: server.py (HTTP + WebSocket on stdlib), web/ (vanilla HTML/CSS/JS, skins), window.py (optional pywebview).
+# Importing this package registers the `serve` command in the registry.
 from . import server  # noqa: F401

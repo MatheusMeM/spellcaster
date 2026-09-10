@@ -5,11 +5,12 @@ from spellcaster.protocols import osc
 class EncodeTest(unittest.TestCase):
     def test_all_types(self):
         tt = osc.timetag(1_700_000_000.5)
-        args = [1, -2, 3.5, "olá", osc.Blob(b"\x01\x02\x03"), True, False, None, Ellipsis,
+        multibyte = "caf\u00e9"                      # UTF-8 multi-byte, written as an escape: this file stays ASCII
+        args = [1, -2, 3.5, multibyte, osc.Blob(b"\x01\x02\x03"), True, False, None, Ellipsis,
                 ("d", 2.25), ("h", 2**40), ("t", tt), 2**40]
         addr, got = osc.parse(osc.message("/x/y", *args))
         self.assertEqual(addr, "/x/y")
-        self.assertEqual(got, [1, -2, 3.5, "olá", b"\x01\x02\x03", True, False, None, Ellipsis,
+        self.assertEqual(got, [1, -2, 3.5, multibyte, b"\x01\x02\x03", True, False, None, Ellipsis,
                                2.25, 2**40, tt, 2**40])
         self.assertIsInstance(got[4], osc.Blob)
 

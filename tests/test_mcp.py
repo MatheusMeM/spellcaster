@@ -1,4 +1,4 @@
-# MCP: subprocesso stdio real e mcp_install num arquivo de %TEMP%.
+# MCP: a real stdio subprocess and mcp_install on a file in %TEMP%.
 import json
 import os
 import subprocess
@@ -12,7 +12,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 class TestStdio(unittest.TestCase):
-    """Sobe `python -m spellcaster.mcp.server` de verdade e fala JSON-RPC por stdin/stdout."""
+    """Brings up a real `python -m spellcaster.mcp.server` and speaks JSON-RPC over stdin/stdout."""
 
     @classmethod
     def setUpClass(cls):
@@ -35,9 +35,9 @@ class TestStdio(unittest.TestCase):
             msg["params"] = params
         self.p.stdin.write(json.dumps(msg) + "\n")
         self.p.stdin.flush()
-        while True:                                   # pula notificacoes do watcher do player
+        while True:                                   # skips notifications from the player watcher
             line = self.p.stdout.readline()
-            self.assertTrue(line, "servidor MCP fechou stdout")
+            self.assertTrue(line, "the MCP server closed stdout")
             m = json.loads(line)
             if m.get("id") == mid:
                 return m
@@ -49,7 +49,7 @@ class TestStdio(unittest.TestCase):
         self.p.stdin.write(json.dumps(msg) + "\n")
         self.p.stdin.flush()
 
-    def test_sessao_completa(self):
+    def test_full_session(self):
         r = self.rpc(1, "initialize", {"protocolVersion": "2025-06-18",
                                        "capabilities": {}, "clientInfo": {"name": "t", "version": "0"}})
         res = r["result"]
@@ -62,10 +62,10 @@ class TestStdio(unittest.TestCase):
         self.assertEqual(self.rpc(2, "ping")["result"], {})
 
         tools = self.rpc(3, "tools/list")["result"]["tools"]
-        nomes = [t["name"] for t in tools]
+        names = [t["name"] for t in tools]
         for n in ("net", "play_show", "stop", "monitor", "show_summary", "run_command"):
-            self.assertIn(n, nomes)
-        for t in tools:                               # todo inputSchema e um object JSON valido
+            self.assertIn(n, names)
+        for t in tools:                               # every inputSchema is a valid JSON object
             self.assertEqual(t["inputSchema"]["type"], "object")
             self.assertIsInstance(t["inputSchema"]["properties"], dict)
         locate = next(t for t in tools if t["name"] == "locate")
@@ -84,28 +84,28 @@ class TestStdio(unittest.TestCase):
         self.assertEqual(sorted(uris), ["spell://log", "spell://net", "spell://patch", "spell://show"])
         c = self.rpc(6, "resources/read", {"uri": "spell://net"})["result"]["contents"][0]
         self.assertEqual(c["uri"], "spell://net")
-        d = json.loads(c["text"])                     # o `net` unico devolve o dict com o texto em `report`
+        d = json.loads(c["text"])                     # the single `net` returns the dict with the text in `report`
         self.assertIn("interfaces", d)
         self.assertIn("Interfaces", d["report"])
 
         prompts = self.rpc(7, "prompts/list")["result"]["prompts"]
-        self.assertEqual(sorted(p["name"] for p in prompts), ["calibrar_grupo", "montar_show_do_video"])
-        g = self.rpc(8, "prompts/get", {"name": "montar_show_do_video",
+        self.assertEqual(sorted(p["name"] for p in prompts), ["build_show_from_video", "calibrate_group"])
+        g = self.rpc(8, "prompts/get", {"name": "build_show_from_video",
                                         "arguments": {"video": "medgrupo.mp4"}})["result"]
         self.assertEqual(g["messages"][0]["role"], "user")
         self.assertIn("medgrupo.mp4", g["messages"][0]["content"]["text"])
 
-        self.assertEqual(self.rpc(9, "nao_existe")["error"]["code"], -32601)
-        r = self.rpc(10, "tools/call", {"name": "nao_existe", "arguments": {}})["result"]
+        self.assertEqual(self.rpc(9, "does_not_exist")["error"]["code"], -32601)
+        r = self.rpc(10, "tools/call", {"name": "does_not_exist", "arguments": {}})["result"]
         self.assertTrue(r["isError"])
 
 
 class TestInstall(unittest.TestCase):
-    def test_grava_entrada_e_faz_backup(self):
+    def test_writes_entry_and_makes_backup(self):
         d = tempfile.mkdtemp(prefix="spell_mcp_")
         p = os.path.join(d, ".mcp.json")
         with open(p, "w", encoding="utf-8") as f:
-            json.dump({"mcpServers": {"outro": {"command": "x"}}}, f)
+            json.dump({"mcpServers": {"other": {"command": "x"}}}, f)
 
         self.assertEqual(install.mcp_install("code", path=p, yes=True), p)
         with open(p, encoding="utf-8") as f:
@@ -114,13 +114,13 @@ class TestInstall(unittest.TestCase):
         self.assertEqual(e["args"], ["-m", "spellcaster.cli", "mcp"])
         self.assertTrue(e["command"].lower().endswith(("python.exe", "python", "python3")))
         self.assertEqual(e["env"]["PYTHONPATH"], install.ROOT)
-        self.assertIn("outro", cfg["mcpServers"])     # nao apaga o que ja estava la
+        self.assertIn("other", cfg["mcpServers"])     # does not erase what was already there
         self.assertTrue(os.path.exists(p + ".bak"))
 
-        self.assertEqual(install.mcp_install("code", path=p, yes=True), p)   # idempotente: sem diff
+        self.assertEqual(install.mcp_install("code", path=p, yes=True), p)   # idempotent: no diff
 
-    def test_target_invalido(self):
-        self.assertRaises(ValueError, install.config_path, "nada")
+    def test_invalid_target(self):
+        self.assertRaises(ValueError, install.config_path, "nothing")
 
     def test_config_path_desktop(self):
         self.assertTrue(install.config_path("desktop").endswith("claude_desktop_config.json"))

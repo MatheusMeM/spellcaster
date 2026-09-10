@@ -4,7 +4,7 @@ from spellcaster.core.clock import Clock
 
 
 class TestClock(unittest.TestCase):
-    def test_30_ticks_a_60fps(self):
+    def test_30_ticks_at_60fps(self):
         c = Clock(fps=60); ticks = []
 
         def fn(t):
@@ -16,10 +16,10 @@ class TestClock(unittest.TestCase):
         self.assertAlmostEqual(dt, 0.5, delta=0.1)          # ±20 %
         self.assertAlmostEqual(ticks[-1], 29 / 60, delta=0.05)
 
-    def test_transporte(self):
+    def test_transport(self):
         c = Clock(); c.locate(5.0); c.play(); time.sleep(0.05); c.pause()
         self.assertAlmostEqual(c.time, 5.05, delta=0.03)
-        t = c.time; time.sleep(0.02); self.assertEqual(c.time, t)   # pausado congela
+        t = c.time; time.sleep(0.02); self.assertEqual(c.time, t)   # paused freezes
         c.stop(); self.assertEqual(c.time, 0.0)
 
     def test_duration(self):

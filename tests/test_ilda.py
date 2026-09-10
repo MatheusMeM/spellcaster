@@ -8,7 +8,7 @@ from spellcaster.protocols.ilda import etherdream as ed
 
 
 def square(size=10000, col=(255, 0, 0)):
-    return Frame(generators.rect(0, 0, size, size, col, k=4), name="quad")
+    return Frame(generators.rect(0, 0, size, size, col, k=4), name="square")
 
 
 class TestIld(unittest.TestCase):
@@ -19,10 +19,10 @@ class TestIld(unittest.TestCase):
             ild.write(path, frames, fmt=fmt, **kw)
             back = ild.read(path)
         self.assertEqual(len(back), 3)
-        self.assertEqual([f.name for f in back][:2], ["quad", "circ"])
+        self.assertEqual([f.name for f in back][:2], ["square", "circ"])
         for a, b in zip(frames[:2], back):
             self.assertEqual([(p.x, p.y, p.blank) for p in a], [(p.x, p.y, p.blank) for p in b])
-        self.assertEqual(len(back[2]), 1)  # frame vazio vira 1 ponto apagado
+        self.assertEqual(len(back[2]), 1)  # empty frame becomes 1 blanked point
         self.assertTrue(back[2].points[0].blank)
         return frames, back
 
@@ -44,7 +44,7 @@ class TestIld(unittest.TestCase):
             self.roundtrip(fmt)
 
     def test_seed_layout_matches(self):
-        # header e registro do formato 5 identicos ao seed/ilda_gen.py: 32 bytes + 8 por ponto, X Y status B G R
+        # header and format-5 record identical to seed/ilda_gen.py: 32 bytes + 8 per point, X Y status B G R
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "s.ild")
             ild.write(path, [Frame([Point(1, -2, 10, 20, 30), Point(3, 4, blank=True)])], name="medgrupo", company="feitic.")
@@ -54,7 +54,7 @@ class TestIld(unittest.TestCase):
         self.assertEqual(raw[7], 5)
         self.assertEqual(raw[8:16], b"medgrupo")
         self.assertEqual(raw[32:48], struct.pack(">hhBBBB", 1, -2, 0, 30, 20, 10) + struct.pack(">hhBBBB", 3, 4, 0xC0, 0, 0, 0))
-        self.assertEqual(len(raw), 32 + 16 + 32)  # + terminador
+        self.assertEqual(len(raw), 32 + 16 + 32)  # + terminator
 
 
 class TestOptimize(unittest.TestCase):
@@ -63,12 +63,12 @@ class TestOptimize(unittest.TestCase):
                    Point(-20000, -20000, blank=True), Point(-20000, -20000, 255, 0, 0), Point(-19000, -20000, 255, 0, 0)])
         o = optimize(f, dwell=2, blank_gap=4, max_step=1200)
         pts = o.points
-        # salto apagado: 4 copias apagadas de (3000,3000) antes de sair + 4 apagadas no destino
+        # blanked jump: 4 blanked copies of (3000,3000) before leaving + 4 blanked at the destination
         self.assertEqual(sum(1 for p in pts if p.blank and (p.x, p.y) == (3000, 3000)), 4)
         self.assertGreaterEqual(sum(1 for p in pts if p.blank and (p.x, p.y) == (-20000, -20000)), 5)
-        # interpolacao: nenhum passo maior que max_step
+        # interpolation: no step larger than max_step
         self.assertTrue(all(max(abs(b.x - a.x), abs(b.y - a.y)) <= 1200 for a, b in zip(pts, pts[1:])))
-        # dwell no vertice (3000,0): 90 graus -> 1 original + 2 repeticoes acesas
+        # dwell at the (3000,0) corner: 90 degrees -> 1 original + 2 lit repeats
         self.assertEqual(sum(1 for p in pts if p.lit and (p.x, p.y) == (3000, 0)), 3)
         self.assertEqual(optimize(Frame([])).points, [])
 
@@ -76,7 +76,7 @@ class TestOptimize(unittest.TestCase):
 class TestSafety(unittest.TestCase):
     def test_small_figure_darkens(self):
         small = safety(square(500), min_size=2000)
-        self.assertTrue(all(p.r == 127 for p in small.points))  # 1000/2000 * 255, truncado
+        self.assertTrue(all(p.r == 127 for p in small.points))  # 1000/2000 * 255, truncated
         big = safety(square(5000), min_size=2000)
         self.assertTrue(all(p.r == 255 for p in big.points))
         dot = safety(Frame([Point(0, 0, 255, 255, 255)] * 5))

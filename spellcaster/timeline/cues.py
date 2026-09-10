@@ -1,5 +1,5 @@
-# Cue list: GO manual, wait antes de comecar, follow automatico ao terminar, fade linear entre snapshots.
-# Snapshot = {"universo/endereco": [valores]} no .spell; vira {(universo, endereco): [valores]}.
+# Cue list: manual GO, wait before starting, automatic follow on finishing, linear fade between snapshots.
+# Snapshot = {"universe/address": [values]} in the .spell; becomes {(universe, address): [values]}.
 
 
 def key(s):
@@ -12,8 +12,8 @@ class Cue:
     def __init__(self, spec):
         self.name = spec.get("name", "")
         self.fade = float(spec.get("fade", 0.0))
-        self.wait = float(spec.get("wait", 0.0))          # atraso entre o gatilho e o inicio do fade
-        self.follow = bool(spec.get("follow", False))     # ao terminar, dispara a proxima
+        self.wait = float(spec.get("wait", 0.0))          # delay between the trigger and the start of the fade
+        self.follow = bool(spec.get("follow", False))     # on finishing, fires the next one
         self.values = {key(k): (list(v) if isinstance(v, list) else [v]) for k, v in spec.get("values", {}).items()}
 
     def __repr__(self):
@@ -21,7 +21,7 @@ class Cue:
 
 
 class CueList:
-    """update(t) devolve o snapshot corrente {(universo, endereco): [valores]}; o Player aplica nos Universes."""
+    """update(t) returns the current snapshot {(universe, address): [values]}; the Player applies it to the Universes."""
 
     def __init__(self, cues=()):
         self.cues = [c if isinstance(c, Cue) else Cue(c) for c in cues]
@@ -30,10 +30,10 @@ class CueList:
         self._cue = None
         self._t0 = 0.0
         self._from = {}
-        self._pending = None                              # (indice, instante do gatilho)
+        self._pending = None                              # (index, trigger instant)
 
     def go(self, t, index=None):
-        """Dispara a proxima cue (ou a de indice dado). O fade comeca depois do wait dela."""
+        """Fires the next cue (or the one at the given index). The fade starts after its wait."""
         i = self.index + 1 if index is None else int(index)
         if not (0 <= i < len(self.cues)):
             return None

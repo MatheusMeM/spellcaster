@@ -1,10 +1,10 @@
-# Arquivo de show .spell (JSON): carga, gravacao e migracao de versao.
-# Esquema minimo:
+# .spell show file (JSON): load, save and version migration.
+# Minimum schema:
 #   {"version": 1, "name": "...", "fps": 30, "duration": 85.9,
 #    "outputs": [{"type": "sacn", "universes": [1]}],
 #    "tracks":  [{"type": "pyfx", "file": "medgrupo.py", "universe": 1}],
 #    "cues": []}
-# load() acrescenta "_dir" (pasta do arquivo, para resolver caminhos relativos); save() descarta chaves com "_".
+# load() adds "_dir" (the file's folder, to resolve relative paths); save() drops keys starting with "_".
 import json
 import os
 
@@ -14,8 +14,8 @@ VERSION = 1
 def migrate(sh):
     v = int(sh.get("version", 0))
     if v > VERSION:
-        raise ValueError(f".spell versao {v}: mais novo que este player (v{VERSION})")
-    if v < 1:                       # v0 = rascunho sem campo version; o resto do esquema e igual
+        raise ValueError(f".spell version {v}: newer than this player (v{VERSION})")
+    if v < 1:                       # v0 = draft without a version field; the rest of the schema is the same
         sh["version"] = VERSION
     return sh
 

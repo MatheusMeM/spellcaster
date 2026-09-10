@@ -1,21 +1,21 @@
-# Onde ficam os arquivos. Congelado (PyInstaller onedir): pasta do executavel. Rodando do fonte: raiz do repo.
-# Nada em %APPDATA% -- o pendrive leva shows, profiles e config.json junto do exe.
+# Where the files live. Frozen (PyInstaller onedir): the executable's folder. Running from source: the repo root.
+# Nothing under %APPDATA% -- the USB stick carries shows, profiles and config.json next to the exe.
 import pathlib
 import sys
 
 FROZEN = bool(getattr(sys, "frozen", False))
 ROOT = pathlib.Path(sys.executable).resolve().parent if FROZEN else pathlib.Path(__file__).resolve().parents[1]
-BUNDLE = pathlib.Path(getattr(sys, "_MEIPASS", ROOT))     # dados empacotados (_internal/) ou o proprio repo
+BUNDLE = pathlib.Path(getattr(sys, "_MEIPASS", ROOT))     # bundled data (_internal/) or the repo itself
 
 
 def _dir(name):
-    """Pasta do usuario ao lado do exe; cai na copia que veio no bundle enquanto ela nao existir."""
+    """User folder next to the exe; falls back to the copy shipped in the bundle while it does not exist."""
     p = ROOT / name
     return p if p.is_dir() else BUNDLE / name
 
 
 SHOWS = _dir("shows")
 PROFILES = _dir("profiles")
-WEB = BUNDLE / "spellcaster" / "gui" / "web"              # assets da GUI: sempre os do bundle
+WEB = BUNDLE / "spellcaster" / "gui" / "web"              # GUI assets: always the bundled ones
 SKINS = WEB / "skins"
 CONFIG = ROOT / "config.json"

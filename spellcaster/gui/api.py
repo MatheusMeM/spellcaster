@@ -1,9 +1,9 @@
-# Comandos do registry que a GUI precisa e o resto do produto ainda nao tinha: show corrente em
-# memoria (abrir/salvar/editar), transporte com player nao-bloqueante e leitura de patch/perfis/rede.
-# A GUI e cliente: nenhuma logica de produto vive no JS, tudo entra por aqui.
+# Registry commands the GUI needs and the rest of the product did not have yet: current show in
+# memory (open/save/edit), transport with a non-blocking player and reading of patch/profiles/network.
+# The GUI is a client: no product logic lives in the JS, everything comes in through here.
 #
-# Um show corrente por processo (SHOW), mesma convencao do PATCH de fixtures/patch.py.
-# ponytail: show unico global ; passar id de sessao quando a GUI abrir dois shows ao mesmo tempo.
+# One current show per process (SHOW), same convention as the PATCH in fixtures/patch.py.
+# ponytail: a single global show ; pass a session id when the GUI opens two shows at the same time.
 import copy
 import json
 import os
@@ -17,11 +17,11 @@ from ..player import player as playermod
 from ..timeline.model import CURVES
 from . import server as gs
 
-NEW = {"version": 1, "name": "novo show", "fps": 30, "duration": 60.0,
+NEW = {"version": 1, "name": "new show", "fps": 30, "duration": 60.0,
        "outputs": [{"type": "sacn", "universes": [1]}],
        "patch": [], "tracks": [], "cues": [], "markers": [], "in": 0.0, "out": 60.0}
 
-SHOW = copy.deepcopy(NEW)          # deepcopy: listas de NEW nao podem ser as do show vivo
+SHOW = copy.deepcopy(NEW)          # deepcopy: the lists in NEW must not be the ones of the live show
 SHOW["_dir"] = os.getcwd()
 PATH = ""
 
@@ -34,12 +34,12 @@ def _track(i):
     tracks = SHOW.setdefault("tracks", [])
     i = int(i)
     if not 0 <= i < len(tracks):
-        raise IndexError(f"track {i}: o show tem {len(tracks)}")
+        raise IndexError(f"track {i}: the show has {len(tracks)}")
     return tracks[i]
 
 
 def _value(v):
-    """Valor de keyframe vindo como texto: JSON quando der (255, [255,0,0]), senao o proprio texto."""
+    """Keyframe value arriving as text: JSON when it parses (255, [255,0,0]), otherwise the text itself."""
     if not isinstance(v, str):
         return v
     try:
@@ -51,18 +51,18 @@ def _value(v):
 # ---------------------------------------------------------------- show
 @command
 def show_get():
-    """Show corrente (JSON). E daqui que a GUI desenha timeline, patch e transporte."""
+    """Current show (JSON). This is what the GUI draws the timeline, patch and transport from."""
     return _clean(SHOW)
 
 
 @command
 def show_set(data: str):
-    """Substitui o show corrente pelo JSON dado (texto ou dict). Devolve o show corrente."""
+    """Replaces the current show with the given JSON (text or dict). Returns the current show."""
     sh = json.loads(data) if isinstance(data, str) else data
     if not isinstance(sh, dict):
-        raise ValueError("show_set: esperava um objeto JSON")
+        raise ValueError("show_set: expected a JSON object")
     if not isinstance(sh.get("tracks", []), list):
-        raise ValueError("show_set: 'tracks' precisa ser lista")
+        raise ValueError("show_set: 'tracks' must be a list")
     base = sh.get("_dir") or SHOW.get("_dir", "")
     SHOW.clear()
     SHOW.update(showfile.migrate(sh))
@@ -72,7 +72,7 @@ def show_set(data: str):
 
 @command
 def show_open(file: str):
-    """Abre um .spell e passa a ser o show corrente."""
+    """Opens a .spell and makes it the current show."""
     global PATH
     sh = showfile.load(file)
     SHOW.clear()
@@ -83,11 +83,11 @@ def show_open(file: str):
 
 @command
 def show_save(file: str = ""):
-    """Grava o show corrente (sem argumento, no caminho do ultimo show_open/show_save)."""
+    """Saves the current show (with no argument, to the path of the last show_open/show_save)."""
     global PATH
     p = file or PATH
     if not p:
-        raise ValueError("show_save: sem caminho (passe file=)")
+        raise ValueError("show_save: no path (pass file=)")
     showfile.save(p, SHOW)
     PATH = os.path.abspath(p)
     SHOW["_dir"] = os.path.dirname(PATH)
@@ -96,7 +96,7 @@ def show_save(file: str = ""):
 
 @command
 def show_new():
-    """Zera o show corrente."""
+    """Resets the current show."""
     global PATH
     SHOW.clear()
     SHOW.update(copy.deepcopy(NEW))
@@ -105,11 +105,11 @@ def show_new():
     return _clean(SHOW)
 
 
-# ---------------------------------------------------------------- tracks e keyframes
+# ---------------------------------------------------------------- tracks and keyframes
 @command
 def track_add(type: str = "dmx", universe: int = 1, address: int = 1, label: str = ""):
-    """Acrescenta um track vazio ao show corrente. Devolve o indice do track.
-    O nome do track chama-se `label` porque `registry.call(name, **kwargs)` ja usa `name` de posicional."""
+    """Appends an empty track to the current show. Returns the track index.
+    The track name is called `label` because `registry.call(name, **kwargs)` already uses `name` positionally."""
     tr = {"type": type, "universe": universe, "address": address, "keys": []}
     if label:
         tr["name"] = label
@@ -119,16 +119,16 @@ def track_add(type: str = "dmx", universe: int = 1, address: int = 1, label: str
 
 @command
 def track_del(index: int):
-    """Remove o track de indice dado. Devolve o track removido."""
+    """Removes the track at the given index. Returns the removed track."""
     _track(index)
     return SHOW["tracks"].pop(int(index))
 
 
 @command
 def key_set(track: int, t: float, value: str = "0", curve: str = "linear"):
-    """Cria ou move o keyframe do track em t. value e JSON (255, [255,0,0]) ou texto ("amarelo")."""
+    """Creates or moves the track keyframe at t. value is JSON (255, [255,0,0]) or text ("amarelo")."""
     if curve not in CURVES:
-        raise ValueError(f"curva {curve!r}: use {sorted(CURVES)}")
+        raise ValueError(f"curve {curve!r}: use {sorted(CURVES)}")
     ks = _track(track).setdefault("keys", [])
     v, t = _value(value), float(t)
     for i, k in enumerate(ks):
@@ -143,17 +143,17 @@ def key_set(track: int, t: float, value: str = "0", curve: str = "linear"):
 
 @command
 def key_del(track: int, t: float):
-    """Apaga o keyframe do track em t (tolerancia 1 ms). Devolve quantos sairam."""
+    """Deletes the track keyframe at t (1 ms tolerance). Returns how many were removed."""
     ks = _track(track).setdefault("keys", [])
     n = len(ks)
     ks[:] = [k for k in ks if abs(float(k[0]) - float(t)) > 1e-3]
     return n - len(ks)
 
 
-# ---------------------------------------------------------------- transporte
+# ---------------------------------------------------------------- transport
 class _Tap:
-    """Saida DMX falsa: publica cada frame do player no topico binario 'dmx' da GUI.
-    Cumpre o contrato send/close, entao entra na lista de saidas do Engine como qualquer protocolo."""
+    """Fake DMX output: publishes every player frame on the GUI binary topic 'dmx'.
+    It honours the send/close contract, so it joins the Engine output list like any protocol."""
 
     def send(self, universe, data):
         srv = gs.SERVER
@@ -165,7 +165,7 @@ class _Tap:
 
 
 def _live(sh):
-    """Show sem os tracks mudos (ou so os em solo): mute/solo da GUI valem no que toca de verdade."""
+    """Show without the muted tracks (or only the soloed ones): the GUI mute/solo apply to what actually plays."""
     tracks = sh.get("tracks") or []
     solo = [t for t in tracks if t.get("solo")]
     return {**sh, "tracks": solo or [t for t in tracks if not t.get("mute")]}
@@ -173,7 +173,7 @@ def _live(sh):
 
 @command
 def transport_state():
-    """Estado do transporte: state, t, dur, loop."""
+    """Transport state: state, t, dur, loop."""
     p = playermod.CURRENT
     return {"state": p.clock.state if p else "stop", "t": p.clock.time if p else 0.0,
             "dur": SHOW.get("duration") or 60.0, "loop": bool(p.loop) if p else False}
@@ -181,10 +181,10 @@ def transport_state():
 
 @command
 def transport(state: str = "play", t: float = -1.0, loop: bool = False):
-    """play | pause | stop do show corrente, sem bloquear (o `play_show` da CLI bloqueia).
-    Cada frame DMX vai para o topico 'dmx' da GUI. t >= 0 localiza antes de tocar."""
+    """play | pause | stop of the current show, without blocking (the CLI `play_show` blocks).
+    Every DMX frame goes to the GUI 'dmx' topic. t >= 0 locates before playing."""
     if state not in ("play", "pause", "stop"):
-        raise ValueError(f"transport: {state!r} nao e play/pause/stop")
+        raise ValueError(f"transport: {state!r} is not play/pause/stop")
     p = playermod.CURRENT
     if state == "play":
         if p is None:
@@ -201,15 +201,15 @@ def transport(state: str = "play", t: float = -1.0, loop: bool = False):
         if state == "pause":
             p.pause()
         else:
-            p.close()                       # stop: fecha sockets e threads; o proximo play cria outro
+            p.close()                       # stop: closes sockets and threads; the next play creates another one
             playermod.CURRENT = None
     return transport_state()
 
 
-# ---------------------------------------------------------------- patch, perfis, rede
+# ---------------------------------------------------------------- patch, profiles, network
 @command
 def patch_check():
-    """Monta o patch do show corrente e devolve as linhas para a grade + o erro de sobreposicao."""
+    """Builds the patch of the current show and returns the rows for the grid + the overlap error."""
     p, err = Patch(), None
     for f in SHOW.get("patch", ()) or ():
         try:
@@ -222,8 +222,8 @@ def patch_check():
 
 @command
 def profiles():
-    """Nomes dos perfis disponiveis em profiles/."""
+    """Names of the profiles available in profiles/."""
     return profile_names()
 
 
-_ = playerpkg  # noqa: F401  (importar o pacote player registra play_show/stop/pause/locate/markers)
+_ = playerpkg  # noqa: F401  (importing the player package registers play_show/stop/pause/locate/markers)

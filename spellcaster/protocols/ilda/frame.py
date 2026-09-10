@@ -1,4 +1,4 @@
-"""Ponto/frame ILDA, otimizacao de scan e safety."""
+"""ILDA point/frame, scan optimisation and safety."""
 import math
 from dataclasses import dataclass, replace
 
@@ -30,7 +30,7 @@ class Point:
 class Frame:
     def __init__(self, points=None, name=""):
         self.points = list(points or [])
-        self.name = name  # nome de frame do .ild (8 chars)
+        self.name = name  # .ild frame name (8 chars)
 
     def __len__(self):
         return len(self.points)
@@ -39,7 +39,7 @@ class Frame:
         return iter(self.points)
 
     def bbox(self, lit_only=True):
-        """(x0, y0, x1, y1) dos pontos acesos; None se nao houver."""
+        """(x0, y0, x1, y1) of the lit points; None if there are none."""
         pts = [p for p in self.points if p.lit] if lit_only else self.points
         if not pts:
             return None
@@ -52,8 +52,8 @@ def _lerp(p, q, u, blank):
 
 
 def optimize(frame, dwell=2, blank_gap=4, max_step=1200, angle=25):
-    """Dwell nos vertices, pontos apagados nas transicoes aceso<->apagado,
-    interpolacao de passos maiores que max_step (unidades ILDA)."""
+    """Dwell on the vertices, blanked points on the lit<->blanked transitions,
+    interpolation of steps larger than max_step (ILDA units)."""
     src = frame.points
     if not src:
         return Frame([], frame.name)
@@ -61,7 +61,7 @@ def optimize(frame, dwell=2, blank_gap=4, max_step=1200, angle=25):
     out = [src[0]]
     for i in range(1, len(src)):
         p, q = src[i - 1], src[i]
-        # salto: repete p apagado antes de sair, q apagado antes de acender
+        # jump: repeats p blanked before leaving, q blanked before lighting up
         if p.lit and not q.lit:
             out += [replace(p, blank=True)] * blank_gap
         step = max(abs(q.x - p.x), abs(q.y - p.y))
@@ -71,7 +71,7 @@ def optimize(frame, dwell=2, blank_gap=4, max_step=1200, angle=25):
         if not p.lit and q.lit:
             out += [replace(q, blank=True)] * blank_gap
         out.append(q)
-        # vertice: mudanca de direcao (ou inicio de segmento) -> dwell
+        # vertex: change of direction (or start of a segment) -> dwell
         if q.lit and i + 1 < len(src) and src[i + 1].lit:
             ax, ay = q.x - p.x, q.y - p.y
             bx, by = src[i + 1].x - q.x, src[i + 1].y - q.y
@@ -82,14 +82,14 @@ def optimize(frame, dwell=2, blank_gap=4, max_step=1200, angle=25):
 
 
 def safety(frame, min_size=2000, max_intensity=255, zone=None):
-    """Escurece figura menor que min_size (ponto parado queima), limita intensidade,
-    apaga pontos fora de zone=(x0, y0, x1, y1)."""
+    """Dims a figure smaller than min_size (a stationary point burns), caps intensity,
+    blanks points outside zone=(x0, y0, x1, y1)."""
     bb = frame.bbox()
     gain = 1.0
     if bb:
         size = max(bb[2] - bb[0], bb[3] - bb[1])
         if size < min_size:
-            gain = size / min_size  # ponto unico -> 0
+            gain = size / min_size  # single point -> 0
     out = []
     for p in frame.points:
         q = replace(p, r=min(p.r * gain, max_intensity), g=min(p.g * gain, max_intensity),

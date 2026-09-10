@@ -1,6 +1,6 @@
-"""Analise de rede: interfaces, nos Art-Net (ArtPoll), fontes sACN (discovery), Ether Dream (beacon), sugestoes.
-Os pacotes sao decodificados por artnet.parse e sacn.parse: aqui so mora a varredura.
-Uso: python -m spellcaster.protocols.netscan [--json] [--timeout N]"""
+"""Network scan: interfaces, Art-Net nodes (ArtPoll), sACN sources (discovery), Ether Dream (beacon), suggestions.
+Packets are decoded by artnet.parse and sacn.parse: only the scan lives here.
+Usage: python -m spellcaster.protocols.netscan [--json] [--timeout N]"""
 import argparse
 import json
 import platform
@@ -16,7 +16,7 @@ from . import artnet, sacn
 from .ilda.etherdream import BEACON, BEACON_PORT, STATUS, parse_beacon
 
 ARTNET_PORT = artnet.PORT
-ARTPOLL = artnet.artpoll(flags=0, priority=0)   # TalkToMe 0, prioridade 0: so quero o ArtPollReply
+ARTPOLL = artnet.artpoll(flags=0, priority=0)   # TalkToMe 0, priority 0: the ArtPollReply is all we want
 SACN_PORT, SACN_DISCOVERY = sacn.PORT, sacn.DISCOVERY_IP
 IPV4 = r"(\d{1,3}(?:\.\d{1,3}){3})"
 WINDOWS = platform.system() == "Windows"
@@ -41,7 +41,7 @@ _HEADER = re.compile(r"^.*?\b(?:\w+ adapter|Adaptador (?:de Rede sem Fio|de T\S+
 
 
 def parse_ipconfig(text):
-    """Saida de `ipconfig` (pt-BR ou en, acentos podem vir quebrados) -> lista de interfaces com IPv4."""
+    """`ipconfig` output (pt-BR or en, accents may arrive mangled) -> list of interfaces with IPv4."""
     ifaces, cur, want_gw = [], None, False
     for line in text.splitlines():
         if line and not line[0].isspace() and line.rstrip().endswith(":"):
@@ -52,7 +52,7 @@ def parse_ipconfig(text):
             continue
         if cur is None:
             continue
-        if want_gw and re.fullmatch(r"\s*" + IPV4 + r"\s*", line):  # gateway IPv4 na linha seguinte ao IPv6
+        if want_gw and re.fullmatch(r"\s*" + IPV4 + r"\s*", line):  # IPv4 gateway on the line after the IPv6 one
             cur["gateway"] = line.strip()
             want_gw = False
             continue
@@ -69,7 +69,7 @@ def parse_ipconfig(text):
 
 
 def parse_ip_addr(text, route_text=""):
-    """Fallback Linux: saida de `ip addr` (+ `ip route` para o gateway)."""
+    """Linux fallback: `ip addr` output (+ `ip route` for the gateway)."""
     ifaces, cur = [], None
     for line in text.splitlines():
         if m := re.match(r"^\d+:\s+([^:@]+)", line):
@@ -92,7 +92,7 @@ def _run(*cmd):
 
 
 def interfaces():
-    """[{name, ip, mask, gateway}] das interfaces IPv4 ativas (sem loopback)."""
+    """[{name, ip, mask, gateway}] of the active IPv4 interfaces (loopback excluded)."""
     if WINDOWS:
         ifaces = parse_ipconfig(_run("ipconfig"))
     else:
@@ -107,21 +107,21 @@ def interfaces():
 
 # ---------------------------------------------------------------- Art-Net
 def scan_artnet(timeout=2, ifaces=None):
-    """ArtPoll em broadcast (global + 2.x + 10.x + subrede de cada interface) e coleta ArtPollReply."""
+    """Broadcasts ArtPoll (global + 2.x + 10.x + each interface subnet) and collects ArtPollReply."""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     try:
-        s.bind(("", ARTNET_PORT))  # replies vem em broadcast na 6454
+        s.bind(("", ARTNET_PORT))  # replies come in as broadcast on 6454
     except OSError:
-        s.bind(("", 0))  # porta ocupada: alguns nos respondem unicast ao remetente
+        s.bind(("", 0))  # port taken: some nodes answer unicast to the sender
     targets = {"255.255.255.255", "2.255.255.255", "10.255.255.255"}
     targets |= {_bcast(i["ip"], i["mask"]) for i in (ifaces or []) if i["mask"]}
     for dst in targets:
         try:
             s.sendto(ARTPOLL, (dst, ARTNET_PORT))
         except OSError:
-            pass  # sem rota para essa subrede
+            pass  # no route to that subnet
     found, end = {}, time.monotonic() + timeout
     while (left := end - time.monotonic()) > 0:
         s.settimeout(left)
@@ -139,7 +139,7 @@ def scan_artnet(timeout=2, ifaces=None):
 
 # ---------------------------------------------------------------- sACN
 def scan_sacn(timeout=3, ifaces=None):
-    """Entra no multicast de discovery (239.255.250.214:5568) e lista fontes e universos anunciados."""
+    """Joins the discovery multicast group (239.255.250.214:5568) and lists announced sources and universes."""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind(("", SACN_PORT))
@@ -166,7 +166,7 @@ def scan_sacn(timeout=3, ifaces=None):
 
 # ---------------------------------------------------------------- Ether Dream
 def scan_etherdream(timeout=2):
-    """Escuta beacons UDP 7654 (1 Hz por DAC)."""
+    """Listens for UDP beacons on 7654 (1 Hz per DAC)."""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -186,38 +186,38 @@ def scan_etherdream(timeout=2):
     return list(found.values())
 
 
-# ---------------------------------------------------------------- sugestoes
+# ---------------------------------------------------------------- suggestions
 def suggest(ifaces, windows=WINDOWS):
-    """Regras: Art-Net prefere 2.x/8 ou 10.x/8; sACN qualquer; aviso de interfaces na mesma subrede.
-    No Windows inclui o comando netsh pronto (texto; nao executa)."""
+    """Rules: Art-Net prefers 2.x/8 or 10.x/8; sACN takes any; warning for interfaces on the same subnet.
+    On Windows it includes the ready-made netsh command (text only; it does not run)."""
     out = []
     if not ifaces:
-        return ["Nenhuma interface IPv4 ativa: conecte o cabo ou fixe um IP."]
+        return ["No active IPv4 interface: plug the cable in or set a static IP."]
     nets = {}
     for i in ifaces:
         name, ip, mask = i["name"], i["ip"], i["mask"] or "255.255.255.0"
         nets.setdefault(_net(ip, mask), []).append(name)
         if ip.split(".")[0] in ("2", "10"):
-            out.append(f"{name} {ip}/{mask}: Art-Net ok (rede {ip.split('.')[0]}.x.x.x), sACN ok.")
+            out.append(f"{name} {ip}/{mask}: Art-Net ok ({ip.split('.')[0]}.x.x.x network), sACN ok.")
         else:
-            out.append(f"{name} {ip}/{mask}: sACN ok; Art-Net prefere 2.x.x.x/8 ou 10.x.x.x/8 "
-                       "(nos de fabrica em 2.x nao enxergam esta placa).")
+            out.append(f"{name} {ip}/{mask}: sACN ok; Art-Net prefers 2.x.x.x/8 or 10.x.x.x/8 "
+                       "(factory nodes on 2.x cannot see this adapter).")
             if windows:
                 out.append(f'  netsh interface ip set address name="{name}" static 2.0.0.{ip.split(".")[-1]} 255.0.0.0'
-                           "   (como administrador; nao executado)")
+                           "   (as administrator; not executed)")
     for net, names in nets.items():
         if len(names) > 1:
-            out.append(f"Aviso: {', '.join(names)} na mesma subrede {net}: o sistema envia por uma so; "
-                       "desligue a outra ou fixe o IP de origem.")
+            out.append(f"Warning: {', '.join(names)} on the same subnet {net}: the system sends through one only; "
+                       "disable the other one or set the source IP.")
     if len(ifaces) > 1:
-        out.append("sACN multicast sai pela interface da rota padrao (gateway); "
-                   "para outra placa, fixe o IP de origem (IP_MULTICAST_IF).")
+        out.append("sACN multicast leaves through the default route interface (gateway); "
+                   "for another adapter, set the source IP (IP_MULTICAST_IF).")
     return out
 
 
-# ---------------------------------------------------------------- relatorio
+# ---------------------------------------------------------------- report
 def scan_all(timeout=2):
-    """Dict JSON-serializavel com tudo; os tres scans rodam em paralelo (~timeout+1 s)."""
+    """JSON-serializable dict with everything; the three scans run in parallel (~timeout+1 s)."""
     ifaces = interfaces()
     res = {"interfaces": ifaces, "suggestions": suggest(ifaces), "artnet": [], "sacn": [], "etherdream": []}
     jobs = {"artnet": (scan_artnet, (timeout, ifaces)), "sacn": (scan_sacn, (timeout + 1, ifaces)),
@@ -242,26 +242,26 @@ def report(d):
         ln.extend(["", title])
         items = d[key]
         if isinstance(items, dict):
-            ln.append(f"  erro: {items['error']}")
+            ln.append(f"  error: {items['error']}")
         elif not items:
-            ln.append("  (nada encontrado)")
+            ln.append("  (nothing found)")
         else:
             ln.extend("  " + fmt(x) for x in items)
 
-    ln = ["Interfaces:"] if d["interfaces"] else ["Interfaces: (nenhuma)"]
+    ln = ["Interfaces:"] if d["interfaces"] else ["Interfaces: (none)"]
     for i in d["interfaces"]:
         ln.append(f"  {i['name']}: {i['ip']} / {i['mask']}" + (f"  gw {i['gateway']}" if i.get("gateway") else ""))
-    ln += ["", "Sugestoes:"] + [f"  {s}" for s in d["suggestions"]]
+    ln += ["", "Suggestions:"] + [f"  {s}" for s in d["suggestions"]]
     section("Art-Net (ArtPollReply):", "artnet", lambda n: f"{n['ip']}  {n['short_name']!r}  {n['long_name']!r}  "
-            f"[{', '.join(f'{p['dir']} U{p['universe']}' for p in n['ports']) or 'sem portas'}]")
-    section("sACN (discovery):", "sacn", lambda s: f"{s['ip']}  {s['source_name']!r}  universos {s['universes']}")
+            f"[{', '.join(f'{p['dir']} U{p['universe']}' for p in n['ports']) or 'no ports'}]")
+    section("sACN (discovery):", "sacn", lambda s: f"{s['ip']}  {s['source_name']!r}  universes {s['universes']}")
     section("Ether Dream (beacon):", "etherdream", lambda e: f"{e['ip']}  mac {e['mac']}  hw {e['hw_rev']} sw {e['sw_rev']}  "
             f"buffer {e['buffer_capacity']}  max {e['max_point_rate']} pps  playback {e['status']['playback_state']}")
     return "\n".join(ln)
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Spellcaster: analise de rede")
+    ap = argparse.ArgumentParser(description="Spellcaster: network scan")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--timeout", type=float, default=2)
     a = ap.parse_args(argv)

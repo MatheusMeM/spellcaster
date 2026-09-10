@@ -1,12 +1,12 @@
-# Patch: fixture nomeada = perfil + universo + endereco. Escreve por nome de canal direto no Universes do core.
+# Patch: named fixture = profile + universe + address. Writes by channel name straight into the core Universes.
 import json
 
 from ..core.registry import command
 from ..core.universe import Universes
 from .profile import load
 
-PATCH = None   # ponytail: o ultimo Patch criado e o corrente do processo (um show por processo) ;
-               # trocar por selecao explicita quando a GUI abrir dois shows ao mesmo tempo.
+PATCH = None   # ponytail: the last Patch created is the process-wide current one (one show per process) ;
+               # swap for an explicit selection when the GUI opens two shows at the same time.
 
 
 class PatchError(ValueError):
@@ -14,7 +14,7 @@ class PatchError(ValueError):
 
 
 class Fixture:
-    """Resolvida no add: `chans[nome] = (indice, indice_fine, nomes)` ja em coordenada de universo."""
+    """Resolved on add: `chans[name] = (index, fine_index, names)` already in universe coordinates."""
     __slots__ = ("name", "profile", "universe", "address", "data", "chans")
 
     def __init__(self, name, profile, universe, address, data):
@@ -30,24 +30,24 @@ class Patch:
     def __init__(self, universes=None):
         self.universes = Universes() if universes is None else universes
         self.fixtures = {}
-        self._busy = {}                      # (universo, canal) -> nome da fixture
+        self._busy = {}                      # (universe, channel) -> fixture name
         global PATCH
         PATCH = self
 
     def add(self, name, profile, universe, address):
-        """Erro na hora se o footprint do perfil pisa em outra fixture ou passa de 512."""
+        """Fails right away if the profile footprint steps on another fixture or runs past 512."""
         if name in self.fixtures:
-            raise PatchError(f"fixture {name!r} ja esta no patch")
+            raise PatchError(f"fixture {name!r} is already in the patch")
         p = load(profile)
         if not 1 <= address <= 512 or address + p.size - 1 > 512:
-            raise PatchError(f"{name} [{p.name}]: endereco {address} + {p.size} ch passa de 512 (universo {universe})")
+            raise PatchError(f"{name} [{p.name}]: address {address} + {p.size} ch runs past 512 (universe {universe})")
         for a in range(address, address + p.size):
             other = self._busy.get((universe, a))
             if other is not None:
                 o = self.fixtures[other]
-                raise PatchError(f"sobreposicao no universo {universe} canal {a}: {other!r} "
-                                 f"[{o.profile.name}, {o.profile.size} ch em {o.address}] e {name!r} "
-                                 f"[{p.name}, {p.size} ch em {address}]")
+                raise PatchError(f"overlap on universe {universe} channel {a}: {other!r} "
+                                 f"[{o.profile.name}, {o.profile.size} ch at {o.address}] and {name!r} "
+                                 f"[{p.name}, {p.size} ch at {address}]")
         u = self.universes.get_or_create(universe)
         for a in range(address, address + p.size):
             self._busy[(universe, a)] = name
@@ -55,23 +55,23 @@ class Patch:
         return fx
 
     def set(self, name, **params):
-        """Valor: int/float em 0-255, float em 0.0-1.0 tratado como fracao, nome de faixa ou nome de roda.
-        Canal com `fine` vai a 16 bit sozinho."""
+        """Value: int/float in 0-255, float in 0.0-1.0 treated as a fraction, range name or wheel name.
+        A channel with `fine` goes to 16 bit on its own."""
         fx = self.fixtures.get(name)
         if fx is None:
-            raise PatchError(f"fixture {name!r} nao esta no patch")
+            raise PatchError(f"fixture {name!r} is not in the patch")
         data, chans = fx.data, fx.chans
         for ch, v in params.items():
             c = chans.get(ch)
             if c is None:
-                raise PatchError(f"{name} [{fx.profile.name}]: sem canal {ch!r}; tem {sorted(chans)}")
+                raise PatchError(f"{name} [{fx.profile.name}]: no channel {ch!r}; it has {sorted(chans)}")
             k = v.__class__
             if k is str:
                 v = c[2].get(v)
                 if v is None:
-                    raise PatchError(f"{name}.{ch}: {params[ch]!r} nao e faixa nem roda; tem {sorted(c[2])}")
+                    raise PatchError(f"{name}.{ch}: {params[ch]!r} is neither a range nor a wheel; it has {sorted(c[2])}")
             elif k is float and 0.0 <= v <= 1.0:
-                v *= 255.0   # ponytail: float em 0..1 e fracao ; passe int quando o valor puder cair em 0..1 em DMX cru
+                v *= 255.0   # ponytail: a float in 0..1 is a fraction ; pass an int when the value may land in 0..1 as raw DMX
             if v < 0:
                 v = 0
             elif v > 255:
@@ -85,7 +85,7 @@ class Patch:
                 data[f] = w & 255
 
     def get(self, name, ch):
-        """Valor cru do canal (tupla hi, lo quando o canal e 16 bit). Para teste e para a GUI ler o estado."""
+        """Raw channel value (a (hi, lo) tuple when the channel is 16 bit). For tests and for the GUI to read state."""
         fx = self.fixtures[name]
         i, f, _ = fx.chans[ch]
         return fx.data[i] if f < 0 else (fx.data[i], fx.data[f])
@@ -97,7 +97,7 @@ class Patch:
 
 @command
 def patch_list():
-    """Lista as fixtures do patch corrente (JSON): nome, perfil, universo, endereco, canais."""
+    """Lists the fixtures of the current patch (JSON): name, profile, universe, address, channels."""
     rows = PATCH.rows() if PATCH is not None else []
     print(json.dumps(rows, indent=1, ensure_ascii=False))
     return rows

@@ -1,4 +1,4 @@
-# Loop do engine: look(t) -> universos -> saídas, a cada tick do Clock.
+# Engine loop: look(t) -> universes -> outputs, on every Clock tick.
 from .clock import Clock
 from .universe import Universes
 
@@ -10,7 +10,7 @@ class Engine:
         self.clock = Clock(fps)
 
     def apply(self, frame):
-        """frame: {addr: [..]} (universo 1) ou {(universo, addr): [..]}."""
+        """frame: {addr: [..]} (universe 1) or {(universe, addr): [..]}."""
         for key, vals in frame.items():
             u, a = key if isinstance(key, tuple) else (1, key)
             self.universes.get_or_create(u).set(a, vals)

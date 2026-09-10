@@ -1,5 +1,5 @@
-# Player: equivalencia byte a byte com Engine.run(look), transporte local e por OSC, loop,
-# laser sincronizado no emulador do Ether Dream e desempenho a 60 fps com 8 universos + OSC.
+# Player: byte-for-byte equivalence with Engine.run(look), local and OSC transport, loop,
+# laser synced on the Ether Dream emulator and performance at 60 fps with 8 universes + OSC.
 import pathlib
 import socket
 import sys
@@ -22,7 +22,7 @@ SPELL = str(ROOT / "shows" / "medgrupo.spell")
 
 
 class Cap:
-    """Saida de teste: guarda os bytes de cada universo (contrato send(universe, data) / close())."""
+    """Test output: keeps the bytes of every universe (send(universe, data) / close() contract)."""
 
     def __init__(self):
         self.frames = []
@@ -52,8 +52,8 @@ def wait_until(fn, timeout=3.0):
 
 
 class TestPyfx(unittest.TestCase):
-    def test_medgrupo_spell_igual_ao_engine(self):
-        """Aceite 1: o track pyfx do .spell da os mesmos bytes do universo 1 que Engine.run(look)."""
+    def test_medgrupo_spell_equals_engine(self):
+        """Acceptance 1: the .spell pyfx track gives the same universe 1 bytes as Engine.run(look)."""
         sh = showfile.load(SPELL)
         ts = [i / 30 for i in range(0, int(sh["duration"] * 30), 13)]
         self.assertGreaterEqual(len(ts), 30)
@@ -73,9 +73,9 @@ class TestPyfx(unittest.TestCase):
         self.assertEqual(a, b)
 
 
-class TestTransporte(unittest.TestCase):
-    def test_play_pause_locate_play_e_osc(self):
-        """Aceite 4: transporte local e remoto por OSC em loopback."""
+class TestTransport(unittest.TestCase):
+    def test_play_pause_locate_play_and_osc(self):
+        """Acceptance 4: local and remote transport over OSC on loopback."""
         port = free_port()
         sh = {"fps": 60, "duration": 1.0, "transport": {"osc_port": port}, "outputs": [],
               "tracks": [{"type": "dmx", "universe": 1, "address": 1, "keys": [[0, [0]], [1.0, [255]]]}]}
@@ -91,15 +91,15 @@ class TestTransporte(unittest.TestCase):
             t = p.clock.time
             self.assertGreater(t, 0.02)
             time.sleep(0.1)
-            self.assertEqual(p.clock.time, t)                    # pausado congela
+            self.assertEqual(p.clock.time, t)                    # paused freezes
             rc.send("/spellcaster/locate", 0.5)
             self.assertTrue(wait_until(lambda: abs(p.clock.time - 0.5) < 1e-6))
             n = len(cap.frames)
             rc.send("/spellcaster/play")
             self.assertTrue(wait_until(lambda: p.clock.state == "play"))
             self.assertTrue(wait_until(lambda: len(cap.frames) > n + 5))
-            self.assertGreater(cap.frames[-1][1][0], 120)        # depois do locate o valor esta acima da metade
-            self.assertTrue(p.wait(3))                           # duracao atingida -> stop
+            self.assertGreater(cap.frames[-1][1][0], 120)        # after the locate the value is above half
+            self.assertTrue(p.wait(3))                           # duration reached -> stop
             self.assertEqual(p.clock.state, "stop")
         finally:
             rc.close()
@@ -113,20 +113,20 @@ class TestTransporte(unittest.TestCase):
         try:
             p.play()
             time.sleep(0.7)
-            self.assertEqual(p.clock.state, "play")              # com loop nao para no fim
+            self.assertEqual(p.clock.state, "play")              # with loop it does not stop at the end
             self.assertLess(p.clock.time, 0.25)
             self.assertGreater(len(cap.frames), 30)
         finally:
             p.close()
 
-    def test_saida_sacn_em_loopback(self):
+    def test_sacn_output_on_loopback(self):
         rx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         rx.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             rx.bind(("127.0.0.1", sacn.PORT))
         except OSError as e:
             rx.close()
-            self.skipTest(f"porta 5568 ocupada: {e}")
+            self.skipTest(f"port 5568 busy: {e}")
         rx.settimeout(2.0)
         sh = {"fps": 30, "duration": 0.5,
               "outputs": [{"type": "sacn", "universes": [1], "interfaces": ["127.0.0.1"]}],
@@ -140,8 +140,8 @@ class TestTransporte(unittest.TestCase):
             rx.close()
         self.assertEqual(tuple(sacn.parse(pk)["data"][9:12]), (7, 8, 9))
 
-    def test_cue_disparada_pela_timeline(self):
-        """Aceite 3 dentro do player: track cue dispara GO e o fade sai nos universos."""
+    def test_cue_fired_by_the_timeline(self):
+        """Acceptance 3 inside the player: the cue track fires GO and the fade goes out on the universes."""
         sh = {"fps": 60, "duration": 1.2, "outputs": [],
               "tracks": [{"type": "cue", "keys": [[0.05, "GO"]]}],
               "cues": [{"name": "q1", "fade": 0.5, "values": {"1/10": [255]}}]}
@@ -153,14 +153,14 @@ class TestTransporte(unittest.TestCase):
             vals = [d[9] for u, d in cap.frames]
             self.assertEqual(vals[0], 0)
             self.assertEqual(vals[-1], 255)
-            self.assertTrue(any(60 < v < 200 for v in vals), "fade nao foi amostrado")
+            self.assertTrue(any(60 < v < 200 for v in vals), "fade was not sampled")
         finally:
             p.close()
 
 
 class TestLaser(unittest.TestCase):
-    def test_frame_150_em_t5_no_emulador(self):
-        """Aceite 5: t = 5 s a 30 fps = frame 150 do .ild, com safety() antes de sair."""
+    def test_frame_150_at_t5_on_the_emulator(self):
+        """Acceptance 5: t = 5 s at 30 fps = frame 150 of the .ild, with safety() before it goes out."""
         em = Emulator().start()
         sh = showfile.load(SPELL)
         sh["outputs"] = [{"type": "laser", "dac": "127.0.0.1", "port": em.port, "pps": 25000,
@@ -174,7 +174,7 @@ class TestLaser(unittest.TestCase):
             self.assertEqual([(q.x, q.y, q.r) for q in exp], [(q.x, q.y, q.r) for q in ref])
             p.start()
             p.locate(5.0)
-            p.pause()                                            # tempo congelado em 5 s
+            p.pause()                                            # time frozen at 5 s
             self.assertTrue(wait_until(lambda: len(em.received) >= len(exp)))
         finally:
             p.close()
@@ -183,21 +183,21 @@ class TestLaser(unittest.TestCase):
         self.assertEqual([(r[1], r[2]) for r in got], [(q.x, q.y) for q in exp])
         self.assertEqual([r[3] // 257 for r in got], [(0 if q.blank else q.r) for q in exp])
 
-    def test_safety_apaga_figura_pequena(self):
+    def test_safety_dims_small_figure(self):
         sh = {"fps": 30, "outputs": [{"type": "laser", "dac": None, "safety": {"min_size": 2000}}],
               "tracks": [{"type": "laser", "gen": "medgrupo"}]}
         p = Player(sh, outputs=[])
         p.clip = [Frame([Point(0, 0, 255, 255, 255), Point(100, 100, 255, 255, 255)])]
         fr = p.laser_frame(0.0)
-        self.assertLess(max(q.r for q in fr), 20)                # 100/2000 do brilho: praticamente apagado
+        self.assertLess(max(q.r for q in fr), 20)                # 100/2000 of the brightness: practically dark
         p.clip = [Frame([Point(-8000, -8000, 255, 0, 0), Point(8000, 8000, 255, 0, 0)])]
         self.assertEqual(max(q.r for q in p.laser_frame(0.0)), 255)
 
 
-class TestDesempenho(unittest.TestCase):
-    def test_60fps_8_universos_mais_osc(self):
+class TestPerformance(unittest.TestCase):
+    def test_60fps_8_universes_plus_osc(self):
         port = free_port()
-        ouvinte = OscIn(port)
+        listener = OscIn(port)
         tracks = [{"type": "dmx", "universe": u, "address": 1, "keys": [[0, [0] * 24], [5, [255] * 24]]}
                   for u in range(1, 9)]
         tracks.append({"type": "osc", "address": "/spell/x", "keys": [[0, 0.0], [5, 1.0]]})
@@ -205,27 +205,27 @@ class TestDesempenho(unittest.TestCase):
               "outputs": [{"type": "sacn", "universes": list(range(1, 9)), "interfaces": ["127.0.0.1"]},
                           {"type": "osc", "host": "127.0.0.1", "port": port}]}
         p = Player(sh)
-        marcas = []
+        marks = []
         tick = p._tick
 
-        def medido(t):
-            marcas.append((time.perf_counter(), t))
+        def measured(t):
+            marks.append((time.perf_counter(), t))
             tick(t)
-        p._tick = medido
+        p._tick = measured
         try:
             p.start()
             p.play()
             self.assertTrue(p.wait(15))
         finally:
             p.close()
-            ouvinte.close()
-        dts = [b[0] - a[0] for a, b in zip(marcas, marcas[1:])]
+            listener.close()
+        dts = [b[0] - a[0] for a, b in zip(marks, marks[1:])]
         jitter = max(abs(d - 1 / 60) for d in dts)
-        deriva = (marcas[-1][0] - marcas[0][0]) - (marcas[-1][1] - marcas[0][1])
-        print(f"\nPERF 60fps 8 universos sACN + 1 OSC: ticks={len(marcas)} "
-              f"jitter_max={jitter * 1000:.1f}ms deriva={deriva * 1000:.1f}ms", file=sys.stderr)
-        self.assertGreater(len(marcas), 280)                     # ~300 ticks em 5 s
-        self.assertLess(abs(deriva), 0.05)
+        drift = (marks[-1][0] - marks[0][0]) - (marks[-1][1] - marks[0][1])
+        print(f"\nPERF 60fps 8 sACN universes + 1 OSC: ticks={len(marks)} "
+              f"jitter_max={jitter * 1000:.1f}ms drift={drift * 1000:.1f}ms", file=sys.stderr)
+        self.assertGreater(len(marks), 280)                      # ~300 ticks in 5 s
+        self.assertLess(abs(drift), 0.05)
         self.assertLess(jitter, 0.020)
 
 

@@ -1,4 +1,4 @@
-/* feiticaria - padrao da casa: preto industrial, amarelo de sinalizacao, verde-lima, tudo em angulo reto. */
+/* feiticaria - the house default: industrial black, signage yellow, lime green, everything at right angles. */
 .chrome { border-bottom: 2px solid var(--accent); }
 .logo { font-stretch: condensed; }
 .logo::after { content: " //"; color: var(--accent2); }
@@ -10,7 +10,7 @@
 .timecode { border: 1px solid #333; color: var(--accent); }
 #vu { border: 1px solid #333; }
 #scrub { accent-color: var(--accent2); }
-/* faixa de perigo, do design system */
+/* hazard stripe, from the design system */
 .transport { position: relative; padding-top: 12px; }
 .transport::before {
   content: ""; position: absolute; left: 0; right: 0; top: 0; height: 4px;

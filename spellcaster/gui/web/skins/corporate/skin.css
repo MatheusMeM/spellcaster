@@ -1,4 +1,4 @@
-/* corporate - cinza-prata de escritorio, azul corporativo, relevo discreto, tudo retangular. */
+/* corporate - office silver-grey, corporate blue, discreet bevel, everything rectangular. */
 .chrome, .transport { background: linear-gradient(#e9edf1, #cdd3d9); border-bottom: 1px solid #b3bac1; }
 .transport { border: 0; border-top: 1px solid #b3bac1; }
 .logo { color: #2b3a4a; letter-spacing: .12em; }

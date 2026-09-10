@@ -1,6 +1,6 @@
 {
  "name": "PAR LED RGB 3ch",
- "note": "The Brisas BX-940 on the bar are 5 ch (R,G,B,W,A) but they are patched every 3: the W/A of each one lands on the neighbour's R/G/B. While the rig stays like that, the fixture IS a 3 ch one. A 4 ch RGBW profile at a spacing of 3 becomes a PatchError, and that is the right behaviour.",
+ "note": "The Brisas BX-940 on the bar are 5 ch (R,G,B,W,A) but are patched every 3: the W/A of each one lands on the R/G/B of its neighbour. While the rig stays like this, the unit IS a 3 ch unit. A 4 ch RGBW profile at spacing 3 raises PatchError, and that is the right behaviour.",
  "channels": [
   {"name": "r", "offset": 0},
   {"name": "g", "offset": 1},

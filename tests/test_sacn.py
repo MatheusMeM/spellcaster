@@ -1,4 +1,4 @@
-# Regressão byte a byte contra o gerador do seed + loopback UDP.
+# Byte-for-byte regression against the seed generator + UDP loopback.
 import socket, struct, unittest, uuid
 
 from spellcaster.protocols import sacn
@@ -7,7 +7,7 @@ CID = uuid.uuid4().bytes
 
 
 def packet_seed(universe, data, seq):
-    """Recorte de seed/show_medgrupo.py (seq passado em vez de global)."""
+    """Excerpt from seed/show_medgrupo.py (seq passed in instead of global)."""
     dmp = struct.pack(">HBBHHH", 0x7000 | (11 + len(data)), 0x02, 0xA1, 0, 1, 1 + len(data)) + b"\0" + data
     fr = struct.pack(">H", 0x7000 | (77 + len(dmp))) + struct.pack(">I", 2) + b"Feiticaria show medgrupo".ljust(64, b"\0") \
          + struct.pack(">BHBBH", 100, 0, seq, 0, universe) + dmp
@@ -16,7 +16,7 @@ def packet_seed(universe, data, seq):
 
 
 class TestPacket(unittest.TestCase):
-    def test_bytes_iguais_ao_seed(self):
+    def test_bytes_equal_to_seed(self):
         data = bytes(range(256)) * 2
         for seq, u in ((1, 1), (255, 1), (7, 300)):
             self.assertEqual(sacn.packet(u, data, CID, seq, "Feiticaria show medgrupo", 100), packet_seed(u, data, seq))
@@ -35,7 +35,7 @@ class TestLoopback(unittest.TestCase):
         try:
             rx.bind(("127.0.0.1", sacn.PORT))
         except OSError as e:
-            rx.close(); self.skipTest(f"porta 5568 ocupada: {e}")
+            rx.close(); self.skipTest(f"port 5568 busy: {e}")
         rx.settimeout(1.0)
         out = sacn.SacnOut(universes=(1,), interfaces=["127.0.0.1"])
         data = bytes(range(256)) * 2
@@ -48,7 +48,7 @@ class TestLoopback(unittest.TestCase):
         p = sacn.parse(pk)
         self.assertEqual((p["universe"], p["seq"], p["data"]), (1, 1, data))
 
-    def test_seq_por_universo(self):
+    def test_seq_per_universe(self):
         out = sacn.SacnOut(universes=(1, 2), interfaces=["127.0.0.1"])
         try:
             out.send(1, b"\0"); out.send(1, b"\0"); out.send(2, b"\0")

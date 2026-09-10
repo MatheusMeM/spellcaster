@@ -3,30 +3,33 @@ import unittest
 
 from spellcaster.protocols import artnet, netscan, sacn
 
+# Real pt-BR ipconfig output: the labels stay in Portuguese because that is what the parser has to match.
+# Accents are written as escapes so the file itself stays ASCII; the last block keeps the U+FFFD that a
+# mis-decoded console produces, which the parser must survive too.
 IPCONFIG_PTBR = """
-Configuração de IP do Windows
+Configura\u00e7\u00e3o de IP do Windows
 
 
 Adaptador Ethernet Ethernet:
 
-   Estado da mídia. . . . . . . . . . . . . .  : mídia desconectada
-   Sufixo DNS específico de conexão. . . . . . :
+   Estado da m\u00eddia. . . . . . . . . . . . . .  : m\u00eddia desconectada
+   Sufixo DNS espec\u00edfico de conex\u00e3o. . . . . . :
 
 Adaptador de Rede sem Fio Wi-Fi:
 
-   Sufixo DNS específico de conexão. . . . . . : lan
-   Endereço IPv6 de link local . . . . . . . . : fe80::cfcb:2c7e:3705:89a0%15
-   Endereço IPv4. . . . . . . .  . . . . . . . : 192.168.0.132
-   Máscara de Sub-rede . . . . . . . . . . . . : 255.255.255.0
-   Gateway Padrão. . . . . . . . . . . . . . . : fe80::763a:efff:fe76:d266%15
+   Sufixo DNS espec\u00edfico de conex\u00e3o. . . . . . : lan
+   Endere\u00e7o IPv6 de link local . . . . . . . . : fe80::cfcb:2c7e:3705:89a0%15
+   Endere\u00e7o IPv4. . . . . . . .  . . . . . . . : 192.168.0.132
+   M\u00e1scara de Sub-rede . . . . . . . . . . . . : 255.255.255.0
+   Gateway Padr\u00e3o. . . . . . . . . . . . . . . : fe80::763a:efff:fe76:d266%15
                                                  192.168.0.1
 
 Adaptador Ethernet Ethernet 2:
 
-   Sufixo DNS específico de conexão. . . . . . :
-   Endere�o IPv4. . . . . . . . . . . . . . . . : 2.0.0.10
-   M�scara de Sub-rede . . . . . . . . . . . . : 255.0.0.0
-   Gateway Padr�o. . . . . . . . . . . . . . . :
+   Sufixo DNS espec\u00edfico de conex\u00e3o. . . . . . :
+   Endere\ufffdo IPv4. . . . . . . . . . . . . . . . : 2.0.0.10
+   M\ufffdscara de Sub-rede . . . . . . . . . . . . : 255.0.0.0
+   Gateway Padr\ufffdo. . . . . . . . . . . . . . . :
 """
 
 IPCONFIG_EN = """
@@ -50,7 +53,7 @@ Wireless LAN adapter Wi-Fi:
 """
 
 
-def artpollreply(ip="2.0.0.50", short=b"Node1", long_=b"Nodo de teste", net=0, sub=1, swout=(2, 3), swin=(5,)):
+def artpollreply(ip="2.0.0.50", short=b"Node1", long_=b"Test node", net=0, sub=1, swout=(2, 3), swin=(5,)):
     p = bytearray(239)
     p[0:8] = b"Art-Net\0"
     struct.pack_into("<H", p, 8, 0x2100)
@@ -69,7 +72,7 @@ def artpollreply(ip="2.0.0.50", short=b"Node1", long_=b"Nodo de teste", net=0, s
     return bytes(p)
 
 
-def sacn_discovery(name=b"Fonte X", universes=(1, 2, 10)):
+def sacn_discovery(name=b"Source X", universes=(1, 2, 10)):
     p = bytearray(120)
     struct.pack_into(">HH", p, 0, 0x10, 0)
     p[4:16] = b"ASC-E1.17\0\0\0"
@@ -88,7 +91,7 @@ class TestParse(unittest.TestCase):
         self.assertEqual([i["name"] for i in ifs], ["Wi-Fi", "Ethernet 2"])
         self.assertEqual(ifs[0]["ip"], "192.168.0.132")
         self.assertEqual(ifs[0]["mask"], "255.255.255.0")
-        self.assertEqual(ifs[0]["gateway"], "192.168.0.1")  # IPv4 na linha depois do IPv6
+        self.assertEqual(ifs[0]["gateway"], "192.168.0.1")  # IPv4 on the line after the IPv6
         self.assertEqual(ifs[1], {"name": "Ethernet 2", "ip": "2.0.0.10", "mask": "255.0.0.0", "gateway": None})
 
     def test_ipconfig_en(self):
@@ -106,7 +109,7 @@ class TestParse(unittest.TestCase):
         r = artnet.parse(artpollreply())
         self.assertEqual(r["ip"], "2.0.0.50")
         self.assertEqual(r["short_name"], "Node1")
-        self.assertEqual(r["long_name"], "Nodo de teste")
+        self.assertEqual(r["long_name"], "Test node")
         self.assertEqual(r["mac"], "aa:bb:cc:dd:ee:ff")
         self.assertEqual(r["ports"], [{"dir": "out", "universe": 0x12}, {"dir": "in", "universe": 0x15},
                                       {"dir": "out", "universe": 0x13}])
@@ -114,9 +117,9 @@ class TestParse(unittest.TestCase):
 
     def test_sacn_discovery(self):
         r = sacn.parse(sacn_discovery())
-        self.assertEqual((r["kind"], r["name"]), ("discovery", "Fonte X"))
+        self.assertEqual((r["kind"], r["name"]), ("discovery", "Source X"))
         self.assertEqual(r["universes"], [1, 2, 10])
-        # o n sai do comprimento do PDU, nao do datagrama: padding depois dos universos e ignorado
+        # n comes from the PDU length, not from the datagram: padding after the universes is ignored
         self.assertEqual(sacn.parse(sacn_discovery() + bytes(8))["universes"], [1, 2, 10])
         self.assertIsNone(sacn.parse(b"x" * 200))
 
@@ -130,7 +133,7 @@ class TestSuggest(unittest.TestCase):
         txt = "\n".join(s)
         self.assertIn("Laser 2.0.0.10/255.0.0.0: Art-Net ok", txt)
         self.assertIn('netsh interface ip set address name="Wi-Fi" static 2.0.0.132 255.0.0.0', txt)
-        self.assertIn("Wi-Fi, Ethernet na mesma subrede 192.168.0.0", txt)
+        self.assertIn("Wi-Fi, Ethernet on the same subnet 192.168.0.0", txt)
         self.assertNotIn("netsh", "\n".join(netscan.suggest(ifs, windows=False)))
         self.assertEqual(len(netscan.suggest([])), 1)
 
@@ -139,11 +142,11 @@ class TestReport(unittest.TestCase):
     def test_report_text(self):
         d = {"interfaces": [{"name": "Wi-Fi", "ip": "192.168.0.132", "mask": "255.255.255.0", "gateway": "192.168.0.1"}],
              "suggestions": ["x"], "artnet": [artnet.parse(artpollreply())],
-             "sacn": {"error": "porta ocupada"}, "etherdream": []}
+             "sacn": {"error": "port busy"}, "etherdream": []}
         txt = netscan.report(d)
         self.assertIn("2.0.0.50  'Node1'", txt)
-        self.assertIn("erro: porta ocupada", txt)
-        self.assertIn("(nada encontrado)", txt)
+        self.assertIn("error: port busy", txt)
+        self.assertIn("(nothing found)", txt)
 
 
 if __name__ == "__main__":

@@ -1,22 +1,22 @@
-# Monitor de texto: transporte, universos em barras, fontes de rede, laser e log.
-# Com curses (Pi/Linux) redesenha a tela; sem curses (Windows) imprime UMA linha com \r.
+# Text monitor: transport, universes as bars, network sources, laser and log.
+# With curses (Pi/Linux) it redraws the screen; without curses (Windows) it prints ONE line with \r.
 import threading
 import time
 
 from .core.registry import command
 
-GLYPHS = " .:-=+*#%@"                # 0..255 -> 10 niveis
-SOURCES = []                         # fontes vistas na rede; so o --scan preenche
+GLYPHS = " .:-=+*#%@"                # 0..255 -> 10 levels
+SOURCES = []                         # sources seen on the network; only --scan fills it
 
 
 def bar(data, cols=48):
-    """Barra de um universo: cada coluna e o maior valor do seu bloco de canais."""
+    """Bar of one universe: each column is the highest value of its channel block."""
     n = max(1, len(data) // cols)
     return "".join(GLYPHS[min(9, max(data[i:i + n], default=0) * 10 // 256)] for i in range(0, cols * n, n))
 
 
 def snapshot(log=()):
-    """Estado deste processo: player em execucao (transporte, universos, laser) e fontes de rede."""
+    """State of this process: running player (transport, universes, laser) and network sources."""
     from .player.player import CURRENT
     st = {"state": "--", "t": 0.0, "universes": {}, "laser": "-", "sources": list(SOURCES), "log": list(log)}
     if CURRENT is not None:
@@ -24,23 +24,23 @@ def snapshot(log=()):
         st["state"] = CURRENT.clock.state
         st["t"] = CURRENT.clock.time
         st["universes"] = {u.number: u.data for u in CURRENT.eng.universes.values()}
-        st["laser"] = f"{cfg.get('pps', 25000)} pps dac {cfg.get('dac') or '(nenhum)'}" if cfg else "-"
+        st["laser"] = f"{cfg.get('pps', 25000)} pps dac {cfg.get('dac') or '(none)'}" if cfg else "-"
     return st
 
 
 def render(st, cols=48):
-    """Estado -> linhas ASCII (o console e cp1252: nada fora de ASCII sai daqui)."""
-    ln = [f"spellcaster  transporte {st['state']:5}  t={st['t']:8.2f}s"]
+    """State -> ASCII lines (the console is cp1252: nothing outside ASCII leaves here)."""
+    ln = [f"spellcaster  transport {st['state']:5}  t={st['t']:8.2f}s"]
     for n, d in sorted(st["universes"].items()):
         ln.append(f"U{n:<3}|{bar(d, cols)}| max {max(d, default=0):3}")
     ln.append("laser: " + str(st["laser"]))
-    ln.append("rede : " + (", ".join(st["sources"]) or "(sem fontes; spell tui --scan)"))
+    ln.append("net  : " + (", ".join(st["sources"]) or "(no sources; spell tui --scan)"))
     ln += ["log  : " + s for s in st["log"][-5:]]
     return [x.encode("ascii", "replace").decode() for x in ln]
 
 
 def draw(st, width=118):
-    """Fallback sem curses: tudo numa linha so, reescrita com \r."""
+    """Fallback without curses: everything on a single line, rewritten with \r."""
     print(("  ".join(render(st, 24)) + " " * width)[:width], end="\r", flush=True)
 
 
@@ -52,14 +52,14 @@ def _scan_bg(timeout=2):
             d = netscan.scan_all(timeout)
             SOURCES[:] = ([f"sacn {s['source_name']}" for s in d["sacn"]]
                           + [f"artnet {n['short_name']}" for n in d["artnet"]])
-        except Exception as e:                     # scan e diagnostico: falhar nele nao derruba o monitor
-            SOURCES[:] = [f"scan falhou: {type(e).__name__}"]
+        except Exception as e:                     # the scan is diagnostics: failing there does not take the monitor down
+            SOURCES[:] = [f"scan failed: {type(e).__name__}"]
     threading.Thread(target=go, daemon=True).start()
 
 
 @command
 def tui(fps: int = 4, seconds: float = 0, scan: bool = False):
-    """Monitor de texto (curses, ou uma linha com \r sem curses). --seconds limita; Ctrl+C encerra."""
+    """Text monitor (curses, or a single line with \r without curses). --seconds caps it; Ctrl+C quits."""
     if scan:
         _scan_bg()
     log, prev = [], None
@@ -70,7 +70,7 @@ def tui(fps: int = 4, seconds: float = 0, scan: bool = False):
         st = snapshot(log)
         if st["state"] != prev:
             prev = st["state"]
-            log.append(f"{time.strftime('%H:%M:%S')} transporte {prev}")
+            log.append(f"{time.strftime('%H:%M:%S')} transport {prev}")
         return st
 
     def loop(scr=None):
@@ -87,7 +87,7 @@ def tui(fps: int = 4, seconds: float = 0, scan: bool = False):
             time.sleep(1.0 / max(1, fps))
 
     try:
-        import curses                              # ponytail: sem teclas, so leitura ; ler tecla quando houver transporte no tui
+        import curses                              # ponytail: no keys, read-only ; read keys once the tui has transport
     except ImportError:
         curses = None
     try:

@@ -1,6 +1,6 @@
 {
   "name": "headspace",
-  "author": "inspirada na skin Headspace do Windows Media Player 7 (2001)",
+  "author": "inspired by the Headspace skin of Windows Media Player 7 (2001)",
   "chrome": { "transport": "pill", "visualizer": "scope" },
   "vars": {
     "--bg": "#0b1a22",
