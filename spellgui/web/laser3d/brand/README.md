@@ -5,7 +5,8 @@ Vetores oficiais de `4-Marketing/ID VISUAL 2026/Logos/SVG (vetor)/`, com o preen
 
 | arquivo | o que é | onde usar |
 |---|---|---|
-| `submark.svg` | o símbolo (boneco em órbita) sozinho | ícone, LED de conexão, favicon, canto do display |
+| `symbol.svg` | o símbolo (boneco em órbita) sozinho, recortado do `stacked.svg` (não existe como arquivo oficial) | ícone, favicon, botão de voltar o Pino, canto do display |
+| `submark.svg` | FEITIÇARIA + símbolo, sem INDUSTRIAL (horizontal 1009×305) | tampa, etiqueta, onde o nome inteiro não cabe |
 | `wordmark.svg` | FEITIÇARIA INDUSTRIAL em texto | serigrafia da traseira, rodapé do HUD |
 | `main.svg` | FEITIÇARIA + símbolo (horizontal) | HUD, splash |
 | `stacked.svg` | símbolo em cima do nome | telas quadradas, bench |
