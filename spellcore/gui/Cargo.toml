@@ -10,6 +10,7 @@ path = "src/main.rs"
 [dependencies]
 cli = { workspace = true }
 engine = { workspace = true }   # only for `midi::builder`: the MIDI map uses the CLI registry
+include_dir = "0.7.4"
 serve = { workspace = true }
 
 # The window only exists on Windows (WebView2 already ships with 11); on the Pi the Lite opens

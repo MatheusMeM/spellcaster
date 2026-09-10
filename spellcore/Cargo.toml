@@ -3,7 +3,7 @@ resolver = "2"
 members = ["engine", "protocols", "laser", "script", "pixelmap", "mcp", "serve", "cli", "gui", "bench"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 rust-version = "1.88"   # rmcp 3 (crate mcp) requires 1.88
 license = "MIT"

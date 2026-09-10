@@ -1,5 +1,5 @@
 # CI and deploy. Push to main / PR: Python tests on loopback across the three platforms, spellcore
-# tests + clippy, artifacts (Windows onedir, Lite tarball, spellcore binary). Tag v*: GitHub Release
+# tests + clippy, artifacts (Windows onedir, Lite tarball, spellcore binary, portable spellcaster.exe). Tag v*: GitHub Release
 # with the same artifacts attached. The jitter/throughput bench is a gate (it fails if it leaves the
 # PRD target).
 name: build
@@ -63,6 +63,8 @@ jobs:
           - os: windows-latest
             bin: spellcore.exe
             name: spellcore-windows-x64.exe
+            # the program: one portable exe (window + bus + pages + seed data embedded)
+            gui: spellcaster-windows-x64.exe
           - os: ubuntu-latest
             bin: spellcore
             name: spellcore-linux-x64
@@ -131,10 +133,17 @@ jobs:
         shell: bash
         run: cp "spellcore/${{ env.REL }}/${{ matrix.bin }}" "${{ runner.temp }}/${{ matrix.name }}"
 
+      - name: the portable program (Windows)
+        if: matrix.gui
+        shell: bash
+        run: cp "spellcore/${{ env.REL }}/spellcaster.exe" "${{ runner.temp }}/${{ matrix.gui }}"
+
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}
-          path: ${{ runner.temp }}/${{ matrix.name }}
+          path: |
+            ${{ runner.temp }}/${{ matrix.name }}
+            ${{ runner.temp }}/${{ matrix.gui }}
           if-no-files-found: error
 
   release:

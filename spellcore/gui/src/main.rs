@@ -1,6 +1,8 @@
 // ponytail: outside Windows the window does not exist and the path helpers go unused ; drop
 // this when the window gets Linux/mac
 #![cfg_attr(not(windows), allow(dead_code))]
+// no console window behind the program; errors go to `spellcaster.log` beside the exe
+#![cfg_attr(windows, windows_subsystem = "windows")]
 //! `spellcaster.exe` - the Spellcaster as a program, not as a browser tab.
 //!
 //!   spellcaster [show.spell] [--dir ROOT]
@@ -13,7 +15,59 @@
 //! whole Tauri ; go Tauri when a native menu, an updater, a tray or a signed icon is missed -
 //! none of that exists here.
 
+use include_dir::{include_dir, Dir};
 use std::path::{Path, PathBuf};
+
+// The portable exe carries the pages and the seed data. Outside a checkout it unpacks them
+// beside itself (a USB stick), else in %LOCALAPPDATA%\Spellcaster. Pages and design are
+// overwritten on every start (a new exe brings new pages); shows, profiles, faces and modules are
+// the user's and are only seeded when missing.
+// ponytail: whole `design/` (1 MB) because the pages read tokens/ and SHORTCUTS.md from it ;
+// trim to those two when the exe gets fat.
+static WEB: Dir = include_dir!("$CARGO_MANIFEST_DIR/../../spellgui/web");
+static DESIGN: Dir = include_dir!("$CARGO_MANIFEST_DIR/../../design");
+static SHOWS: Dir = include_dir!("$CARGO_MANIFEST_DIR/../../shows");
+static PROFILES: Dir = include_dir!("$CARGO_MANIFEST_DIR/../../profiles");
+static FACES: Dir = include_dir!("$CARGO_MANIFEST_DIR/../../faces");
+static MODULES: Dir = include_dir!("$CARGO_MANIFEST_DIR/../../modules");
+
+/// Unpacks the embedded tree under `base`. Returns the error of the first write that fails.
+fn desempacotar(base: &Path) -> std::io::Result<()> {
+    for (d, rel, sempre) in [
+        (&WEB, "spellgui/web", true),
+        (&DESIGN, "design", true),
+        (&SHOWS, "shows", false),
+        (&PROFILES, "profiles", false),
+        (&FACES, "faces", false),
+        (&MODULES, "modules", false),
+    ] {
+        let alvo = base.join(rel);
+        if sempre || !alvo.is_dir() {
+            std::fs::create_dir_all(&alvo)?;
+            d.extract(&alvo)?;
+        }
+    }
+    Ok(())
+}
+
+/// The root when no checkout is found: beside the exe, else %LOCALAPPDATA%\Spellcaster.
+fn raiz_portatil(exe_dir: Option<&Path>) -> Result<PathBuf, String> {
+    let mut tentativas = Vec::new();
+    if let Some(d) = exe_dir {
+        tentativas.push(d.to_path_buf());
+    }
+    if let Some(l) = std::env::var_os("LOCALAPPDATA") {
+        tentativas.push(PathBuf::from(l).join("Spellcaster"));
+    }
+    let mut erro = String::from("no directory to unpack into");
+    for t in tentativas {
+        match desempacotar(&t) {
+            Ok(()) => return Ok(t),
+            Err(e) => erro = format!("{}: {}", t.display(), e),
+        }
+    }
+    Err(erro)
+}
 
 /// The page the window opens. It is the 3D laser view (`design/laser/` became a product in the
 /// `ui-3d` front), by the owner's request: the program is the model of the device, not a tab
@@ -83,7 +137,11 @@ fn janela() -> Result<(), String> {
     let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
     let (show, dir) = args(std::env::args().skip(1));
     let exe = std::env::current_exe().ok();
-    let raiz = raiz(dir, exe.as_deref().and_then(Path::parent), &cwd);
+    let exe_dir = exe.as_deref().and_then(Path::parent);
+    let mut raiz = raiz(dir, exe_dir, &cwd);
+    if !raiz.join("spellgui").join("web").is_dir() {
+        raiz = raiz_portatil(exe_dir)?;
+    }
     let show = show_abs(show, &cwd);
     std::env::set_current_dir(&raiz).map_err(|e| format!("{}: {}", raiz.display(), e))?;
 
@@ -132,6 +190,13 @@ fn janela() -> Result<(), String> {
 fn main() {
     if let Err(e) = janela() {
         eprintln!("spellcaster: {}", e);
+        // windows_subsystem = "windows": there is no console, the log is the only trace
+        let log = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|d| d.join("spellcaster.log")))
+            .unwrap_or_else(|| PathBuf::from("spellcaster.log"));
+        let _ = std::fs::write(log, format!("spellcaster: {}
+", e));
         std::process::exit(1);
     }
 }
@@ -193,6 +258,25 @@ mod tests {
         );
         std::fs::remove_dir_all(&base).ok();
         std::fs::remove_dir_all(&outro).ok();
+    }
+
+    /// The portable exe: an empty directory receives the pages and the seed, and a second
+    /// unpack does not touch the user's shows.
+    #[test]
+    fn unpacks_pages_and_seeds_data_once() {
+        let d = std::env::temp_dir().join("spellcaster_gui_portatil");
+        std::fs::remove_dir_all(&d).ok();
+        std::fs::create_dir_all(&d).unwrap();
+        let r = raiz_portatil(Some(&d)).unwrap();
+        assert_eq!(r, d);
+        assert!(d.join("spellgui/web/laser3d/app.html").is_file());
+        assert!(d.join("design/SHORTCUTS.md").is_file());
+        assert!(d.join("profiles").is_dir());
+        let meu = d.join("shows").join("meu.spell");
+        std::fs::write(&meu, "{}").unwrap();
+        raiz_portatil(Some(&d)).unwrap();
+        assert!(meu.is_file(), "a second unpack keeps the user's show");
+        std::fs::remove_dir_all(&d).ok();
     }
 
     #[test]
