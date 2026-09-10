@@ -1,4 +1,4 @@
-/* Renderer, ambiente PMREM procedural, texturas procedurais e materiais do aparelho. Tudo sem asset externo. */
+/* Renderer, procedural PMREM environment, procedural textures and the materials of the device. All of it with no external asset. */
 window.MAT = function (THREE, R) {
   "use strict";
   R.physicallyCorrectLights = true; R.outputEncoding = THREE.sRGBEncoding; R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = .95; R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -12,9 +12,9 @@ window.MAT = function (THREE, R) {
   var brushR = noise(256, 256, function (x, y) { var v = 150 + (rows[y] - .5) * 60 + (Math.random() - .5) * 40; return [v, v, v]; }); brushR.repeat.set(3, 3);
   var grainR = noise(256, 256, function () { var v = 120 + Math.random() * 110; return [v, v, v]; }); grainR.repeat.set(20, 20);
   var anoN = noise(256, 256, function () { var v = (Math.random() - .5) * 10; return [128, 128 + v, 255]; }); anoN.repeat.set(8, 8);
-  // mesa óptica: furação M4 a cada 12,5 mm (24 × 16 em 300 × 200 mm), textura de cor + rugosidade
+  // optical bench: M4 holes every 12.5 mm (24 x 16 over 300 x 200 mm), colour + roughness texture
   var benchC = tex(1200, 800, function (x, w, h) { x.fillStyle = "#b9bec4"; x.fillRect(0, 0, w, h); for (var i = 0; i < 6000; i++) { x.fillStyle = "rgba(255,255,255," + Math.random() * .08 + ")"; x.fillRect(Math.random() * w, Math.random() * h, 40 + Math.random() * 80, 1); } for (var a = 0; a < 24; a++) for (var b = 0; b < 16; b++) { var cx = 25 + a * 50, cy = 25 + b * 50; x.fillStyle = "#3a3d40"; x.beginPath(); x.arc(cx, cy, 8, 0, 7); x.fill(); x.fillStyle = "#101214"; x.beginPath(); x.arc(cx, cy, 5.5, 0, 7); x.fill(); } }, true);
-  // PCB: máscara verde escura, trilhas manhattan, pads, silkscreen discreto
+  // PCB: dark green solder mask, manhattan traces, pads, discreet silkscreen
   function pcbTex(seed) { return tex(512, 384, function (x, w, h) { x.fillStyle = "#0b3b22"; x.fillRect(0, 0, w, h); var rnd = function () { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
       x.strokeStyle = "#1c6b3c"; x.lineWidth = 3; for (var i = 0; i < 70; i++) { x.beginPath(); var px = rnd() * w, py = rnd() * h; x.moveTo(px, py); for (var j = 0; j < 4; j++) { if (rnd() < .5) px = rnd() * w; else py = rnd() * h; x.lineTo(px, py); } x.stroke(); }
       for (i = 0; i < 160; i++) { var cx = rnd() * w, cy = rnd() * h; x.fillStyle = "#c9cdd1"; x.beginPath(); x.arc(cx, cy, 5, 0, 7); x.fill(); x.fillStyle = "#0b3b22"; x.beginPath(); x.arc(cx, cy, 2.2, 0, 7); x.fill(); }
@@ -28,9 +28,10 @@ window.MAT = function (THREE, R) {
     steel: M(0x8f959b, { metalness: .9, roughness: .35, roughnessMap: brushR }),
     dark: M(0x1e2226, { metalness: .6, roughness: .5, normalMap: anoN, normalScale: new THREE.Vector2(.2, .2) }),
     brass: M(0xc9a24a, { metalness: 1, roughness: .3, roughnessMap: brushR }),
-    // preto de ferragem (D-shell, powerCON, moldura de chave). metalness 0 não serve: a sala é forte de
-    // propósito (para o alumínio ficar bonito) e um albedo de 4 % em difusa pura sai CINZA-CLARO — os
-    // conectores pretos eram as peças mais claras do painel. Metal escuro tem difusa ~0 e não estoura.
+    // hardware black (D-shell, powerCON, key switch bezel). metalness 0 does not work: the room is
+    // bright on purpose (so the aluminium looks good) and a 4 % albedo in pure diffuse comes out
+    // LIGHT GREY — the black connectors were the brightest parts of the panel. Dark metal has diffuse
+    // ~0 and does not blow out.
     black: M(0x0a0b0d, { metalness: .7, roughness: .5, roughnessMap: grainR }),
     rubber: M(0x0d0e0f, { metalness: 0, roughness: .9, roughnessMap: grainR }),
     plastic: M(0x121416, { metalness: .05, roughness: .35 }),
@@ -44,7 +45,7 @@ window.MAT = function (THREE, R) {
     dichro: function (tint) { return new THREE.MeshPhysicalMaterial({ color: tint, metalness: 0, roughness: .02, transmission: .82, clearcoat: 1, clearcoatRoughness: .01, reflectivity: 1, transparent: true, opacity: .75, side: THREE.DoubleSide }); },
     mirror: M(0xf4f6f8, { metalness: 1, roughness: .02, side: THREE.DoubleSide }),
     led: function (c) { return new THREE.MeshBasicMaterial({ color: c }); } };
-  // caixa com aresta arredondada (chapa dobrada tem raio) e chapa com furo redondo (aro da ventoinha)
+  // box with a rounded edge (folded sheet metal has a radius) and a plate with a round hole (fan ring)
   function rbox(w, h, d, r) { r = Math.min(r || .004, w / 2, h / 2, d / 2); var s = new THREE.Shape(); s.moveTo(-w / 2 + r, -h / 2); s.lineTo(w / 2 - r, -h / 2); s.absarc(w / 2 - r, -h / 2 + r, r, -1.5708, 0, false); s.lineTo(w / 2, h / 2 - r); s.absarc(w / 2 - r, h / 2 - r, r, 0, 1.5708, false); s.lineTo(-w / 2 + r, h / 2); s.absarc(-w / 2 + r, h / 2 - r, r, 1.5708, 3.1416, false); s.lineTo(-w / 2, -h / 2 + r); s.absarc(-w / 2 + r, -h / 2 + r, r, 3.1416, 4.7124, false); var g = new THREE.ExtrudeGeometry(s, { depth: d - 2 * r, bevelEnabled: true, bevelThickness: r, bevelSize: r, bevelSegments: 3, curveSegments: 6 }); g.center(); return g; }
   function ring(w, hole, d) { var s = new THREE.Shape(); s.moveTo(-w / 2, -w / 2); s.lineTo(w / 2, -w / 2); s.lineTo(w / 2, w / 2); s.lineTo(-w / 2, w / 2); s.closePath(); var p = new THREE.Path(); p.absarc(0, 0, hole, 0, Math.PI * 2, true); s.holes.push(p); var g = new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: false, curveSegments: 32 }); g.center(); return g; }
   function hex(r, h) { return new THREE.CylinderGeometry(r, r, h, 6); }

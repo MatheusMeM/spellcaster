@@ -1,13 +1,13 @@
 "use strict";
 // node --test spellgui/web/test/
-// A parte da pagina do laser 3D que roda sem WebGL: o manifesto das acoes (o que a frente MIDI
-// vai consumir), o mapa estado -> comando do registry, e o leitor de ILDA.
+// The part of the 3D laser page that runs without WebGL: the manifest of the actions (what the MIDI
+// front end will consume), the state -> registry command map, and the ILDA reader.
 
 const { test } = require("node:test");
 const assert = require("node:assert");
 
-// bind.js e ilda.js sao arquivos de navegador: dois stubs bastam (loopback do DOM).
-// O stub guarda o handler de keydown: e' por ele que o teste do teclado dispara tecla sem browser.
+// bind.js and ilda.js are browser files: two stubs are enough (DOM loopback).
+// The stub keeps the keydown handler: that is how the keyboard test fires a key with no browser.
 global.window = {};
 const KEYDOWN = [];
 global.document = { addEventListener(t, f) { if (t === "keydown") KEYDOWN.push(f); } };
@@ -17,49 +17,49 @@ const Bind = require("../laser3d/bind.js");
 const ILDA = require("../laser3d/ilda.js");
 const { cmdFor } = require("../laser3d/engine.js");
 
-test("Bind.manifest: uma linha por acao, com tecla, MIDI e tipo", () => {
-  Bind.def("key.toggle", "chave: arma", () => {}, { key: "S", get: () => true });
+test("Bind.manifest: one row per action, with key, MIDI and type", () => {
+  Bind.def("key.toggle", "key switch: arms", () => {}, { key: "S", get: () => true });
   Bind.def("kpps", "kpps (fader)", () => {}, { type: "cc" });
-  Bind.def("mudo", "sem tecla", () => {});
+  Bind.def("mute", "no key", () => {});
   const m = Bind.manifest();
-  assert.deepStrictEqual(m.map(a => a.id), ["key.toggle", "kpps", "mudo"], "ordem de declaracao");
-  assert.deepStrictEqual(m[0], { id: "key.toggle", label: "chave: arma", key: "S", midi: "", type: "btn" });
-  assert.strictEqual(m[1].type, "cc", "fader e' cc, nao botao");
-  assert.strictEqual(m[2].key, "", "acao sem tecla nao inventa tecla");
+  assert.deepStrictEqual(m.map(a => a.id), ["key.toggle", "kpps", "mute"], "declaration order");
+  assert.deepStrictEqual(m[0], { id: "key.toggle", label: "key switch: arms", key: "S", midi: "", type: "btn" });
+  assert.strictEqual(m[1].type, "cc", "a fader is cc, not a button");
+  assert.strictEqual(m[2].key, "", "an action with no key does not invent one");
 });
 
-test("cmdFor: a chave abre e fecha o DAC", () => {
+test("cmdFor: the key switch opens and closes the DAC", () => {
   assert.deepStrictEqual(cmdFor("key", true, { dac: "etherdream", host: "10.0.0.9", kpps: 30000 }),
     { cmd: "laser_open", args: { dac: "etherdream", host: "10.0.0.9", kpps: 30 } });
   assert.deepStrictEqual(cmdFor("key", false, { feed: 7 }), { cmd: "laser_close", args: { feed: 7 } });
-  assert.strictEqual(cmdFor("key", false, {}), null, "desarmar sem feed aberto nao manda nada");
+  assert.strictEqual(cmdFor("key", false, {}), null, "disarming with no open feed sends nothing");
 });
 
-test("cmdFor: play toca o .ild no feed, e o transporte anda com o show", () => {
+test("cmdFor: play plays the .ild on the feed, and the transport moves with the show", () => {
   assert.deepStrictEqual(cmdFor("play", true, { feed: 2, file: "shows/a.ild", fps: 25 }),
     { cmd: "laser_play", args: { feed: 2, file: "shows/a.ild", fps: 25, loop: true } });
   assert.deepStrictEqual(cmdFor("play", false, { feed: 2 }), { cmd: "laser_stop", args: { feed: 2 } });
-  assert.strictEqual(cmdFor("play", true, { feed: 2 }), null, "sem arquivo nao ha' o que tocar");
-  assert.strictEqual(cmdFor("play", true, {}), null, "sem feed nao ha' onde tocar");
+  assert.strictEqual(cmdFor("play", true, { feed: 2 }), null, "with no file there is nothing to play");
+  assert.strictEqual(cmdFor("play", true, {}), null, "with no feed there is nowhere to play");
   assert.deepStrictEqual(cmdFor("transport", true, { show: "medgrupo" }), { cmd: "resume", args: {} });
   assert.deepStrictEqual(cmdFor("transport", false, { show: "medgrupo" }), { cmd: "pause", args: {} });
-  assert.strictEqual(cmdFor("transport", true, {}), null, "sem show carregado o transporte fica quieto");
+  assert.strictEqual(cmdFor("transport", true, {}), null, "with no show loaded the transport stays quiet");
 });
 
-test("cmdFor: os parametros que o laser_param aceita hoje, e so' eles", () => {
+test("cmdFor: the parameters laser_param accepts today, and only those", () => {
   const st = { feed: 1 };
   assert.deepStrictEqual(cmdFor("size", 1.25, st), { cmd: "laser_param", args: { feed: 1, path: "geo/scale", value: 1.25 } });
   assert.deepStrictEqual(cmdFor("lim.g", 0.5, st), { cmd: "laser_param", args: { feed: 1, path: "limit/g", value: 0.5 } });
-  // interlock fechado = obturador aberto
+  // interlock closed = shutter open
   assert.deepStrictEqual(cmdFor("lock", true, st), { cmd: "laser_param", args: { feed: 1, path: "shutter", value: 0 } });
   assert.deepStrictEqual(cmdFor("lock", false, st), { cmd: "laser_param", args: { feed: 1, path: "shutter", value: 1 } });
   for (const id of ["kpps", "gam.r", "dmx", "buffer", "speed", "net.sacn", "power", "cam.show"]) {
-    assert.strictEqual(cmdFor(id, 1, st), null, id + " ainda nao tem comando: fica local");
+    assert.strictEqual(cmdFor(id, 1, st), null, id + " has no command yet: it stays local");
   }
-  assert.strictEqual(cmdFor("size", 1, {}), null, "sem feed aberto nao ha' o que parametrizar");
+  assert.strictEqual(cmdFor("size", 1, {}), null, "with no open feed there is nothing to parametrize");
 });
 
-test("ILDA: le de volta o frame que escreveu (formato 5, RGB)", () => {
+test("ILDA: reads back the frame it wrote (format 5, RGB)", () => {
   const frame = [
     { x: 0, y: 0, r: 255, g: 0, b: 0, bl: true },
     { x: 10000, y: -10000, r: 0, g: 255, b: 0, bl: false },
@@ -67,92 +67,92 @@ test("ILDA: le de volta o frame que escreveu (formato 5, RGB)", () => {
   ];
   const d = ILDA.parse(ILDA.write([frame]).buffer);
   assert.strictEqual(d.frames.length, 1);
-  assert.strictEqual(d.name, "SPELL", "o cabecalho leva o nome de quem escreveu");
+  assert.strictEqual(d.name, "SPELL", "the header carries the name of whoever wrote it");
   assert.deepStrictEqual(d.frames[0], frame);
 });
 
-test("ILDA: dado que nao e' ILDA devolve zero frame, sem estourar", () => {
+test("ILDA: data that is not ILDA gives back zero frames, without blowing up", () => {
   assert.deepStrictEqual(ILDA.parse(new Uint8Array(64).buffer).frames, []);
 });
 
-// ---- display e controles (frente ui-3d-usab) ----
+// ---- display and controls (ui-3d-usab front) ----
 const { oledLines, CONTROLS, kindOf, PAGES } = require("../laser3d/engine.js");
 
-test("oledLines: desligado so' diz que esta' desligado; ligado, a linha grande e' o estado", () => {
-  assert.strictEqual(oledLines({ power: false }, {})[1], "DESLIGADO");
-  const desarm = oledLines({ power: true, key: false, lock: true, page: 0, kpps: 30000, show: [[1, 2, 3]], frame: 0 }, {});
-  assert.strictEqual(desarm[1], "DESARMADO");
-  assert.match(desarm[0], /^STATUS +1\/7$/);
+test("oledLines: off it only says it is off; on, the big line is the state", () => {
+  assert.strictEqual(oledLines({ power: false }, {})[1], "OFF");
+  const disarmed = oledLines({ power: true, key: false, lock: true, page: 0, kpps: 30000, show: [[1, 2, 3]], frame: 0 }, {});
+  assert.strictEqual(disarmed[1], "DISARMED");
+  assert.match(disarmed[0], /^STATUS +1\/7$/);
   assert.strictEqual(oledLines({ power: true, key: true, lock: true, page: 0, kpps: 30000, show: [[]], frame: 0 }, {})[1], "LIVE");
   assert.strictEqual(oledLines({ power: true, key: true, lock: false, page: 0, kpps: 30000, show: [[]], frame: 0 }, {})[1], "SCAN FAIL");
 });
 
-test("oledLines: campo em edicao leva '>' e a pagina ERRO mostra o ultimo erro", () => {
+test("oledLines: a field being edited carries '>' and the ERROR page shows the last error", () => {
   const dmx = oledLines({ power: true, page: PAGES.indexOf("DMX"), edit: true, field: 1, dmx: 7, univ: 3 }, {});
   assert.strictEqual(dmx[1], "ADDR 007");
-  assert.strictEqual(dmx[2][0], " ", "campo 0 nao esta' selecionado");
-  assert.strictEqual(dmx[3][0], ">", "campo 1 selecionado");
-  const erro = oledLines({ power: true, page: PAGES.indexOf("ERRO"), err: { msg: "laser_open: sem DAC", when: "20:34:00" } }, {});
-  assert.strictEqual(erro[1], "ERRO");
-  assert.strictEqual(erro[2], " LASER_OPEN: SEM DAC");
-  assert.ok(oledLines({ power: true, page: 0 }, {}).every(l => /^[\x20-\x7e]*$/.test(l)), "display so' ASCII");
+  assert.strictEqual(dmx[2][0], " ", "field 0 is not selected");
+  assert.strictEqual(dmx[3][0], ">", "field 1 selected");
+  const err = oledLines({ power: true, page: PAGES.indexOf("ERROR"), err: { msg: "laser_open: no DAC", when: "20:34:00" } }, {});
+  assert.strictEqual(err[1], "ERROR");
+  assert.strictEqual(err[2], " LASER_OPEN: NO DAC");
+  assert.ok(oledLines({ power: true, page: 0 }, {}).every(l => /^[\x20-\x7e]*$/.test(l)), "the display is ASCII only");
 });
 
-test("CONTROLS: um controle, uma familia; energia num ponto so'", () => {
-  const fam = new Set(["toggle", "momentary", "valor", "navegacao", "mapear", "peca"]);
-  for (const k in CONTROLS) assert.ok(fam.has(CONTROLS[k][0]), k + " tem familia conhecida");
-  assert.strictEqual(kindOf("power"), "toggle", "rocker liga e desliga");
+test("CONTROLS: one control, one family; power in a single spot", () => {
+  const fam = new Set(["toggle", "momentary", "value", "nav", "map", "part"]);
+  for (const k in CONTROLS) assert.ok(fam.has(CONTROLS[k][0]), k + " has a known family");
+  assert.strictEqual(kindOf("power"), "toggle", "the rocker turns it on and off");
   const toggles = Object.keys(CONTROLS).filter(k => CONTROLS[k][0] === "toggle");
-  assert.deepStrictEqual(toggles.sort(), ["keyswitch", "power"], "cada toggle e' uma funcao unica");
-  assert.strictEqual(kindOf("fusivel"), "", "nao existe fusivel");
+  assert.deepStrictEqual(toggles.sort(), ["keyswitch", "power"], "each toggle is a unique function");
+  assert.strictEqual(kindOf("fuse"), "", "there is no fuse");
 });
 
-// ---- hover so' em controle, e o interlock como entrada (frente hud-4) ----
+// ---- hover only on a control, and the interlock as an input (hud-4 front) ----
 const { inert, labelOf } = require("../laser3d/engine.js");
 
-test("peca sem funcao: sem rotulo, inerte, e a USB nao existe mais", () => {
-  // o dono: "nao quero que tenham menus de hover na frente tampa e aletas", "nao quero ter menu
-  // hover no ac", "nao quero hover menu na ventoinha", "quero que vc apague a entrada USB".
+test("a part with no function: no label, inert, and the USB does not exist any more", () => {
+  // the owner: "I do not want hover menus on the front, lid and fins", "I do not want a hover
+  // menu on the ac", "I do not want a hover menu on the fan", "I want you to delete the USB input".
   for (const k of ["lid", "side", "front", "aperture", "acin", "fan", "bench", "dichro", "fold", "psu", "pcb", "dac"])
-    assert.strictEqual(CONTROLS[k][1], "", k + " nao tem tooltip");
+    assert.strictEqual(CONTROLS[k][1], "", k + " has no tooltip");
   for (const k of ["side", "front", "aperture", "acin", "fan", "bench", "dichro", "fold", "psu", "pcb", "dac"])
-    assert.ok(inert(k), k + " e' peca: nao acende e o clique nao faz nada");
-  assert.strictEqual(CONTROLS.usb, undefined, "a porta USB saiu do aparelho");
-  assert.ok(inert("usb"), "chave fora da tabela e' peca inerte");
-  assert.strictEqual(labelOf("usb"), "", "chave desconhecida nao vira tooltip com o nome dela");
-  // a tampa continua clicavel (abrir = preferencias), so' que sem tooltip
-  assert.strictEqual(kindOf("lid"), "navegacao");
-  assert.ok(!inert("lid"), "a tampa abre no clique");
-  assert.ok(!inert("pino.ilda"), "os pinos do Pino tem dono e rotulo proprios");
-  assert.ok(!inert("enc") && !inert("power") && !inert("rj45"), "controle continua controle");
+    assert.ok(inert(k), k + " is a part: it does not light up and the click does nothing");
+  assert.strictEqual(CONTROLS.usb, undefined, "the USB port left the device");
+  assert.ok(inert("usb"), "a key outside the table is an inert part");
+  assert.strictEqual(labelOf("usb"), "", "an unknown key does not become a tooltip with its own name");
+  // the lid stays clickable (opening = preferences), only with no tooltip
+  assert.strictEqual(kindOf("lid"), "nav");
+  assert.ok(!inert("lid"), "the lid opens on click");
+  assert.ok(!inert("pino.ilda"), "the pins of the Pino have their own owner and label");
+  assert.ok(!inert("enc") && !inert("power") && !inert("rj45"), "a control is still a control");
 });
 
-test("interlock e' uma entrada: familia 'mapear', nao toggle", () => {
-  assert.strictEqual(kindOf("interlock"), "mapear", "clicar abre onde se mapeia quem aciona");
+test("the interlock is an input: family 'map', not toggle", () => {
+  assert.strictEqual(kindOf("interlock"), "map", "clicking opens where you map what drives it");
   assert.ok(!inert("interlock"));
-  assert.ok(CONTROLS.interlock[1], "o interlock ainda diz o que e' no tooltip");
+  assert.ok(CONTROLS.interlock[1], "the interlock still says what it is in the tooltip");
 });
 
-// O teclado e' do aparelho: um <input type=range> focado (o fader do painel) so' pode ficar com as
-// teclas que ele usa. Antes qualquer input focado devolvia cedo e matava o teclado inteiro.
-test("teclado: fader focado nao mata as teclas do aparelho; Escape cancela o learn de MIDI", () => {
+// The keyboard belongs to the device: a focused <input type=range> (the panel fader) can only keep the
+// keys it uses. Before, any focused input returned early and killed the whole keyboard.
+test("keyboard: a focused fader does not kill the device keys; Escape cancels the MIDI learn", () => {
   let n = 0;
-  Bind.def("teste.tecla", "teste", () => { n++; }, { key: "Q" });
-  assert.ok(press("q"), "tecla do aparelho responde e consome o evento");
+  Bind.def("test.key", "test", () => { n++; }, { key: "Q" });
+  assert.ok(press("q"), "a device key answers and consumes the event");
   assert.strictEqual(n, 1);
   press("q", { tagName: "INPUT", type: "range" });
-  assert.strictEqual(n, 2, "fader focado nao mata o teclado do aparelho");
-  assert.strictEqual(press("ArrowUp", { tagName: "INPUT", type: "range" }), false, "seta e' do fader");
+  assert.strictEqual(n, 2, "a focused fader does not kill the device keyboard");
+  assert.strictEqual(press("ArrowUp", { tagName: "INPUT", type: "range" }), false, "the arrow belongs to the fader");
   press("q", { tagName: "INPUT", type: "text" });
-  assert.strictEqual(n, 2, "campo de texto engole a tecla");
+  assert.strictEqual(n, 2, "a text field swallows the key");
   press("q", { tagName: "DIV", isContentEditable: true });
-  assert.strictEqual(n, 2, "campo editavel tambem");
+  assert.strictEqual(n, 2, "an editable field too");
 
-  Bind.click({ target: { closest: () => ({ dataset: { learn: "midi", id: "teste.tecla" } }) } });
-  assert.ok(Bind.learnState(), "learn de MIDI armado");
+  Bind.click({ target: { closest: () => ({ dataset: { learn: "midi", id: "test.key" } }) } });
+  assert.ok(Bind.learnState(), "MIDI learn armed");
   press("Q");
-  assert.ok(Bind.learnState(), "no learn de MIDI a tecla nao vira binding");
-  assert.strictEqual(n, 2, "nem dispara a acao");
+  assert.ok(Bind.learnState(), "during MIDI learn the key does not become a binding");
+  assert.strictEqual(n, 2, "it does not fire the action either");
   press("Escape");
-  assert.strictEqual(Bind.learnState(), null, "Escape cancela o learn de MIDI");
+  assert.strictEqual(Bind.learnState(), null, "Escape cancels the MIDI learn");
 });

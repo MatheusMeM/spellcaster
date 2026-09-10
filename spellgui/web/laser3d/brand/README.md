@@ -1,14 +1,14 @@
-# brand/ — a marca Feitiçaria Industrial
+# brand/ — the Feitiçaria Industrial brand
 
-Vetores oficiais de `4-Marketing/ID VISUAL 2026/Logos/SVG (vetor)/`, com o preenchimento trocado de
-`#333` para `#F2F1EA` (a marca é clara sobre o chassi preto e sobre o HUD escuro).
+Official vectors from `4-Marketing/ID VISUAL 2026/Logos/SVG (vetor)/`, with the fill swapped from
+`#333` to `#F2F1EA` (the brand is light over the black chassis and over the dark HUD).
 
-| arquivo | o que é | onde usar |
+| file | what it is | where to use it |
 |---|---|---|
-| `symbol.svg` | o símbolo (boneco em órbita) sozinho, recortado do `stacked.svg` (não existe como arquivo oficial) | ícone, favicon, botão de voltar o Pino, canto do display |
-| `submark.svg` | FEITIÇARIA + símbolo, sem INDUSTRIAL (horizontal 1009×305) | tampa, etiqueta, onde o nome inteiro não cabe |
-| `wordmark.svg` | FEITIÇARIA INDUSTRIAL em texto | serigrafia da traseira, rodapé do HUD |
-| `main.svg` | FEITIÇARIA + símbolo (horizontal) | HUD, splash |
-| `stacked.svg` | símbolo em cima do nome | telas quadradas, bench |
+| `symbol.svg` | the symbol (figure in orbit) on its own, cut out of `stacked.svg` (it does not exist as an official file) | icon, favicon, the button that brings the Pino back, corner of the display |
+| `submark.svg` | FEITIÇARIA + symbol, without INDUSTRIAL (horizontal 1009×305) | lid, label, wherever the whole name does not fit |
+| `wordmark.svg` | FEITIÇARIA INDUSTRIAL as text | silkscreen of the rear panel, HUD footer |
+| `main.svg` | FEITIÇARIA + symbol (horizontal) | HUD, splash |
+| `stacked.svg` | symbol on top of the name | square screens, bench |
 
-Para desenhar em textura de canvas: `img = new Image(); img.src = "brand/wordmark.svg"; img.onload → ctx.drawImage(img, x, y, w, h)` e `texture.needsUpdate = true` depois do load. A serigrafia da traseira (`body.js`) faz isso.
+To draw onto a canvas texture: `img = new Image(); img.src = "brand/wordmark.svg"; img.onload → ctx.drawImage(img, x, y, w, h)` and `texture.needsUpdate = true` after the load. The silkscreen of the rear panel (`body.js`) does exactly that.
