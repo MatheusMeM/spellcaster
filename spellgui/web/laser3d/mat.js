@@ -28,7 +28,10 @@ window.MAT = function (THREE, R) {
     steel: M(0x8f959b, { metalness: .9, roughness: .35, roughnessMap: brushR }),
     dark: M(0x1e2226, { metalness: .6, roughness: .5, normalMap: anoN, normalScale: new THREE.Vector2(.2, .2) }),
     brass: M(0xc9a24a, { metalness: 1, roughness: .3, roughnessMap: brushR }),
-    black: M(0x0a0b0d, { metalness: 0, roughness: .55, roughnessMap: grainR }),
+    // preto de ferragem (D-shell, powerCON, moldura de chave). metalness 0 não serve: a sala é forte de
+    // propósito (para o alumínio ficar bonito) e um albedo de 4 % em difusa pura sai CINZA-CLARO — os
+    // conectores pretos eram as peças mais claras do painel. Metal escuro tem difusa ~0 e não estoura.
+    black: M(0x0a0b0d, { metalness: .7, roughness: .5, roughnessMap: grainR }),
     rubber: M(0x0d0e0f, { metalness: 0, roughness: .9, roughnessMap: grainR }),
     plastic: M(0x121416, { metalness: .05, roughness: .35 }),
     white: M(0xe6e8ea, { metalness: 0, roughness: .5 }),
