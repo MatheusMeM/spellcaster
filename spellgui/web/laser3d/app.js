@@ -44,18 +44,27 @@
       if (c.cmd === "laser_close") { ENG.feed = null; ENG.stats = null; ENG.err = false; }
       drawOled(); refresh(); return r;
     }, function (e) { if (c.cmd === "laser_open") ENG.feed = null; var m = String(e.message); fail(m.indexOf(c.cmd) === 0 ? m : c.cmd + ": " + m); }); }
-  function showName() { bus.call("show_get", {}).then(function (r) { ENG.show = (r && r.name) || ""; ENG.rev = bus.rev; drawOled(); }, function () {}); }
-  function hello() { ENG.on = true; showName();
+  // `full` traz também `inputs`: é de lá que o HUD sabe se existe entrada Art-Net ou sACN, e em
+  // que universo. Sem isso a linha de entrada seria chute — e o HUD não chuta.
+  function showName() { bus.call("show_get", { full: true }).then(function (r) { ENG.show = (r && r.name) || ""; ENG.rev = bus.rev; readInputs(r); drawOled(); refresh(); }, function () {}); }
+  /// Firmware no chassi (o dono: "grava o firmware no próprio chassi"): a versão vem do engine, e
+  /// só dele. Sem engine a placa escreve FIRMWARE OFFLINE — placa de aparelho não inventa número.
+  function plate(fw) { if (B.plate) B.plate({ fw: fw || null, sn: "SC-0512" }); }
+  // ponytail: `version` ainda não é comando do registry ; quando for, a placa passa a ler dele em
+  // vez do `ver` que a página carrega.
+  function fwPlate() { bus.call("version", {}).then(function (r) { plate((r && (r.version || r.ver)) || ENG.ver); }, function () { plate(ENG.ver); }); }
+  function hello() { ENG.on = true; showName(); fwPlate();
     bus.call("laser_files", {}).then(function (r) { ENG.files = (r && r.files) || []; refresh(); }, function (e) { fail("laser_files: " + e.message); });
     drawOled(); refresh(); }
   bus.on("open", hello);
   bus.on("show", showName); // outra página renomeou ou editou o show: o display não pode mentir
   bus.on("transport", function (d) { ENG.tr = d; drawOled(); }); // página SHOW: t, estado e duração vêm daqui
   bus.on("log", function (d) { ENG.log = (d && d.text) || ""; if (/erro|error|falha|fail/i.test(ENG.log)) fail(ENG.log); else drawOled(); });
-  // ponytail: o `dmx` do barramento é o frame que SAI (topic 1) ; vira entrada quando o engine
-  // publicar o universo recebido — a página já mostra o canal do endereço configurado.
-  bus.on("dmx", function (d) { if (d) S.dmxIn = { universe: d.universe, value: d.data[Math.max(0, S.dmx - 1)] }; });
-  bus.on("close", function () { ENG.on = false; ENG.feed = null; ENG.stats = null; ENG.tr = null; drawOled(); refresh(); });
+  // topic 1 é o frame que SAI, topic 2 é o que ENTRA (`show.inputs`): a entrada é que acende o LED
+  // de Art-Net / sACN no HUD, e ela só acende com frame recebido de verdade.
+  bus.on("dmx", function (d) { if (!d) return; if (d.topic === 2) INPUTS.forEach(function (i) { if (i.u === d.universe) i.last = performance.now(); });
+    S.dmxIn = { universe: d.universe, value: d.data[Math.max(0, S.dmx - 1)] }; });
+  bus.on("close", function () { ENG.on = false; ENG.feed = null; ENG.stats = null; ENG.tr = null; INPUTS = []; plate(null); drawOled(); refresh(); });
   // ponytail: `laser_stats` por polling de 1 s ; vira evento quando o engine publicar um tópico de laser
   setInterval(function () { if (ENG.feed == null) return; bus.call("laser_stats", { feed: ENG.feed }).then(function (r) { ENG.stats = r; drawOled(); }, function () {}); }, 1000);
   /// Toca um .ild que está no disco do engine: o engine manda para o DAC, a página lê o mesmo
@@ -123,23 +132,47 @@
   var VIEWS = { show: [[1.5, .95, 1.25], [0, .8, -1.9]], rear: [[.015, .445, .60], [0, .40, .04]], inside: [[.09, .80, .27], [-.02, .38, -.03]], wall0: [[.25, .8, .35], [0, 1.5, -2.6]], wall: [[0, 2.0, .2], [0, 2.2, -5]] }, camSpeed = 5;
   // a câmera anda por baixo do cursor: a etiqueta da peça que estava sob ele fica mentindo na tela
   // (e a peça continua acesa) até o próximo movimento do mouse. Trocar de vista apaga as duas.
-  function setCam(k, speed) { S.cam = k; unhover(); CAM.setView(VIEWS[k][0], VIEWS[k][1]); camSpeed = speed || 5; document.querySelectorAll("#cams [data-a]").forEach(function (b) { b.classList.toggle("on", b.dataset.a === "cam." + k); }); if (S.mode === "play") blip(k === "inside" ? 700 : 1000); if (k !== "inside") closePanel(); }
+  function setCam(k, speed) { S.cam = k; unhover(); CAM.setView(VIEWS[k][0], VIEWS[k][1]); camSpeed = speed || 5; document.querySelectorAll("#cams [data-a]").forEach(function (b) { b.classList.toggle("on", b.dataset.a === "cam." + k); }); if (S.mode === "play") blip(k === "inside" ? 700 : 1000); }
   var CENTER = new THREE.Vector3(0, .40, 0);
 
-  /* ---------- painel ---------- */
-  var panel = $("#panel"), pbody = $("#pbody"), pcur = null; panel.querySelector(".x").addEventListener("click", closePanel);
-  function closePanel() { panel.classList.remove("on"); pcur = null; }
-  function open(title, sub, html, wide, id) { panel.classList.toggle("wide", !!wide); pbody.innerHTML = "<h3>" + title + "</h3><div class='sub'>" + sub + "</div>" + html; panel.classList.add("on"); pcur = id || null; }
+  /* ---------- painel: a gaveta da direita ----------
+     Todo menu e toda configuração moram aqui (pedido do dono), numa gaveta de 360 px com abas, no
+     lugar do painel flutuante que tapava o aparelho. Clicar numa peça abre a aba daquela peça: é a
+     mesma navegação de antes, num lugar só. O puxador na borda abre e fecha, `Tab` também, `Esc`
+     fecha. Dentro da gaveta o `Tab` volta a ser do teclado (foco entre os controles). */
+  var drawer = $("#drawer"), dbody = $("#dbody"), dtabs = $("#dtabs"), dcur = "laser";
+  var TABN = { laser: "LASER", dmx: "DMX", net: "NET", interlock: "INTERLOCK", bind: "BINDINGS", info: "INFO" };
+  dtabs.innerHTML = Object.keys(TABN).map(function (t) { return "<button class='lb' data-tab='" + t + "'>" + TABN[t] + "</button>"; }).join("");
+  function drawerOn() { return drawer.classList.contains("on"); }
+  function openDrawer(tab) { if (tab) dcur = tab; drawer.classList.add("on"); paint(); }
+  function closeDrawer() { drawer.classList.remove("on"); }
+  function toggleDrawer() { if (drawerOn()) closeDrawer(); else openDrawer(); }
+  function paint() { dbody.innerHTML = PANE[dcur](); var cv = dbody.querySelector("[data-cv]"); if (cv) cv.replaceWith(curveCanvas());
+    dtabs.querySelectorAll("[data-tab]").forEach(function (b) { b.classList.toggle("on", b.dataset.tab === dcur); }); }
+  function refresh() { if (drawerOn()) paint(); }
+  $("#dpull").addEventListener("click", toggleDrawer);
+  dtabs.addEventListener("click", function (e) { var b = e.target.closest("[data-tab]"); if (b) { blip(1000); openDrawer(b.dataset.tab); } });
+  // dentro da gaveta o Tab é do teclado, não do aparelho: sem isto o binding global engolia o Tab
+  // e não havia como andar de controle em controle com o teclado (SISTEMA.md §11).
+  drawer.addEventListener("keydown", function (e) { if (e.key === "Tab") e.stopPropagation(); });
+  /// `cam-4` desloca o enquadramento da vista TRÁS pelo que a gaveta ocupa: a gaveta não pode
+  /// tapar o aparelho, e ela abre e fecha.
+  window.SC = window.SC || {}; SC.drawerWidth = function () { return drawerOn() ? drawer.offsetWidth : 0; };
   function get(p) { var a = p.split("."), o = S; for (var i = 0; i < a.length; i++) o = o[a[i]]; return o; } function set(p, v) { var a = p.split("."), o = S; for (var i = 0; i < a.length - 1; i++) o = o[a[i]]; o[a[a.length - 1]] = v; }
   var FMT = { kpps: function (v) { return Math.round(v / 1000) + "k"; }, pct: function (v) { return Math.round(v * 100) + "%"; }, gam: function (v) { return "γ " + (+v).toFixed(2); }, n: function (v) { return v; }, x: function (v) { return "×" + (+v).toFixed(2); } }, fmtOf = {};
   function rg(label, path, min, max, step, f) { fmtOf[path] = FMT[f]; return "<div class='row'><span>" + label + "</span><input type='range' data-p='" + path + "' min='" + min + "' max='" + max + "' step='" + step + "' value='" + get(path) + "'><span class='v' data-v='" + path + "'>" + FMT[f](get(path)) + "</span></div>"; }
-  panel.addEventListener("input", function (e) { var r = e.target; if (!r.dataset.p) return; set(r.dataset.p, +r.value); panel.querySelector("[data-v='" + r.dataset.p + "']").textContent = fmtOf[r.dataset.p](+r.value); remember(); if (/^(lim|gam)\./.test(r.dataset.p)) { var old = pbody.querySelector(".cv"); if (old) old.replaceWith(curveCanvas()); } push(r.dataset.p, get(r.dataset.p)); Bind.syncAll(); });
+  /// Campo de texto (host do DAC, universo/canal do interlock, tópico MQTT) não redesenha a gaveta
+  /// enquanto se digita: o campo sumiria debaixo do cursor.
+  drawer.addEventListener("input", function (e) { var r = e.target;
+    if (r.dataset.host !== undefined) { ENG.host = r.value.trim(); return; }
+    if (r.dataset.ilk) { ILK[r.dataset.ilk] = r.dataset.ilk === "topic" ? r.value : Math.max(1, Math.min(512, +r.value || 1)); ilkSave(); return; }
+    if (!r.dataset.p) return; set(r.dataset.p, +r.value); dbody.querySelector("[data-v='" + r.dataset.p + "']").textContent = fmtOf[r.dataset.p](+r.value); remember(); if (/^(lim|gam)\./.test(r.dataset.p)) { var old = dbody.querySelector(".cv"); if (old) old.replaceWith(curveCanvas()); } push(r.dataset.p, get(r.dataset.p)); Bind.syncAll(); });
   /// O mesmo valor aparece em três lugares no painel (fader, número e a linha `spell` do `<pre>`),
   /// e o `<pre>` ficava congelado no valor de quando o painel abriu — LIMITE 25% com
   /// `spell ilda limit --r 1.00` embaixo. Ao SOLTAR o fader o painel se redesenha inteiro (não
   /// durante o arrasto, que destruiria o fader na mão) e o foco volta para o mesmo fader.
-  panel.addEventListener("change", function (e) { var p = e.target.dataset.p; if (!p) return; refresh(); var el = pbody.querySelector("[data-p='" + p + "']"); if (el) el.focus(); });
-  panel.addEventListener("click", function (e) { if (Bind.click(e)) { PANELS.bind(); return; }
+  drawer.addEventListener("change", function (e) { var p = e.target.dataset.p; if (!p) return; refresh(); var el = dbody.querySelector("[data-p='" + p + "']"); if (el) el.focus(); });
+  drawer.addEventListener("click", function (e) { if (Bind.click(e)) { paint(); return; }
     var f = e.target.closest("[data-f]"); if (f) { playFile(f.dataset.f, f.dataset.n); refresh(); return; }
     var d = e.target.closest("[data-d]"); if (d) { var p = d.dataset.d.split("|"); ENG.dac = p[0]; ENG.host = p[1]; refresh(); return; }
     var b = e.target.closest("[data-a]"); if (b) Bind.run(b.dataset.a); });
@@ -155,38 +188,64 @@
     return "<div class='fl'>" + ENG.files.map(function (f) { return "<button class='lb" + (ENG.file === f.path ? " on" : "") + "' data-f=\"" + f.path.replace(/"/g, "&quot;") + "\" data-n=\"" + f.name.replace(/"/g, "&quot;") + "\">" + f.name + " <small>" + Math.round(f.bytes / 1024) + " kB</small></button>"; }).join("") + "</div>"; }
   /// A chave arma o aparelho, e armar é abrir um DAC: sem DAC escolhido não há o que armar.
   function dacList() { if (!ENG.on) return "<pre>engine offline · a chave arma só o modelo</pre>";
-    return "<pre>DAC <b>" + ENG.dac + " " + (ENG.host || "(sem host)") + "</b>" + (ENG.feed != null ? " · feed " + ENG.feed : "") + "\nspell laser_open --dac " + ENG.dac + " --host " + (ENG.host || "&lt;ip&gt;") + " --kpps " + Math.round(S.kpps / 1000) + "</pre><div class='btns'><button class='lb" + (ENG.scan ? " on" : "") + "' data-a='dacs'>" + (ENG.scan ? "PROCURANDO…" : "PROCURAR DACS") + "</button>"
+    return "<pre>DAC <b>" + ENG.dac + " " + (ENG.host || "(sem host)") + "</b>" + (ENG.feed != null ? " · feed " + ENG.feed : "") + "\nspell laser_open --dac " + ENG.dac + " --host " + (ENG.host || "&lt;ip&gt;") + " --kpps " + Math.round(S.kpps / 1000) + "</pre>"
+      + "<div class='map'><span>HOST</span><input class='tx' data-host value=\"" + ENG.host.replace(/"/g, "&quot;") + "\" placeholder=\"169.254.207.140\"></div>"
+      + "<div class='btns'><button class='lb" + (ENG.scan ? " on" : "") + "' data-a='dacs'>" + (ENG.scan ? "PROCURANDO…" : "PROCURAR DACS") + "</button>"
       + (ENG.dacs || []).map(function (d) { return "<button class='lb" + (ENG.host === d.host ? " on" : "") + "' data-d=\"" + d.type + "|" + d.host + "\">" + d.type.toUpperCase() + " " + d.host + "</button>"; }).join("") + "</div>"; }
-  var PANELS = {
+  function h3(t, s) { return "<h3>" + t + "</h3><div class='sub'>" + s + "</div>"; }
+  /// O interlock não é um botão de liga-desliga: é uma ENTRADA do aparelho. Quem o aciona é a fonte
+  /// mapeada aqui, e a identidade dela é um endereço textual (FUNCOES/README regra 2), o mesmo em
+  /// tecla, MIDI, OSC, Art-Net, MQTT e CLI. Só o que já existe no engine é ligado de verdade
+  /// (tecla e MIDI, pelo `Bind`); o resto mostra o endereço e a linha de CLI, marcada "em breve".
+  var ILK_ADDR = "laser/1/interlock", ILK = { univ: 1, chan: 512, topic: "spell/laser/1/interlock" };
+  try { var im = JSON.parse(localStorage.getItem("sc-laser-ilk") || "null"); if (im) { ILK.univ = im.univ || ILK.univ; ILK.chan = im.chan || ILK.chan; ILK.topic = im.topic || ILK.topic; } } catch (e) {}
+  function ilkSave() { try { localStorage.setItem("sc-laser-ilk", JSON.stringify(ILK)); } catch (e) {} }
+  function learnBtn(src, ready) { var l = Bind.learnState(), on = l && l.id === "lock.toggle" && l.src === src;
+    return "<button class='lb" + (on ? " learn" : "") + "' data-learn='" + src + "' data-id='lock.toggle'>" + (on ? ready : (Bind.keyOf("lock.toggle", src) || "MAPEAR")) + "</button>"; }
+  var PANE = {
     /// Contador ao vivo é do HUD (canto de cima: frame, pontos, fps). Aqui ficava a mesma conta
     /// congelada no instante em que o painel abriu — número parado ao lado de um número andando é
-    /// pior que número nenhum. O painel diz o que não muda: o arquivo e o tamanho dele.
-    ilda: function () { open("ILDA IN", "DB25 · " + S.name, "<pre>arquivo <b>" + S.show.length + " frames</b> · frame, pontos e fps ao vivo no canto de cima\nspell ilda play show.ild --kpps " + Math.round(S.kpps / 1000) + "</pre><div class='btns'><button class='lb' data-a='file.open'>ESCOLHER .ILD</button><button class='lb' data-a='demo'>DEMO</button>" + onoff("play.toggle", S.play, "PAUSA", "PLAY") + "</div>" + rg("TAMANHO", "size", .3, 1.3, .01, "pct") + fileList(), false, "ilda"); },
-    ildathru: function () { open("ILDA OUT", "DB25 macho · passa o sinal para o próximo projetor", "<pre>encadeado: <b>nenhum</b>\nspell ilda play show.ild --chain 2</pre>"); },
-    /// O DAC mora aqui: o EtherDream é um aparelho de rede, e é nesta porta que ele aparece.
-    /// (Antes ficava no painel da chave — a chave agora só arma, e armar é abrir o DAC escolhido.)
-    rj45: function () { open("NET", "RJ45 · fontes de rede e o DAC", "<div class='btns'>" + ["ndi", "spout", "artnet", "sacn"].map(netBtn).join("") + "</div><pre>NDI → ILDA e Spout → ILDA são o conversor <b>FÓSFORO</b>, que ainda não existe.\nspell ilda net --ndi \"RESOLUME (out)\"</pre>" + dacList(), false, "rj45"); },
-    dmxin: function () { open("DMX IN", "XLR-5 fêmea · endereço e modo", rg("ENDEREÇO", "dmx", 1, 512, 1, "n") + rg("UNIVERSO", "univ", 1, 512, 1, "n") + "<pre>modo <b>16 canais</b>: shutter · padrão · tamanho · rotação · X · Y · cor · kpps...\nspell dmx addr " + S.dmx + "</pre>", false, "dmxin"); },
-    dmxout: function () { open("DMX OUT", "XLR-5 macho · o Pino está plugado aqui", "<pre>repete o universo para o próximo aparelho\nterminador: <b>não</b> · cabo: <b>Pino</b></pre>"); },
-    /// Plugue, e nada mais: quem liga é o rocker POWER. Um controle, uma função.
-    acin: function () { open("AC IN", "powerCON TRUE1 · 100-240 V · 180 W", "<pre>consumo <b>" + (S.power ? (live() ? "180 W" : "42 W") : "0 W") + "</b> · sem fusível externo: proteção na fonte\neste conector é <b>plugue</b>: liga e desliga é o rocker POWER, logo acima</pre>"); },
-    usb: function () { open("USB", "atualização de firmware", "<pre>firmware <b>0.1.2</b> · spell 0.1.2\nspell fw update</pre>"); },
-    fan: function () { open("VENTOINHA", "60 mm axial · aspira pelas aletas", "<pre>diodos <b>" + S.temp.toFixed(0) + " °C</b> · galvos " + (S.temp - 6).toFixed(0) + " °C · fonte " + (S.temp + 4).toFixed(0) + " °C\nrotação: automática · desliga a 65 °C</pre>"); },
-    psu: function () { open("FONTE", "48 V · 250 W", "<pre>48,1 V · 3,7 A · <b>" + (S.temp + 4).toFixed(0) + " °C</b>\nspell status</pre>"); },
-    galvo: function () { open("GALVOS X/Y", "30 kpps nominal · 40 máx", rg("KPPS", "kpps", 5000, 40000, 500, "kpps") + "<pre>taxa de frame = kpps ÷ pontos · &lt; 25 fps pisca\n&gt; 32 kpps o galvo não acompanha: cantos viram curvas\nspell ilda play --kpps " + Math.round(S.kpps / 1000) + "</pre>", false, "galvo"); },
-    galvodrv: function () { open("DRIVER DOS GALVOS", "buffer e velocidade", rg("BUFFER", "buffer", 1, 8, 1, "n") + rg("VELOCIDADE", "speed", .4, 1.6, .01, "x") + "<pre>buffer em frames antes do galvo; velocidade escala o passa-baixa</pre>", false, "galvodrv"); },
-    pcb: function () { open("DRIVER DO DIODO", "corrente constante · modulação analógica", "<pre>3 canais · 0-5 V · 100 kHz\nlimite e curva: clique no módulo</pre>"); },
-    dac: function () { open("PLACA DAC ILDA", "os conectores traseiros nascem aqui", "<pre>DAC 12 bit X/Y · 8 bit RGB · " + Math.round(S.kpps / 1000) + " kpps\nspell ilda play show.ild</pre>"); },
-    dichro: function () { open("DICROICOS", "combinam R, G e B num feixe", "<pre>alinhamento: <b>ok</b> · desvio 0,1 mrad\ndois parafusos de ajuste: não mexa sem chave hexagonal</pre>"); },
-    fold: function () { open("ESPELHO DE DOBRA", "HR 99,5 % · manda o feixe para os galvos", "<pre>desvio 0,05 mrad · limpo</pre>"); },
-    shutter: function () { open("OBTURADOR", "solenoide · fecha sem chave ou sem interlock", "<pre>estado: <b>" + (live() ? "ABERTO" : "FECHADO") + "</b>\ntempo de fechamento 8 ms</pre>"); },
-    bench: function () { open("MESA ÓPTICA", "alumínio 16 mm · furação M4 a 12,5 mm", "<pre>tudo parafusado nela: módulos, suportes, obturador, galvos\nnada solto dentro da caixa</pre>"); },
-    aperture: function () { open("ABERTURA", "classe 4 · 10 W", "<pre><b>PERIGO</b>: 10 W a 445-638 nm\ndivergência 1,2 mrad · diâmetro 5 mm\nzona de exclusão: 3 m acima da plateia</pre>"); },
-    front: function () { PANELS.aperture(); }, side: function () { PANELS.fan(); }, lid: function () { setCam("inside"); }, pino: function () { pinoMenu(); },
-    bind: function () { open("BINDINGS", "tecla e MIDI · clique, depois aperte a tecla ou mexa no controlador · Esc cancela", "<div class='btns'><button class='lb' data-a='midi.connect'>MIDI: " + Bind.midi + "</button>" + onoff("cam.reverse", CAM.reverse, "RODA: SOLIDWORKS", "RODA: NORMAL") + "<button class='lb amb' data-a='bind.reset'>RESET</button></div>" + Bind.html(), true, "bind"); },
-    nfo: function () { open("SPELLCASTER LASER", "info · N fecha", "<pre>o programa é o aparelho: portas atrás = menu, tampa aberta = preferências\nparede = kpps ÷ pontos, galvo passa-baixa; feixe em GLSL; câmera SolidWorks; bindings tecla + MIDI\nos cinco pinos do Pino são as telas do programa; a trava manda ele embora\n\nengine: <b>" + (ENG.on ? "ligado · rev " + ENG.rev + (ENG.show ? " · " + ENG.show : "") : "offline (a página roda local)") + "</b>" + (ENG.feed != null ? " · feed " + ENG.feed + " no " + ENG.dac : "") + "\nCLI: spell laser_open --dac etherdream --host &lt;ip&gt; · spell laser_play --file show.ild\n\nGREETZ: PANGOLIN · ETHER DREAM · LSX · KVANT · CHATAIGNE · MADMAPPER\nCRACKED BY FEITIÇARIA iNDUSTRIAL · NO SERIAL NEEDED</pre>", true, "nfo"); } };
-  ["r", "g", "b"].forEach(function (k) { PANELS[k] = function () { var nm = { r: "638 nm · 2,5 W", g: "520 nm · 3 W", b: "445 nm · 4,5 W" }[k]; open("MÓDULO " + { r: "VERMELHO", g: "VERDE", b: "AZUL" }[k], nm + " · limite e curva", rg("LIMITE", "lim." + k, 0, 1, .01, "pct") + rg("CURVA", "gam." + k, .5, 2.5, .01, "gam") + "<pre>spell ilda limit --" + k + " " + S.lim[k].toFixed(2) + "</pre>", false, k); pbody.appendChild(curveCanvas()); }; });
-  function refresh() { if (pcur && PANELS[pcur]) PANELS[pcur](); }
+    /// pior que número nenhum. A gaveta diz o que não muda: o arquivo, os limites, a curva.
+    laser: function () { return h3("ILDA IN", "DB25 · " + S.name)
+      + "<pre>arquivo <b>" + S.show.length + " frames</b> · frame, pontos e fps ao vivo no canto de cima\nspell ilda play show.ild --kpps " + Math.round(S.kpps / 1000) + "</pre>"
+      + "<div class='btns'><button class='lb' data-a='file.open'>ESCOLHER .ILD</button><button class='lb' data-a='demo'>DEMO</button>" + onoff("play.toggle", S.play, "PAUSA", "PLAY") + "</div>"
+      + rg("TAMANHO", "size", .3, 1.3, .01, "pct") + fileList()
+      + h3("GALVOS X/Y", "30 kpps nominal · 40 máx") + rg("KPPS", "kpps", 5000, 40000, 500, "kpps") + rg("BUFFER", "buffer", 1, 8, 1, "n") + rg("VELOCIDADE", "speed", .4, 1.6, .01, "x")
+      + "<pre>taxa de frame = kpps ÷ pontos · &lt; 25 fps pisca\n&gt; 32 kpps o galvo não acompanha: cantos viram curvas</pre>"
+      + h3("MÓDULOS R/G/B", "638 / 520 / 445 nm · limite e curva de cada diodo")
+      + ["r", "g", "b"].map(function (k) { return rg({ r: "VERMELHO", g: "VERDE", b: "AZUL" }[k], "lim." + k, 0, 1, .01, "pct") + rg("CURVA " + k.toUpperCase(), "gam." + k, .5, 2.5, .01, "gam"); }).join("")
+      + "<span data-cv></span><pre>spell ilda limit --r " + S.lim.r.toFixed(2) + " --g " + S.lim.g.toFixed(2) + " --b " + S.lim.b.toFixed(2) + "</pre>"
+      + h3("OBTURADOR", "solenoide · fecha sem chave ou sem interlock") + "<pre>estado: <b>" + (live() ? "ABERTO" : "FECHADO") + "</b> · tempo de fechamento 8 ms</pre>"
+      + h3("ILDA OUT", "DB25 macho · passa o sinal para o próximo projetor") + "<pre>encadeado: <b>nenhum</b>\nspell ilda play show.ild --chain 2</pre>"; },
+    dmx: function () { return h3("DMX IN / OUT", "XLR-3 · endereço, universo e modo")
+      + rg("ENDEREÇO", "dmx", 1, 512, 1, "n") + rg("UNIVERSO", "univ", 1, 512, 1, "n")
+      + "<pre>modo <b>16 canais</b>: shutter · padrão · tamanho · rotação · X · Y · cor · kpps...\nbus: " + (S.dmxIn ? "U" + S.dmxIn.universe + " ch" + S.dmx + " = " + S.dmxIn.value : "nenhum frame recebido") + "\nspell dmx addr " + S.dmx + "</pre>"
+      + "<pre>o DMX OUT repete o universo para o próximo aparelho · o Pino está plugado nele</pre>"; },
+    /// O DAC mora na porta NET: o EtherDream é um aparelho de rede. O host é editável — o beacon
+    /// pode não chegar (Sitter aberto), e digitar o IP tem de ser possível sem procurar.
+    net: function () { return h3("NET", "RJ45 · fontes de rede e o DAC")
+      + "<div class='btns'>" + ["ndi", "spout", "artnet", "sacn"].map(netBtn).join("") + "</div>"
+      + "<pre>NDI → ILDA e Spout → ILDA são o conversor <b>FÓSFORO</b>, que ainda não existe.\nspell ilda net --ndi \"RESOLUME (out)\"</pre>" + dacList(); },
+    interlock: function () { return h3("INTERLOCK", "uma entrada do aparelho · endereço <b>" + ILK_ADDR + "</b>")
+      + "<pre>estado agora: <b>" + (S.lock ? "PLUGUE POSTO · obturador liberado" : "PLUGUE FORA · SCAN FAIL") + "</b>\nquem muda esse estado é a fonte mapeada abaixo</pre>"
+      + "<div class='sub'>O interlock é uma entrada. Mapeie para:</div>"
+      + "<div class='map'><span>TECLA</span>" + learnBtn("key", "APERTE A TECLA…")
+      + "<span>MIDI</span>" + learnBtn("midi", "MEXA NO CONTROLADOR…")
+      + "<span>OSC</span><code>" + ILK_ADDR + "</code>"
+      + "<span>ART-NET</span><span>univ <input class='tx n' data-ilk='univ' value='" + ILK.univ + "'> canal <input class='tx n' data-ilk='chan' value='" + ILK.chan + "'> · ≥ 128 = fechado</span>"
+      + "<span>MQTT</span><input class='tx' data-ilk='topic' value=\"" + ILK.topic.replace(/"/g, "&quot;") + "\">"
+      + "<span>CLI</span><code>spell laser_param --path shutter --value 1</code></div>"
+      + "<pre>MIDI já mapeia no engine: <b>spell midi_map --key 176/1 --cmd laser_param</b>\nOSC, Art-Net e MQTT ainda não têm comando de mapa:\n<b class='soon'>spell map osc " + ILK_ADDR + "   (em breve)</b></pre>"
+      + "<div class='btns'>" + onoff("lock.toggle", S.lock, "SIMULAR ABERTURA", "REPOR O PLUGUE") + "</div>"; },
+    bind: function () { return h3("BINDINGS", "tecla e MIDI · clique, depois aperte a tecla ou mexa no controlador · Esc cancela")
+      + "<div class='btns'><button class='lb' data-a='midi.connect'>MIDI: " + Bind.midi + "</button>" + onoff("cam.reverse", CAM.reverse, "RODA: SOLIDWORKS", "RODA: NORMAL") + "<button class='lb amb' data-a='bind.reset'>RESET</button></div>" + Bind.html(); },
+    info: function () { return h3("SPELLCASTER LASER", "info · N fecha")
+      + "<pre>o programa é o aparelho: portas atrás = menu, tampa aberta = preferências\nparede = kpps ÷ pontos, galvo passa-baixa; feixe em GLSL; câmera SolidWorks; bindings tecla + MIDI\nos cinco pinos do Pino são as telas do programa\n\nengine: <b>" + (ENG.on ? "ligado · rev " + ENG.rev + (ENG.show ? " · " + ENG.show : "") : "offline (a página roda local)") + "</b>" + (ENG.feed != null ? " · feed " + ENG.feed + " no " + ENG.dac : "") + "\nCLI: spell laser_open --dac etherdream --host &lt;ip&gt; · spell laser_play --file show.ild\n\nGREETZ: PANGOLIN · ETHER DREAM · LSX · KVANT · CHATAIGNE · MADMAPPER\nCRACKED BY FEITIÇARIA iNDUSTRIAL · NO SERIAL NEEDED</pre>"; } };
+  /* A peça clicada abre a aba dela: é a navegação de sempre, agora num lugar só. Peça que não está
+     aqui é peça inerte (`LaserEngine.inert`) e o clique nela não faz nada. */
+  var TAB_OF = { ilda: "laser", ildathru: "laser", shutter: "laser", galvo: "laser", galvodrv: "laser", r: "laser", g: "laser", b: "laser",
+    dmxin: "dmx", dmxout: "dmx", rj45: "net", interlock: "interlock", bind: "bind", nfo: "info" };
+  var PANELS = {}; Object.keys(TAB_OF).forEach(function (k) { PANELS[k] = function () { openDrawer(TAB_OF[k]); }; });
 
   /* ---------- display do painel ----------
      O display é o instrumento do aparelho: 200 × 100 mm no meio da traseira, sete páginas, e a
@@ -256,9 +315,11 @@
   Bind.def("demo", "demo.ild", function () { S.show = demo.frames; S.frame = 0; S.pos = 0; S.name = "demo.ild · " + demo.frames.length + " frames"; refresh(); pino.say("Demo de volta: túnel, pentagrama e a fita.", null, false); }, { key: "D" });
   ["ndi", "spout", "artnet", "sacn"].forEach(function (k) { Bind.def("net." + k, "rede: " + k.toUpperCase(), function () { S.net[k] = !S.net[k]; blip(1000); drawOled(); refresh(); if (S.net[k] && (k === "ndi" || k === "spout")) pino.say(k.toUpperCase() + " ligado, mas o conversor para ILDA ainda não existe: o FÓSFORO, um monitor de rack nesta porta.", null, false); }, { get: function () { return S.net[k]; } }); });
   Bind.def("oled.up", "OLED: encoder +", function () { oledTurn(1); }); Bind.def("oled.down", "OLED: encoder −", function () { oledTurn(-1); }); Bind.def("oled.ok", "OLED: OK", oledOk); Bind.def("oled.back", "OLED: BACK", oledBack, { key: "Backspace" });
-  Bind.def("nfo", "info", function () { if (pcur === "nfo") closePanel(); else PANELS.nfo(); }, { key: "N" });
-  Bind.def("bind", "bindings", function () { if (pcur === "bind") closePanel(); else PANELS.bind(); }, { key: "B" });
-  Bind.def("esc", "fecha painel", function () { closePanel(); pino.hide(); }, { key: "Escape" });
+  function tabKey(t) { return function () { if (drawerOn() && dcur === t) closeDrawer(); else openDrawer(t); }; }
+  Bind.def("nfo", "info", tabKey("info"), { key: "N" });
+  Bind.def("bind", "bindings", tabKey("bind"), { key: "B" });
+  Bind.def("drawer", "gaveta: abre e fecha", toggleDrawer, { key: "Tab", get: drawerOn });
+  Bind.def("esc", "fecha a gaveta", function () { closeDrawer(); pino.hide(); }, { key: "Escape" });
   /// Procura que não responde nada é procura que parece quebrada: enquanto varre, o painel diz
   /// PROCURANDO; ao terminar diz quantos achou, e zero achados é resposta, não silêncio.
   Bind.def("dacs", "procurar DACs", function () { if (!ENG.on) { pino.say("Sem engine não há DAC para procurar. Sobe o spellcore serve e a chave passa a armar de verdade.", null, false); return; } ENG.dacs = []; ENG.scan = true; refresh(); bus.call("laser_dacs", { timeout: 2 }).then(function (r) { ENG.dacs = Array.isArray(r) ? r : []; ENG.scan = false; if (ENG.dacs.length) { if (!ENG.host) { ENG.dac = ENG.dacs[0].type; ENG.host = ENG.dacs[0].host; } pino.say(ENG.dacs.length + (ENG.dacs.length > 1 ? " DACs na rede." : " DAC na rede.") + " Clica no que vai receber o feixe.", null, false); } else pino.say("Nenhum DAC respondeu em 2 s. Confere o cabo no RJ45 e se o EtherDream está na mesma rede.", null, false); refresh(); }, function (e) { ENG.scan = false; refresh(); fail("laser_dacs: " + e.message); }); });
@@ -268,8 +329,9 @@
   Bind.def("cam.fit", "câmera: enquadra", function () { CAM.fit(CENTER, .32); }, { key: "F" });
   [["front", "1"], ["back", "2"], ["left", "3"], ["right", "4"], ["top", "5"], ["bottom", "6"], ["iso", "7"]].forEach(function (v) { Bind.def("cam." + v[0], "vista padrão: " + v[0], function () { CAM.std(v[0], CENTER, .32); }, { key: "Ctrl+" + v[1] }); });
   Bind.def("cam.zoomIn", "câmera: zoom +", function () { CAM.zoom(.8); }, { key: "Z" }); Bind.def("cam.zoomOut", "câmera: zoom −", function () { CAM.zoom(1.25); }, { key: "Shift+Z" });
-  Bind.onChange(function () { if (pcur === "bind") PANELS.bind(); $("#midi").textContent = "MIDI " + Bind.midi + (Bind.learnState() ? " · LEARN: aperte a tecla ou mexa no controlador" : ""); });
-  $("#midi").textContent = "MIDI " + Bind.midi;
+  // O estado do MIDI (e o LEARN em curso) mora na gaveta e na linha MIDI dos stats: o canto de
+  // baixo da tela some (pedido do dono), e um estado só pode ser lido num lugar.
+  Bind.onChange(refresh);
   document.querySelectorAll("#cams [data-a]").forEach(function (b) { b.addEventListener("click", function () { if (S.mode === "splash") return; Bind.run(b.dataset.a); }); });
   /// Durante o splash esses botões engoliam o clique em silêncio, com cara de botão vivo. Botão que
   /// não faz nada agora fica desabilitado (cinza, sem cursor de mão) e volta quando o splash sai.
@@ -279,11 +341,12 @@
   /* ---------- interação 3D ---------- */
   function glow(o, on) { if (!o) return; o.traverse(function (mm) { if (mm.material && mm.material.emissive) { if (on) { if (mm.userData.orig) return; mm.userData.orig = mm.material; mm.material = mm.material.clone(); mm.material.emissive.setHex(0x38ff5c); mm.material.emissiveIntensity = .45; } else if (mm.userData.orig) { mm.material = mm.userData.orig; mm.userData.orig = null; } } }); }
   /* Um clique, uma função. A família da peça (`LaserEngine.CONTROLS`) decide o que o clique faz, e
-     nenhuma peça cai em dois ramos: `toggle` inverte o estado e acaba ali (não abre painel), o
-     `conector` não faz nada, e o resto é navegação — abre a tela daquela peça. */
-  var ACT = { power: function () { Bind.run("power.toggle"); }, keyswitch: function () { Bind.run("key.toggle"); }, interlock: function () { Bind.run("lock.toggle"); },
+     nenhuma peça cai em dois ramos: `toggle` inverte o estado e acaba ali (não abre gaveta), a
+     peça inerte (chapa, aleta, plugue, ventoinha) não faz nada, `mapear` abre onde se escolhe quem
+     aciona aquela entrada, e o resto é navegação — abre a aba daquela peça na gaveta. */
+  var ACT = { power: function () { Bind.run("power.toggle"); }, keyswitch: function () { Bind.run("key.toggle"); }, interlock: function () { openDrawer("interlock"); },
     enc: oledOk, back: oledBack, lid: function () { setCam("inside"); }, pino: function () { pinoMenu(); } };
-  function cursorFor(k) { return LaserEngine.kindOf(k) === "conector" ? "default" : "pointer"; }
+  function cursorFor(k) { return LaserEngine.inert(k) ? "default" : "pointer"; }
   gl.addEventListener("pointermove", function (e) { var p = ptr(e); if (CAM.dragging() || S.mode === "splash") { tip.style.display = "none"; return; } var h = hitOf(e), o = h ? h.o : null; if (o !== hot) { glow(hot, false); hot = o; if (hot && cursorFor(hot.userData.key) === "pointer") glow(hot, true); if (hot && /^pino\./.test(hot.userData.key)) pino.say(hot.userData.label, null, false); }
     if (hot) { tip.style.display = "block"; tip.textContent = hot.userData.label; tip.style.left = (p[0] + 14) + "px"; tip.style.top = (p[1] + 14) + "px"; gl.style.cursor = cursorFor(hot.userData.key); } else { tip.style.display = "none"; gl.style.cursor = "grab"; } });
   gl.addEventListener("pointerleave", unhover);
@@ -292,11 +355,11 @@
   // anda por baixo do cursor (ou clique sem mexer o mouse antes) não pode fazer o painel errado abrir
   gl.addEventListener("pointerup", function (e) { if (!pressed || e.button !== 0) return; pressed = false; if (CAM.dragging()) return; if (S.mode === "splash") { skipSplash(); return; }
     var h = hitOf(e); if (!h) return; var k = h.o.userData.key;
-    if (LaserEngine.kindOf(k) === "conector") { pino.say(h.o.userData.label, null, false); return; }
+    if (LaserEngine.inert(k)) return; // chapa, aleta, plugue, ventoinha: o clique não faz nada
     if (/^pino\./.test(k)) { onPin(k.slice(5)); return; }
     blip(1100);
     if (ACT[k]) { ACT[k](); return; }
-    if (/^(dmx|ilda|rj45|usb|fan|front|aperture|side)/.test(k) && S.cam === "show") setCam("rear"); if (/^(psu|galvo|pcb|dac|dichro|fold|shutter|bench|r|g|b)$/.test(k) && S.cam !== "inside") setCam("inside"); (PANELS[k] || function () {})(); });
+    if (/^(dmx|ilda|rj45)/.test(k) && S.cam === "show") setCam("rear"); if (/^(galvo|galvodrv|shutter|r|g|b)$/.test(k) && S.cam !== "inside") setCam("inside"); (PANELS[k] || function () {})(); });
   // roda do mouse em cima do encoder = girar o encoder (não é zoom de câmera)
   gl.addEventListener("wheel", function (e) { if (hot && hot.userData.key === "enc") { e.stopImmediatePropagation(); e.preventDefault(); oledTurn(e.deltaY < 0 ? 1 : -1); } }, { passive: false, capture: true });
   gl.addEventListener("dragover", function (e) { e.preventDefault(); stage.classList.add("dz"); }); gl.addEventListener("dragleave", function () { stage.classList.remove("dz"); });
@@ -333,6 +396,31 @@
   function skipSplash() { if (S.mode !== "splash") return; jingle(); start(); }
   document.addEventListener("keydown", function (e) { if (S.mode === "splash" && e.target.tagName !== "TEXTAREA") { e.stopPropagation(); skipSplash(); } }, true);
 
+  /* ---------- HUD: os stats do canto de cima à direita ----------
+     Uma linha por fato VIVO, e só aparece o que está ligado. Nada aqui é inventado: engine e DAC
+     vêm do barramento, as entradas vêm do que o show declara em `inputs` (e acendem com o frame
+     que chega, topic 2), o MIDI vem do `Bind`. Sem fato do engine, a linha não existe.
+     Estado nunca é só cor (SISTEMA.md §11): cada LED anda colado ao rótulo que o nomeia. */
+  var srows = $("#srows"), lastHud = "", INPUTS = [];
+  function readInputs(sh) { INPUTS = ((sh && sh.inputs) || []).filter(function (i) { return i && i.type; }).map(function (i) {
+    return { name: { sacn: "sACN", artnet: "ART-NET", midi: "MIDI IN" }[i.type] || String(i.type).toUpperCase(), u: i.universe == null ? 1 : i.universe, last: 0 }; }); }
+  function row(cls, txt, led) { return "<div class='r " + cls + "'><span>" + txt + "</span><i class='led " + led + "'></i></div>"; }
+  // os quatro estados do aparelho (SISTEMA.md §5), na ordem em que o operador precisa lê-los
+  function stateRow() { return !S.power ? ["", "", "DESLIGADO"] : !S.key ? ["amb", "warn blink lg", "STANDBY · DESARMADO"]
+    : !S.lock ? ["red", "err lg", "SCAN FAIL"] : ["las", "on lg", "LIVE · ARMADO"]; }
+  function hudStats() {
+    var f = S.show[S.frame], F = fps(), st = stateRow(), now = performance.now(), h = "";
+    h += row("pri", ENG.on ? "ENGINE · rev " + ENG.rev + (ENG.show ? " · " + ENG.show : "") : "ENGINE OFFLINE", (ENG.on ? "on" : "") + " lg");
+    if (ENG.on) h += row("", "DAC " + ENG.dac + " " + (ENG.host || "(sem host)") + (ENG.feed != null ? " · feed " + ENG.feed : ""),
+      (ENG.feed != null ? "on" : ENG.scan ? "warn blink" : ENG.err ? "err" : "") + " lg");
+    INPUTS.forEach(function (i) { h += row("", i.name + " · in " + i.u, now - i.last < 2000 ? "on" : ""); });
+    if (/^[0-9]/.test(Bind.midi)) h += row("", "MIDI · " + Bind.midi, /^0 in/.test(Bind.midi) ? "" : "on");
+    h += row(F && F < 25 && live() ? "red" : "las", (S.kpps / 1000).toFixed(0) + " kpps · " + (f ? f.length : 0) + " pts · " + (F ? F.toFixed(0) : "–") + " fps", "nil");
+    h += row("", S.name.split(" · ")[0] + " · frame " + (S.frame + 1) + "/" + S.show.length + " · DMX " + S.dmx, "nil");
+    h += row(st[0], st[2], st[1]);
+    if (h !== lastHud) { lastHud = h; srows.innerHTML = h; }
+  }
+
   /* ---------- tick ---------- */
   var last = performance.now(), W = 0, H = 0, T0 = performance.now(), lidT = 0, rearI = 0, segsW = [], tmpV = new THREE.Vector3();
   function size() { if (stage.clientWidth !== W || stage.clientHeight !== H) { W = stage.clientWidth; H = stage.clientHeight; var pr = R.getPixelRatio(); R.setSize(W, H, false); composer.setSize(W, H); bloom.resolution.set(W, H); fxaa.uniforms.resolution.value.set(1 / (W * pr), 1 / (H * pr)); cam.aspect = W / H; cam.updateProjectionMatrix(); } }
@@ -365,11 +453,15 @@
     puffs.forEach(function (p) { p.position.x += p.userData.v[0] * dt; p.position.y += p.userData.v[1] * dt; if (p.position.x > 3) p.position.x = -3; if (p.position.x < -3) p.position.x = 3; p.material.opacity = .02 + .06 * S.fog; });
     S.temp += ((live() ? 42 : 31) - S.temp) * dt * .05;
     tmpV.set(0, .314, .15).project(cam); pino.update(dt, mouse, W, H, (1 - tmpV.y) / 2 * H + 14);
-    var f = S.show[S.frame], F = fps(); $("#st1").textContent = (S.kpps / 1000).toFixed(0) + " kpps · " + (f ? f.length : 0) + " pts · " + (F ? F.toFixed(0) : "–") + " fps de frame"; $("#st1").style.color = F && F < 25 && live() ? "#FF2A1A" : "#38FF5C"; $("#st2").textContent = "frame " + (S.frame + 1) + " / " + S.show.length + " · " + S.name + " · DMX " + S.dmx + " · " + (ENG.on ? "ENGINE" + (ENG.show ? " · " + ENG.show : "") : "OFFLINE"); $("#warn").textContent = "PERIGO · LASER CLASSE 4 · 10 W · NÃO OLHE PARA O FEIXE · " + (!S.power ? "DESLIGADO" : S.mode === "splash" ? "FEIXE LIBERADO" : live() ? "FEIXE LIBERADO" : !S.key ? "DESARMADO" : !S.lock ? "SCAN FAIL" : "FEIXE ESTACIONADO"); $("#warn").style.color = live() || S.mode === "splash" ? "#FFB000" : "#FF2A1A"; 
+    // LED grande de ARMADO no chassi (contrato do `chassi-4`): apagado sem energia, vermelho forte
+    // piscando desarmado pela chave, vermelho fixo em SCAN FAIL, verde fixo armado. É o mesmo
+    // estado do bloco de stats — o operador lê no aparelho e na tela sem precisar comparar.
+    if (B.armLed) B.armLed.material.color.setHex(!S.power ? 0x2a0a08 : !S.key ? ((reduced || Math.floor(t * 1.6) % 2) ? 0xff2a1a : 0x2a0a08) : !S.lock ? 0xff2a1a : 0x38ff5c);
+    hudStats();
     if (S.mode === "play") tips(); composer.render(); requestAnimationFrame(tick); }
 
   /* ---------- boot: câmera mirada no output; o foco sai do ponto estático e vai para a parede ---------- */
-  document.fonts.ready.then(function () { size(); var ol = ILDA.outlines([["SPELLCASTER", "64px Michroma", 272], ["LASER", "64px Michroma", 372]], WW, WH); SP.loops = ol.loops; SP.len = ol.len;
+  document.fonts.ready.then(function () { size(); plate(null); var ol = ILDA.outlines([["SPELLCASTER", "64px Michroma", 272], ["LASER", "64px Michroma", 372]], WW, WH); SP.loops = ol.loops; SP.len = ol.len;
     var h = location.hash; if (h === "#laser" || h === "#tras" || h === "#dentro") { CAM.setView(VIEWS.rear[0], VIEWS.rear[1], true); start(); if (h === "#laser" || h === "#dentro") { S.key = true; camsEnabled(true); if (h === "#laser") setCam("show"); } if (h === "#dentro") setCam("inside"); }
     else { CAM.setView(VIEWS.wall0[0], VIEWS.wall0[1], true); setTimeout(function () { setCam("wall", 2.6); }, 300); S.t0 = performance.now(); }
     requestAnimationFrame(tick); });
