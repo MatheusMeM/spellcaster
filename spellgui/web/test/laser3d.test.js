@@ -82,7 +82,7 @@ test("oledLines: off it only says it is off; on, the big line is the state", () 
   assert.strictEqual(oledLines({ power: false }, {})[1], "OFF");
   const disarmed = oledLines({ power: true, key: false, lock: true, page: 0, kpps: 30000, show: [[1, 2, 3]], frame: 0 }, {});
   assert.strictEqual(disarmed[1], "DISARMED");
-  assert.match(disarmed[0], /^STATUS +1\/7$/);
+  assert.match(disarmed[0], /^STATUS +1\/6$/);
   assert.strictEqual(oledLines({ power: true, key: true, lock: true, page: 0, kpps: 30000, show: [[]], frame: 0 }, {})[1], "LIVE");
   assert.strictEqual(oledLines({ power: true, key: true, lock: false, page: 0, kpps: 30000, show: [[]], frame: 0 }, {})[1], "SCAN FAIL");
 });
@@ -113,10 +113,14 @@ const { inert, labelOf } = require("../laser3d/engine.js");
 test("a part with no function: no label, inert, and the USB does not exist any more", () => {
   // the owner: "I do not want hover menus on the front, lid and fins", "I do not want a hover
   // menu on the ac", "I do not want a hover menu on the fan", "I want you to delete the USB input".
-  for (const k of ["lid", "side", "front", "aperture", "acin", "fan", "bench", "dichro", "fold", "psu", "pcb", "dac"])
+  for (const k of ["lid", "side", "front", "aperture", "acin", "fan", "bench", "fold", "psu", "dac"])
     assert.strictEqual(CONTROLS[k][1], "", k + " has no tooltip");
-  for (const k of ["side", "front", "aperture", "acin", "fan", "bench", "dichro", "fold", "psu", "pcb", "dac"])
+  for (const k of ["side", "front", "aperture", "acin", "fan", "bench", "dichro", "fold", "psu", "dac"])
     assert.ok(inert(k), k + " is a part: it does not light up and the click does nothing");
+  // "I want a hover menu on the laser driver and on the dichroic mirrors": the driver opens the laser tab,
+  // the dichroic only says what it does.
+  assert.strictEqual(kindOf("pcb"), "nav"); assert.match(CONTROLS.pcb[1], /^laser driver/);
+  assert.ok(CONTROLS.dichro[1] && !/TEMP/.test(PAGES.join()), "dichroic has a tooltip; no invented temperature page");
   assert.strictEqual(CONTROLS.usb, undefined, "the USB port left the device");
   assert.ok(inert("usb"), "a key outside the table is an inert part");
   assert.strictEqual(labelOf("usb"), "", "an unknown key does not become a tooltip with its own name");

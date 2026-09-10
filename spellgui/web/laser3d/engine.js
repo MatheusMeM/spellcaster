@@ -48,12 +48,12 @@
     r:         ["nav", "red module 638 nm · 2.5 W: limit and curve"],
     g:         ["nav", "green module 520 nm · 3 W: limit and curve"],
     b:         ["nav", "blue module 445 nm · 4.5 W: limit and curve"],
-    dichro:    ["part", ""],
+    dichro:    ["part", "dichroic mirror: joins the beams into one"],
     fold:      ["part", ""],
     shutter:   ["nav", "shutter: closes without key or without interlock"],
     galvo:     ["nav", "X/Y galvos: kpps"],
     galvodrv:  ["nav", "galvo driver: buffer and speed"],
-    pcb:       ["part", ""],
+    pcb:       ["nav", "laser driver: R/G/B limit and curve"],
     dac:       ["part", ""],
     psu:       ["part", ""],
     // Pino
@@ -103,9 +103,10 @@
   // the lines ready to draw: [0] header, [1] the big line (the one you read from the other side of the
   // room), [2..] up to four detail lines. A line that starts with ">" is the selected field.
   // Everything in ASCII: this is equipment hardware, not a web page.
-  var PAGES = ["STATUS", "SHOW", "DMX", "NET", "TEMP/ILK", "ENGINE", "ERROR"];
+  // ponytail: no TEMP page ; the device publishes no temperature. STATUS already shows key, interlock and shutter.
+  var PAGES = ["STATUS", "SHOW", "DMX", "NET", "ENGINE", "ERROR"];
   // The fields the encoder edits on each page, in the order it walks through them.
-  var FIELDS = { STATUS: ["kpps"], DMX: ["addr", "univ"], NET: ["sacn", "artnet", "ndi", "spout"], "TEMP/ILK": [], SHOW: [], ENGINE: [], ERROR: ["clear"] };
+  var FIELDS = { STATUS: ["kpps"], DMX: ["addr", "univ"], NET: ["sacn", "artnet", "ndi", "spout"], SHOW: [], ENGINE: [], ERROR: ["clear"] };
   function n3(v) { return ("00" + Math.round(v)).slice(-3); }
   function mmss(t) { t = Math.max(0, Math.round(t || 0)); return Math.floor(t / 60) + ":" + ("0" + (t % 60)).slice(-2); }
   function cut(s, n) { s = String(s == null ? "" : s).toUpperCase(); return s.length > n ? s.slice(0, n - 1) + "+" : s; }
@@ -141,11 +142,6 @@
       var nets = f, on = nets.filter(function (k) { return S.net && S.net[k]; });
       out.push(on.length ? on.join(" ").toUpperCase() : "ALL OFF");
       nets.forEach(function (k, i) { if (i < 4) out.push(sel(i, k.toUpperCase() + (S.net && S.net[k] ? "  ON" : "  OFF") + (i === 0 ? "        DAC " + cut(eng.dac || "-", 10) : ""))); });
-    } else if (page === "TEMP/ILK") {
-      out.push(Math.round(S.temp) + " C");
-      out.push(" DIODES " + Math.round(S.temp) + "C  GALVOS " + Math.round(S.temp - 6) + "C  PSU " + Math.round(S.temp + 4) + "C");
-      out.push(" FAN " + (S.power ? "SPINNING" : "STOPPED") + "   SHUTS DOWN AT 65 C");
-      out.push(" INTERLOCK " + (S.lock ? "CLOSED" : "OPEN: SCAN FAIL"));
     } else if (page === "ENGINE") {
       out.push(eng.on ? "OK  REV " + (eng.rev || 0) : "OFFLINE");
       out.push(" PORT " + cut(eng.port || "-", 22) + "   SPELL " + cut(eng.ver || "0.1.2", 8));

@@ -14,7 +14,7 @@
   function click() { try { var t = ac().currentTime; tone(3000, t, .02, "square", .04); tone(180, t, .04, "triangle", .06); } catch (e) {} }
 
   /* ---------- state ---------- */
-  var S = { mode: "splash", t0: performance.now(), play: true, key: false, lock: true, power: true, kpps: 30000, buffer: 3, speed: 1, size: 1, fog: .85, frame: 0, pos: 0, show: null, name: "", cam: "rear", lim: { r: 1, g: 1, b: 1 }, gam: { r: 1, g: 1, b: 1 }, dmx: 1, univ: 1, net: { ndi: false, spout: false, artnet: false, sacn: true }, page: 0, field: 0, edit: false, err: null, dmxIn: null, temp: 31, mem: null, tip: {}, dim: 1, encT: 0 };
+  var S = { mode: "splash", t0: performance.now(), play: true, key: false, lock: true, power: true, kpps: 30000, buffer: 3, speed: 1, size: 1, fog: .85, frame: 0, pos: 0, show: null, name: "", cam: "rear", lim: { r: 1, g: 1, b: 1 }, gam: { r: 1, g: 1, b: 1 }, dmx: 1, univ: 1, net: { ndi: false, spout: false, artnet: false, sacn: true }, page: 0, field: 0, edit: false, err: null, dmxIn: null, mem: null, tip: {}, dim: 1, encT: 0 };
   try { S.mem = JSON.parse(localStorage.getItem("sc-laser") || "null"); if (S.mem && S.mem.kpps) S.kpps = S.mem.kpps; } catch (e) {}
   var demo = ILDA.parse(ILDA.write(ILDA.demo()).buffer); S.show = demo.frames; S.name = "demo.ild · " + demo.frames.length + " frames";
   function fps() { var f = S.show[S.frame]; return f && f.length ? S.kpps / f.length : 0; }
@@ -356,7 +356,7 @@
       + "<pre>the program is the device: ports at the back = menu, lid open = preferences\nwall = kpps ÷ points, low-pass galvo; beam in GLSL; SolidWorks camera; key + MIDI bindings\nthe five pins of the Pino are the screens of the program\n\nengine: <b>" + (ENG.on ? "on · rev " + ENG.rev + (ENG.show ? " · " + ENG.show : "") : "offline (the page runs local)") + "</b>" + (ENG.feed != null ? " · feed " + ENG.feed + " on " + ENG.dac : "") + "\nCLI: spell laser_open --dac etherdream --host &lt;ip&gt; · spell laser_play --file show.ild\n\nGREETZ: PANGOLIN · ETHER DREAM · LSX · KVANT · CHATAIGNE · MADMAPPER\nCRACKED BY FEITIÇARIA iNDUSTRIAL · NO SERIAL NEEDED</pre>"; } };
   /* The clicked part opens its own tab: it is the usual navigation, now in one place only. A part that is
      not here is an inert part (`LaserEngine.inert`) and clicking it does nothing. */
-  var TAB_OF = { ilda: "laser", ildathru: "laser", shutter: "laser", galvo: "laser", galvodrv: "laser", r: "laser", g: "laser", b: "laser",
+  var TAB_OF = { ilda: "laser", ildathru: "laser", shutter: "laser", galvo: "laser", galvodrv: "laser", pcb: "laser", r: "laser", g: "laser", b: "laser",
     dmxin: "dmx", dmxout: "dmx", rj45: "net", interlock: "interlock", bind: "bind", nfo: "info" };
   var PANELS = {}; Object.keys(TAB_OF).forEach(function (k) { PANELS[k] = function () { openDrawer(TAB_OF[k]); }; });
 
@@ -400,7 +400,7 @@
     for (i = 2; i < LN.length && i < 6; i++) fitText(LN[i], 14, 200 + (i - 2) * 56, "", 44, w - 28);
     fitText("PRESS: " + (S.edit ? "NEXT FIELD" : "ENTER") + "   BACK: RETURNS", 16, 456, "", 30, w - 32);
     oc.shadowBlur = 0; B.oled.tex.needsUpdate = true; }
-  // ponytail: a 4 Hz clock redraw for what changes on its own (transport t, temperature, points) ; every
+  // ponytail: a 4 Hz clock redraw for what changes on its own (transport t, points) ; every
   // action already calls `drawOled` right away, so the click feedback does not wait for this.
   drawOled(); setInterval(drawOled, 250);
 
@@ -491,7 +491,7 @@
     if (/^pino\./.test(k)) { onPin(k.slice(5)); return; }
     blip(1100);
     if (ACT[k]) { ACT[k](); return; }
-    if (/^(dmx|ilda|rj45)/.test(k) && S.cam === "show") setCam("rear"); if (/^(galvo|galvodrv|shutter|r|g|b)$/.test(k) && S.cam !== "inside") setCam("inside"); (PANELS[k] || function () {})(); });
+    if (/^(dmx|ilda|rj45)/.test(k) && S.cam === "show") setCam("rear"); if (/^(galvo|galvodrv|pcb|shutter|r|g|b)$/.test(k) && S.cam !== "inside") setCam("inside"); (PANELS[k] || function () {})(); });
   // mouse wheel over the encoder = turning the encoder (it is not a camera zoom)
   gl.addEventListener("wheel", function (e) { if (hot && hot.userData.key === "enc") { e.stopImmediatePropagation(); e.preventDefault(); oledTurn(e.deltaY < 0 ? 1 : -1); } }, { passive: false, capture: true });
   gl.addEventListener("dragover", function (e) { e.preventDefault(); stage.classList.add("dz"); }); gl.addEventListener("dragleave", function () { stage.classList.remove("dz"); });
@@ -596,7 +596,6 @@
     S.encT = Math.max(0, S.encT - dt); S.backT = Math.max(0, (S.backT || 0) - dt);
     B.knob.position.z += ((S.encT > 0 ? .0072 : .009) - B.knob.position.z) * Math.min(1, dt * 22); B.backCap.position.z += ((S.backT > 0 ? .0015 : .003) - B.backCap.position.z) * Math.min(1, dt * 22);
     puffs.forEach(function (p) { if (!p.visible) return; p.position.x += p.userData.v[0] * dt; p.position.y += p.userData.v[1] * dt; if (p.position.x > 3) p.position.x = -3; if (p.position.x < -3) p.position.x = 3; p.material.opacity = .02 + .06 * S.fog; });
-    S.temp += ((live() ? 42 : 31) - S.temp) * dt * .05;
     tmpV.set(0, .314, .15).project(cam); pino.update(dt, mouse, W, H, (1 - tmpV.y) / 2 * H + 14);
     // big ARMED LED on the chassis (contract of `chassi-4`): dark with no power, strong red blinking when
     // disarmed by the key, steady red in SCAN FAIL, steady green when armed. It is the same state as the

@@ -49,8 +49,8 @@ everything glows and the camera flies to the rear panel: about 7.6 s. Any key or
 (with a jingle).
 **The device** is a 10 W projector in 3D: chassis, rear panel with ports, display, encoder,
 key switch, power rocker, and the optical bench under the lid. Hovering lights up the part and shows
-its label; clicking opens that part's tab in the drawer. Plate, fin, plug, PSU and fan are inert
-parts: they do not light up and clicking does nothing.
+its label; clicking opens that part's tab in the drawer. The dichroic mirrors only show a label.
+Plate, fin, plug, PSU and fan are inert parts: they do not light up and clicking does nothing.
 
 **The three views.**
 
@@ -88,11 +88,11 @@ appear.
 Below the HUD, in amber, sits the echo of the last command the page sent, in the form
 `spell <command> --arg value`.
 
-**The rear panel display.** Seven pages — STATUS, SHOW, DMX, NET, TEMP/ILK, ENGINE, ERROR — with one
+**The rear panel display.** Six pages — STATUS, SHOW, DMX, NET, ENGINE, ERROR — with one
 big line you can read from across the room. An alarm (SCAN FAIL, error) inverts the block; there is
 no new colour. The encoder turns pages; pressing it enters edit mode and steps from field to field;
 BACK leaves the field, or goes back one page. Fields per page: STATUS = kpps; DMX = address and
-universe; NET = sACN, Art-Net, NDI, Spout; ERROR = clear. SHOW, TEMP/ILK and ENGINE are informative
+universe; NET = sACN, Art-Net, NDI, Spout; ERROR = clear. SHOW and ENGINE are informative
 only. An engine error lands on the ERROR page and in Pino's mouth; nothing locks up.
 
 **Pino.** A DMX cable with five button-pins, attached to the camera in the bottom left corner,
