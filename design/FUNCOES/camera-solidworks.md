@@ -70,7 +70,7 @@ Três vistas, três leis. O aparelho é o modelo; a vista diz o que se pode faze
 
 **`rear` — fixo.** A traseira **é o menu**; câmera solta em cima de um menu é a mesma coisa que um menu que anda quando você passa o mouse. A pose é calculada da normal do painel traseiro, enquadrando os 400 × 180 mm com folga, e **recalculada quando a janela muda de tamanho** (o enquadramento depende do aspect). Sem arrasto, sem meio, sem roda-zoom, sem setas. O único movimento é um respiro de ±2° que segue o mouse, e ele **não muda a distância**: é paralaxe, não navegação.
 
-**`inside` — restrito.** Órbita em torno do centro da mesa óptica, `yaw ∈ [−60°, +60°]` em relação à normal da tampa aberta, `pitch ∈ [20°, 80°]`, **distância fixa**. É a mesma ideia do `Rotate about scene floor` do manual (travar um eixo para o modelo não tombar), levada ao limite: aqui o que se trava é a caixa inteira, para a tampa aberta nunca entrar no quadro por trás da câmera.
+**`inside` — restrito.** Órbita em torno do centro da mesa óptica, `yaw ∈ [−60°, +60°]` em relação à **pose de entrada da vista**, `pitch ∈ [20°, 80°]`, **distância fixa**. A referência do yaw é a pose de entrada e não a normal da tampa aberta porque a tampa aberta aponta para **cima**: ±60° em torno de um vetor vertical não limita yaw nenhum. A pose de entrada já é a que olha a mesa pela abertura, e é dela que os ±60° fazem sentido. É a mesma ideia do `Rotate about scene floor` do manual (travar um eixo para o modelo não tombar), levada ao limite: aqui o que se trava é a caixa inteira, para a tampa aberta nunca entrar no quadro por trás da câmera.
 
 ## 4. O que fica de fora, e por quê
 

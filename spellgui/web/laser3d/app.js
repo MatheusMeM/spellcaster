@@ -128,7 +128,7 @@
      com a distância travada. As poses fixas são refeitas quando a janela muda de tamanho. */
   var LAWS = { show: { mode: "free", center: CENTER, R: .34 },
     rear: { mode: "rear", center: new THREE.Vector3(0, .314 + B.H / 2, B.D / 2), normal: new THREE.Vector3(0, 0, 1), w: B.W, h: B.H, pad: 1.55 },
-    inside: { mode: "inside", center: new THREE.Vector3(-.02, .348, -.03), yaw0: .35, pit0: .92, w: .30, h: .22, pad: 1.6 },
+    inside: { mode: "inside", center: new THREE.Vector3(-.02, .348, -.03), yaw0: .35, pit0: .92, w: .40, h: .26, pad: 1.6 },
     wall0: { mode: "free", center: CENTER, R: .34 }, wall: { mode: "free", center: CENTER, R: .34 } };
   // a câmera anda por baixo do cursor: a etiqueta da peça que estava sob ele fica mentindo na tela
   // (e a peça continua acesa) até o próximo movimento do mouse. Trocar de vista apaga as duas.

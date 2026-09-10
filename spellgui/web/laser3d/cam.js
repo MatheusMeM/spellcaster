@@ -17,7 +17,8 @@
      Agora é mola criticamente amortecida, na forma analítica (estável em qualquer dt, chega e para).
    - um arrasto que começava EM CIMA de uma peça não virava arrasto de câmera (certo) mas também
      não contava como arrasto (errado): ao soltar, `app.js` tratava como clique e abria o painel
-     daquela peça. Agora o gesto é registrado com modo "none" e `dragging()` responde por ele.
+     daquela peça. Agora o gesto é registrado com modo "none" e `dragging()` responde por ele — e
+     continua respondendo DURANTE o `pointerup`, que é quando `app.js` pergunta (ver `ended`).
 
    `SWCam.clamp(mode, goal, env)` é a lei, pura e sem THREE: é o que `test/cam.test.js` verifica. */
 (function () {
@@ -85,7 +86,7 @@
     var goal = { t: new THREE.Vector3(0, .4, 0), d: 1, yaw: 0, pit: .3, roll: 0 },
         cur = { t: goal.t.clone(), d: 1, yaw: 0, pit: .3, roll: 0 },
         vel = { x: 0, y: 0, z: 0, d: 0, yaw: 0, pit: 0, roll: 0 },
-        drag = null, api, mode = "free", env = { R: .34 }, fixed = null, aspect0 = -1,
+        drag = null, ended = false, api, mode = "free", env = { R: .34 }, fixed = null, aspect0 = -1,
         br = { x: 0, y: 0 };                                   // respiro da vista fixa
     var Y = new THREE.Vector3(0, 1, 0), tmp = new THREE.Vector3();
 
@@ -125,6 +126,7 @@
       if (mode === "rear") return;                                   // a traseira é menu: não se arrasta
       // arrasto que começa numa peça não move a câmera, mas É um arrasto: sem isto o `pointerup`
       // de `app.js` virava clique e abria o painel da peça no fim de um giro.
+      ended = false;
       if (left && o.hit(e)) { drag = { mode: "none", x: e.clientX, y: e.clientY, moved: false }; return; }
       var m = mode === "inside" ? "rot"                              // dentro só gira
         : e.ctrlKey ? "pan" : e.shiftKey ? "zoom" : e.altKey ? "roll" : "rot";
@@ -135,7 +137,7 @@
     function moveAt(e) {
       var r = dom.getBoundingClientRect();                           // respiro: ±2° de paralaxe, sem mexer na distância
       br.x = lim(((e.clientX - r.left) / r.width) * 2 - 1, -1, 1); br.y = lim(((e.clientY - r.top) / r.height) * 2 - 1, -1, 1);
-      if (!drag) return;
+      if (!drag) { ended = false; return; }                          // pointermove depois do solto: gesto novo
       var dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY;
       // 4 px: tremor de mão com o dedo no botão não pode virar arrasto e engolir o clique
       if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
@@ -146,7 +148,10 @@
     }
     dom.addEventListener("pointerdown", press);
     dom.addEventListener("pointermove", moveAt);
-    function up() { drag = null; }
+    /* `up` roda ANTES do `pointerup` de `app.js` (este listener foi registrado primeiro), então
+       zerar `drag` aqui fazia `dragging()` mentir justo para quem pergunta: o fim de um giro virava
+       clique e abria o painel da peça. `ended` guarda o "houve arrasto" até o próximo gesto. */
+    function up() { ended = !!(drag && drag.moved); drag = null; }
     dom.addEventListener("pointerup", up); dom.addEventListener("pointercancel", up);
     dom.addEventListener("pointerleave", function () { br.x = br.y = 0; });
     dom.addEventListener("wheel", function (e) {
@@ -172,7 +177,7 @@
       zoom: function (s) { if (mode === "free") zoomAt(s, null); },
       fit: function (center, radius) { if (mode !== "free") return; goal.t.copy(center); goal.d = radius / Math.sin(cam.fov * Math.PI / 360) * 1.1; },
       std: function (k, center, radius) { var v = STD[k]; if (mode !== "free" || !v) return; goal.yaw = v[0]; goal.pit = v[1]; goal.roll = 0; if (center) api.fit(center, radius); },
-      dragging: function () { return !!(drag && drag.moved); },
+      dragging: function () { return !!(drag && drag.moved) || ended; },
       update: function (dt) {
         if (cam.aspect !== aspect0) repose();                        // janela mudou: pose fixa refeita
         if (fixed) {
