@@ -659,7 +659,7 @@ default `v`. "Dispara na GUI" cita a página (`index.html` = TIMELINE, `teatro.h
 | `play_show` | `file:string`, `loop:boolean=false`, `osc_port:integer?` | **sobe** um player e toca até o fim ou Ctrl+C | `{name, frames, jitter_p99_ms, jitter_max_ms, drift}` | TIMELINE: `Play` sem player vivo; CLI `spellcore play` |
 | `net` | `timeout:number=2`, `json:boolean=false` | varre a rede (interfaces, Art-Net, sACN, Ether Dream) | relatório de texto, ou o scan cru | CLI `spellcore net` |
 | `graph_check` | — | compila o graph do show aberto sem rodar | `{nodes, error}` | PATCHBAY: a cada edição do graph |
-| `laser_dacs` | `timeout:number=2` | procura DACs (Ether Dream por beacon, IDN por scan) | `[{type, id, host}]` | LASER: `Procurar` |
+| `laser_dacs` | `timeout:number=2` | procura DACs (Ether Dream por beacon UDP e, sem beacon, por status TCP; IDN por scan) | `[{type, id, host, via}]` | LASER: `Procurar` |
 | `laser_open` | `dac:string`, `host:string=""`, `kpps:number=30`, `safety:any=null` | abre o DAC e sobe o feed (a safety nunca desliga) | `{feed, dac, pps}` | LASER: `Abrir` |
 | `laser_play` | `feed:integer`, `file:string`, `fps:number=30`, `loop:boolean=false` | empurra os frames do `.ild` ao DAC | `{feed, file, frames, fps, loop}` | LASER: `Play` |
 | `laser_stop` | `feed:integer` | para o playback; o DAC continua aberto | `{feed, playing:false}` | LASER: `Stop` |
@@ -799,7 +799,7 @@ o laser o que `player::current()` é para o transporte (um processo, N feeds).
 
 | Comando | Faz | Devolve |
 |---|---|---|
-| `laser_dacs(timeout=2)` | Ether Dream por beacon (`netscan`) e IDN por scan | lista de `{type, id, host}` |
+| `laser_dacs(timeout=2)` | Ether Dream por beacon e, se nenhum beacon chegar em metade do prazo, por status TCP nos vizinhos da ARP (`netscan`); IDN por scan | lista de `{type, id, host, via}`, `via` = `beacon` ou `tcp` (achado por TCP não traz `buffer`/`max_pps`: só o beacon os carrega) |
 | `laser_open(dac, host="", kpps=30, safety?)` | abre o DAC e sobe o `Feed`; `safety` = `{min_size, max_intensity, zone}`, nunca desligável | `{feed, dac, pps}` |
 | `laser_play(feed, file, fps=30, loop=false)` | thread que lê o `.ild` e faz `feed.push` no ritmo (o `.ild` não carrega taxa); sem `loop`, o fim do arquivo desarma o transporte e `laser_stats` volta a `playing:false` | `{feed, file, frames, fps, loop}` |
 | `laser_stop(feed)` | para o playback; o DAC continua aberto | `{feed, playing:false}` |
