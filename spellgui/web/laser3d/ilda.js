@@ -7,9 +7,23 @@ window.ILDA = (function () {
     for (i = 0; i < frames.length; i++) { var f = frames[i]; head(f.length, i, frames.length); for (var j = 0; j < f.length; j++) { var p = f[j]; dv.setInt16(o, p.x); dv.setInt16(o + 2, p.y); buf[o + 4] = (p.bl ? 64 : 0) | (j === f.length - 1 ? 128 : 0); buf[o + 5] = p.b; buf[o + 6] = p.g; buf[o + 7] = p.r; o += 8; } }
     head(0, frames.length, frames.length); return buf; }
   function pal(i) { if (i === 0) return [255, 0, 0]; if (i >= 56) return [255, 255, 255]; var h = (i / 56) * 6, k = Math.floor(h), f = Math.round((h - k) * 255), c = [[255, f, 0], [255 - f, 255, 0], [0, 255, f], [0, 255 - f, 255], [f, 0, 255], [255, 0, 255 - f]]; return c[k % 6]; }
-  function parse(ab) { var dv = new DataView(ab), o = 0, frames = [], name = "";
-    while (o + 32 <= ab.byteLength) { if (String.fromCharCode(dv.getUint8(o), dv.getUint8(o + 1), dv.getUint8(o + 2), dv.getUint8(o + 3)) !== "ILDA") break; var fmt = dv.getUint8(o + 7), n = dv.getUint16(o + 24); if (!name) name = String.fromCharCode.apply(null, new Uint8Array(ab, o + 8, 8)).replace(/\0/g, "").trim(); o += 32; if (n === 0) break; if (fmt === 2) { o += n * 3; continue; }
-      var f = [], sz = fmt === 0 ? 8 : fmt === 1 ? 6 : fmt === 4 ? 10 : 8; for (var j = 0; j < n; j++) { var x = dv.getInt16(o), y = dv.getInt16(o + 2), st, c; if (fmt === 0) { st = dv.getUint8(o + 6); c = pal(dv.getUint8(o + 7)); } else if (fmt === 1) { st = dv.getUint8(o + 4); c = pal(dv.getUint8(o + 5)); } else if (fmt === 4) { st = dv.getUint8(o + 6); c = [dv.getUint8(o + 9), dv.getUint8(o + 8), dv.getUint8(o + 7)]; } else { st = dv.getUint8(o + 4); c = [dv.getUint8(o + 7), dv.getUint8(o + 6), dv.getUint8(o + 5)]; } f.push({ x: x, y: y, r: c[0], g: c[1], b: c[2], bl: !!(st & 64) }); o += sz; } frames.push(f); }
+  /* ponytail: Uint8Array e vetor pre-dimensionado; o ponto continua sendo {x,y,r,g,b,bl},
+     que e o que a parede e o viewer.js leem. So vira tipado se o custo do GC voltar a doer. */
+  function parse(ab) { var b = new Uint8Array(ab), L = b.length, o = 0, frames = [], name = "";
+    while (o + 32 <= L) { if (b[o] !== 73 || b[o + 1] !== 76 || b[o + 2] !== 68 || b[o + 3] !== 65) break;
+      var fmt = b[o + 7], n = (b[o + 24] << 8) | b[o + 25];
+      if (!name) name = String.fromCharCode.apply(null, b.subarray(o + 8, o + 16)).replace(/\0/g, "").trim();
+      o += 32; if (n === 0) break; if (fmt === 2) { o += n * 3; continue; }
+      var sz = fmt === 0 ? 8 : fmt === 1 ? 6 : fmt === 4 ? 10 : 8; if (o + n * sz > L) break;
+      var f = new Array(n);
+      for (var j = 0; j < n; j++, o += sz) { var x = (b[o] << 8) | b[o + 1], y = (b[o + 2] << 8) | b[o + 3], st, r, g, bb;
+        if (x > 32767) x -= 65536; if (y > 32767) y -= 65536;
+        if (fmt === 5) { st = b[o + 4]; bb = b[o + 5]; g = b[o + 6]; r = b[o + 7]; }
+        else if (fmt === 4) { st = b[o + 6]; r = b[o + 7]; g = b[o + 8]; bb = b[o + 9]; }
+        else if (fmt === 1) { st = b[o + 4]; var c1 = pal(b[o + 5]); r = c1[0]; g = c1[1]; bb = c1[2]; }
+        else { st = b[o + 6]; var c0 = pal(b[o + 7]); r = c0[0]; g = c0[1]; bb = c0[2]; }
+        f[j] = { x: x, y: y, r: r, g: g, b: bb, bl: (st & 64) !== 0 }; }
+      frames.push(f); }
     return { name: name, frames: frames }; }
   function P(x, y, c, bl) { return { x: Math.max(-32768, Math.min(32767, Math.round(x * 32767))), y: Math.max(-32768, Math.min(32767, Math.round(y * 32767))), r: c[0], g: c[1], b: c[2], bl: !!bl }; }
   function poly(pts, c, out) { out.push(P(pts[0][0], pts[0][1], c, true)); for (var i = 0; i < pts.length; i++) out.push(P(pts[i][0], pts[i][1], c)); }

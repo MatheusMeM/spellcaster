@@ -64,28 +64,94 @@
     fetch("/" + p.replace(/\\/g, "/")).then(function (r) { return r.arrayBuffer(); }).then(function (ab) { var d = ILDA.parse(ab); if (d.frames.length) { S.show = d.frames; S.frame = 0; S.pos = 0; S.name = name + " · " + d.frames.length + " frames · engine"; } refresh(); }, function () {});
     push("play", true); }
 
-  /* ---------- parede ---------- */
+  /* ---------- parede ----------
+     A parede é um render target: o rastro mora NELE. Todo quadro entra um quad preto que esmaece o
+     que já estava lá (o `fillRect` de antes, só que por tempo: `1 - FADE^(dt*60)`, para o rastro
+     durar o mesmo tanto a 20 ou a 60 fps) e por cima os segmentos do quadro, num `LineSegments` de
+     buffer pré-alocado. O traço vai em source-over, como o `stroke` do canvas: traço sobre traço
+     troca a cor, não soma — aditivo saturava em branco onde a figura passa dezenas de vezes.
+     Só o halo e o ponto do galvo somam. Antes era um canvas 2D 1024×640 com um `stroke` de `shadowBlur = 18` POR
+     PONTO — a 30 kpps são 500 traços desfocados por quadro na CPU, mais a subida da textura inteira
+     à GPU a cada quadro: com um .ild de 3000 pontos por frame o Chrome ficava em 1,8 fps.
+     ponytail: a splash continua no canvas 2D (`fillDone` é `fill("evenodd")` de polígono de letra, e
+     triangular fonte não cabe aqui); ela roda uma vez, por 8 s, com poucos traços. Ao sair do splash
+     o `map` do plano troca do canvas para o render target, que nasce limpo. */
   var WC = document.createElement("canvas"); WC.width = 1024; WC.height = 640; var wx = WC.getContext("2d"), WW = 1024, WH = 640, galvo = null, lit = [], gpos = [0, 0];
-  function toScreen(p) { var sc = S.size * WH * .3 / 32767; return [WW * .5 + p.x * sc, WH * .5 - p.y * sc]; }
-  function cc(p) { var g = S.gam, l = S.lim; return [Math.round(255 * l.r * Math.pow(p.r / 255, g.r)), Math.round(255 * l.g * Math.pow(p.g / 255, g.g)), Math.round(255 * l.b * Math.pow(p.b / 255, g.b))]; }
-  function col(c, a) { return "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + a + ")"; }
-  function drawFrame(f, from, count) { var N = f.length, lag = Math.max(.3, Math.min(1, 1.3 - S.kpps / 40000)) * S.speed, i; lit = [];
-    wx.globalCompositeOperation = "lighter"; wx.lineCap = "round"; wx.lineJoin = "round"; wx.shadowBlur = 18; var prev = galvo || toScreen(f[(from - 1 + N) % N]);
-    for (i = 0; i < count; i++) { var p = f[(from + i) % N], s = toScreen(p), cur = [prev[0] + (s[0] - prev[0]) * Math.min(1, lag), prev[1] + (s[1] - prev[1]) * Math.min(1, lag)];
-      if (!p.bl && (i > 0 || galvo)) { var c = cc(p); if (c[0] + c[1] + c[2] > 12) { wx.strokeStyle = col(c, .85); wx.shadowColor = col(c, 1); wx.lineWidth = 3; wx.beginPath(); wx.moveTo(prev[0], prev[1]); wx.lineTo(cur[0], cur[1]); wx.stroke(); lit.push([cur, c]); } } prev = cur; }
-    galvo = prev; gpos = [(prev[0] / WW - .5) * 2, (.5 - prev[1] / WH) * 2]; wx.shadowBlur = 24; wx.shadowColor = "#fff"; wx.fillStyle = "rgba(255,255,255,.9)"; wx.beginPath(); wx.arc(prev[0], prev[1], 3, 0, 7); wx.fill(); wx.shadowBlur = 0; wx.globalCompositeOperation = "source-over"; }
-  function parked(now, a) { var c = toScreen({ x: 0, y: 0 }); galvo = null; gpos = [0, 0]; wx.globalCompositeOperation = "lighter"; wx.shadowBlur = 34; wx.shadowColor = "#FF2A1A"; wx.fillStyle = "rgba(255,42,26," + (a == null ? .6 + .4 * Math.sin(now / 90) : a) + ")"; wx.beginPath(); wx.arc(c[0], c[1], 4, 0, 7); wx.fill(); wx.shadowBlur = 0; wx.globalCompositeOperation = "source-over"; lit = [[c, [255, 42, 26]]]; }
-  function wallTick(now, dt) { wx.globalCompositeOperation = "source-over"; wx.fillStyle = "rgba(0,0,0," + (reduced ? .6 : .3) + ")"; wx.fillRect(0, 0, WW, WH); var f = S.show[S.frame]; if (!S.power) { lit = []; return; }
-    if (live() && f && f.length) { var N = f.length, adv = S.kpps * dt; if (S.play) { S.pos += adv; while (S.pos >= N) { S.pos -= N; S.frame = (S.frame + 1) % S.show.length; N = S.show[S.frame].length; f = S.show[S.frame]; } } else S.pos = (S.pos + adv) % N; var from = Math.floor(S.pos), count = Math.min(N, Math.ceil(adv)); drawFrame(f, (from - count + N) % N, count); } else parked(now); }
+  // ponytail: medida do portao numa linha, so com ?perf=1 ; sai quando houver um HUD de perf de verdade
+  var PERF = /(\?|&)perf=1/.test(location.search) ? (window.__perf = { frames: 0, wallMs: 0 }) : null;
+  // 4096 segmentos: o quadro desenha `min(pontos do frame, kpps × dt)` e dt está preso em .1 s, ou
+  // seja no máximo 4000 pontos a 40 kpps. Passou disso, o resto do quadro cai fora (não realoca).
+  var MAXSEG = 4096, segN = 0, dotN = 0;
+  var wrt = new THREE.WebGLRenderTarget(WW, WH, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false, stencilBuffer: false });
+  wrt.texture.encoding = THREE.sRGBEncoding; wrt.texture.generateMipmaps = false;
+  var wscene = new THREE.Scene(), wcam = new THREE.OrthographicCamera(0, WW, 0, WH, -1, 1); // coordenadas do canvas: y cresce para baixo
+  /* O alfa do render target fica preso em 1: o plano `proj` é aditivo e multiplica a cor pelo alfa
+     da textura, então um alfa que esmaece junto com o rastro apagaria a parede duas vezes. */
+  function wmat(m, add) { m.transparent = true; m.depthTest = m.depthWrite = false; m.toneMapped = false; m.blending = THREE.CustomBlending;
+    m.blendSrc = THREE.SrcAlphaFactor; m.blendDst = add ? THREE.OneFactor : THREE.OneMinusSrcAlphaFactor;
+    m.blendSrcAlpha = THREE.ZeroFactor; m.blendDstAlpha = THREE.OneFactor; return m; }
+  function attr(a, n) { var b = new THREE.BufferAttribute(a, n); b.setUsage(THREE.DynamicDrawUsage); return b; }
+  var segPos = new Float32Array(MAXSEG * 6), segCol = new Float32Array(MAXSEG * 6), haloPos = new Float32Array(MAXSEG * 3), haloCol = new Float32Array(MAXSEG * 3), dotPos = new Float32Array(3);
+  var segGeo = new THREE.BufferGeometry(); segGeo.setAttribute("position", attr(segPos, 3)); segGeo.setAttribute("color", attr(segCol, 3));
+  var haloGeo = new THREE.BufferGeometry(); haloGeo.setAttribute("position", attr(haloPos, 3)); haloGeo.setAttribute("color", attr(haloCol, 3));
+  var dotGeo = new THREE.BufferGeometry(); dotGeo.setAttribute("position", attr(dotPos, 3));
+  // o halo do traço: `shadowBlur` virou um sprite de gradiente por ponto, que é o que a GPU faz de graça
+  var GC = document.createElement("canvas"); GC.width = GC.height = 64; var gc = GC.getContext("2d"), gg = gc.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gg.addColorStop(0, "rgba(255,255,255,1)"); gg.addColorStop(.3, "rgba(255,255,255,.45)"); gg.addColorStop(1, "rgba(255,255,255,0)"); gc.fillStyle = gg; gc.fillRect(0, 0, 64, 64);
+  var glowTex = new THREE.CanvasTexture(GC);
+  var segMat = wmat(new THREE.LineBasicMaterial({ vertexColors: true, opacity: 1 }), false);
+  var haloMat = wmat(new THREE.PointsMaterial({ size: 9, sizeAttenuation: false, map: glowTex, vertexColors: true, opacity: .12 }), true);
+  var dotMat = wmat(new THREE.PointsMaterial({ size: 14, sizeAttenuation: false, map: glowTex, opacity: .9 }), true);
+  var fadeMat = wmat(new THREE.MeshBasicMaterial({ color: 0x000000, opacity: reduced ? .6 : .3 }), false), FADE = reduced ? .4 : .7;
+  var fade = new THREE.Mesh(new THREE.PlaneGeometry(WW, WH), fadeMat); fade.position.set(WW / 2, WH / 2, 0);
+  var segs = new THREE.LineSegments(segGeo, segMat), halo = new THREE.Points(haloGeo, haloMat), dot = new THREE.Points(dotGeo, dotMat);
+  [fade, segs, halo, dot].forEach(function (o, i) { o.frustumCulled = false; o.renderOrder = i; wscene.add(o); });
+  /* Limite e curva viram tabela de 256 entradas: o quadro fazia 1500 `Math.pow` (três por ponto).
+     A tabela guarda os dois valores da mesma cor — o byte, que é o contrato do `lit` (os feixes da
+     cena leem `L[1][k] / 255`), e o valor LINEAR que a cor do material precisa, porque o render
+     target é sRGB: entrando linear, sai gravado o mesmo byte que o canvas escrevia, e a soma dos
+     traços acontece em sRGB como antes. */
+  function s2l(v) { return v <= .04045 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); }
+  var Lb = [new Uint8Array(256), new Uint8Array(256), new Uint8Array(256)], Ll = [new Float32Array(256), new Float32Array(256), new Float32Array(256)], Lk = "", PARKC = [s2l(1), s2l(42 / 255), s2l(26 / 255)];
+  function lut() { var g = S.gam, l = S.lim, k = l.r + "," + l.g + "," + l.b + "," + g.r + "," + g.g + "," + g.b; if (k === Lk) return; Lk = k;
+    ["r", "g", "b"].forEach(function (c, j) { for (var i = 0; i < 256; i++) { var v = Math.min(1, l[c] * Math.pow(i / 255, g[c])); Lb[j][i] = Math.round(255 * v); Ll[j][i] = s2l(v); } }); }
+  function drawFrame(f, from, count) { var N = f.length, LG = Math.min(1, Math.max(.3, Math.min(1, 1.3 - S.kpps / 40000)) * S.speed), sc = S.size * WH * .3 / 32767, i, n = 0,
+      q = f[(from - 1 + N) % N], px = galvo ? galvo[0] : WW * .5 + q.x * sc, py = galvo ? galvo[1] : WH * .5 - q.y * sc;
+    lit.length = 0;
+    for (i = 0; i < count; i++) { var p = f[(from + i) % N], cx = px + (WW * .5 + p.x * sc - px) * LG, cy = py + (WH * .5 - p.y * sc - py) * LG;
+      if (!p.bl && (i > 0 || galvo)) { var r = Lb[0][p.r], g = Lb[1][p.g], b = Lb[2][p.b];
+        if (r + g + b > 12 && n < MAXSEG) { var o = n * 6, h = n * 3, lr = Ll[0][p.r], lg = Ll[1][p.g], lb = Ll[2][p.b];
+          segPos[o] = px; segPos[o + 1] = py; segPos[o + 3] = cx; segPos[o + 4] = cy;
+          segCol[o] = segCol[o + 3] = lr; segCol[o + 1] = segCol[o + 4] = lg; segCol[o + 2] = segCol[o + 5] = lb;
+          haloPos[h] = cx; haloPos[h + 1] = cy; haloCol[h] = lr; haloCol[h + 1] = lg; haloCol[h + 2] = lb;
+          n++; lit.push([[cx, cy], [r, g, b]]); } }
+      px = cx; py = cy; }
+    segN = n; galvo = galvo || [0, 0]; galvo[0] = px; galvo[1] = py; gpos[0] = (px / WW - .5) * 2; gpos[1] = (.5 - py / WH) * 2;
+    dotPos[0] = px; dotPos[1] = py; dotN = 1; dotMat.color.setRGB(1, 1, 1); dotMat.opacity = .9; dotMat.size = 10; }
+  function parked(now) { galvo = null; gpos[0] = gpos[1] = 0; segN = 0;
+    dotPos[0] = WW * .5; dotPos[1] = WH * .5; dotN = 1; dotMat.color.setRGB(PARKC[0], PARKC[1], PARKC[2]); dotMat.opacity = .6 + .4 * Math.sin(now / 90); dotMat.size = 12;
+    lit.length = 0; lit.push([[WW * .5, WH * .5], [255, 42, 26]]); }
+  function up(a, n) { if (!n) return; a.updateRange.offset = 0; a.updateRange.count = n; a.needsUpdate = true; }
+  function wallDraw(dt) { fadeMat.opacity = 1 - Math.pow(FADE, dt * 60); up(segGeo.attributes.position, segN * 6); up(segGeo.attributes.color, segN * 6); up(haloGeo.attributes.position, segN * 3); up(haloGeo.attributes.color, segN * 3); up(dotGeo.attributes.position, dotN * 3);
+    segGeo.setDrawRange(0, segN * 2); haloGeo.setDrawRange(0, segN); dotGeo.setDrawRange(0, dotN);
+    if (proj.material.map !== wrt.texture) { var c0 = R.getClearColor(new THREE.Color()), a0 = R.getClearAlpha(); R.setRenderTarget(wrt); R.setClearColor(0x000000, 1); R.clear(true, false, false); R.setClearColor(c0, a0); proj.material.map = wrt.texture; proj.material.needsUpdate = true; }
+    var ac = R.autoClear; R.autoClear = false; R.setRenderTarget(wrt); R.render(wscene, wcam); R.setRenderTarget(null); R.autoClear = ac; }
+  function wallTick(now, dt) { lut(); var f = S.show[S.frame];
+    if (!S.power) { lit.length = 0; segN = 0; dotN = 0; }
+    else if (live() && f && f.length) { var N = f.length, adv = S.kpps * dt; if (S.play) { S.pos += adv; while (S.pos >= N) { S.pos -= N; S.frame = (S.frame + 1) % S.show.length; N = S.show[S.frame].length; f = S.show[S.frame]; } } else S.pos = (S.pos + adv) % N; var from = Math.floor(S.pos), count = Math.min(N, Math.ceil(adv)); drawFrame(f, (from - count + N) % N, count); }
+    else parked(now);
+    wallDraw(dt); }
   // splash: o galvo contorna SPELLCASTER LASER, laço a laço; cada letra fechada é revelada; no fim tudo brilha
   var SP = { loops: [], len: 0, pos: 0, li: 0, pi: 0, done: [], flew: false, last: null };
+  // ponto do galvo na splash, que continua no canvas 2D como o resto dela
+  function spDot(x, y, c, fill, blur, r) { wx.globalCompositeOperation = "lighter"; wx.shadowBlur = blur; wx.shadowColor = c; wx.fillStyle = fill; wx.beginPath(); wx.arc(x, y, r, 0, 7); wx.fill(); wx.shadowBlur = 0; wx.globalCompositeOperation = "source-over"; }
   function fillDone(alpha, glow) { if (!SP.done.length) return; wx.save(); wx.globalCompositeOperation = "lighter"; wx.beginPath(); SP.done.forEach(function (l) { wx.moveTo(l[0][0], l[0][1]); for (var i = 1; i < l.length; i++) wx.lineTo(l[i][0], l[i][1]); wx.closePath(); }); wx.shadowBlur = glow || 0; wx.shadowColor = "#38FF5C"; wx.fillStyle = "rgba(56,255,92," + alpha + ")"; wx.fill("evenodd"); wx.restore(); }
   function wallSplash(now, dt) { var t = (now - S.t0) / 1000, T = SP;
-    if (t < .8) { wx.fillStyle = "rgba(0,0,0,.35)"; wx.fillRect(0, 0, WW, WH); parked(now); return; }
+    if (t < .8) { wx.fillStyle = "rgba(0,0,0,.35)"; wx.fillRect(0, 0, WW, WH); parked(now); spDot(WW * .5, WH * .5, "#FF2A1A", "rgba(255,42,26," + (.6 + .4 * Math.sin(now / 90)) + ")", 34, 4); return; }
     if (t < 4.8 && T.loops.length) { if (!T.cleared) { T.cleared = true; wx.globalCompositeOperation = "source-over"; wx.fillStyle = "#000"; wx.fillRect(0, 0, WW, WH); } var target = Math.min(T.len, (t - .8) / 4 * T.len), pt = null; wx.globalCompositeOperation = "lighter"; wx.lineCap = "round"; wx.lineJoin = "round"; wx.lineWidth = 3; wx.strokeStyle = "rgba(56,255,92,.9)"; wx.shadowBlur = 14; wx.shadowColor = "#38FF5C";
       while (T.pos < target && T.li < T.loops.length) { var L = T.loops[T.li], a = L[T.pi], b = L[T.pi + 1]; if (!b) { T.done.push(L); T.li++; T.pi = 0; T.last = null; continue; } var sl = Math.hypot(b[0] - a[0], b[1] - a[1]), room = target - T.pos, k = Math.min(1, room / Math.max(1e-6, sl)); pt = [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k]; var from = T.last || a; wx.beginPath(); wx.moveTo(from[0], from[1]); wx.lineTo(pt[0], pt[1]); wx.stroke(); if (k >= 1) { T.pos += sl; T.pi++; T.last = null; } else { T.pos = target; T.last = pt; } }
       wx.shadowBlur = 0; wx.globalCompositeOperation = "source-over"; if (T.done.length > (T.filled || 0)) { fillDone(.14); T.filled = T.done.length; }
-      if (pt) { wx.globalCompositeOperation = "lighter"; wx.shadowBlur = 26; wx.shadowColor = "#fff"; wx.fillStyle = "rgba(255,255,255,.9)"; wx.beginPath(); wx.arc(pt[0], pt[1], 3, 0, 7); wx.fill(); wx.shadowBlur = 0; wx.globalCompositeOperation = "source-over"; lit = [[pt, [120, 255, 150]]]; gpos = [(pt[0] / WW - .5) * 2, (.5 - pt[1] / WH) * 2]; } return; }
+      if (pt) { spDot(pt[0], pt[1], "#fff", "rgba(255,255,255,.9)", 26, 3); lit = [[pt, [120, 255, 150]]]; gpos[0] = (pt[0] / WW - .5) * 2; gpos[1] = (.5 - pt[1] / WH) * 2; } return; }
     if (t < 5.8) { if (T.li < T.loops.length) { T.done = T.loops.slice(); T.li = T.loops.length; } var k = (t - 4.8); fillDone(.05 + .25 * Math.sin(Math.min(1, k) * Math.PI) * (1 + Math.sin(k * 40) * .3), 40 * Math.sin(Math.min(1, k) * Math.PI)); lit = []; return; }
     // laser apaga, a parede esfria, a luz da sala baixa, a câmera voa para a traseira
     wx.fillStyle = "rgba(0,0,0,.08)"; wx.fillRect(0, 0, WW, WH); lit = []; S.dim = .55; if (!T.flew) { T.flew = true; setCam("rear", 2.2); } if (t > 7.6) start(); }
@@ -343,7 +409,7 @@
      cada quadro até a posição voltar a subir, com a tarja vermelha de erro por cima da tela de quem
      abre `app.html#laser`. Era também a animação inteira (câmera, tampa, ventoinha) andando de ré. */
   function tick(now) { size(); var dt = Math.min(.1, Math.max(0, (now - last) / 1000)); last = now; var t = (now - T0) / 1000;
-    if (S.mode === "splash") wallSplash(now, dt); else wallTick(now, dt); wallTex.needsUpdate = true;
+    var wt0 = PERF && performance.now(); if (S.mode === "splash") { wallSplash(now, dt); wallTex.needsUpdate = true; } else wallTick(now, dt); if (PERF) { PERF.wallMs += performance.now() - wt0; PERF.frames++; }
     var want = S.cam === "inside" ? 1 : 0; lidT += (want - lidT) * Math.min(1, dt * 3); var sT = Math.min(1, lidT / .45), lT = Math.max(0, (lidT - .4) / .6); B.screws.forEach(function (s, i) { s.position.y = .004 + sT * .05; s.rotation.y = sT * 12 + i; }); B.lid.rotation.x = -lT * 1.9;
     CAM.update(dt * camSpeed / 5); rearI += (((S.cam === "rear" && S.mode === "play") ? 14 : 0) - rearI) * Math.min(1, dt * 3); B.rearLight.intensity = rearI; inLight.intensity = .35 * lidT; sun.intensity = 90 * S.dim; B.wallLight.intensity = 14 * S.dim;
     // feixes externos: abertura → pontos acesos da parede
