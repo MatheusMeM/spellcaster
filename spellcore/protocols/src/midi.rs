@@ -8,8 +8,9 @@
 //! `144/60` = note on canal 1 nota 60, `176/1` = CC 1 do canal 1. O canal ja' esta' no status,
 //! entao um controlador em outro canal e' outra chave, sem campo a mais.
 
+#[cfg(not(target_env = "musl"))]
 use midir::{Ignore, MidiInput, MidiInputConnection};
-use std::sync::mpsc::{sync_channel, Receiver};
+use std::sync::mpsc::Receiver;
 
 /// Fila entre a thread de callback do driver e quem consome (o frame). Cheia, o evento NOVO cai:
 /// o driver nunca bloqueia.
@@ -19,6 +20,12 @@ const DEPTH: usize = 256;
 
 /// Nomes das portas de entrada, na ordem do driver. Maquina sem MIDI (ou sem servico) devolve
 /// lista vazia: procurar porta nunca e' erro.
+#[cfg(target_env = "musl")]
+pub fn ports() -> Vec<String> {
+    Vec::new()
+}
+
+#[cfg(not(target_env = "musl"))]
 pub fn ports() -> Vec<String> {
     let Ok(mi) = MidiInput::new("spellcaster") else {
         return Vec::new();
@@ -34,9 +41,18 @@ pub struct MidiIn {
     name: String,
     rx: Receiver<(u8, u8, u8)>,
     /// A conexao viva: solta-la fecha a porta.
+    #[cfg(not(target_env = "musl"))]
     _conn: MidiInputConnection<()>,
 }
 
+#[cfg(target_env = "musl")]
+impl MidiIn {
+    pub fn open(_port: &str) -> Result<MidiIn, String> {
+        Err("MIDI indisponivel neste binario (estatico, sem ALSA)".into())
+    }
+}
+
+#[cfg(not(target_env = "musl"))]
 impl MidiIn {
     /// `port` = indice em texto ("0"), trecho do nome (sem diferenca de caixa) ou vazio = a
     /// primeira porta.
@@ -53,7 +69,7 @@ impl MidiIn {
             .collect();
         let i = escolhe(&nomes, port)?;
         let name = nomes[i].clone();
-        let (tx, rx) = sync_channel(DEPTH);
+        let (tx, rx) = std::sync::mpsc::sync_channel(DEPTH);
         let conn = mi
             .connect(
                 &ps[i],

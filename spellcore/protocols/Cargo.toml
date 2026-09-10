@@ -7,4 +7,8 @@ edition.workspace = true
 serde = { workspace = true }
 serde_json = { workspace = true }
 socket2 = { workspace = true }
+
+# ponytail: sem MIDI no binario estatico do Pi (musl nao tem libasound) ; trocar por ALSA
+# estatico se algum dia um Pi precisar de superficie MIDI
+[target.'cfg(not(target_env = "musl"))'.dependencies]
 midir = { workspace = true }
