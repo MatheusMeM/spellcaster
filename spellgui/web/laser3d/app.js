@@ -96,8 +96,8 @@
   var GC = document.createElement("canvas"); GC.width = GC.height = 64; var gc = GC.getContext("2d"), gg = gc.createRadialGradient(32, 32, 0, 32, 32, 32);
   gg.addColorStop(0, "rgba(255,255,255,1)"); gg.addColorStop(.3, "rgba(255,255,255,.45)"); gg.addColorStop(1, "rgba(255,255,255,0)"); gc.fillStyle = gg; gc.fillRect(0, 0, 64, 64);
   var glowTex = new THREE.CanvasTexture(GC);
-  var segMat = wmat(new THREE.LineBasicMaterial({ vertexColors: true, opacity: .28 }), true);
-  var haloMat = wmat(new THREE.PointsMaterial({ size: 9, sizeAttenuation: false, map: glowTex, vertexColors: true, opacity: .05 }), true);
+  var segMat = wmat(new THREE.LineBasicMaterial({ vertexColors: true, opacity: 1 }), false);
+  var haloMat = wmat(new THREE.PointsMaterial({ size: 9, sizeAttenuation: false, map: glowTex, vertexColors: true, opacity: .12 }), true);
   var dotMat = wmat(new THREE.PointsMaterial({ size: 14, sizeAttenuation: false, map: glowTex, opacity: .9 }), true);
   var fadeMat = wmat(new THREE.MeshBasicMaterial({ color: 0x000000, opacity: reduced ? .6 : .3 }), false), FADE = reduced ? .4 : .7;
   var fade = new THREE.Mesh(new THREE.PlaneGeometry(WW, WH), fadeMat); fade.position.set(WW / 2, WH / 2, 0);
