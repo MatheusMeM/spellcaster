@@ -1,12 +1,14 @@
 "use strict";
-// nav.js — a barra que liga as cinco paginas e mostra o show aberto. Toda pagina inclui com
+// nav.js — a barra que liga as seis paginas e mostra o show aberto. Toda pagina inclui com
 // duas linhas no topo do <body>:
 //
 //   <div id="nav"></div>
 //   <script src="nav.js"></script>
 //
-// Abas TIMELINE / PATCHBAY / TEATRO / FACE / LASER, `Shift+1`..`Shift+5` (design/SHORTCUTS.md,
-// "Foco de painel"), indicador ENGINE/OFFLINE com o `rev` do show, e o nome do show editavel.
+// Abas TIMELINE / PATCHBAY / TEATRO / FACE / LASER / AJUDA, `Shift+1`..`Shift+6`
+// (design/SHORTCUTS.md, "Foco de painel"), indicador ENGINE/OFFLINE com o `rev` do show, e o
+// nome do show editavel. A barra tambem carrega o `help.js`: e' o que liga a tecla `?` em
+// toda pagina, e nao so' na de ajuda.
 // Cor e fonte so' de design/tokens/spellcaster.css.
 
 const NAV = {};
@@ -17,6 +19,7 @@ NAV.PAGINAS = [
   { rot: "TEATRO", href: "teatro.html" },
   { rot: "FACE", href: "face.html?face=quatro" },
   { rot: "LASER", href: "laser.html" },
+  { rot: "AJUDA", href: "help.html" },
 ];
 
 // ---- regras (o resto e' DOM) --------------------------------------------
@@ -36,7 +39,7 @@ NAV.abas = function (pathname) {
   }));
 };
 
-/// `Shift+1`..`Shift+5` -> href, ou null. Digitando num campo, nenhuma tecla navega: o nome do
+/// `Shift+1`..`Shift+6` -> href, ou null. Digitando num campo, nenhuma tecla navega: o nome do
 /// show tem digitos. Vale o `code` da tecla, nao o `key`: em teclado ABNT2 o Shift+2 escreve `"`
 /// e o Shift+3 escreve `#`. O `key` so' entra como reserva, para layout em que o Shift mantem o
 /// digito (e para evento sintetico, que costuma vir sem `code`).
@@ -170,9 +173,19 @@ if (typeof document !== "undefined") {
       (typeof bus !== "undefined" ? bus : null); // eslint-disable-line no-undef
     return window.Bus && b instanceof window.Bus ? b : null;
   };
+  // A tecla `?` do SHORTCUTS.md so' existe em quem carrega o help.js; a barra esta' em todas as
+  // paginas, entao e' ela quem o traz.
+  const ajuda = () => {
+    if (window.HELP) return window.HELP.bindKey();
+    const s = document.createElement("script");
+    s.src = "help.js";
+    s.onload = () => window.HELP && window.HELP.bindKey();
+    document.head.appendChild(s);
+  };
   const arranca = () => {
     const el = document.getElementById("nav");
     if (!el) return;
+    ajuda();
     const pronto = () => NAV.monta(document, el, daPagina() || new window.Bus({}).connect());
     if (window.Bus) return pronto();
     const s = document.createElement("script");

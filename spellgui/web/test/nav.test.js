@@ -83,12 +83,13 @@ test("abas: a atual e' a da pagina, e a raiz e' a timeline", () => {
   assert.strictEqual(NAV.abas("/").find(a => a.rot === "FACE").href, "face.html?face=quatro");
 });
 
-test("Shift+1..5 troca de pagina; sem Shift, com Ctrl ou num campo, nao", () => {
+test("Shift+1..6 troca de pagina; sem Shift, com Ctrl ou num campo, nao", () => {
   const tecla = e => NAV.destino(Object.assign({ target: { tagName: "BODY" } }, e));
   assert.strictEqual(tecla({ code: "Digit1", shiftKey: true }), "index.html");
   assert.strictEqual(tecla({ code: "Digit3", shiftKey: true }), "teatro.html");
   assert.strictEqual(tecla({ code: "Digit5", shiftKey: true }), "laser.html");
-  assert.strictEqual(tecla({ code: "Digit6", shiftKey: true }), null);
+  assert.strictEqual(tecla({ code: "Digit6", shiftKey: true }), "help.html");
+  assert.strictEqual(tecla({ code: "Digit7", shiftKey: true }), null);
   assert.strictEqual(tecla({ code: "Digit1" }), null);
   // ABNT2: Shift+2 escreve `"`, e quem identifica a tecla e' o `code`
   assert.strictEqual(tecla({ code: "Digit2", key: '"', shiftKey: true }), "patchbay.html");
