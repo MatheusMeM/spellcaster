@@ -1,126 +1,126 @@
-# Modo de mapeamento — `Ctrl+Shift+A`
+# Mapping mode — `Ctrl+Shift+A`
 
-Pedido do Matheus (09/09/2026), literal: *"e um sistema de mapping que nem o resolume Ctrl shift A"*. A tecla está fixada pelo dono e não se discute; o que este arquivo faz é dizer o que o modo mostra, o que ele grava e como isso se resolve num comando.
+Request from Matheus (2026-09-09), literal: *"and a mapping system just like resolume Ctrl shift A"*. The key is fixed by the owner and is not up for discussion; what this file does is say what the mode shows, what it records and how that resolves into a command.
 
-Fonte: **Resolume Arena**, manual online, páginas *Keyboard Shortcuts*, *MIDI Shortcuts*, *DMX Shortcuts*, *OSC* e *Shortcuts* (tabela). Citações verbatim. Onde o Resolume tem quatro modos e nós temos um, o motivo está escrito.
+Source: **Resolume Arena**, online manual, pages *Keyboard Shortcuts*, *MIDI Shortcuts*, *DMX Shortcuts*, *OSC* and *Shortcuts* (table). Verbatim quotes. Where Resolume has four modes and we have one, the reason is written down.
 
-| Item | Quem resolveu melhor | Por quê |
+| Item | Who solved it best | Why |
 |---|---|---|
-| Entrar no modo | Resolume | Recolore a interface inteira e diz na cara o que é mapeável: *"Everything blue can have a shortcut assigned to it."* Um diálogo de "escolha o controle numa lista" seria a mesma informação escondida |
-| Gesto de aprender | Resolume | *"click on it with the mouse. Now press the spacebar, and voila"* — clicar o controle e tocar a entrada. Duas ações, nenhuma caixa de texto |
-| Painel do modo | Resolume | Aba que **só existe dentro do modo**, com a lista completa, ordenável, e duplicata marcada em vermelho |
-| Apagar | Resolume | `Backspace` ou Delete no menu de contexto |
-| Comportamento (toggle, piano, faixa) | Resolume, com corte | `Mode` = Toggle/Value/Mouse, `Piano` e `Invert` como toggles, `Range` como slider de min/max. Nós ficamos com faixa e com piano; o resto vira graph (§5) |
-| Endereço textual | Resolume | *"The addresses are all fixed and set up already... Unlike MIDI and keyboard shortcuts, that require you to first link a control to a specific shortcut."* É a regra 2 de `FUNCOES/README.md`, já nossa |
-| Quatro modos por protocolo | nenhum | **Não copiamos.** Ver §2 |
-| Escopo do alvo (By Position / This Clip / Selected) | nenhum | **Não copiamos agora.** Ver §7 |
+| Entering the mode | Resolume | It recolors the whole interface and says right to your face what is mappable: *"Everything blue can have a shortcut assigned to it."* A "pick the control from a list" dialog would be the same information hidden |
+| Learn gesture | Resolume | *"click on it with the mouse. Now press the spacebar, and voila"* — click the control and play the input. Two actions, no text box |
+| Mode panel | Resolume | A tab that **only exists inside the mode**, with the complete list, sortable, and duplicates marked in red |
+| Delete | Resolume | `Backspace` or Delete in the context menu |
+| Behavior (toggle, piano, range) | Resolume, with a cut | `Mode` = Toggle/Value/Mouse, `Piano` and `Invert` as toggles, `Range` as a min/max slider. We keep range and piano; the rest becomes graph (§5) |
+| Textual address | Resolume | *"The addresses are all fixed and set up already... Unlike MIDI and keyboard shortcuts, that require you to first link a control to a specific shortcut."* It is rule 2 of `FUNCOES/README.md`, already ours |
+| Four modes, one per protocol | none | **We do not copy it.** See §2 |
+| Target scope (By Position / This Clip / Selected) | none | **We do not copy it for now.** See §7 |
 
-## 1. O que o modo faz na tela
+## 1. What the mode does on screen
 
-`Ctrl+Shift+A` liga e desliga. `Esc` também desliga — Resolume, *Shortcuts*: `Stop Shortcut Editing | Esc`.
+`Ctrl+Shift+A` turns it on and off. `Esc` also turns it off — Resolume, *Shortcuts*: `Stop Shortcut Editing | Esc`.
 
-Dentro do modo:
+Inside the mode:
 
-1. **Toda a interface recolore**, em todas as páginas: timeline (`index.html`), patchbay, teatro, face, laser 3D, midi. Resolume, *Keyboard Shortcuts*: *"The interface will now turn partially blue."* Aqui a tinta é o âmbar de `PRINCIPIOS.md §2`, porque é um estado e estado tem uma cor só. O que **não** recolore não é mapeável, e isso é a informação.
-2. **Cada controle mapeável mostra o seu ENDEREÇO em texto**, sobre ele ou ao lado. Resolume mostra o atalho já atribuído (*"If the Bypass button was big enough, you could even read it had the spacebar assigned to it"*); nós mostramos o endereço **sempre**, porque o endereço é a identidade (regra 2) e porque é o que o operador digita na CLI, manda por OSC e escreve numa cue.
-3. **Painel do modo**, canto inferior direito, só existe dentro do modo (Resolume, *Keyboard Shortcuts*: *"This tab is only visible while you're in Shortcuts mode"*). Colunas: entrada, endereço, tipo, faixa. Ordenável por qualquer coluna; **duplicata em vermelho** (*"which makes it really easy to spot double assigned shortcuts. These will be marked in red"*).
-4. **Aprender**: clique no controle, depois toque a entrada — tecla, nota/CC do MIDI, mensagem OSC. O que chegar primeiro vira o mapeamento.
-5. **Apagar**: com a linha ou o controle selecionado, `Backspace` ou Delete no menu de contexto (Resolume, texto idêntico nas três páginas).
-6. **Sair não desfaz nada.** O mapa é do show e já está gravado quando o modo fecha.
+1. **The whole interface recolors**, on every page: timeline (`index.html`), patchbay, teatro, face, laser 3D, midi. Resolume, *Keyboard Shortcuts*: *"The interface will now turn partially blue."* Here the paint is the amber of `PRINCIPIOS.md §2`, because it is a state and a state has only one color. What does **not** recolor is not mappable, and that is the information.
+2. **Every mappable control shows its ADDRESS in text**, on it or next to it. Resolume shows the already assigned shortcut (*"If the Bypass button was big enough, you could even read it had the spacebar assigned to it"*); we show the address **always**, because the address is the identity (rule 2) and because it is what the operator types in the CLI, sends over OSC and writes in a cue.
+3. **Mode panel**, bottom right corner, only exists inside the mode (Resolume, *Keyboard Shortcuts*: *"This tab is only visible while you're in Shortcuts mode"*). Columns: input, address, type, range. Sortable by any column; **duplicates in red** (*"which makes it really easy to spot double assigned shortcuts. These will be marked in red"*).
+4. **Learn**: click the control, then play the input — key, MIDI note/CC, OSC message. Whatever arrives first becomes the mapping.
+5. **Delete**: with the row or the control selected, `Backspace` or Delete in the context menu (Resolume, identical text on all three pages).
+6. **Leaving undoes nothing.** The map belongs to the show and is already saved when the mode closes.
 
-O overlay é uma camada só, escrita uma vez, e por isso **exige que todas as páginas falem pelo mesmo bus**. Hoje são três clientes de WebSocket: `bus.js` (patchbay, laser, face), o de `timeline.js:64-106` e o de `teatro.js:71`, os dois últimos com `ponytail:` mandando trocar. Trocar é pré-requisito desta função, não melhoria (`pontos-falhos.md` item 15).
+The overlay is a single layer, written once, and for that reason it **requires every page to talk over the same bus**. Today there are three WebSocket clients: `bus.js` (patchbay, laser, face), the one in `timeline.js:64-106` and the one in `teatro.js:71`, the last two with a `ponytail:` telling us to swap them. Swapping is a prerequisite of this function, not an improvement (`pontos-falhos.md` item 15).
 
-## 2. Um modo, não quatro
+## 2. One mode, not four
 
-O Resolume tem quatro portas de entrada, cada uma com sua cor: `Shift+Ctrl+K` teclado, `Shift+Ctrl+M` MIDI, `Shift+Ctrl+O` OSC, `Shift+Ctrl+X` DMX (*Shortcuts*, tabela). A cor muda por protocolo (*MIDI Shortcuts*: *"The interface will now change color depending on the protocol"*; DMX é *"a nice pastelly yellow"*).
+Resolume has four entry doors, each with its own color: `Shift+Ctrl+K` keyboard, `Shift+Ctrl+M` MIDI, `Shift+Ctrl+O` OSC, `Shift+Ctrl+X` DMX (*Shortcuts*, table). The color changes per protocol (*MIDI Shortcuts*: *"The interface will now change color depending on the protocol"*; DMX is *"a nice pastelly yellow"*).
 
-Nós temos **um** modo, `Ctrl+Shift+A`, pelos motivos abaixo, e as três teclas do Resolume viram **filtro dentro do modo**:
+We have **one** mode, `Ctrl+Shift+A`, for the reasons below, and Resolume's three keys become a **filter inside the mode**:
 
-- O protocolo já vem na própria entrada. Uma tecla é uma tecla, uma nota MIDI é uma nota, uma mensagem OSC é uma mensagem — não há ambiguidade a resolver com um modo separado. O Resolume precisa dos quatro porque no DMX não existe "tocar o controle" (por isso lá há *DMX Learn* e "Create DMX Shortcut" no botão direito).
-- Quatro cores contra `PRINCIPIOS.md §2` ("um acento, e ele significa estado"). Quatro modos com quatro cores é quatro estados para a mesma coisa.
-- O dono fixou uma tecla. Quatro entradas seriam quatro teclas.
+- The protocol already comes with the input itself. A key is a key, a MIDI note is a note, an OSC message is a message — there is no ambiguity to resolve with a separate mode. Resolume needs all four because in DMX there is no "play the control" (that is why there is *DMX Learn* and "Create DMX Shortcut" on the right button).
+- Four colors go against `PRINCIPIOS.md §2` ("one accent, and it means state"). Four modes with four colors is four states for the same thing.
+- The owner fixed one key. Four entries would be four keys.
 
-Dentro do modo, `K`, `M` e `O` **restringem a fonte que o próximo aprendizado aceita** — útil quando há um teclado MIDI mandando clock e o operador quer mapear uma tecla do computador sem capturar a primeira nota que passar. Teclas nuas, painel focado, e a tabela do painel filtra junto. É a única coisa que as três teclas do Resolume compram aqui, e é o suficiente para justificá-las.
+Inside the mode, `K`, `M` and `O` **restrict the source that the next learn accepts** — useful when a MIDI keyboard is sending clock and the operator wants to map a computer key without capturing the first note that goes by. Bare keys, focused panel, and the panel table filters along. That is the only thing Resolume's three keys buy here, and it is enough to justify them.
 
-Não há modo DMX de entrada: DMX-in não existe no engine (não há `in.dmx` no catálogo fechado de `script/src/graph.rs`). Quando existir, entra como fonte `dmx:` na mesma tabela, sem modo novo.
+There is no DMX input mode: DMX-in does not exist in the engine (there is no `in.dmx` in the closed catalog of `script/src/graph.rs`). When it exists, it enters as a `dmx:` source in the same table, with no new mode.
 
-## 3. Conflito de tecla: `Ctrl+Shift+A`
+## 3. Key conflict: `Ctrl+Shift+A`
 
-`design/SHORTCUTS.md` já usa `Ctrl+Shift+A` para **"Selecionar nada"** (par de `Ctrl+A`, origem "ambos": Premiere e Resolve).
+`design/SHORTCUTS.md` already uses `Ctrl+Shift+A` for **"Select none"** (the pair of `Ctrl+A`, origin "both": Premiere and Resolve).
 
-O dono fixou `Ctrl+Shift+A` para o modo de mapeamento. Então "selecionar nada" muda, e muda para **`Alt+A`**, porque a própria gramática de `SHORTCUTS.md` já diz o que fazer: *"Ctrl = comando, Shift = estende/amplia, **Alt = variante/limpa**"*, e o mapa já aplica isso três vezes (`Alt+I`, `Alt+O`, `Alt+X` limpam In/Out). Limpar a seleção com `Alt` é a regra da casa aplicada a si mesma, não uma exceção.
+The owner fixed `Ctrl+Shift+A` for the mapping mode. So "select none" moves, and it moves to **`Alt+A`**, because the grammar of `SHORTCUTS.md` itself already says what to do: *"Ctrl = command, Shift = extends/widens, **Alt = variant/clears**"*, and the map already applies that three times (`Alt+I`, `Alt+O`, `Alt+X` clear In/Out). Clearing the selection with `Alt` is the house rule applied to itself, not an exception.
 
-(Nota de fonte, para o registro: no Resolume `Ctrl+Shift+A` é *"Open Advanced Output"*, não o modo de atalhos — os modos de lá são `Shift+Ctrl+K/M/O/X`. O dono pediu a tecla, não a página; a tecla fica como ele pediu.)
+(Source note, for the record: in Resolume `Ctrl+Shift+A` is *"Open Advanced Output"*, not the shortcuts mode — the modes there are `Shift+Ctrl+K/M/O/X`. The owner asked for the key, not the page; the key stays as he asked.)
 
-`A` sozinho é modo automação (`daw-arranjo.md` D1) e `Alt+A` não colide com ele.
+`A` alone is automation mode (`daw-arranjo.md` D1) and `Alt+A` does not collide with it.
 
-## 4. Endereços
+## 4. Addresses
 
-Um endereço é o nome do registry, agrupado por `/` (regra 2 de `FUNCOES/README.md`; convenção já fixada em `DECISOES.md` 09/09: *"Porta do graph escreve-se `<uid>/<porta>`... o nome da porta já leva `/` e assim a porta é o próprio endereço do registry"*).
+An address is the registry name, grouped by `/` (rule 2 of `FUNCOES/README.md`; convention already fixed in `DECISOES.md` 09/09: *"A graph port is written `<uid>/<port>`... the port name already carries `/` and so the port is the registry address itself"*).
 
-| Endereço | Controle | Tipo | Resolve para |
+| Address | Control | Type | Resolves to |
 |---|---|---|---|
-| `transport/play` | botão play | trigger | `resume` |
-| `transport/pause` | botão pause | trigger | `pause` |
-| `transport/stop` | botão stop | trigger | `stop` |
-| `transport/locate` | régua, campo de posição | valor (s) | `locate {t: $<duração>}` |
-| `transport/loop` | botão loop | toggle | estado de janela (`daw-arranjo.md §4.2`) |
-| `track/<i>/mute` | M do cabeçalho | toggle | `show_patch {ops:[{op:"add", path:"/tracks/<i>/mute", value:…}]}` |
-| `track/<i>/solo` | S do cabeçalho | toggle | idem, `/solo` |
-| `track/<i>/lock` | cadeado | toggle | idem, `/lock` |
-| `cue/<i>/go` | linha da cue, célula da grade | trigger | `cue_go {index:<i>}` |
-| `cue/go` | botão GO | trigger | `cue_go {}` (próxima) |
-| `level/<u>/<ch>` | fader do programmer | valor 0..255 | `level_set {universe:<u>, address:<ch>, value:"$255"}` |
-| `level/clear` | botão soltar | trigger | `level_clear` |
-| `fixture/<nome>/<canal>` | fader de aparelho | valor | `fixture_set {name, channel, value:"$255"}` |
-| `laser/1/arm`, `power`, `play`, `shutter` | botões do modelo 3D | trigger | `laser_*` (`integracao-laser.md`, já em `DECISOES.md`) |
-| `laser/1/kpps` | slider | valor | `laser_param {feed:"laser", path:"kpps", value:"$"}` |
-| `laser/1/limit/r|g|b`, `curve/r|g|b`, `geo/scale`, `dmx/addr` | sliders do painel | valor | `laser_param` |
-| `ilda/fps`, `dev/pps` | painel do player | valor | `ilda-player.md §1` |
-| `<mod>/<path>` | parâmetro de módulo | valor | `<mod>_param {feed:"<mod>", path, value}` (`DECISOES.md` 09/09) |
-| `marker/<nome>` | marcador na régua | trigger | `input {key:"marker:<nome>", value:1}` |
-| `widget/<id>` | widget de Face | valor | `input {key:"widget:<id>", value}` |
+| `transport/play` | play button | trigger | `resume` |
+| `transport/pause` | pause button | trigger | `pause` |
+| `transport/stop` | stop button | trigger | `stop` |
+| `transport/locate` | ruler, position field | value (s) | `locate {t: $<duration>}` |
+| `transport/loop` | loop button | toggle | window state (`daw-arranjo.md §4.2`) |
+| `track/<i>/mute` | M of the header | toggle | `show_patch {ops:[{op:"add", path:"/tracks/<i>/mute", value:…}]}` |
+| `track/<i>/solo` | S of the header | toggle | same, `/solo` |
+| `track/<i>/lock` | padlock | toggle | same, `/lock` |
+| `cue/<i>/go` | cue row, grid cell | trigger | `cue_go {index:<i>}` |
+| `cue/go` | GO button | trigger | `cue_go {}` (next) |
+| `level/<u>/<ch>` | programmer fader | value 0..255 | `level_set {universe:<u>, address:<ch>, value:"$255"}` |
+| `level/clear` | release button | trigger | `level_clear` |
+| `fixture/<name>/<channel>` | fixture fader | value | `fixture_set {name, channel, value:"$255"}` |
+| `laser/1/arm`, `power`, `play`, `shutter` | buttons of the 3D model | trigger | `laser_*` (`integracao-laser.md`, already in `DECISOES.md`) |
+| `laser/1/kpps` | slider | value | `laser_param {feed:"laser", path:"kpps", value:"$"}` |
+| `laser/1/limit/r|g|b`, `curve/r|g|b`, `geo/scale`, `dmx/addr` | panel sliders | value | `laser_param` |
+| `ilda/fps`, `dev/pps` | player panel | value | `ilda-player.md §1` |
+| `<mod>/<path>` | module parameter | value | `<mod>_param {feed:"<mod>", path, value}` (`DECISOES.md` 09/09) |
+| `marker/<name>` | marker on the ruler | trigger | `input {key:"marker:<name>", value:1}` |
+| `widget/<id>` | Face widget | value | `input {key:"widget:<id>", value}` |
 
-Os nomes de `laser/*` e `ilda/*` não são inventados aqui: vêm de `integracao-laser.md` e de `ilda-player.md §1`, e `DECISOES.md` (09/09) já registrou a lista. Este arquivo só acrescenta `transport/*`, `track/*`, `cue/*` e `level/*`, que são os endereços dos controles que a timeline e o teatro desenham.
+The `laser/*` and `ilda/*` names are not invented here: they come from `integracao-laser.md` and from `ilda-player.md §1`, and `DECISOES.md` (09/09) already recorded the list. This file only adds `transport/*`, `track/*`, `cue/*` and `level/*`, which are the addresses of the controls that the timeline and the teatro draw.
 
-**Endereço não existe sem controle.** Um endereço na tabela e nenhum widget na tela é a "declaração sem implementação" que `DECISOES.md` já apontou como problema no `modules/laser.json`. A prova disso é um teste (§8).
+**An address does not exist without a control.** An address in the table and no widget on screen is the "declaration without implementation" that `DECISOES.md` already flagged as a problem in `modules/laser.json`. The proof of that is a test (§8).
 
-## 5. Tipos: o que o mapeamento faz, e o que o graph faz
+## 5. Types: what the mapping does, and what the graph does
 
-O Resolume tem, por atalho: `Mode` (Toggle / Value / Mouse, e Velocity em nota MIDI), `Piano`, `Invert`, `Range` com min e max, e mais quatro modos só para CC (Absolute / Button / Relative / Fake Relative). É muito, e a razão é que o Resolume não tem um graph atrás.
+Resolume has, per shortcut: `Mode` (Toggle / Value / Mouse, and Velocity on a MIDI note), `Piano`, `Invert`, `Range` with min and max, plus four more modes for CC only (Absolute / Button / Relative / Fake Relative). It is a lot, and the reason is that Resolume does not have a graph behind it.
 
-Nós temos. A divisão:
+We do. The split:
 
-**O mapa direto (flat) faz duas coisas, sem estado:**
+**The direct (flat) map does two things, with no state:**
 
-- **trigger** — a entrada chega, o comando roda. `144/60` → `cue_go`.
-- **valor** — a entrada chega com um número, e ele entra nos argumentos. É o `"$"` que a frente `midi` já implementou (`spellcore/engine/src/midi.rs:85-107`): `"$"` vira o valor 0..1, `"$<n>"` vira `round(valor * n)` inteiro (`"$127"` = byte MIDI cru, `"$255"` = nível DMX). Recursivo dentro de lista e de objeto.
+- **trigger** — the input arrives, the command runs. `144/60` → `cue_go`.
+- **value** — the input arrives with a number, and it goes into the arguments. It is the `"$"` that the `midi` workstream already implemented (`spellcore/engine/src/midi.rs:85-107`): `"$"` becomes the value 0..1, `"$<n>"` becomes `round(value * n)` as an integer (`"$127"` = raw MIDI byte, `"$255"` = DMX level). Recursive inside a list and inside an object.
 
-**Faixa (Range).** Resolume, *Keyboard Shortcuts*: *"With the Range option, you can see what values the slider should jump to when the button is pressed and released"*; e para CC absoluto, *"If you want, you can Invert this behaviour, or set a specific Range."* Cabe numa terceira forma do mesmo token, sem campo novo: **`"$<min>..<max>"`** → `min + valor * (max - min)`, arredondado como `"$<n>"` já é. Invert é `"$255..0"` — o próprio `min > max`, que é como o Ableton também resolve (§33.2.3: *"You can reverse this behavior by setting a Min value that is higher than its corresponding Max value"*). Um `match` a mais em `expande()`, e nenhuma chave nova no arquivo.
+**Range.** Resolume, *Keyboard Shortcuts*: *"With the Range option, you can see what values the slider should jump to when the button is pressed and released"*; and for absolute CC, *"If you want, you can Invert this behaviour, or set a specific Range."* It fits in a third form of the same token, with no new field: **`"$<min>..<max>"`** → `min + value * (max - min)`, rounded as `"$<n>"` already is. Invert is `"$255..0"` — `min > max` itself, which is how Ableton solves it too (§33.2.3: *"You can reverse this behavior by setting a Min value that is higher than its corresponding Max value"*). One more `match` in `expande()`, and no new key in the file.
 
-**Piano** (segurar liga, soltar desliga). Resolume: *"they will be on for as long as you hold the key down, and turn off when you release"*. **Não precisa de campo nenhum em MIDI**: note-on e note-off são status diferentes (`144/60` e `128/60`), então são duas linhas do mapa, e piano é mapear as duas. Para tecla de computador e para OSC, a chave ganha o sufixo `^` (`"key:Space^"` = ao soltar), que é uma linha no despachante e nenhuma estrutura nova.
+**Piano** (hold turns it on, release turns it off). Resolume: *"they will be on for as long as you hold the key down, and turn off when you release"*. **It needs no field at all in MIDI**: note-on and note-off are different statuses (`144/60` and `128/60`), so they are two rows of the map, and piano is mapping both. For a computer key and for OSC, the key gains the suffix `^` (`"key:Space^"` = on release), which is one line in the dispatcher and no new structure.
 
-**Toggle, latch, contador, rampa, limiar, atraso.** **Não entram no mapa.** Vão para o graph, que já tem os nós no catálogo fechado (`logic.*`, `math.*`, `time.*`, `state`, `cmd` — `script/src/graph.rs:1-70`), e a rota é `in.midi` → `logic.toggle` → `cmd`. O modo de mapeamento oferece um botão "mandar para o graph" que cria essa rota e abre o PATCHBAY nela. Motivo: guardar estado em dois lugares é a fonte dupla que este documento existe para evitar, e o graph é o lugar que já foi desenhado para isso (`orquestrador.md`).
+**Toggle, latch, counter, ramp, threshold, delay.** **They do not go into the map.** They go to the graph, which already has the nodes in the closed catalog (`logic.*`, `math.*`, `time.*`, `state`, `cmd` — `script/src/graph.rs:1-70`), and the route is `in.midi` → `logic.toggle` → `cmd`. The mapping mode offers a "send to the graph" button that creates that route and opens the PATCHBAY on it. Reason: keeping state in two places is the double source that this document exists to avoid, and the graph is the place that was already designed for it (`orquestrador.md`).
 
-**Fora, e por quê:**
+**Out, and why:**
 
-- **Mouse mode** (Resolume: *"you can use the mouse to control a parameter while you have the shortcut pressed"*). Gesto bonito, sem pedido, e brigaria com o arraste de clipe.
-- **Relative / Fake Relative** (encoder infinito, com Steps, Step Size, Loop). Entra quando existir superfície com encoder infinito no palco; hoje não há e a frente `midi` já registrou "uma porta MIDI por processo" como limite.
-- **Velocity** (nota MIDI, força vira valor). Uma linha quando existir pad sensível: é `"$"` lendo `data2` em vez de disparar 1. Registrado, não implementado.
-- **Shortcut Groups** e *Select Next/Previous/Random Item* (Resolume). É o graph com `logic` e `state`.
+- **Mouse mode** (Resolume: *"you can use the mouse to control a parameter while you have the shortcut pressed"*). A pretty gesture, with no request behind it, and it would fight with clip dragging.
+- **Relative / Fake Relative** (endless encoder, with Steps, Step Size, Loop). It comes in when there is a surface with an endless encoder on stage; today there is none and the `midi` workstream already recorded "one MIDI port per process" as a limit.
+- **Velocity** (MIDI note, force becomes value). One line when a sensitive pad exists: it is `"$"` reading `data2` instead of firing 1. Recorded, not implemented.
+- **Shortcut Groups** and *Select Next/Previous/Random Item* (Resolume). That is the graph with `logic` and `state`.
 
-## 6. Como isso se grava, e como se unifica com a frente `midi`
+## 6. How this is saved, and how it unifies with the `midi` workstream
 
-A frente `midi` (branch `frente/midi`, commit `39b2c4d`) já criou, e está certo:
+The `midi` workstream (branch `frente/midi`, commit `39b2c4d`) already created this, and it is right:
 
 ```json
 "midi": { "144/60": {"cmd": "resume", "args": {}},
           "176/1":  {"cmd": "laser_param", "args": {"feed":"laser","path":"kpps","value":"$"}} }
 ```
 
-— um bloco `extra` do show (`midi.rs:62-68`), chave `"<status>/<data1>"` validada (`midi.rs:110-122`), comandos `midi_map` / `midi_unmap` / `midi_maps` / `midi_learn` / `midi_last`.
+— an `extra` block of the show (`midi.rs:62-68`), key `"<status>/<data1>"` validated (`midi.rs:110-122`), commands `midi_map` / `midi_unmap` / `midi_maps` / `midi_learn` / `midi_last`.
 
-**A unificação é de uma linha: o mesmo bloco, com a fonte no prefixo da chave.**
+**The unification is one line: the same block, with the source in the key prefix.**
 
 ```json
 "map": {
@@ -133,42 +133,42 @@ A frente `midi` (branch `frente/midi`, commit `39b2c4d`) já criou, e está cert
 }
 ```
 
-Por que isso não é um formato novo: **o prefixo já é o vocabulário do engine.** `input {key}` documenta exatamente essas chaves (`registry.rs:110-112`: *"widget:go", "key:Space", "osc:/spell/go", "module:laser/stat/fps"*), e `chave()` no graph produz as mesmas cinco (`script/src/graph.rs:280-290`). O bloco `"midi"` da frente `midi` é esse mapa com o prefixo implícito.
+Why this is not a new format: **the prefix is already the vocabulary of the engine.** `input {key}` documents exactly those keys (`registry.rs:110-112`: *"widget:go", "key:Space", "osc:/spell/go", "module:laser/stat/fps"*), and `chave()` in the graph produces the same five (`script/src/graph.rs:280-290`). The `"midi"` block of the `midi` workstream is that map with the prefix implicit.
 
-Consequências, e é isso que evita duas fontes de verdade:
+Consequences, and this is what avoids two sources of truth:
 
-1. `"midi"` vira `"map"`, e a chave passa a ser `"midi:144/60"`. `migrate()` (`show.rs`) faz a conversão prefixando; nenhum show existente quebra.
-2. `midi_map {key, cmd, args}` vira `map_set {key, cmd, args}`, com a mesma validação: comando existe no registry, chave bem formada por fonte (`chave_ok` de `midi.rs:110-122` vira o ramo `midi:`). `midi_map` pode ficar como apelido que prefixa, ou sair — decide a frente `comandos`.
-3. `midi_learn` vira `map_learn {source}` e é o que o overlay chama.
-4. **Um despachante só.** Hoje `midi::liga(key)` (`midi.rs:73-82`) lê o bloco e chama o registry a partir do pump MIDI. Passa a ser `map::liga(key)`, chamado de três lugares: pump MIDI, `onkeydown` da GUI e o receptor OSC. `input {key, value}` continua sendo a porta única para o graph, e o mapa é consultado **antes**: se a chave está no mapa, roda o comando; sempre, o evento também vai para os ganchos do player (é o que `midi.rs:pump` já faz).
-5. **A regra que fecha o assunto:** o mapa direto e o graph nunca guardam a mesma coisa. Mapa = chave → comando, sem estado. Graph = tudo com estado. Uma chave pode estar nos dois (dispara o comando e alimenta a rota), e isso é deliberado, não duplicação: são efeitos diferentes da mesma entrada.
+1. `"midi"` becomes `"map"`, and the key becomes `"midi:144/60"`. `migrate()` (`show.rs`) does the conversion by prefixing; no existing show breaks.
+2. `midi_map {key, cmd, args}` becomes `map_set {key, cmd, args}`, with the same validation: the command exists in the registry, the key is well formed per source (`chave_ok` of `midi.rs:110-122` becomes the `midi:` branch). `midi_map` can stay as an alias that prefixes, or go away — the `comandos` workstream decides.
+3. `midi_learn` becomes `map_learn {source}` and it is what the overlay calls.
+4. **One single dispatcher.** Today `midi::liga(key)` (`midi.rs:73-82`) reads the block and calls the registry from the MIDI pump. It becomes `map::liga(key)`, called from three places: the MIDI pump, the GUI's `onkeydown` and the OSC receiver. `input {key, value}` remains the single door to the graph, and the map is consulted **first**: if the key is in the map, the command runs; always, the event also goes to the player hooks (which is what `midi.rs:pump` already does).
+5. **The rule that closes the matter:** the direct map and the graph never store the same thing. Map = key → command, no state. Graph = everything with state. A key can be in both (it fires the command and feeds the route), and that is deliberate, not duplication: they are different effects of the same input.
 
-`design/laser/bind.js` (protótipo da rodada 5) tem um terceiro formato, com chave `note:1:60` / `cc:1:7` e persistência em `localStorage`. `DECISOES.md` (09/09, frente `midi`) já registrou o conflito e mandou para voto. A resposta deste arquivo: **ganha a chave do engine** (`midi:144/60`), porque é a que `in.midi` do graph já usa e a que o PRD §10 fixou; e **o `bind.js` para de persistir em `localStorage`**, porque mapeamento é do show e `FUNCOES/README.md §12` não deixa estado de show fora do `.spell`.
+`design/laser/bind.js` (round 5 prototype) has a third format, with the key `note:1:60` / `cc:1:7` and persistence in `localStorage`. `DECISOES.md` (09/09, `midi` workstream) already recorded the conflict and sent it to a vote. The answer of this file: **the engine key wins** (`midi:144/60`), because it is the one the graph's `in.midi` already uses and the one PRD §10 fixed; and **`bind.js` stops persisting in `localStorage`**, because mapping belongs to the show and `FUNCOES/README.md §12` does not allow show state outside the `.spell`.
 
-## 7. O que fica de fora
+## 7. What stays out
 
-- **Shortcut Target** (Resolume: *By Position* / *This Clip, Layer or Group* / *Selected*). É o problema real de "mapeei o mute do track 3 e depois reordenei os tracks", e o Resolume avisa: *"When you delete that specific clip, layer or group, of course the shortcut disappears with it!"*. Aqui isso é o mesmo item de `daw-arranjo.md §4.3` (índice contra `uid`). **Não se decide aqui**: se o track ganhar `uid`, o endereço vira `track/<uid>/mute` e o problema some sem modo de escopo nenhum. Vai junto no voto.
-- **Presets de mapeamento** (Resolume: XML separado, trocável por dropdown). O mapa é do show. Quando existir a mesma superfície em dois shows, o caminho é o show importar um arquivo de mapa, não a GUI guardar presets.
-- **OSC output / feedback** (Resolume: *"By right clicking, you can enable OSC output for this and only this button"*; e a frente `midi` já registrou LED e fader motorizado como fora, aguardando voto). Fica fora aqui também, pelo mesmo motivo: é a metade de volta e ela precisa de decisão de produto.
-- **DMX-in** (Resolume, *DMX Shortcuts*): sem `in.dmx` no catálogo, não há o que mapear.
-- **Endereços OSC fixos sem mapear** (Resolume, *OSC*: *"The addresses are all fixed and set up already"*). Isso nós **já temos e é melhor**: todo comando do registry é um endereço OSC por construção, e `GET /commands` lista. O modo de mapeamento é para o caminho contrário (uma entrada física → um endereço), não para inventar endereço.
+- **Shortcut Target** (Resolume: *By Position* / *This Clip, Layer or Group* / *Selected*). It is the real problem of "I mapped the mute of track 3 and then reordered the tracks", and Resolume warns: *"When you delete that specific clip, layer or group, of course the shortcut disappears with it!"*. Here that is the same item as `daw-arranjo.md §4.3` (index versus `uid`). **It is not decided here**: if the track gains a `uid`, the address becomes `track/<uid>/mute` and the problem disappears with no scope mode at all. It goes into the vote together.
+- **Mapping presets** (Resolume: separate XML, swappable by dropdown). The map belongs to the show. When the same surface exists in two shows, the way is for the show to import a map file, not for the GUI to keep presets.
+- **OSC output / feedback** (Resolume: *"By right clicking, you can enable OSC output for this and only this button"*; and the `midi` workstream already recorded LED and motorized fader as out, awaiting vote). It stays out here too, for the same reason: it is the return half and it needs a product decision.
+- **DMX-in** (Resolume, *DMX Shortcuts*): with no `in.dmx` in the catalog, there is nothing to map.
+- **Fixed OSC addresses with no mapping** (Resolume, *OSC*: *"The addresses are all fixed and set up already"*). That we **already have and it is better**: every registry command is an OSC address by construction, and `GET /commands` lists them. The mapping mode is for the opposite direction (a physical input → an address), not for inventing an address.
 
-## 8. Testes
+## 8. Tests
 
-| O que prova | Como |
+| What it proves | How |
 |---|---|
 | `expande("$", 0.5)` | `0.5` |
-| `expande("$255", 0.5)` | `128` (inteiro, não `127.5`) |
+| `expande("$255", 0.5)` | `128` (integer, not `127.5`) |
 | `expande("$0..40000", 0.5)` | `20000` |
-| `expande("$255..0", 0.25)` | `191` (invert por `min > max`) |
-| `map_set` com chave sem prefixo | erro, com a lista de prefixos aceitos |
-| `map_set` com `cmd` inexistente | erro (a frente `midi` já tem este teste: `tests/midi.rs:26`) |
-| Migração | show com bloco `"midi"` carrega com `"map"` e chaves `midi:` |
-| Despachante | `map::liga("key:Space")` devolve `("resume", {})` depois de `map_set` |
-| Piano | `map_set("key:Space^")` e `map_set("key:Space")` coexistem e disparam comandos diferentes |
-| **Todo endereço tem controle** | percorrer a tabela de §4 e conferir que cada endereço aparece num `data-addr` de alguma página de `spellgui/web/`; o que não aparecer, falha |
-| **Todo controle tem endereço** | o inverso: todo elemento clicável das cinco páginas tem `data-addr`, ou está numa lista de exceções declarada no teste |
+| `expande("$255..0", 0.25)` | `191` (invert by `min > max`) |
+| `map_set` with a key with no prefix | error, with the list of accepted prefixes |
+| `map_set` with a nonexistent `cmd` | error (the `midi` workstream already has this test: `tests/midi.rs:26`) |
+| Migration | a show with a `"midi"` block loads with `"map"` and `midi:` keys |
+| Dispatcher | `map::liga("key:Space")` returns `("resume", {})` after `map_set` |
+| Piano | `map_set("key:Space^")` and `map_set("key:Space")` coexist and fire different commands |
+| **Every address has a control** | walk the table of §4 and check that each address appears in a `data-addr` of some page of `spellgui/web/`; whatever does not appear, fails |
+| **Every control has an address** | the inverse: every clickable element of the five pages has `data-addr`, or is in an exception list declared in the test |
 
-Os dois últimos são os que impedem o modo de mapeamento de virar uma tela bonita com metade dos controles apagados.
+The last two are the ones that keep the mapping mode from becoming a pretty screen with half the controls dead.
 
-Prova visual: screenshot headless de `index.html`, `patchbay.html`, `teatro.html`, `face.html` e `laser.html` com o modo ligado, mostrando o overlay e os endereços — e a contagem de controles mapeáveis por página no rodapé do painel.
+Visual proof: headless screenshot of `index.html`, `patchbay.html`, `teatro.html`, `face.html` and `laser.html` with the mode on, showing the overlay and the addresses — and the count of mappable controls per page in the panel footer.

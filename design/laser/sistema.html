@@ -59,71 +59,71 @@
 
 <header class="top">
   <div class="id">
-    <div class="eyebrow">Spellcaster · modulo laser / ILDA</div>
-    <h1>Design system do projetor</h1>
-    <p class="lead">Sistema desta ferramenta so. Valores em <code>tokens.css</code>; regra escrita em <code>SISTEMA.md</code>. O programa e o modelo 3D do aparelho: traseira e menu, tampa aberta e preferencias, a parede e o output.</p>
+    <div class="eyebrow">Spellcaster · laser / ILDA module</div>
+    <h1>Design system of the projector</h1>
+    <p class="lead">System of this tool only. Values in <code>tokens.css</code>; written rule in <code>SISTEMA.md</code>. The program is the 3D model of the device: rear panel is menu, open lid is preferences, the wall is the output.</p>
   </div>
   <div class="meta">
-    material <b>aluminio + feixe</b><br>
-    acento <b>#38FF5C</b><br>
-    fontes <b>Michroma / Share Tech Mono</b><br>
-    tempos <b>120 / 220 / 700 ms</b>
+    material <b>aluminium + beam</b><br>
+    accent <b>#38FF5C</b><br>
+    fonts <b>Michroma / Share Tech Mono</b><br>
+    times <b>120 / 220 / 700 ms</b>
   </div>
 </header>
 
 <section>
-  <h2><span>01</span>Principio</h2>
+  <h2><span>01</span>Principle</h2>
   <div class="cols">
     <ul class="l">
-      <li><b>Traseira = menu.</b> Todo controle vive num conector, chave ou display que existe no equipamento real.</li>
-      <li><b>Tampa aberta = preferencias.</b> Calibracao, kpps, limites de scan, ILDA in/out.</li>
-      <li><b>A parede e o output.</b> Preview de ILDA nao e um retangulo de UI: e feixe em nevoa.</li>
+      <li><b>Rear panel = menu.</b> Every control lives in a connector, switch or display that exists on the real equipment.</li>
+      <li><b>Lid open = preferences.</b> Calibration, kpps, scan limits, ILDA in/out.</li>
+      <li><b>The wall is the output.</b> An ILDA preview is not a UI rectangle: it is a beam in haze.</li>
     </ul>
     <ul class="l">
-      <li><b>Funcao antes de UI.</b> Cada elemento responde "que peca do laser e essa". Se a resposta e "e um card", corta.</li>
-      <li><b>Um material.</b> Aluminio anodizado preto opaco. A unica coisa que transmite luz e a nevoa.</li>
-      <li><b>CLI sempre visivel.</b> Quem aprende a GUI aprende o verbo <code>spell</code> de graca.</li>
+      <li><b>Function before UI.</b> Every element answers "which part of the laser is this". If the answer is "it is a card", cut it.</li>
+      <li><b>One material.</b> Opaque black anodized aluminium. The only thing that transmits light is the haze.</li>
+      <li><b>CLI always visible.</b> Whoever learns the GUI learns the <code>spell</code> verb for free.</li>
     </ul>
   </div>
 </section>
 
 <section>
-  <h2><span>02</span>Cor</h2>
+  <h2><span>02</span>Color</h2>
   <div class="grid">
     <div class="sw"><span class="chip" style="background:#050608"></span><div class="txt">
-      <div class="n">--bg</div><div class="h">#050608</div><div class="u">Fundo da sala e do corpo. Preto anodizado, nunca cinza.</div></div></div>
+      <div class="n">--bg</div><div class="h">#050608</div><div class="u">Background of the room and of the body. Anodized black, never gray.</div></div></div>
     <div class="sw"><span class="chip" style="background:#07090C"></span><div class="txt">
-      <div class="n">--panel</div><div class="h">#07090C</div><div class="u">Painel opaco. Sem blur, sem vidro.</div></div></div>
+      <div class="n">--panel</div><div class="h">#07090C</div><div class="u">Opaque panel. No blur, no glass.</div></div></div>
     <div class="sw"><span class="chip" style="background:#38FF5C;box-shadow:var(--glow-on)"></span><div class="txt">
-      <div class="n">--las</div><div class="h">#38FF5C</div><div class="u">Acento do feixe. Ativo, LIVE, armado, valor corrente.</div></div></div>
+      <div class="n">--las</div><div class="h">#38FF5C</div><div class="u">Accent of the beam. Active, LIVE, armed, current value.</div></div></div>
     <div class="sw"><span class="chip" style="background:#FFB000"></span><div class="txt">
-      <div class="n">--amb</div><div class="h">#FFB000</div><div class="u">Aviso, pendente, LEARN em curso, eco de CLI. Nunca estado final.</div></div></div>
+      <div class="n">--amb</div><div class="h">#FFB000</div><div class="u">Warning, pending, LEARN in progress, CLI echo. Never a final state.</div></div></div>
     <div class="sw"><span class="chip" style="background:#FF2A1A"></span><div class="txt">
-      <div class="n">--red</div><div class="h">#FF2A1A</div><div class="u">Perigo, desarmado, e-stop, interlock aberto, SCAN FAIL.</div></div></div>
+      <div class="n">--red</div><div class="h">#FF2A1A</div><div class="u">Danger, disarmed, e-stop, interlock open, SCAN FAIL.</div></div></div>
     <div class="sw"><span class="chip" style="background:#9FF5D0"></span><div class="txt">
-      <div class="n">--oled</div><div class="h">#9FF5D0</div><div class="u">So o display fisico da traseira. Nenhum outro elemento usa.</div></div></div>
+      <div class="n">--oled</div><div class="h">#9FF5D0</div><div class="u">Only the physical display of the rear panel. No other element uses it.</div></div></div>
     <div class="sw"><span class="chip" style="background:#3A6BFF"></span><div class="txt">
-      <div class="n">--blue</div><div class="h">#3A6BFF</div><div class="u">Sinal externo (ILDA/DMX de fora). Uso raro; nao e segundo acento.</div></div></div>
+      <div class="n">--blue</div><div class="h">#3A6BFF</div><div class="u">External signal (ILDA/DMX from outside). Rare use; not a second accent.</div></div></div>
     <div class="sw"><span class="chip" style="background:#E6EBEF"></span><div class="txt">
-      <div class="n">--fg</div><div class="h">#E6EBEF</div><div class="u">Texto de leitura.</div></div></div>
+      <div class="n">--fg</div><div class="h">#E6EBEF</div><div class="u">Reading text.</div></div></div>
     <div class="sw"><span class="chip" style="background:#7C8791"></span><div class="txt">
-      <div class="n">--dim</div><div class="h">#7C8791</div><div class="u">Rotulo e metadado. Nunca informacao critica.</div></div></div>
+      <div class="n">--dim</div><div class="h">#7C8791</div><div class="u">Label and metadata. Never critical information.</div></div></div>
     <div class="sw"><span class="chip" style="background:#1A2026"></span><div class="txt">
-      <div class="n">--line / --line-2</div><div class="h">#1A2026 / #2A333C</div><div class="u">Aresta usinada e aresta iluminada.</div></div></div>
+      <div class="n">--line / --line-2</div><div class="h">#1A2026 / #2A333C</div><div class="u">Machined edge and lit edge.</div></div></div>
   </div>
-  <p class="note">Estado nunca e comunicado so por cor: sempre cor + rotulo + posicao.</p>
+  <p class="note">State is never communicated by color alone: always color + label + position.</p>
 </section>
 
 <section>
-  <h2><span>03</span>Tipografia e escala</h2>
+  <h2><span>03</span>Typography and scale</h2>
   <div class="type-row"><div class="lbl">--fs-6 · 34</div><div style="font-family:var(--font-disp);font-size:var(--fs-6)">SPELLCASTER</div></div>
-  <div class="type-row"><div class="lbl">--fs-5 · 18</div><div style="font-family:var(--font-disp);font-size:var(--fs-5)">Titulo de tela</div></div>
-  <div class="type-row"><div class="lbl">--fs-4 · 15</div><div style="font-size:var(--fs-4)">Texto lido de longe, corpo do documento</div></div>
-  <div class="type-row"><div class="lbl">--fs-3 · 13</div><div style="font-size:var(--fs-3)">CLI, bloco de comando, valor grande</div></div>
-  <div class="type-row"><div class="lbl">--fs-2 · 12</div><div style="font-size:var(--fs-2)">Corpo da UI do aparelho: linha de painel, botao</div></div>
-  <div class="type-row"><div class="lbl">--fs-1 · 11</div><div style="font-size:var(--fs-1)">Rotulo, sub, binding, metadado</div></div>
-  <div class="type-row"><div class="lbl">--fs-0 · 10</div><div style="font-size:var(--fs-0)">HUD de aviso, tag em botao de tabela</div></div>
-  <p class="note">Michroma so em titulo e HUD de titulo. Share Tech Mono em todo o resto. Sem terceira familia.</p>
+  <div class="type-row"><div class="lbl">--fs-5 · 18</div><div style="font-family:var(--font-disp);font-size:var(--fs-5)">Screen title</div></div>
+  <div class="type-row"><div class="lbl">--fs-4 · 15</div><div style="font-size:var(--fs-4)">Text read from a distance, document body</div></div>
+  <div class="type-row"><div class="lbl">--fs-3 · 13</div><div style="font-size:var(--fs-3)">CLI, command block, large value</div></div>
+  <div class="type-row"><div class="lbl">--fs-2 · 12</div><div style="font-size:var(--fs-2)">Body of the device UI: panel row, button</div></div>
+  <div class="type-row"><div class="lbl">--fs-1 · 11</div><div style="font-size:var(--fs-1)">Label, sub, binding, metadata</div></div>
+  <div class="type-row"><div class="lbl">--fs-0 · 10</div><div style="font-size:var(--fs-0)">Warning HUD, tag on a table button</div></div>
+  <p class="note">Michroma only in a title and a title HUD. Share Tech Mono in everything else. No third family.</p>
   <div class="scale">
     <span>--s1 4</span><span>--s2 8</span><span>--s3 12</span><span>--s4 16</span><span>--s6 24</span><span>--s8 32</span>
     <span>--chamfer 14</span><span>--chamfer-room 30</span>
@@ -132,49 +132,49 @@
 </section>
 
 <section>
-  <h2><span>04</span>Botao laser <code>.lb</code></h2>
+  <h2><span>04</span>Laser button <code>.lb</code></h2>
   <div class="bench">
     <button class="lb">ARM</button>
     <button class="lb on">ARM <small>A</small></button>
-    <button class="lb amb">CALIBRAR</button>
+    <button class="lb amb">CALIBRATE</button>
     <button class="lb red">E-STOP</button>
-    <button class="lb red on">DESARMADO</button>
+    <button class="lb red on">DISARMED</button>
     <button class="lb" disabled>BLANK</button>
   </div>
-  <p class="note">Contorno do acento; preenchimento so quando ativo. Desabilitado nao brilha. Foco: outline branco 2px, offset 2px — teste com Tab.</p>
+  <p class="note">Accent outline; fill only when active. Disabled does not glow. Focus: white 2px outline, 2px offset — test with Tab.</p>
 </section>
 
 <section>
-  <h2><span>05</span>HUD, tooltip e OLED</h2>
+  <h2><span>05</span>HUD, tooltip and OLED</h2>
   <div class="stage">
     <div class="beam"></div>
     <div class="wall"><div class="t">SPELLCASTER LASER</div></div>
     <div class="floor"></div>
-    <div class="hud title" style="left:20px;top:16px">SALA · NEVOA 40%</div>
-    <div class="hud" style="left:20px;top:44px">LIVE · 30 kpps · 1 universo</div>
+    <div class="hud title" style="left:20px;top:16px">ROOM · HAZE 40%</div>
+    <div class="hud" style="left:20px;top:44px">LIVE · 30 kpps · 1 universe</div>
     <div class="hud cli" style="left:20px;top:64px">spell ilda play show.ild --kpps 30</div>
-    <div class="hud warn" style="left:20px;bottom:52px">MPE ATIVO · NAO OLHE PARA A ABERTURA</div>
-    <div class="hud danger" style="left:20px;bottom:34px">INTERLOCK: ABERTO</div>
-    <div id="tipdemo" class="tip" style="right:24px;top:22px;display:block">DIODO VERDE · 520 nm</div>
+    <div class="hud warn" style="left:20px;bottom:52px">MPE ACTIVE · DO NOT LOOK INTO THE APERTURE</div>
+    <div class="hud danger" style="left:20px;bottom:34px">INTERLOCK: OPEN</div>
+    <div id="tipdemo" class="tip" style="right:24px;top:22px;display:block">GREEN DIODE · 520 nm</div>
     <div class="oledbox" style="position:absolute;right:24px;bottom:34px">LIVE&nbsp;&nbsp;30 kpps<br>ILDA IN&nbsp;&nbsp;OK</div>
   </div>
-  <p class="note">HUD nunca recebe clique. Tooltip e etiqueta de bancada: verde solido, texto preto, sem seta.</p>
+  <p class="note">A HUD never receives a click. A tooltip is a bench label: solid green, black text, no arrow.</p>
 </section>
 
 <section>
-  <h2><span>06</span>Painel <code>.panel</code> e balao do Pino <code>.bal</code></h2>
+  <h2><span>06</span>Panel <code>.panel</code> and Pino's balloon <code>.bal</code></h2>
   <div class="stage tall">
     <div class="panel demo" style="left:24px;top:24px;width:300px">
       <span class="x">x</span>
       <h3>SCANNER</h3>
-      <div class="sub">tampa aberta · preferencias</div>
+      <div class="sub">lid open · preferences</div>
       <div class="row"><label for="r1">kpps</label><input id="r1" type="range" min="8" max="40" value="30"><span class="v">30</span></div>
       <div class="row"><label for="r2">size</label><input id="r2" type="range" min="0" max="100" value="72"><span class="v">72%</span></div>
       <div class="row"><label for="r3">blank shift</label><input id="r3" type="range" min="0" max="12" value="4"><span class="v">4</span></div>
       <div class="btns">
         <button class="lb on">ILDA IN</button>
-        <button class="lb">TESTE</button>
-        <button class="lb red">DESARMAR</button>
+        <button class="lb">TEST</button>
+        <button class="lb red">DISARM</button>
       </div>
       <pre style="margin-top:10px"><b>$</b> spell ilda play show.ild --kpps 30</pre>
     </div>
@@ -182,109 +182,109 @@
     <div class="bal demo on" style="right:24px;bottom:28px;transform:none">
       <span class="x">x</span>
       <b>Pino</b>
-      Interlock aberto. Sem interlock, sem feixe.
+      Interlock open. No interlock, no beam.
       <ul>
-        <li>Fechar interlock <small>I</small></li>
-        <li>Ver estado do scanner <small>S</small></li>
-        <li>Abrir preferencias <small>,</small></li>
+        <li>Close interlock <small>I</small></li>
+        <li>See scanner state <small>S</small></li>
+        <li>Open preferences <small>,</small></li>
       </ul>
-      <div class="hint">A unica coisa de software na cena. De proposito.</div>
+      <div class="hint">The only software thing in the scene. On purpose.</div>
     </div>
   </div>
-  <p class="note">Painel opaco, chanfro 14px, linhas no grid rotulo · controle · valor. Balao Win98 seco, nao cartoon.</p>
+  <p class="note">Opaque panel, 14px chamfer, rows on the grid label · control · value. Dry Win98 balloon, not cartoon.</p>
 </section>
 
 <section>
-  <h2><span>07</span>Bindings · tecla e MIDI, in e out</h2>
+  <h2><span>07</span>Bindings · key and MIDI, in and out</h2>
   <div class="panel demo" style="position:relative;width:min(560px,100%);box-sizing:border-box">
     <h3>KEY BINDING</h3>
-    <div class="sub">persistido em localStorage <code>sc-laser-bind</code></div>
+    <div class="sub">persisted in localStorage <code>sc-laser-bind</code></div>
     <table>
       <tr><td class="k">arm</td><td class="b">A · note 36 ch1 (out)</td><td style="text-align:right"><button class="lb">LEARN</button></td></tr>
       <tr><td class="k">blackout</td><td class="b">ESC · note 37 ch1 (out)</td><td style="text-align:right"><button class="lb">LEARN</button></td></tr>
       <tr><td class="k">kpps +/-</td><td class="b">CC 21 ch1</td><td style="text-align:right"><button class="lb learn">LEARN</button></td></tr>
-      <tr><td class="k">play cue</td><td class="b">sem binding</td><td style="text-align:right"><button class="lb">LEARN</button></td></tr>
+      <tr><td class="k">play cue</td><td class="b">no binding</td><td style="text-align:right"><button class="lb">LEARN</button></td></tr>
     </table>
-    <div class="sub" style="margin:10px 0 0">MIDI out acende o pad quando ARM liga. Binding e bidirecional por padrao.</div>
+    <div class="sub" style="margin:10px 0 0">MIDI out lights the pad when ARM turns on. A binding is bidirectional by default.</div>
   </div>
-  <p class="note">Enquanto o botao pulsa ambar, o proximo evento de tecla ou MIDI captura. <code>prefers-reduced-motion</code> desliga o pulso; o ambar fica.</p>
+  <p class="note">While the button pulses amber, the next key or MIDI event is captured. <code>prefers-reduced-motion</code> turns the pulse off; the amber stays.</p>
 </section>
 
 <section>
-  <h2><span>08</span>Sala <code>.room</code></h2>
+  <h2><span>08</span>Room <code>.room</code></h2>
   <div class="room" style="height:300px">
     <div class="beam" style="left:38%;transform:rotate(6deg);transform-origin:top center"></div>
     <div class="beam" style="left:56%;transform:rotate(-5deg);transform-origin:top center;opacity:.35"></div>
     <div class="wall"><div class="t">OUTPUT</div></div>
-    <div class="hud" style="left:20px;bottom:44px">chanfro 30px nos cantos · recorte trapezoidal na base</div>
-    <div class="hud warn" style="left:20px;bottom:26px">A SALA NUNCA E RETANGULAR</div>
+    <div class="hud" style="left:20px;bottom:44px">30px chamfer on the corners · trapezoidal cutout at the base</div>
+    <div class="hud warn" style="left:20px;bottom:26px">THE ROOM IS NEVER RECTANGULAR</div>
   </div>
 </section>
 
 <section>
-  <h2><span>09</span>Estados do aparelho</h2>
+  <h2><span>09</span>States of the device</h2>
   <table class="t">
-    <tr><th>Estado</th><th>Feixe</th><th>OLED</th><th>LED de emissao</th><th>UI</th></tr>
-    <tr><td class="k"><span class="dot" style="background:#2A333C"></span>DESLIGADO</td><td>ausente</td><td>apagado</td><td>apagado</td><td>paineis disabled; sala escura; so a chave de forca responde</td></tr>
-    <tr><td class="k"><span class="dot" style="background:var(--amb)"></span>STANDBY</td><td>ausente</td><td>STANDBY / INTERLOCK OK</td><td>ambar piscando lento</td><td>controles editaveis, ARM disponivel; HUD ambar "sem emissao"</td></tr>
-    <tr><td class="k"><span class="dot" style="background:var(--red)"></span>SCAN FAIL</td><td>cortado imediatamente</td><td>SCAN FAIL invertido</td><td>vermelho fixo</td><td>ARM em .red.on, output travado ate reset; Pino explica</td></tr>
-    <tr><td class="k"><span class="dot" style="background:var(--las)"></span>LIVE</td><td>visivel na nevoa</td><td>LIVE · 30 kpps</td><td>verde fixo</td><td>HUD verde, CLI ecoando, e-stop sempre alcancavel</td></tr>
+    <tr><th>State</th><th>Beam</th><th>OLED</th><th>Emission LED</th><th>UI</th></tr>
+    <tr><td class="k"><span class="dot" style="background:#2A333C"></span>OFF</td><td>absent</td><td>dark</td><td>dark</td><td>panels disabled; dark room; only the power switch responds</td></tr>
+    <tr><td class="k"><span class="dot" style="background:var(--amb)"></span>STANDBY</td><td>absent</td><td>STANDBY / INTERLOCK OK</td><td>amber blinking slowly</td><td>controls editable, ARM available; amber HUD "no emission"</td></tr>
+    <tr><td class="k"><span class="dot" style="background:var(--red)"></span>SCAN FAIL</td><td>cut immediately</td><td>SCAN FAIL inverted</td><td>steady red</td><td>ARM in .red.on, output locked until reset; Pino explains</td></tr>
+    <tr><td class="k"><span class="dot" style="background:var(--las)"></span>LIVE</td><td>visible in the haze</td><td>LIVE · 30 kpps</td><td>steady green</td><td>green HUD, CLI echoing, e-stop always reachable</td></tr>
   </table>
-  <p class="note">Nunca ir de DESLIGADO direto a LIVE. SCAN FAIL so sai por reset explicito. Perda de interlock cai para SCAN FAIL, nao para STANDBY.</p>
+  <p class="note">Never go from OFF straight to LIVE. SCAN FAIL is only left by an explicit reset. Loss of interlock falls to SCAN FAIL, not to STANDBY.</p>
 </section>
 
 <section>
-  <h2><span>10</span>Camera · padrao SolidWorks</h2>
+  <h2><span>10</span>Camera · SolidWorks standard</h2>
   <table class="t">
-    <tr><th>Gesto</th><th>Acao</th></tr>
-    <tr><td class="k">MMB arrastar</td><td>gira em torno do <b>ponto clicado</b>, nao do centro da cena</td></tr>
+    <tr><th>Gesture</th><th>Action</th></tr>
+    <tr><td class="k">MMB drag</td><td>orbits around the <b>clicked point</b>, not around the center of the scene</td></tr>
     <tr><td class="k">Ctrl + MMB</td><td>pan</td></tr>
     <tr><td class="k">Shift + MMB</td><td>zoom</td></tr>
-    <tr><td class="k">Roda</td><td>zoom no cursor, direcao <b>invertida por padrao</b>, com toggle nas preferencias</td></tr>
-    <tr><td class="k">Botao esquerdo no vazio</td><td>tambem gira — quem nao tem botao do meio nao fica de fora</td></tr>
+    <tr><td class="k">Wheel</td><td>zoom at the cursor, <b>direction inverted by default</b>, with a toggle in the preferences</td></tr>
+    <tr><td class="k">Left button on empty space</td><td>also orbits — whoever has no middle button is not left out</td></tr>
   </table>
   <div class="keys">
-    <span><kbd>&larr;</kbd><kbd>&rarr;</kbd><kbd>&uarr;</kbd><kbd>&darr;</kbd> <b>gira 15&deg;</b></span>
-    <span><kbd>Shift</kbd>+setas <b>90&deg;</b></span>
-    <span><kbd>Ctrl</kbd>+setas <b>pan</b></span>
-    <span><kbd>F</kbd> <b>enquadra</b></span>
-    <span><kbd>Ctrl</kbd>+<kbd>1</kbd>..<kbd>7</kbd> <b>vistas padrao</b></span>
+    <span><kbd>&larr;</kbd><kbd>&rarr;</kbd><kbd>&uarr;</kbd><kbd>&darr;</kbd> <b>orbit 15&deg;</b></span>
+    <span><kbd>Shift</kbd>+arrows <b>90&deg;</b></span>
+    <span><kbd>Ctrl</kbd>+arrows <b>pan</b></span>
+    <span><kbd>F</kbd> <b>frame</b></span>
+    <span><kbd>Ctrl</kbd>+<kbd>1</kbd>..<kbd>7</kbd> <b>standard views</b></span>
     <span><kbd>A</kbd> <b>arm</b></span>
     <span><kbd>Esc</kbd> <b>blackout</b></span>
     <span><kbd>I</kbd> <b>interlock</b></span>
-    <span><kbd>,</kbd> <b>preferencias</b></span>
+    <span><kbd>,</kbd> <b>preferences</b></span>
     <span><kbd>Space</kbd> <b>play/pause</b></span>
   </div>
-  <p class="note">Todo movimento de camera em --t-cam (700 ms) com ease-out. Sem inercia infinita.</p>
+  <p class="note">Every camera movement in --t-cam (700 ms) with ease-out. No infinite inertia.</p>
 </section>
 
 <section>
-  <h2><span>11</span>Movimento, som e texto</h2>
+  <h2><span>11</span>Movement, sound and text</h2>
   <div class="cols">
     <div>
-      <div class="eyebrow">Splash, uma vez</div>
+      <div class="eyebrow">Splash, once</div>
       <ul class="l">
-        <li>O foco sai do ponto estatico e vai para a <b>parede</b>, ignorando o laser e a traseira.</li>
-        <li>O feixe <b>contorna</b> SPELLCASTER LASER em movimento dinamico.</li>
-        <li>As letras sao <b>reveladas</b> e ficam na parede.</li>
-        <li>Todas <b>brilham</b> ao fechar o contorno.</li>
-        <li>A camera <b>voa para a traseira</b> (menu) ou para a tampa (preferencias).</li>
-        <li>O laser <b>apaga</b> e a luz da sala <b>baixa</b>.</li>
+        <li>The focus leaves the static point and goes to the <b>wall</b>, ignoring the laser and the rear panel.</li>
+        <li>The beam <b>outlines</b> SPELLCASTER LASER in a dynamic movement.</li>
+        <li>The letters are <b>revealed</b> and stay on the wall.</li>
+        <li>They all <b>glow</b> when the outline closes.</li>
+        <li>The camera <b>flies to the rear panel</b> (menu) or to the lid (preferences).</li>
+        <li>The laser <b>goes dark</b> and the room light <b>drops</b>.</li>
       </ul>
     </div>
     <div>
-      <div class="eyebrow">Som</div>
+      <div class="eyebrow">Sound</div>
       <ul class="l">
-        <li>Jingle de <b>onda quadrada</b> na splash. Sem sample.</li>
-        <li><b>Blip</b> ao revelar letra e ao capturar LEARN.</li>
-        <li><b>Clique</b> seco de botao fisico em <code>.lb</code>.</li>
-        <li><b>Acorde descendente</b> ao desarmar ou entrar em SCAN FAIL.</li>
-        <li>Mudo e padrao respeitado e persistido.</li>
+        <li><b>Square wave</b> jingle in the splash. No sample.</li>
+        <li><b>Blip</b> when a letter is revealed and when a LEARN is captured.</li>
+        <li>Dry physical-button <b>click</b> on <code>.lb</code>.</li>
+        <li><b>Descending chord</b> when disarming or entering SCAN FAIL.</li>
+        <li>Mute is a default that is respected and persisted.</li>
       </ul>
-      <div class="eyebrow" style="margin-top:16px">Voz do Pino</div>
+      <div class="eyebrow" style="margin-top:16px">Pino's voice</div>
       <ul class="l">
-        <li>Bom: <b>Interlock aberto. Sem interlock, sem feixe.</b></li>
-        <li>Ruim: Ops! Parece que algo deu errado :(</li>
+        <li>Good: <b>Interlock open. No interlock, no beam.</b></li>
+        <li>Bad: Oops! Looks like something went wrong :(</li>
       </ul>
       <div class="cli-line">spell ilda play show.ild --kpps 30</div>
     </div>
@@ -292,25 +292,25 @@
 </section>
 
 <section>
-  <h2><span>12</span>Acessibilidade</h2>
+  <h2><span>12</span>Accessibility</h2>
   <ul class="l">
-    <li><b>Foco visivel</b> obrigatorio em todo controle, inclusive dentro da cena 3D: outline branco 2px, offset 2px. Ordem de tab segue a leitura do painel.</li>
-    <li><b>prefers-reduced-motion</b>: sem splash animada, sem pulso do LEARN, sem transicao de painel. A informacao continua toda presente por cor e texto.</li>
-    <li><b>Contraste</b> — pares aprovados sobre --bg/--panel: --fg, --las, --amb, --oled, e --dim so para rotulo. --red aprovado para icone e borda; texto longo em vermelho, nao.</li>
-    <li>Alvo de clique minimo <b>24px</b> na cena, mesmo quando a peca modelada e menor.</li>
+    <li><b>Visible focus</b> mandatory on every control, including inside the 3D scene: white 2px outline, 2px offset. Tab order follows the reading of the panel.</li>
+    <li><b>prefers-reduced-motion</b>: no animated splash, no LEARN pulse, no panel transition. All the information remains present through color and text.</li>
+    <li><b>Contrast</b> — approved pairs over --bg/--panel: --fg, --las, --amb, --oled, and --dim only for a label. --red approved for icon and border; long text in red, no.</li>
+    <li>Minimum click target of <b>24px</b> in the scene, even when the modelled part is smaller.</li>
   </ul>
 </section>
 
 <section>
-  <h2><span>13</span>O que NAO fazer</h2>
+  <h2><span>13</span>What NOT to do</h2>
   <ul class="no">
-    <li><b>Software quadradao.</b> Grid de cards, sidebar, barra de titulo de app. Se parece dashboard, esta errado.</li>
-    <li><b>Painel transparente.</b> Vidro, blur, translucidez na UI. O unico material que transmite luz e a nevoa.</li>
-    <li><b>Elemento sem funcao.</b> Dois interlocks, fusivel decorativo, LED que nao indica nada. Um interlock. Sem fusivel.</li>
-    <li><b>Cartoon.</b> Traco grosso, cor pastel, mascote fofo. O Pino e Win98 seco.</li>
-    <li>Terceira fonte, quarta cor de acento, espacamento fora da escala, tempo fora dos tres.</li>
-    <li>Glow como elevacao de card. Glow e feixe.</li>
-    <li>Cor sozinha carregando estado.</li>
+    <li><b>Boxy software.</b> A grid of cards, a sidebar, an app title bar. If it looks like a dashboard, it is wrong.</li>
+    <li><b>Transparent panel.</b> Glass, blur, translucency in the UI. The only material that transmits light is the haze.</li>
+    <li><b>Element without a function.</b> Two interlocks, a decorative fuse, an LED that indicates nothing. One interlock. No fuse.</li>
+    <li><b>Cartoon.</b> Thick stroke, pastel color, cute mascot. Pino is dry Win98.</li>
+    <li>A third font, a fourth accent color, spacing outside the scale, a timing outside the three.</li>
+    <li>Glow as card elevation. Glow is beam.</li>
+    <li>Color alone carrying state.</li>
   </ul>
 </section>
 
@@ -325,7 +325,7 @@
   document.querySelectorAll('.panel td .lb').forEach(function (b) {
     b.addEventListener('click', function () {
       var on = b.classList.toggle('learn');
-      b.textContent = on ? 'ESCUTANDO' : 'LEARN';
+      b.textContent = on ? 'LISTENING' : 'LEARN';
     });
   });
   var bal = document.querySelector('.bal.demo');

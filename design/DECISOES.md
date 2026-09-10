@@ -1,253 +1,253 @@
-# Decisões de design
+# Design decisions
 
-Uma linha por decisão. Data, decisão, motivo. Agente nenhum re-decide o que está aqui; para mudar, adiciona linha nova que revoga a antiga.
+One line per decision. Date, decision, reason. No agent re-decides what is here; to change it, add a new line that revokes the old one.
 
-- 2026-09-09 — Design system próprio ("Spellcaster DS", prefixo `--sc-`), com o da Feitiçaria como starter kit. Motivo: o produto precisa de cores funcionais (armado, ao vivo, ensaio, erro) e de voz mono que a identidade da firma não tem.
-- 2026-09-09 — Palco `#000000` e Floral White `#F7F5EB` herdados da Feitiçaria; nunca `#FFFFFF`. Motivo: sala escura, continuidade com a firma.
-- 2026-09-09 — Accent do produto é âmbar `#FFB000` (seleção, foco, ativo). Motivo: âmbar de VFD/LED de console, lê à distância, não é a cor da firma.
-- 2026-09-09 — Verde-lima `#A8E05E` da Feitiçaria só em GO e "ok"; Wisteria `#B7AED9` só em modo ensaio; vermelho `#FF2D1F` em armado/ao vivo/erro. Motivo: cor = estado (princípio 2).
-- 2026-09-09 — Tipografia: JetBrains Mono (voz, valores, timecode) e Barlow Condensed (rótulos, overlines em caps). Ambas OFL, embutidas no binário. Motivo: mono é o vocabulário CLI/MCP na tela; condensada cabe em widget 1×1.
-- 2026-09-09 — Grade 8 px, unidade de widget 48 px, gap 8 px, raio 0. Motivo: densidade de console, alvo de toque ≥ 44 px.
-- 2026-09-09 — Sem sombras. Estado "ao vivo" usa contorno 1 px + glow 12 px na cor do estado. Motivo: flat, glow só com significado.
-- 2026-09-09 — Ícones próprios, grade 16 px, traço 1,5 px, cantos retos. Até existirem, placeholder é um quadrado tracejado com o nome do ícone.
-- 2026-09-09 — Faces de referência: `performance` (kiosk, 4 widgets) e `editor` (áreas divisíveis como no Blender; graph ao centro como no TouchDesigner). Motivo: prova a separação Theme/Face antes da R5.
-- 2026-09-09 — Cores das famílias de nó do Graph: entrada âmbar, lógica cinza-claro, comando Floral White, saída wisteria. Motivo: mesma ideia do TouchDesigner (família = cor fixa), sem copiar a paleta dele.
+- 2026-09-09 — Our own design system ("Spellcaster DS", prefix `--sc-`), with Feitiçaria's as the starter kit. Reason: the product needs functional colors (armed, live, rehearsal, error) and a mono voice that the firm's identity does not have.
+- 2026-09-09 — Stage `#000000` and Floral White `#F7F5EB` inherited from Feitiçaria; never `#FFFFFF`. Reason: dark room, continuity with the firm.
+- 2026-09-09 — The product accent is amber `#FFB000` (selection, focus, active). Reason: console VFD/LED amber, reads from a distance, is not the firm's color.
+- 2026-09-09 — Feitiçaria's lime green `#A8E05E` only on GO and "ok"; Wisteria `#B7AED9` only in rehearsal mode; red `#FF2D1F` on armed/live/error. Reason: color = state (principle 2).
+- 2026-09-09 — Typography: JetBrains Mono (voice, values, timecode) and Barlow Condensed (labels, overlines in caps). Both OFL, embedded in the binary. Reason: mono is the CLI/MCP vocabulary on screen; condensed fits in a 1×1 widget.
+- 2026-09-09 — 8 px grid, 48 px widget unit, 8 px gap, radius 0. Reason: console density, touch target ≥ 44 px.
+- 2026-09-09 — No shadows. The "live" state uses a 1 px outline + 12 px glow in the state's color. Reason: flat, glow only with meaning.
+- 2026-09-09 — Our own icons, 16 px grid, 1.5 px stroke, square corners. Until they exist, the placeholder is a dashed square with the icon's name.
+- 2026-09-09 — Reference Faces: `performance` (kiosk, 4 widgets) and `editor` (splittable areas as in Blender; graph in the center as in TouchDesigner). Reason: proves the Theme/Face separation before R5.
+- 2026-09-09 — Colors of the Graph's node families: input amber, logic light gray, command Floral White, output wisteria. Reason: the same idea as TouchDesigner (family = fixed color), without copying its palette.
 
-## 2026-09-09 · rodada 1 do moodboard (reprovada)
+## 2026-09-09 · moodboard round 1 (rejected)
 
-- Votos: A console NÃO · B bancada NÃO · C cápsula TALVEZ · D grimório NÃO · E cartaz NÃO · F fita NÃO.
-- Brief novo do Matheus: como as skins do WMP mesmo que kitsch; nada de software quadradão; janela transparente feito vidro; estética keygen/cracktro com jingle no splash; UI responsiva, boa de usar e engraçada; a experiência segue o arco 5E.
-- Consequência: `PRINCIPIOS.md` e `tokens/spellcaster.css` continuam valendo para o **dentro** da tela (leitura, estado, alvos). A **carcaça** é objeto: silhueta, vidro, gel. Decisões da rodada 2 entram abaixo quando aprovadas.
+- Votes: A console NO · B workbench NO · C capsule MAYBE · D grimoire NO · E poster NO · F ribbon NO.
+- New brief from Matheus: like WMP skins even if kitsch; nothing boxy-software; window transparent like glass; keygen/cracktro aesthetic with a jingle on the splash; responsive UI, good to use and funny; the experience follows the 5E arc.
+- Consequence: `PRINCIPIOS.md` and `tokens/spellcaster.css` still hold for the **inside** of the screen (reading, state, targets). The **shell** is an object: silhouette, glass, gel. Round 2 decisions go below once approved.
 
-## 2026-09-09 · rodada 2 (protótipo, aguardando voto)
+## 2026-09-09 · round 2 (prototype, awaiting vote)
 
-- Entregue como protótipo funcional, não como prancha: https://claude.ai/code/artifact/106e46a9-8070-4edd-9351-83ac4e7a5e2e. Fontes eram `design/rodada2/` (apagado da árvore em 09/09/2026; histórico no git, commit `6fe8b23`).
-- Carcaça = vidro com silhueta cortada + gel (cores de gel reais Lee/Rosco) + geada opcional. No produto: Tauri `transparent`, sem decoração, acrílico via `window-vibrancy`.
-- Entry = splash cracktro com jingle chiptune sintetizado (zero mídia), pulável, "nunca mais" honesto.
-- Skins do WMP entram de verdade: leitor de `.wmz` (zip + XML + BMP) com silhueta por clippingColor, mapa de clique por cor, hover/down repintados; Play/Next → GO. Sliders e JScript ficam fora.
-- Fita compacta (TAB) sobre o Resolume; NFO como about; copy com humor (toast), animação só onde há estado.
-- Pendente: votos da rodada 2 (gel padrão, splash, silhueta, kitsch, jingle, .wmz, fita).
-- 2026-09-09 — Interface e atalhos seguem Adobe Premiere e DaVinci Resolve (mapa em `design/SHORTCUTS.md`). Motivo: operador que edita vídeo opera sem aprender nada novo; gramática Ctrl/Shift/Alt fixa.
-- 2026-09-09 — Carcaça reprovada de novo ("software quadradão"): o vidro passa a ser um fragment shader WebGL (SDF corpo + cúpula do GO, refração com dispersão R/G/B, fresnel, specular no mouse, varredura, sombra e cáustica do gel). Motivo: pedido explícito de vidro reconhecível e "espetaculoso"; GLSL liberado pelo Matheus. Splash cracktro aprovado ("cyber matrix ficou ótima").
+- Delivered as a working prototype, not as a drawing sheet: https://claude.ai/code/artifact/106e46a9-8070-4edd-9351-83ac4e7a5e2e. Sources were `design/rodada2/` (deleted from the tree on 2026-09-09; history in git, commit `6fe8b23`).
+- Shell = glass with a cut silhouette + gel (real Lee/Rosco gel colors) + optional frost. In the product: Tauri `transparent`, no decoration, acrylic via `window-vibrancy`.
+- Entry = cracktro splash with a synthesized chiptune jingle (zero media), skippable, with an honest "never again".
+- WMP skins come in for real: a `.wmz` reader (zip + XML + BMP) with silhouette by clippingColor, click map by color, hover/down repainted; Play/Next → GO. Sliders and JScript stay out.
+- Compact ribbon (TAB) over Resolume; NFO as the about box; copy with humor (toast), animation only where there is state.
+- Pending: round 2 votes (default gel, splash, silhouette, kitsch, jingle, .wmz, ribbon).
+- 2026-09-09 — Interface and shortcuts follow Adobe Premiere and DaVinci Resolve (map in `design/SHORTCUTS.md`). Reason: an operator who edits video operates without learning anything new; fixed Ctrl/Shift/Alt grammar.
+- 2026-09-09 — Shell rejected again ("boxy software"): the glass becomes a WebGL fragment shader (body SDF + GO dome, refraction with dispersion R/G/B, fresnel, specular at the mouse, sweep, shadow and gel caustic). Reason: an explicit request for recognizable, "spectacular" glass; GLSL cleared by Matheus. Cracktro splash approved ("the cyber matrix came out great").
 
-- 2026-09-09 — Vidro 2D-SDF reprovado também (refs: Skins Factory wmpdesign, Shadertoy 4ll3R7 / 4s2GDV / XlscDH / dl3BRS / 4dSBDt). Nova direção aprovada pelo Matheus ("imagina se o menu fica nesse cubo flutuando e é isso a janela"): a janela é um cubo de vidro raymarched (760×470×220, cúpula do GO), flutuando e girando na frente do desktop; refração de duas faces com dispersão por canal, absorção do gel pela espessura, fogo volumétrico (gyroid fBm) dentro do cubo no GO, dois passes do shader (corpo abaixo do HTML, face da frente acima), UI em CSS 3D com a mesma matriz. Fluido MIP (tsKXR3) fica para o gel numa rodada futura: precisa de multi-buffer.
-- 2026-09-09 — Voto da rodada 2 (Matheus): fita SIM · forma OBJETO · gel SEM GEL · jingle CHIP · kitsch MAIS · splash PRIMEIRA · wmz NÃO. Ressalvas: "não amei, mas um milhão de vezes melhor"; W (.wmz) quebrado com o cubo; fogo sem sentido num cubo azul ("use água ou gelo aqui, fogo em outra skin"); falta visão central; "crie temas e destrinche temas antes de personas e usos, aí builde as skins". Consequências: `.wmz` sai do protótipo; o cubo vira tema GELO (rachaduras que acendem no GO); gel padrão = sem gel; `design/TEMAS.md` nasce com a regra "cada tema é um material" e quatro temas (GELO, BRASA, TANQUE, CROMO) para aprovar antes de qualquer skin.
-- 2026-09-09 — Matheus joga fora a UI da rodada 2 ("usa o conhecimento dela para as próximas"). Regras novas: tudo com a mesma cara do splash ao info; **função antes de UI** ("fica muito difícil fazer UI para software sem função"); funções pedidas: ILDA player, NDI→ILDA, orquestrador tipo Chataigne, cenas e cues DMX com menu de cenário interativo, companion tipo Clippy em todas as skins como menu principal; "be more wild". Resposta: `design/TEMAS.md` reescrito como mapa função ↔ tema (LASER, FÓSFORO, PATCHBAY, TEATRO DE PAPEL + Aprendiz); rodada 3 = ILDA player em tema LASER, `design/rodada3/ilda.html` (apagado da árvore; commit `6cc9bfa`).
+- 2026-09-09 — 2D-SDF glass rejected too (refs: Skins Factory wmpdesign, Shadertoy 4ll3R7 / 4s2GDV / XlscDH / dl3BRS / 4dSBDt). New direction approved by Matheus ("imagine if the menu lives in that floating cube and that is the window"): the window is a raymarched glass cube (760×470×220, with the GO dome), floating and rotating in front of the desktop; two-face refraction with per-channel dispersion, gel absorption by thickness, volumetric fire (gyroid fBm) inside the cube on GO, two shader passes (body below the HTML, front face above), UI in CSS 3D with the same matrix. MIP fluid (tsKXR3) is left for the gel in a future round: it needs multi-buffer.
+- 2026-09-09 — Round 2 vote (Matheus): ribbon YES · form OBJECT · gel NO GEL · jingle CHIP · kitsch MORE · splash FIRST · wmz NO. Caveats: "did not love it, but a million times better"; W (.wmz) broken by the cube; fire makes no sense in a blue cube ("use water or ice here, fire in another skin"); no central vision; "create themes and take themes apart before personas and uses, then build the skins". Consequences: `.wmz` leaves the prototype; the cube becomes the ICE theme (cracks that light up on GO); default gel = no gel; `design/TEMAS.md` is born with the rule "every theme is a material" and four themes (ICE, EMBER, TANK, CHROME) to approve before any skin.
+- 2026-09-09 — Matheus throws away the round 2 UI ("use what it taught for the next ones"). New rules: everything with the same look from splash to info; **function before UI** ("it is very hard to do UI for software with no function"); functions requested: ILDA player, NDI→ILDA, Chataigne-style orchestrator, DMX scenes and cues with an interactive stage-set menu, a Clippy-style companion in every skin as the main menu; "be more wild". Answer: `design/TEMAS.md` rewritten as a function ↔ theme map (LASER, FÓSFORO, PATCHBAY, PAPER THEATER + Aprendiz); round 3 = ILDA player in the LASER theme, `design/rodada3/ilda.html` (deleted from the tree; commit `6cc9bfa`).
 
-## 09/09/2026 · voto da rodada 3 e virada para o aparelho
+## 2026-09-09 · round 3 vote and the turn toward the device
 
-Voto (moodboard/round3, 01:53): LASER **ajustar** · Aprendiz **outro personagem** · névoa **mais** · próxima **NDI → ILDA (FÓSFORO)**. Notas: info em camada legível (o transparente não funcionou); programa não quadrado, borda interessante; mascote com botões nele, mais Clippy que pixel art.
+Vote (moodboard/round3, 01:53): LASER **adjust** · Aprendiz **another character** · haze **more** · next **NDI → ILDA (FÓSFORO)**. Notes: info on a readable layer (the transparent one did not work); a program that is not boxy, with an interesting edge; a mascot with buttons on it, more Clippy than pixel art.
 
-Diretriz nova do Matheus, na sequência: **o programa é o modelo 3D do próprio laser 10 W.** Traseira = menu (portas, botões, VFD). Preferências = a câmera sobe, os parafusos saem, a tampa abre, e cada componente é o seu ajuste (diodo = limite e curva; galvos = kpps; placa = buffer e velocidade; VFD = endereço DMX e conexões). Precisa parecer real, fotorrealista, não cartoon.
+New directive from Matheus, right after: **the program is the 3D model of the 10 W laser itself.** Rear panel = menu (ports, buttons, VFD). Preferences = the camera rises, the screws come out, the lid opens, and each component is its own setting (diode = limit and curve; galvos = kpps; board = buffer and speed; VFD = DMX address and connections). It has to look real, photorealistic, not cartoon.
 
-Consequências:
-- **Pino** (`design/pino.js`, apagado da árvore; commit `7dacf8f`): cabo DMX com plugue XLR-5 na cabeça; os cinco pinos são botões (1 ILDA, 2 NDI→ILDA, 3 orquestrador, 4 cenas e cues, 5 info), a trava é "some". Vetor SVG, olhos que seguem o mouse, balão Win98. Substitui o Aprendiz em todas as skins. `design/build.py` inlina o arquivo na rodada para publicar.
-- **Rodada 4 = `design/rodada4/projetor.html`** (apagado da árvore; commit `7dacf8f`): three.js r128 (jsdelivr; o cdnjs não tem o build UMD), PBR com PMREM de estúdio procedural, ACES, sombras PCF, alumínio escovado (normal + roughness procedurais), chapas com chanfro (ExtrudeGeometry), dicroicos em MeshPhysicalMaterial. A parede é o canvas 2D da rodada 3 como textura aditiva; os feixes saem da abertura do modelo. Painel de parâmetros opaco e chanfrado (lição do voto). Sala com clip-path chanfrado e degrau (borda não quadrada).
-- **NDI → ILDA (FÓSFORO)** não morreu: vira o que aparece na porta ETHER (um monitor de rack ligado ali). Fica para a rodada 5 se o voto confirmar.
-- Rodada 3 (`ilda.html`) fica como registro; o ajuste do LASER foi absorvido pela 4.
+Consequences:
+- **Pino** (`design/pino.js`, deleted from the tree; commit `7dacf8f`): a DMX cable with an XLR-5 plug for a head; the five pins are buttons (1 ILDA, 2 NDI→ILDA, 3 orchestrator, 4 scenes and cues, 5 info), the latch means "go away". SVG vector, eyes that follow the mouse, Win98 speech balloon. Replaces the Aprendiz in every skin. `design/build.py` inlines the file into the round for publishing.
+- **Round 4 = `design/rodada4/projetor.html`** (deleted from the tree; commit `7dacf8f`): three.js r128 (jsdelivr; cdnjs has no UMD build), PBR with a procedural studio PMREM, ACES, PCF shadows, brushed aluminium (procedural normal + roughness), plates with chamfer (ExtrudeGeometry), dichroics in MeshPhysicalMaterial. The wall is the round 3 2D canvas as an additive texture; the beams leave the model's aperture. Opaque, chamfered parameter panel (lesson from the vote). Room with a chamfered clip-path and a step (a non-boxy edge).
+- **NDI → ILDA (FÓSFORO)** did not die: it becomes what shows up on the ETHER port (a rack monitor plugged in there). Left for round 5 if the vote confirms it.
+- Round 3 (`ilda.html`) stays as a record; the LASER adjustment was absorbed by round 4.
 
-## 09/09/2026 · rodada 5 (protótipo publicado, aguardando voto)
+## 2026-09-09 · round 5 (prototype published, awaiting vote)
 
-- Protótipo: https://claude.ai/code/artifact/8a913f8b-8ea7-4621-b57a-88d7738dbafd · design system: https://claude.ai/code/artifact/2bada8a5-b991-43b7-a086-1b72b0a42232. Fontes em `design/laser/` (módulos `ilda.js`, `cam.js`, `bind.js`, `mat.js`, `body.js`, `optics.js`, `beam.js`, `pino3d.js`, `app.js`, página `app.html`, `tokens.css`, `SISTEMA.md`, `sistema.html`). `design/build.py` inlina qualquer `<script src>` e `<link>` local para publicar como um arquivo só.
-- Pedidos do Matheus desta rodada ficam literais em `design/laser/PEDIDOS.md` (todos marcados como feitos; o voto decide o que ajusta).
-- Traseira inspirada no Kvant Clubmax, sem copiar: powerCON TRUE1, rocker, chave, LED EMISSION, um interlock só, sem fusível, ILDA IN/OUT DB25, DMX IN/OUT XLR-5, NET RJ45, USB, OLED com encoder e BACK, ventoinha axial de 60 mm modelada de verdade (aro, cubo, 7 pás, grade de arame), placa de série.
-- Dentro, "nada voando": mesa óptica de alumínio (bloco silver único, furação M4), três módulos em bases, dois dicroicos e o espelho de dobra em suportes cinemáticos, obturador de solenoide, bloco de galvos em cantoneira (X vertical, Y a 90°, espelhos que seguem o galvo), drivers de diodo e de galvo e a placa DAC nas paredes, escuros; fonte 48 V; nove cabos roteados de um ponto a outro.
-- Feixe em GLSL: cilindros instanciados (núcleo + halo), alfa por dot(N,V), poeira por ruído 1D, aditivo, bloom. Fora: abertura → pontos acesos da parede. Dentro: caminho óptico módulo → dicroico → dobra → obturador → galvo X → galvo Y → abertura, acende com a chave e o obturador corta.
-- Splash = a câmera mira o output: começa num ponto estático, o foco vai para a parede ignorando o laser, o galvo contorna SPELLCASTER LASER (marching squares sobre o texto em Michroma), cada letra fechada é revelada, tudo brilha, o laser apaga, a sala escurece e a câmera pousa na traseira. Sem ILDA na parede durante a splash.
-- Fluxo: a vista SHOW fica trancada até armar a chave (settings primeiro, show depois).
-- Câmera no padrão SolidWorks (`cam.js`): MMB gira em torno do ponto clicado, Ctrl+MMB pan, Shift+MMB zoom, roda no cursor (sentido SolidWorks com toggle), setas 15°/Shift 90°/Ctrl pan, F enquadra, Ctrl+1..7 vistas.
-- Bindings (`bind.js`): toda ação tem id; tecla ou MIDI (note/CC com canal) com LEARN, feedback de saída para o controlador, persistido em localStorage. Espelha o MadMapper/Resolume.
-- Pino 3D substitui o Pino 2D (`design/pino.js`, hoje só no git): cabo DMX plugado no DMX OUT, ponta macho em pé no case, cinco pinos como botões na cena, balão Win98 ancorado na projeção da cabeça.
-- Design system só desta ferramenta: `tokens.css` (cores LASER/âmbar/vermelho/OLED, Michroma + Share Tech Mono, escala, chanfros, glows) + `SISTEMA.md` + `sistema.html`.
-- Pendente: voto da rodada 5 (traseira, dentro, splash, câmera, bindings, Pino 3D) em `moodboard/round5`.
+- Prototype: https://claude.ai/code/artifact/8a913f8b-8ea7-4621-b57a-88d7738dbafd · design system: https://claude.ai/code/artifact/2bada8a5-b991-43b7-a086-1b72b0a42232. Sources in `design/laser/` (modules `ilda.js`, `cam.js`, `bind.js`, `mat.js`, `body.js`, `optics.js`, `beam.js`, `pino3d.js`, `app.js`, page `app.html`, `tokens.css`, `SISTEMA.md`, `sistema.html`). `design/build.py` inlines any local `<script src>` and `<link>` to publish as a single file.
+- Matheus's requests for this round stay verbatim in `design/laser/PEDIDOS.md` (all marked as done; the vote decides what gets adjusted).
+- Rear panel inspired by the Kvant Clubmax, without copying it: powerCON TRUE1, rocker, key switch, EMISSION LED, a single interlock, no fuse, ILDA IN/OUT DB25, DMX IN/OUT XLR-5, NET RJ45, USB, OLED with encoder and BACK, a 60 mm axial fan modeled for real (ring, hub, 7 blades, wire grille), serial plate.
+- Inside, "nothing flying": aluminium optical bench (a single silver block, M4 drilling), three modules on mounts, two dichroics and the fold mirror in kinematic holders, solenoid shutter, galvo block on an angle bracket (X vertical, Y at 90°, mirrors that follow the galvo), diode and galvo drivers and the DAC board on the walls, dark; 48 V PSU; nine cables routed from point to point.
+- Beam in GLSL: instanced cylinders (core + halo), alpha by dot(N,V), dust by 1D noise, additive, bloom. Outside: aperture → lit points on the wall. Inside: optical path module → dichroic → fold → shutter → galvo X → galvo Y → aperture, lights up with the key switch and the shutter cuts it.
+- Splash = the camera aims at the output: it starts on a static dot, the focus goes to the wall ignoring the laser, the galvo traces SPELLCASTER LASER (marching squares over the text in Michroma), each closed letter is revealed, everything glows, the laser goes out, the room darkens and the camera lands on the rear panel. No ILDA on the wall during the splash.
+- Flow: the SHOW view stays locked until the key switch arms (settings first, show after).
+- Camera in the SolidWorks standard (`cam.js`): MMB orbits around the clicked point, Ctrl+MMB pans, Shift+MMB zooms, wheel at the cursor (SolidWorks direction with a toggle), arrows 15°/Shift 90°/Ctrl pan, F frames, Ctrl+1..7 views.
+- Bindings (`bind.js`): every action has an id; key or MIDI (note/CC with channel) with LEARN, output feedback to the controller, persisted in localStorage. Mirrors MadMapper/Resolume.
+- Pino 3D replaces Pino 2D (`design/pino.js`, today only in git): a DMX cable plugged into DMX OUT, male end standing on the case, five pins as buttons in the scene, Win98 speech balloon anchored to the projection of the head.
+- A design system for this tool only: `tokens.css` (LASER/amber/red/OLED colors, Michroma + Share Tech Mono, scale, chamfers, glows) + `SISTEMA.md` + `sistema.html`.
+- Pending: round 5 vote (rear panel, inside, splash, camera, bindings, Pino 3D) in `moodboard/round5`.
 
-## 09/09/2026 · rodada 6 (integração com o orquestrador)
+## 2026-09-09 · round 6 (integration with the orchestrator)
 
-- Protótipo republicado no mesmo artifact da rodada 5 (voto `moodboard/round5` intacto). Fontes: `design/FUNCOES/integracao-laser.md`, `design/laser/module.json`, `graph.json`, `bind.js`, `app.js`; teste `tests/test_laser_graph.py`. Branch `design/0.1.3`.
-- 2026-09-09 — O projetor é o módulo `laser/1` do graph; cada binding de tecla/MIDI é uma rota `entrada → filtro → endereço`. Endereços: `laser/1/arm`, `power`, `play`, `shutter`, `kpps` (valor, e disparo com `{step}`), `clip {file}`, `net/ndi|spout|artnet|sacn` (comandos); `limit/r|g|b`, `curve/r|g|b`, `geo/scale`, `dmx/addr`, `queue` (parâmetros); `interlock`, `temp`, `fps`, `points`, `emitting` (valores somente leitura). Nome = o da CLI, agrupado por `/` como o rótulo de `ilda-player.md §1`. Motivo: regra 2 de `FUNCOES/README.md`, um endereço é a identidade de tudo.
-- 2026-09-09 — Fica fora do registry: câmera (gesto do viewer; só `cam/view` e `cam/fog` sobrevivem, no bloco `view` do `.spell`), splash, Pino, OLED/encoder/BACK (as páginas já são endereços), ILDA OUT/DMX OUT/USB, mecânica (mesa, dicroicos, dobra, PCBs, fonte), velocidade do driver (calibração do previz). Motivo: nada disso muda o show.
-- 2026-09-09 — Porta do graph escreve-se `<uid>/<porta>` (`midi/cc:1:7`, `laser/1/kpps`), não `uid.port` como em `orquestrador.md §5`: o nome da porta já leva `/` e assim a porta é o próprio endereço do registry. Motivo: um nome só.
-- 2026-09-09 — CC contínuo passa por `filter.lag` (80 ms); nota e tecla são `trigger` direto; `trigger → value` exige argumento; `number → trigger` não tem filtro no PRD §10 (fica como rota sem filtro, o teste não cobre). `dependency` do manifesto leva `target` (o §5 omite).
-- Ponto aberto: **nó de estado** não existe no PRD §10 (`orquestrador.md §1`, "Estado"). `states[]` sai vazio do `Bind.graph()`; "no segundo ato estas rotas valem e aquelas param" hoje é condição em cada rota. Decisão pendente: adotar a semântica do Chataigne inteira (container de rotas com `ativo`, `ao carregar`, transições) e acrescentar `state` ao catálogo de nós do PRD.
-- Ponto aberto: filtro de limiar (`number → trigger`) para CC em ação de disparo; o `bind.js` já trata CC > 63 como disparo, o graph não sabe dizer isso.
+- Prototype republished into the same round 5 artifact (the `moodboard/round5` vote intact). Sources: `design/FUNCOES/integracao-laser.md`, `design/laser/module.json`, `graph.json`, `bind.js`, `app.js`; test `tests/test_laser_graph.py`. Branch `design/0.1.3`.
+- 2026-09-09 — The projector is the graph's `laser/1` module; every key/MIDI binding is a `input → filter → address` route. Addresses: `laser/1/arm`, `power`, `play`, `shutter`, `kpps` (value, and trigger with `{step}`), `clip {file}`, `net/ndi|spout|artnet|sacn` (commands); `limit/r|g|b`, `curve/r|g|b`, `geo/scale`, `dmx/addr`, `queue` (parameters); `interlock`, `temp`, `fps`, `points`, `emitting` (read-only values). Name = the CLI's, grouped by `/` like the label in `ilda-player.md §1`. Reason: rule 2 of `FUNCOES/README.md`, an address is the identity of everything.
+- 2026-09-09 — Stays out of the registry: camera (a viewer gesture; only `cam/view` and `cam/fog` survive, in the `view` block of the `.spell`), splash, Pino, OLED/encoder/BACK (the pages are already addresses), ILDA OUT/DMX OUT/USB, mechanics (bench, dichroics, fold, PCBs, PSU), driver speed (previz calibration). Reason: none of that changes the show.
+- 2026-09-09 — A graph port is written `<uid>/<port>` (`midi/cc:1:7`, `laser/1/kpps`), not `uid.port` as in `orquestrador.md §5`: the port name already carries `/` and this way the port is the registry address itself. Reason: one single name.
+- 2026-09-09 — A continuous CC goes through `filter.lag` (80 ms); note and key are a direct `trigger`; `trigger → value` requires an argument; `number → trigger` has no filter in PRD §10 (it stays a route with no filter, the test does not cover it). The manifest's `dependency` carries `target` (§5 omits it).
+- Open issue: a **state node** does not exist in PRD §10 (`orquestrador.md §1`, "State"). `states[]` comes out empty from `Bind.graph()`; "in the second act these routes hold and those stop" is a condition on every route today. Pending decision: adopt the whole Chataigne semantics (a container of routes with `active`, `on load`, transitions) and add `state` to the PRD's node catalog.
+- Open issue: a threshold filter (`number → trigger`) for a CC on a trigger action; `bind.js` already treats CC > 63 as a trigger, the graph cannot say so.
 
-## 09/09/2026 · limpeza da árvore de design (0.1.4)
+## 2026-09-09 · design tree cleanup (0.1.4)
 
-- 2026-09-09 — `design/funcoes-referencia` entra em `design/0.1.4` por merge: `design/FUNCOES/` (funções, regras transversais e auditorias em `fontes/`) passa a conviver com `design/laser/`. Motivo: função antes de UI, as duas metades na mesma branch.
-- 2026-09-09 — `design/laser/INTEGRACAO.md` vira `design/FUNCOES/integracao-laser.md` e entra na tabela de `FUNCOES/README.md`. Motivo: era contrato de função, morava em `laser/` só porque a branch não tinha `FUNCOES/`.
-- 2026-09-09 — Rodadas 2, 3 e 4 saem da árvore (`design/rodada2/`, `design/rodada3/`, `design/rodada4/`, `design/pino.js`); o histórico fica no git (commits `6fe8b23`, `6cc9bfa`, `7dacf8f`). Motivo: a rodada 2 foi reprovada no voto e as rodadas 3 e 4 foram absorvidas por `design/laser/`; código morto na árvore custa leitura e não guarda nada que o git já não guarde.
+- 2026-09-09 — `design/funcoes-referencia` goes into `design/0.1.4` by merge: `design/FUNCOES/` (functions, cross-cutting rules and audits in `fontes/`) now lives alongside `design/laser/`. Reason: function before UI, both halves on the same branch.
+- 2026-09-09 — `design/laser/INTEGRACAO.md` becomes `design/FUNCOES/integracao-laser.md` and enters the table in `FUNCOES/README.md`. Reason: it was a function contract, and it lived in `laser/` only because the branch had no `FUNCOES/`.
+- 2026-09-09 — Rounds 2, 3 and 4 leave the tree (`design/rodada2/`, `design/rodada3/`, `design/rodada4/`, `design/pino.js`); the history stays in git (commits `6fe8b23`, `6cc9bfa`, `7dacf8f`). Reason: round 2 was rejected in the vote and rounds 3 and 4 were absorbed by `design/laser/`; dead code in the tree costs reading and keeps nothing that git does not already keep.
 
-## 09/09/2026 · Nó estado e nó módulo no graph — aguarda voto
+## 2026-09-09 · State node and module node in the graph — awaiting vote
 
-- **Nó `state`.** Config `group` (padrão `"main"`) e `initial`; entradas `enter` e `exit`, saída `active`. Um ativo por grupo: pulso em `enter` liga este estado e desliga os outros do mesmo grupo, `exit` desliga, `locate`/`stop` volta ao `initial`. É a State Machine do Chataigne com a parte que cabe em `PRINCIPIOS.md`: sem transição com fade, sem sub-máquina, sem vários ativos no mesmo grupo.
-- **Nó `module`.** Config `module`, que nomeia `modules/<nome>.json` ao lado do show — o `module.json` do Chataigne (`parameters`, `values`, `commands`), regra 14 de `FUNCOES/README.md`. Cada `parameter` é uma entrada (muda → `Ev::Param{target:"<módulo>/<path>"}`, `norm` mapeia 0..1 antes do clamp em `min`..`max`), cada `value` é uma saída de nível alimentada por `input {key:"module:<módulo>/<path>"}`, cada `command` é uma entrada de trigger. O PATCHBAY monta o nó lendo o arquivo, sem conhecer o app.
-- **Chaves `"mute": true` e `"state": "<id>"` em qualquer nó.** As duas significam a mesma coisa no runtime: o nó não emite — saídas em 0, nenhum evento, `time.delay` pendente cancelado. Ao voltar, o valor guardado (toggle, latch, counter) continua lá, as bordas estão zeradas e a próxima saída de nível é reemitida (o "reemitir ao ativar" do Chataigne). É o Bypass do TouchDesigner sem verbo novo (regra 9).
-- **Um verbo por conceito, e `lock` e `solo` ficam de fora do runtime.** `lock` é só edição (congela o valor no editor) e `solo` é o mute dos outros, calculado pelo PATCHBAY: nenhum dos dois precisa de código no engine.
-- **O que o voto decide:** se o estado é exclusivo por grupo (aqui) ou vários ativos ao mesmo tempo (Chataigne), e se `norm` mapeia o sinal 0..1 para a faixa (aqui) ou é só a faixa do slider na GUI.
-- Motivo: são as duas lacunas que `design/FUNCOES/orquestrador.md` aponta contra o Chataigne; sem elas, "no segundo ato este conjunto de rotas passa a valer" vira condição copiada em cada rota, e app separado não vira nó.
+- **`state` node.** Config `group` (default `"main"`) and `initial`; inputs `enter` and `exit`, output `active`. One active per group: a pulse on `enter` turns this state on and the others in the same group off, `exit` turns it off, `locate`/`stop` returns to `initial`. It is Chataigne's State Machine with the part that fits `PRINCIPIOS.md`: no transition with fade, no sub-machine, no multiple actives in the same group.
+- **`module` node.** Config `module`, which names `modules/<name>.json` next to the show — Chataigne's `module.json` (`parameters`, `values`, `commands`), rule 14 of `FUNCOES/README.md`. Each `parameter` is an input (on change → `Ev::Param{target:"<module>/<path>"}`, `norm` maps 0..1 before the clamp on `min`..`max`), each `value` is a level output fed by `input {key:"module:<module>/<path>"}`, each `command` is a trigger input. The PATCHBAY builds the node by reading the file, without knowing the app.
+- **Keys `"mute": true` and `"state": "<id>"` on any node.** Both mean the same thing at runtime: the node does not emit — outputs at 0, no events, a pending `time.delay` canceled. On the way back, the stored value (toggle, latch, counter) is still there, the edges are cleared and the next level output is re-emitted (Chataigne's "re-emit on activate"). It is TouchDesigner's Bypass with no new verb (rule 9).
+- **One verb per concept, and `lock` and `solo` stay out of the runtime.** `lock` is editing only (it freezes the value in the editor) and `solo` is muting the others, computed by the PATCHBAY: neither needs code in the engine.
+- **What the vote decides:** whether the state is exclusive per group (here) or several can be active at once (Chataigne), and whether `norm` maps the 0..1 signal to the range (here) or is just the slider range in the GUI.
+- Reason: these are the two gaps that `design/FUNCOES/orquestrador.md` points out against Chataigne; without them, "in the second act this set of routes starts to hold" becomes a condition copied onto every route, and a separate app never becomes a node.
 
-## 09/09/2026 · Nó módulo → comando: convenção de nome e paths sem implementação — aguarda voto
+## 2026-09-09 · Module node → command: naming convention and paths with no implementation — awaiting vote
 
-- **Convenção.** O nó `module` emite `Ev::Param{target:"<mod>/<path>"}` e `Ev::Cmd{name:"<mod>/<cmd>"}`; o sink da CLI roteia para `<mod>_param {feed:"<mod>", path, value}` e `<mod>_<cmd> {feed:"<mod>", ...}`. Ou seja: **`feed` = nome do módulo**. Com dois lasers abertos, os dois nós `module` teriam que se chamar `laser` e o roteamento colide — a saída é instância nomeada (`laser@palco`), e o voto decide se ela entra agora ou quando aparecer a segunda mesa.
-- **Paths declarados sem implementação.** `modules/laser.json` declara `dev/type`, `dev/host`, `dev/pps`, `ilda/fps`, `curve/r|g|b`, `safe/zone`, `safe/armed` e `test/pattern`; `laser_param` não aceita nenhum deles (`dev/*` e `ilda/*` são argumento de `laser_open`/`laser_play`, o resto espera LUT de cor e `optimize` paramétrico). O manifesto é a declaração do app, não do comando: o voto decide se ele só declara o que já roda, ou se declara o alvo e o comando cresce até ele.
-- **`shutter` está dos dois lados.** É `command` no `modules/laser.json` e `path` no `laser_param`. Uma das duas some.
-- Motivo: a convenção está no código (seis linhas no sink da CLI, com comentário `ponytail:`) e funciona para um laser; registrar aqui evita que ela vire contrato por omissão.
+- **Convention.** The `module` node emits `Ev::Param{target:"<mod>/<path>"}` and `Ev::Cmd{name:"<mod>/<cmd>"}`; the CLI sink routes to `<mod>_param {feed:"<mod>", path, value}` and `<mod>_<cmd> {feed:"<mod>", ...}`. That is: **`feed` = the module's name**. With two lasers open, both `module` nodes would have to be called `laser` and the routing collides — the way out is a named instance (`laser@stage`), and the vote decides whether it comes in now or when the second console shows up.
+- **Paths declared with no implementation.** `modules/laser.json` declares `dev/type`, `dev/host`, `dev/pps`, `ilda/fps`, `curve/r|g|b`, `safe/zone`, `safe/armed` and `test/pattern`; `laser_param` accepts none of them (`dev/*` and `ilda/*` are arguments to `laser_open`/`laser_play`, the rest expect a color LUT and a parametric `optimize`). The manifest is the app's declaration, not the command's: the vote decides whether it only declares what already runs, or declares the target and the command grows into it.
+- **`shutter` is on both sides.** It is a `command` in `modules/laser.json` and a `path` in `laser_param`. One of the two goes away.
+- Reason: the convention is in the code (six lines in the CLI sink, with a `ponytail:` comment) and works for one laser; recording it here keeps it from becoming a contract by omission.
 
-## 09/09/2026 · A barra de navegação na Face (modo kiosk) — aguarda voto
+## 2026-09-09 · The navigation bar in the Face (kiosk mode) — awaiting vote
 
-- **O que existe.** `spellgui/web/nav.js` põe a mesma barra (abas TIMELINE/PATCHBAY/TEATRO/FACE/LASER, `Shift+1`..`Shift+5`, ENGINE/`rev` e o nome do show editável) no topo das cinco páginas, `face.html` inclusive. Sem isso a Face é a única página sem saída: quem abre nela não tem como voltar.
-- **O conflito.** O PRD §10 e `spellgui/web/README.md` descrevem a Face como kiosk: sem chrome, sem nada editável, alvo de toque. Uma barra com o nome do show num campo de texto é chrome, e é editável.
-- **O que o voto decide:** a barra some da Face (e o operador volta pelo `Shift+1`, que continua valendo), ou some só no modo `performance` (e fica no `editor`), ou fica como está.
-- Motivo: é decisão de produto, não de implementação — as três saídas custam a mesma linha de código.
+- **What exists.** `spellgui/web/nav.js` puts the same bar (TIMELINE/PATCHBAY/THEATER/FACE/LASER tabs, `Shift+1`..`Shift+5`, ENGINE/`rev` and the editable show name) at the top of the five pages, `face.html` included. Without it the Face is the only page with no way out: whoever opens on it has no way back.
+- **The conflict.** PRD §10 and `spellgui/web/README.md` describe the Face as kiosk: no chrome, nothing editable, touch targets. A bar with the show name in a text field is chrome, and it is editable.
+- **What the vote decides:** the bar disappears from the Face (and the operator gets back via `Shift+1`, which still holds), or it disappears only in `performance` mode (and stays in `editor`), or it stays as it is.
+- Reason: it is a product decision, not an implementation one — the three outcomes cost the same line of code.
 
-## 09/09/2026 · x/y de fixture no patch — aguarda voto
+## 2026-09-09 · Fixture x/y in the patch — awaiting vote
 
-- O previz da timeline (`spellgui/web/viewer.js`) desenha a planta do patch, e o patch não tem
-  onde a fixture está: `patch_add` grava `{name, profile, universe, address}` e nada mais. Enquanto
-  isso, a planta é uma grade em ordem de endereço — lê o rig, não a sala.
-- **O que o voto decide:** se a entrada do patch ganha `x`/`y` (planta em metros, com o palco na
-  origem) e se eles entram no `.spell` ou num arquivo de planta ao lado dele.
-- Não implementado e não removido até o voto: a grade por endereço fica, e vira posição real no dia
-  em que o patch souber dizer onde a fixture está.
+- The timeline previz (`spellgui/web/viewer.js`) draws the patch plan, and the patch has no
+  record of where the fixture is: `patch_add` writes `{name, profile, universe, address}` and nothing else. Meanwhile,
+  the plan is a grid in address order — it reads the rig, not the room.
+- **What the vote decides:** whether the patch entry gains `x`/`y` (a plan in meters, with the stage at the
+  origin) and whether they go into the `.spell` or into a plan file next to it.
+- Not implemented and not removed until the vote: the address grid stays, and becomes a real position the day
+  the patch can say where the fixture is.
 
-## 09/09/2026 · Entrada DMX e gravação: formato de `inputs` e forma do keyframe gravado — aguarda voto
+## 2026-09-09 · DMX input and recording: format of `inputs` and shape of the recorded keyframe — awaiting vote
 
-- **`inputs` é lista de `{type, universe}`, irmã de `outputs`.** `[{"type":"sacn","universe":1},{"type":"artnet","universe":2}]`: um universo por entrada, sem `interfaces` e sem prioridade. A alternativa era espelhar `outputs` (`{"type":"sacn","universes":[1,2],"interfaces":[...]}`), que casa com o que já existe no arquivo mas repete configuração de rede que a entrada não usa (multicast entra em todos os grupos declarados; Art-Net chega por broadcast). O voto decide qual das duas formas vira contrato do `.spell` v1 — trocar depois quebra show gravado.
-- **O que a gravação escreve.** Um keyframe `linear` por MUDANÇA de valor, sem thinning: um fader andando a 60 fps deixa 60 keyframes por segundo no track. A alternativa é gravar reduzido (Douglas-Peucker no fim do take) ou em degrau (`hold`, que reproduz a mesa byte a byte mas não interpola em fps diferente). O voto decide o padrão; o código está com `linear` e um `ponytail:` apontando a redução.
-- **A largura do track (quantos canais gravam) vem do keyframe que já existe**, não de um campo. Track vazio grava um canal só, no `address`. A alternativa é um campo `channels` no track `dmx` — mais um campo no `.spell` para o caso "armei um track novo de 4 canais".
-- **Fora de escopo, e por quê:** merge HTP entrada→saída (passthrough) e gravação de laser/OSC ficam para depois; vídeo (NDI/GStreamer) está bloqueado pelos SDKs não instalados (ROADMAP R2), não por decisão de design.
+- **`inputs` is a list of `{type, universe}`, sibling of `outputs`.** `[{"type":"sacn","universe":1},{"type":"artnet","universe":2}]`: one universe per input, no `interfaces` and no priority. The alternative was to mirror `outputs` (`{"type":"sacn","universes":[1,2],"interfaces":[...]}`), which matches what is already in the file but repeats network configuration the input does not use (multicast joins every declared group; Art-Net arrives by broadcast). The vote decides which of the two shapes becomes the `.spell` v1 contract — swapping later breaks a recorded show.
+- **What recording writes.** One `linear` keyframe per value CHANGE, with no thinning: a fader moving at 60 fps leaves 60 keyframes per second in the track. The alternative is to record reduced (Douglas-Peucker at the end of the take) or stepped (`hold`, which reproduces the console byte for byte but does not interpolate at a different fps). The vote decides the default; the code is on `linear` with a `ponytail:` pointing at the reduction.
+- **The track's width (how many channels record) comes from the keyframe that already exists**, not from a field. An empty track records a single channel, at the `address`. The alternative is a `channels` field in the `dmx` track — one more field in the `.spell` for the "I armed a new 4-channel track" case.
+- **Out of scope, and why:** HTP merge input→output (passthrough) and laser/OSC recording are left for later; video (NDI/GStreamer) is blocked by the SDKs not being installed (ROADMAP R2), not by a design decision.
 
-## 09/09/2026 · MIDI de entrada (frente `midi`) — o que ficou fora, aguarda voto
+## 2026-09-09 · MIDI input (`midi` workstream) — what stayed out, awaiting vote
 
-- **Chave do evento é `"<status>/<data1>"`** (`144/60` = note on canal 1 nota 60, `176/1` = CC 1), e não o `note:1:60` / `cc:1:7` do protótipo `design/laser/bind.js`: é a chave que o nó `in.midi` do graph já usa (PRD §10) e o canal já vem no status. Quando o `bind.js` virar produto os dois formatos precisam virar um só; o voto decide qual.
-- **Saída MIDI e feedback de superfície (LED, fader motorizado) ficam fora** — aguarda voto. É o que faz o controlador mostrar o estado do show; o `feedback()` do `bind.js` já manda note/CC de volta, então a função existe no protótipo e não no engine.
-- **MTC / MIDI clock e MIDI Show Control ficam fora** — aguarda voto. São o caminho para o Spellcaster receber GO (ou timecode) de uma mesa de som ou de vídeo; é função de produto, não detalhe de implementação.
-- Uma porta MIDI por processo: teclado e surface ao mesmo tempo colidem, porque a chave não diz de qual porta o evento veio. Sai da frente como limite anotado (`// ponytail:` em `spellcore/engine/src/midi.rs`); o voto decide se a porta entra na chave ou se cada superfície vira um módulo.
+- **The event key is `"<status>/<data1>"`** (`144/60` = note on channel 1 note 60, `176/1` = CC 1), and not the `note:1:60` / `cc:1:7` of the `design/laser/bind.js` prototype: it is the key the graph's `in.midi` node already uses (PRD §10) and the channel already comes in the status. When `bind.js` becomes product the two formats have to become one; the vote decides which.
+- **MIDI output and surface feedback (LED, motorized fader) stay out** — awaiting vote. It is what makes the controller show the show's state; `bind.js`'s `feedback()` already sends note/CC back, so the function exists in the prototype and not in the engine.
+- **MTC / MIDI clock and MIDI Show Control stay out** — awaiting vote. They are the path for Spellcaster to receive GO (or timecode) from a sound or video console; it is a product function, not an implementation detail.
+- One MIDI port per process: a keyboard and a surface at the same time collide, because the key does not say which port the event came from. It leaves the workstream as a noted limit (`// ponytail:` in `spellcore/engine/src/midi.rs`); the vote decides whether the port enters the key or whether each surface becomes a module.
 
-## 09/09/2026 · Timeline DAW: marcador com nome, lock de track, cor e altura — aguarda voto
+## 2026-09-09 · DAW timeline: named marker, track lock, color and height — awaiting vote
 
-Origem: `design/FUNCOES/timeline-daw.md` §3 (leitura de Ableton Live 12 e do manual do DaVinci Resolve instalado nesta máquina).
+Origin: `design/FUNCOES/timeline-daw.md` §3 (a reading of Ableton Live 12 and of the DaVinci Resolve manual installed on this machine).
 
-- **Marcador vira objeto.** Hoje há dois formatos no mesmo campo: a GUI grava `markers: [12.5, 40.0]` (números, `spellgui/web/timeline.js:198,864`) e o engine já tem teste com `markers: [{"t": 1.0, "name": "um"}]` (`spellcore/engine/tests/patch.rs:44`); nenhum dos dois falha, porque `show_patch` aceita qualquer JSON. Recomendação: **objeto `{t, name, note}`**, com número aceito na leitura e convertido na carga (migração local, `FUNCOES/README.md §12`). Motivo: marcador sem nome não serve para nada às 23h, e o Resolve mostra por que — nome, nota e um ponto no marcador que tem nota (manual p.548, p.784).
-- **`lock` por track.** `tracks[i].lock: true`, um booleano que o engine ignora: track travado não deixa mover, apagar nem selecionar keyframe. Recomendação: **entra**. Já é coerente com a decisão de 09/09 ("lock é só edição, sem runtime").
-- **Cor por track: não entra como campo.** O Ableton deixa o usuário pintar cada track; `PRINCIPIOS.md §2` proíbe cor decorativa. Recomendação: a cor sai do `type` do track (`dmx`, `laser`, `fx`, `cue`, `media`), como as famílias de nó do Graph — zero campo novo. Pela mesma razão, marcador **não** ganha `color` (`SHORTCUTS.md` já fixou marcador cinza).
-- **Altura de faixa e dobra de lane: não entram no `.spell`.** É estado de janela, proibido dentro do show por `FUNCOES/README.md §12`; vão para o `config.json` da GUI. `loop` idem (estado de transporte); se um dia precisar persistir, o lugar é `transport.loop`, que já existe no arquivo.
-- **Não é formato, é runtime, e precisa entrar:** `mute` de track não faz nada no engine Rust (não há `mute` nem `solo` em `spellcore/engine/`; o `mute` de `spellcore/script/src/graph.rs:200` é o do nó do graph, outra coisa; mute de track só no protótipo Python, `spellcaster/gui/api.py:168-171`). Hoje os botões M e S da timeline são pintura: o DMX continua saindo. `solo` continua sendo "mute dos outros" calculado no cliente.
+- **A marker becomes an object.** Today there are two formats in the same field: the GUI writes `markers: [12.5, 40.0]` (numbers, `spellgui/web/timeline.js:198,864`) and the engine already has a test with `markers: [{"t": 1.0, "name": "um"}]` (`spellcore/engine/tests/patch.rs:44`); neither one fails, because `show_patch` accepts any JSON. Recommendation: **an object `{t, name, note}`**, with a number accepted on read and converted on load (local migration, `FUNCOES/README.md §12`). Reason: a marker with no name is useless at 11 p.m., and Resolve shows why — name, note and a dot on the marker that has a note (manual p.548, p.784).
+- **`lock` per track.** `tracks[i].lock: true`, a boolean the engine ignores: a locked track will not let a keyframe be moved, deleted or selected. Recommendation: **it goes in**. It is already consistent with the 09-09 decision ("lock is editing only, no runtime").
+- **Color per track: does not go in as a field.** Ableton lets the user paint each track; `PRINCIPIOS.md §2` forbids decorative color. Recommendation: the color comes from the track's `type` (`dmx`, `laser`, `fx`, `cue`, `media`), like the Graph's node families — zero new fields. For the same reason, a marker does **not** get a `color` (`SHORTCUTS.md` already fixed markers as gray).
+- **Track height and lane folding: do not go into the `.spell`.** That is window state, forbidden inside the show by `FUNCOES/README.md §12`; they go to the GUI's `config.json`. `loop` likewise (transport state); if it ever needs persisting, the place is `transport.loop`, which already exists in the file.
+- **Not format, runtime, and it has to go in:** track `mute` does nothing in the Rust engine (there is no `mute` and no `solo` in `spellcore/engine/`; the `mute` in `spellcore/script/src/graph.rs:200` is the graph node's, another thing; track mute only in the Python prototype, `spellcaster/gui/api.py:168-171`). Today the timeline's M and S buttons are paint: the DMX keeps going out. `solo` remains "mute the others", computed on the client.
 
-## 09/09/2026 · interface DAW (frente `daw-pesquisa`) — aguarda voto
+## 2026-09-09 · DAW interface (`daw-pesquisa` workstream) — awaiting vote
 
-Seis documentos novos em `design/FUNCOES/` (`daw-arranjo`, `daw-sessao`, `browser-dnd`, `mapping`, `audio-video`, `pontos-falhos`), lidos dos manuais do Ableton Live 12, do DaVinci Resolve 20 e do Resolume Arena. O que eles decidiram está lá; o que eles **não** decidem está aqui.
+Six new documents in `design/FUNCOES/` (`daw-arranjo`, `daw-sessao`, `browser-dnd`, `mapping`, `audio-video`, `pontos-falhos`), read from the Ableton Live 12, DaVinci Resolve 20 and Resolume Arena manuals. What they decided is there; what they do **not** decide is here.
 
-**Formato do `.spell`**
+**`.spell` format**
 
-- **`clips[]` por track**: `{"t0", "len", "src", "offset"}` em segundos, `src` relativo à pasta do show. Convive com `keys[]` e com as lanes de parâmetro, não substitui nada. `migrate()` converte o `clip` (singular) do track laser sem subir `VERSION`. Motivo: hoje um clipe de laser de 46,8 s desenha uma lane vazia, porque a timeline só conhece `keys` (`daw-arranjo.md §4.1`).
-- **Tipos de track `audio` e `video`**, com `clips[]`, lane `gain` e sem `universe`. A alternativa é serem saídas, e não são: têm posição no tempo (`audio-video.md §1`).
-- **Ordem de `tracks[]` é a ordem da tela**, então reordenar reescreve o array e qualquer índice guardado (cue, mapeamento, endereço `track/3/mute`) passa a apontar para outro track. A alternativa é **`uid` por track**, que é o que `FUNCOES/README.md §12` já manda para referência entre objetos, resolve de vez o "Shortcut Target" do Resolume (`mapping.md §7`) e custa um campo. **É a decisão de maior alcance desta rodada.**
-- **`marker.go: "<endereço>"`** transforma marcador em locator (Ableton §6.4) sem objeto novo, e **`cue.fires: ["<endereço>", ...]`** é o que dá célula de grade aos tracks de mídia, cujos valores `cue.values` (só `endereço DMX → número`) não alcançam. O voto decide se os dois se chamam igual (lista nos dois) ou se o marcador fica com string.
-- **`"midi"` vira `"map"`, com a fonte no prefixo da chave** (`"key:Space"`, `"midi:144/60"`, `"osc:/spell/go"`, `"widget:go"`) — o mesmo vocabulário que `input {key}` já documenta e que `chave()` do graph já produz. `midi_map` vira `map_set`; `migrate()` prefixa o bloco antigo. É o que impede duas fontes de verdade entre a frente `midi` e o modo de mapeamento (`mapping.md §6`). O `bind.js` da rodada 5 (chave `note:1:60`, persistência em `localStorage`) perde as duas coisas: a chave vira a do engine e o mapa vai para o `.spell`.
-- **`show.outputs[]` ganha `{"type":"screen","monitor":N}`** para a segunda janela de vídeo no projetor (`audio-video.md §4`), e o track de vídeo aponta para ela por `screen`.
+- **`clips[]` per track**: `{"t0", "len", "src", "offset"}` in seconds, `src` relative to the show folder. It coexists with `keys[]` and with the parameter lanes, it replaces nothing. `migrate()` converts the laser track's `clip` (singular) without bumping `VERSION`. Reason: today a 46.8 s laser clip draws an empty lane, because the timeline only knows `keys` (`daw-arranjo.md §4.1`).
+- **Track types `audio` and `video`**, with `clips[]`, a `gain` lane and no `universe`. The alternative is for them to be outputs, and they are not: they have a position in time (`audio-video.md §1`).
+- **The order of `tracks[]` is the order on screen**, so reordering rewrites the array and any stored index (cue, mapping, address `track/3/mute`) starts pointing at another track. The alternative is a **`uid` per track**, which is what `FUNCOES/README.md §12` already requires for references between objects, settles Resolume's "Shortcut Target" for good (`mapping.md §7`) and costs one field. **It is the widest-reaching decision of this round.**
+- **`marker.go: "<address>"`** turns a marker into a locator (Ableton §6.4) with no new object, and **`cue.fires: ["<address>", ...]`** is what gives media tracks a grid cell, which the `cue.values` (only `DMX address → number`) cannot reach. The vote decides whether both are named alike (a list in both) or whether the marker keeps a string.
+- **`"midi"` becomes `"map"`, with the source in the key's prefix** (`"key:Space"`, `"midi:144/60"`, `"osc:/spell/go"`, `"widget:go"`) — the same vocabulary that `input {key}` already documents and that the graph's `chave()` already produces. `midi_map` becomes `map_set`; `migrate()` prefixes the old block. It is what keeps the `midi` workstream and the mapping mode from having two sources of truth (`mapping.md §6`). Round 5's `bind.js` (key `note:1:60`, persistence in `localStorage`) loses both: the key becomes the engine's and the map goes into the `.spell`.
+- **`show.outputs[]` gains `{"type":"screen","monitor":N}`** for the second video window on the projector (`audio-video.md §4`), and the video track points at it via `screen`.
 
-**Atalhos**
+**Shortcuts**
 
-- **`Ctrl+Shift+A` passa a ser o modo de mapeamento** (o dono fixou a tecla). Consequência: "selecionar nada" sai de `Ctrl+Shift+A` e vai para **`Alt+A`**, pela própria gramática de `SHORTCUTS.md` (*"Alt = variante/limpa"*, como `Alt+I`/`Alt+O`/`Alt+X` já fazem). Nota de fonte: no Resolume `Ctrl+Shift+A` é o Advanced Output; os modos de atalho de lá são `Shift+Ctrl+K/M/O/X`. A tecla fica como o dono pediu.
-- **`Tab` continua sendo a troca de Face** (editor ↔ performance, PRD §10). Arrangement ↔ Session é a **segunda batida do `Shift+2`**, na mesma lógica de `Shift+Z` (enquadra, bate de novo e volta) e de `M` (cria marcador, bate de novo e edita). Terceira vez que `Tab` é disputada; fica decidido e sai dos pontos abertos de `FUNCOES/README.md`.
-- **`Ctrl+E` age no objeto selecionado**: clipe corta (Ableton §6.12), keyframe abre o menu de easing (`SHORTCUTS.md`). Um atalho, dois objetos.
-- **Altura de faixa por track** (Resolve p.643) contra a altura global proposta em `timeline-daw.md` item 19.
+- **`Ctrl+Shift+A` becomes the mapping mode** (the owner fixed the key). Consequence: "select nothing" leaves `Ctrl+Shift+A` and goes to **`Alt+A`**, by `SHORTCUTS.md`'s own grammar (*"Alt = variant/clears"*, as `Alt+I`/`Alt+O`/`Alt+X` already do). Source note: in Resolume `Ctrl+Shift+A` is the Advanced Output; its shortcut modes are `Shift+Ctrl+K/M/O/X`. The key stays as the owner asked.
+- **`Tab` remains the Face switch** (editor ↔ performance, PRD §10). Arrangement ↔ Session is the **second hit of `Shift+2`**, in the same logic as `Shift+Z` (fit, hit again and go back) and `M` (create a marker, hit again and edit). Third time `Tab` has been contested; it is decided and leaves the open issues in `FUNCOES/README.md`.
+- **`Ctrl+E` acts on the selected object**: a clip splits (Ableton §6.12), a keyframe opens the easing menu (`SHORTCUTS.md`). One shortcut, two objects.
+- **Track height per track** (Resolve p.643) against the global height proposed in `timeline-daw.md` item 19.
 
-**Recusas deliberadas, registradas para não voltarem por esquecimento**
+**Deliberate refusals, recorded so they do not come back by forgetfulness**
 
-- **Consolidate** (Ableton §6.13): grava sample novo em `Samples/Processed/Consolidate`. Não renderizamos mídia e não escrevemos arquivo derivado na pasta do show.
-- **Follow actions** (Ableton §16.7): duas ações com probabilidade, dez tipos, `Jump Target`, multiplicador de loops. Nossa cue já tem `follow: bool` (= o Follow Action `Next`), e o resto é máquina de estados escondida na lista de cues — a máquina de estados já está sendo desenhada no lugar certo (nó `state` do graph).
-- **Toggle, latch, contador e limiar no mapa direto**: vão para o graph, que já tem `logic.*`, `math.*`, `time.*` e `state` no catálogo fechado. O mapa flat guarda chave → comando e nada de estado.
-- **Quatro modos de mapeamento por protocolo** (Resolume, `Shift+Ctrl+K/M/O/X`, uma cor cada): um modo só, porque o protocolo já vem na entrada e quatro cores contra `PRINCIPIOS.md §2`. `K`/`M`/`O` sobrevivem como filtro de fonte **dentro** do modo.
-- **NDI e Spout**: bloqueio de licença (SDK registrado, contra `FUNCOES/README.md §14`) e de contexto GPU no WebView, não de esforço. O caso real — levar imagem ao projetor — resolve-se com a segunda janela.
-- **Cor livre por track** (Resolve p.621, 16 cores), **automação vermelha × modulação azul** (Ableton §26.3), **marcador colorido**: `PRINCIPIOS.md §2`, cor significa estado.
-- **`.mov` como formato de vídeo** (Ableton §27.1): o critério é o do reprodutor, e o reprodutor é o WebView.
+- **Consolidate** (Ableton §6.13): writes a new sample in `Samples/Processed/Consolidate`. We do not render media and we do not write a derived file into the show folder.
+- **Follow actions** (Ableton §16.7): two actions with probability, ten types, `Jump Target`, a loop multiplier. Our cue already has `follow: bool` (= the `Next` Follow Action), and the rest is a state machine hidden in the cue list — and the state machine is already being designed in the right place (the graph's `state` node).
+- **Toggle, latch, counter and threshold in the direct map**: they go to the graph, which already has `logic.*`, `math.*`, `time.*` and `state` in its closed catalog. The flat map holds key → command and no state.
+- **Four mapping modes per protocol** (Resolume, `Shift+Ctrl+K/M/O/X`, one color each): a single mode, because the protocol already comes with the input and four colors go against `PRINCIPIOS.md §2`. `K`/`M`/`O` survive as a source filter **inside** the mode.
+- **NDI and Spout**: a licensing block (a registered SDK, against `FUNCOES/README.md §14`) and a GPU-context block in the WebView, not an effort block. The real case — getting an image to the projector — is solved with the second window.
+- **Free color per track** (Resolve p.621, 16 colors), **red automation × blue modulation** (Ableton §26.3), **colored marker**: `PRINCIPIOS.md §2`, color means state.
+- **`.mov` as a video format** (Ableton §27.1): the criterion is the player's, and the player is the WebView.
 
-**Defeito provado, para a frente que corrigir**
+**Proven defect, for whichever workstream fixes it**
 
-- `spellgui/web/timeline.js:308-312`: `commit()` reescreve `spec.mute` a partir de **cada** lane, e as lanes de parâmetro do mesmo track carregam a cópia velha — a última escrita vence e desfaz o mute que o operador acabou de ligar. Vale igual para `solo`. Reproduzido com `shows/medgrupo.spell` (o track laser tem lanes `.rot` e `.scale` sobre o mesmo `spec`). A correção é uma fonte só: `L.mute` vira leitura de `L.spec.mute`.
+- `spellgui/web/timeline.js:308-312`: `commit()` rewrites `spec.mute` from **each** lane, and the parameter lanes of the same track carry the old copy — the last write wins and undoes the mute the operator has just turned on. The same holds for `solo`. Reproduced with `shows/medgrupo.spell` (the laser track has `.rot` and `.scale` lanes over the same `spec`). The fix is a single source: `L.mute` becomes a read of `L.spec.mute`.
 
-## 09/09/2026 · integração da rodada 2
+## 2026-09-09 · round 2 integration
 
-- 2026-09-09 — **Roda pura do mouse rola o conteúdo também no PATCHBAY**, e o `graph.js` passa a
-  escrever `k.ymax` (`desenha()`, a partir da caixa mais baixa). Motivo: um gesto só nas duas telas
-  (`roda` rola, `Shift`+roda anda, `Ctrl`+roda dá zoom), e escrever `ymax` custa duas linhas contra
-  o listener de captura que seria preciso para devolver o zoom à roda pura no graph. Decisão de
-  integração, **reversível**: se o voto disser que graph de nós tem que dar zoom na roda pura (como
-  Blender e TouchDesigner), o `canvaskit.js` ganha o desvio e o `ymax` continua servindo ao clamp.
+- 2026-09-09 — **The plain mouse wheel scrolls the content in the PATCHBAY too**, and `graph.js` now
+  writes `k.ymax` (`desenha()`, from the lowest box). Reason: one single gesture on both screens
+  (`wheel` scrolls, `Shift`+wheel pans, `Ctrl`+wheel zooms), and writing `ymax` costs two lines against
+  the capture listener that would be needed to give zoom back to the plain wheel in the graph. An
+  integration decision, **reversible**: if the vote says a node graph must zoom on the plain wheel (like
+  Blender and TouchDesigner), `canvaskit.js` gets the branch and `ymax` keeps serving the clamp.
 
-## 09/09/2026 · Loop In-Out com track armado reescreve o take — aguarda voto
+## 2026-09-09 · In-Out loop with an armed track overwrites the take — awaiting vote
 
-- Loop de transporte (`loop_set`, In–Out) e gravação (`rec_arm`) são estados independentes: com os
-  dois ligados, cada volta do loop grava por cima do que a volta anterior gravou. Não há erro; há
-  duas semânticas possíveis e nenhuma está escolhida.
-- **O que o voto decide:** (a) a volta do loop **desarma** o track (uma passada, um take, como o
-  punch do Pro Tools), ou (b) fica como está e a documentação diz que loop + arme sobrescreve
-  (como o overdub destrutivo), ou (c) cada volta vira um take novo — que é campo novo no `.spell` e
-  não sai de graça.
-- Não implementado e não removido até o voto: hoje é (b), sem aviso na tela.
+- Transport loop (`loop_set`, In–Out) and recording (`rec_arm`) are independent states: with
+  both on, every pass of the loop records over what the previous pass recorded. There is no bug; there are
+  two possible semantics and neither one has been chosen.
+- **What the vote decides:** (a) the loop's wrap **disarms** the track (one pass, one take, like Pro Tools'
+  punch), or (b) it stays as it is and the documentation says that loop + arm overwrites
+  (like destructive overdub), or (c) each pass becomes a new take — which is a new field in the `.spell` and
+  does not come for free.
+- Not implemented and not removed until the vote: today it is (b), with no warning on screen.
 
-## 09/09/2026 · A página inicial da janela do programa — aguarda voto
+## 2026-09-09 · The program window's home page — awaiting vote
 
-- **O que o voto decide:** ao abrir a janela do Spellcaster, o que aparece primeiro — o **aparelho** (`spellgui/web/laser3d/app.html`, o projetor laser em 3D, com a splash, a traseira como menu e o Pino como navegação) ou a **timeline** (`spellgui/web/index.html`).
-- **Recomendação: o aparelho.** Foi o pedido literal ("não quero abrir no browser, quero uma GUI do programa" · "que a UI seja já wild e com 3D e com shaders GLSL e que seja cool de operar"), e é a regra "função antes de UI" aplicada de verdade: o programa é o aparelho, a timeline é o gravador do aparelho. Abrir pelo gravador inverte a metáfora e devolve o software quadradão.
-- **O que já está de pé nos dois casos:** o `laser3d/` é a página principal e roda ligado ao registry (`laser_open`, `laser_play`, `laser_stop`, `laser_close`, `laser_param`, `laser_stats`, `laser_files`, `resume`/`pause`, `show_get`) por `bus.js`, com three.js e as fontes vendorizados em `spellgui/web/vendor/` — nada de CDN, o evento não tem rede. Sem engine a página continua inteira, em modo local.
-- **O que fica fora enquanto o voto não sai:** a janela nativa (Tauri) é da frente `gui-janela`; esta decisão é só qual URL ela carrega primeiro.
-- Motivo: é escolha de produto, não de código — trocar a página inicial é uma linha, mas define o que o programa **é** quando abre.
+- **What the vote decides:** when the Spellcaster window opens, what shows up first — the **device** (`spellgui/web/laser3d/app.html`, the 3D laser projector, with the splash, the rear panel as the menu and Pino as navigation) or the **timeline** (`spellgui/web/index.html`).
+- **Recommendation: the device.** It was the literal request ("I do not want to open in the browser, I want a GUI of the program" · "let the UI already be wild and with 3D and with GLSL shaders and cool to operate"), and it is the "function before UI" rule actually applied: the program is the device, the timeline is the device's recorder. Opening at the recorder inverts the metaphor and gives back the boxy software.
+- **What already stands in both cases:** `laser3d/` is the main page and runs wired to the registry (`laser_open`, `laser_play`, `laser_stop`, `laser_close`, `laser_param`, `laser_stats`, `laser_files`, `resume`/`pause`, `show_get`) through `bus.js`, with three.js and the fonts vendored in `spellgui/web/vendor/` — no CDN, the event has no network. With no engine the page is still whole, in local mode.
+- **What stays out while the vote is pending:** the native window (Tauri) belongs to the `gui-janela` workstream; this decision is only about which URL it loads first.
+- Reason: it is a product choice, not a code one — swapping the home page is one line, but it defines what the program **is** when it opens.
 
-## 09/09/2026 · O que entra no menu do Pino — aguarda voto
+## 2026-09-09 · What goes into Pino's menu — awaiting vote
 
-- **Os cinco pinos continuam sendo as cinco telas** (1 laser · 2 fósforo · 3 patchbay · 4 teatro · 5 info). O balão ganhou **dois itens que não são pino**: o **GRAVADOR** (a timeline, `index.html`) e a **MESA** (a Face, `face.html`). Cada um leva a frase que justifica a peça: a timeline é a fita do aparelho, a Face são os botões grandes que o operador aperta no show.
-- **O que o voto decide:** se peça sem pino pode morar no balão, ou se cada uma precisa virar um pino — o que exigiria um Pino com sete pinos (XLR-7 não existe) ou um segundo cabo.
-- Motivo: a regra é "nada aparece por conveniência de software". Dois itens sem pino são a exceção que o balão está abrindo; ou ela é aceita com a justificativa, ou o aparelho precisa crescer um conector.
+- **The five pins remain the five screens** (1 laser · 2 phosphor · 3 patchbay · 4 theater · 5 info). The speech balloon gained **two items that are not pins**: the **RECORDER** (the timeline, `index.html`) and the **CONSOLE** (the Face, `face.html`). Each carries the sentence that justifies the piece: the timeline is the device's tape, the Face is the big buttons the operator hits during the show.
+- **What the vote decides:** whether a piece without a pin may live in the speech balloon, or whether each one has to become a pin — which would demand a Pino with seven pins (XLR-7 does not exist) or a second cable.
+- Reason: the rule is "nothing shows up out of software convenience". Two items with no pin are the exception the balloon is opening; either it is accepted with the justification, or the device has to grow a connector.
 
-## 10/09/2026 · chassi-4 · A dobradiça da tampa fica na FRENTE, não atrás
+## 2026-09-10 · chassis-4 · The lid hinge goes at the FRONT, not at the back
 
-- **O pedido dizia** "dobradiça de verdade, em `z = D/2`" (traseira). **Ficou em `z = −D/2 + 4,5 mm`** (frente), no centro do raio da aresta dianteira.
-- **Motivo:** quem abre a tampa é `app.js`, que escreve um ângulo **negativo** em `lid.rotation.x`. Com o eixo atrás, ângulo negativo joga a chapa para baixo e para trás: ela atravessa o painel traseiro e o flightcase — é exatamente o "tampa clipando" reclamado. Com o eixo na frente, o mesmo ângulo negativo abre a tampa para cima e para a frente, sem varrer nada entre 0 e −1,9 rad, e sem precisar de limite de curso artificial.
-- **A alternativa era editar `app.js`** (inverter o sinal), e `app.js` não é desta frente. Se o integrador preferir a dobradiça atrás, o conserto é uma linha em `app.js` (`rotation.x = +ângulo`) mais mover `lid.position.z` de volta para `D/2 − 4,5 mm`.
-- **Efeito colateral que fica para o integrador:** `app.js` sobe os parafusos da tampa 50 mm (`s.position.y = .004 + sT * .05`). Eles são filhos da tampa e acompanham o giro, mas o curso é exagerado; 8 mm bastaria.
+- **The request said** "a real hinge, at `z = D/2`" (rear). **It ended up at `z = −D/2 + 4.5 mm`** (front), at the center of the front edge's radius.
+- **Reason:** what opens the lid is `app.js`, which writes a **negative** angle into `lid.rotation.x`. With the axis at the back, a negative angle throws the plate down and backwards: it goes through the rear panel and the flight case — exactly the "lid clipping" that was reported. With the axis at the front, the same negative angle opens the lid up and forward, sweeping nothing between 0 and −1.9 rad, and with no need for an artificial travel limit.
+- **The alternative was to edit `app.js`** (flip the sign), and `app.js` is not part of this workstream. If the integrator prefers the hinge at the back, the fix is one line in `app.js` (`rotation.x = +angle`) plus moving `lid.position.z` back to `D/2 − 4.5 mm`.
+- **Side effect left to the integrator:** `app.js` raises the lid screws by 50 mm (`s.position.y = .004 + sT * .05`). They are children of the lid and follow the rotation, but the travel is exaggerated; 8 mm would do.
 
-## 10/09/2026 · `Z` e `Shift+Z` trocados de lado, para bater com o manual do SolidWorks
+## 2026-09-10 · `Z` and `Shift+Z` swapped, to match the SolidWorks manual
 
-- Estava `Z` = zoom **+** e `Shift+Z` = zoom **−**. A referência rápida oficial da Dassault
-  (`quick_reference.pdf`, p. 1, `SWQRCENG06060`) diz o contrário: **`Z` afasta, `Shift+Z` aproxima**.
-  Como a câmera da vista SHOW passou a copiar o SolidWorks inteiro (`design/FUNCOES/camera-solidworks.md`),
-  ficar com metade do mapa invertida seria a pior das duas opções: quem conhece o CAD erra, e quem não
-  conhece não ganha nada. Os dois continuam sendo endereços (`cam.zoomIn`, `cam.zoomOut`), remapeáveis.
-- Não estava no pedido; foi decidido aqui porque o pedido mandou seguir o manual e o manual discorda
-  do que havia. **Reversível em uma linha** (as duas teclas no `Bind.def` de `app.js`) se o voto disser
-  que a intuição "Z aproxima" vale mais que a compatibilidade com o CAD.
+- It was `Z` = zoom **in** and `Shift+Z` = zoom **out**. Dassault's official quick reference
+  (`quick_reference.pdf`, p. 1, `SWQRCENG06060`) says the opposite: **`Z` zooms out, `Shift+Z` zooms in**.
+  Since the SHOW view's camera now copies SolidWorks wholesale (`design/FUNCOES/camera-solidworks.md`),
+  keeping half the map inverted would be the worst of the two options: whoever knows the CAD gets it wrong, and whoever does not
+  know it gains nothing. Both remain addresses (`cam.zoomIn`, `cam.zoomOut`), remappable.
+- It was not in the request; it was decided here because the request said to follow the manual and the manual disagrees
+  with what was there. **Reversible in one line** (the two keys in `app.js`'s `Bind.def`) if the vote says
+  the "Z zooms in" intuition is worth more than compatibility with the CAD.
 
-## 10/09/2026 · frente hud-4 · O nome do comando que mapeia uma entrada — aguarda voto
+## 2026-09-10 · hud-4 workstream · The name of the command that maps an input — awaiting vote
 
-- O **interlock deixou de ser um botão** na página do laser: é uma **entrada** do aparelho, e a aba INTERLOCK da gaveta é o lugar onde se declara **quem a aciona**. A identidade é um endereço textual, `laser/1/interlock`, o mesmo em tecla, MIDI, OSC, Art-Net, MQTT e CLI (FUNCOES/README regra 2).
-- **O que já funciona hoje:** tecla e MIDI, pelo `Bind` que a página já tinha (`Bind.def("lock.toggle")`), e no engine o MIDI por `spell midi_map --key 176/1 --cmd laser_param`. O botão `SIMULAR ABERTURA` aciona a entrada sem hardware.
-- **O que o voto decide:** o nome do comando de registry que mapeia uma fonte **não-MIDI** para um endereço. A proposta é uma forma só para todas: `spell map <fonte> <endereço>` — `spell map osc laser/1/interlock`, `spell map artnet 1/512 laser/1/interlock`, `spell map mqtt spell/laser/1/interlock laser/1/interlock`. A alternativa é um comando por protocolo (`osc_map`, `artnet_map`, `mqtt_map`), como o `midi_map` que já existe.
-- **O que fica fora enquanto o voto não sai:** o comando em si. A aba mostra o endereço, o universo/canal e o tópico (guardados em `localStorage`, prontos para virar argumento) e escreve **"em breve"** na linha do comando que falta. Nada de fingir que mapeia.
-- Motivo: `midi_map` existe e cria precedente para a segunda forma; a primeira é uma linha de CLI só para N protocolos. É escolha de nome de comando do produto, não de código — e nome de comando é contrato.
+- The **interlock stopped being a button** on the laser page: it is an **input** of the device, and the drawer's INTERLOCK tab is where you declare **who triggers it**. The identity is a textual address, `laser/1/interlock`, the same across key, MIDI, OSC, Art-Net, MQTT and CLI (FUNCOES/README rule 2).
+- **What already works today:** key and MIDI, through the `Bind` the page already had (`Bind.def("lock.toggle")`), and in the engine MIDI through `spell midi_map --key 176/1 --cmd laser_param`. The `SIMULAR ABERTURA` button triggers the input with no hardware.
+- **What the vote decides:** the name of the registry command that maps a **non-MIDI** source to an address. The proposal is one single form for all of them: `spell map <source> <address>` — `spell map osc laser/1/interlock`, `spell map artnet 1/512 laser/1/interlock`, `spell map mqtt spell/laser/1/interlock laser/1/interlock`. The alternative is one command per protocol (`osc_map`, `artnet_map`, `mqtt_map`), like the `midi_map` that already exists.
+- **What stays out while the vote is pending:** the command itself. The tab shows the address, the universe/channel and the topic (stored in `localStorage`, ready to become arguments) and writes **"coming soon"** on the line of the command that is missing. No pretending to map.
+- Reason: `midi_map` exists and sets a precedent for the second form; the first is a single CLI line for N protocols. It is a choice of product command name, not of code — and a command name is a contract.
 
-## 10/09/2026 · frente hud-4 · A linha de Art-Net/sACN do HUD: declaração acende texto, frame acende LED
+## 2026-09-10 · hud-4 workstream · The HUD's Art-Net/sACN line: a declaration lights the text, a frame lights the LED
 
-- O bloco de estatísticas do HUD só escreve **fato do engine**. A linha de uma entrada Art-Net ou sACN aparece **se, e só se**, `show_get {full:true}` devolver essa entrada em `show.inputs`; o LED dela acende **só quando chega frame de verdade** (tópico binário 2 do barramento), e apaga sozinho quando o frame para.
-- `shows/medgrupo.spell` não declara `inputs`: por isso hoje **não existe linha de Art-Net/sACN na tela** — e é assim que tem que ser. Um LED apagado ao lado de um protocolo que ninguém configurou é ruído; um protocolo inventado é mentira.
-- Mesma regra na plaqueta do chassi: a versão de firmware vem do engine, e sem engine a plaqueta escreve `FIRMWARE OFFLINE` em vez de um número.
+- The HUD's statistics block writes only **engine fact**. The line for an Art-Net or sACN input appears **if, and only if**, `show_get {full:true}` returns that input in `show.inputs`; its LED lights **only when a real frame arrives** (binary topic 2 of the bus), and goes out on its own when the frames stop.
+- `shows/medgrupo.spell` declares no `inputs`: that is why today **there is no Art-Net/sACN line on screen** — and that is how it has to be. An unlit LED next to a protocol nobody configured is noise; an invented protocol is a lie.
+- Same rule on the chassis plate: the firmware version comes from the engine, and with no engine the plate writes `FIRMWARE OFFLINE` instead of a number.
 
-## 10/09/2026 · A luz do interior estoura qualquer material — aguarda voto
+## 2026-09-10 · The interior light blows out any material — awaiting vote
 
-- Medido no bench (`bench.html?v=optica`, spot `sun` com intensidade 50) e conferido em `app.js`
-  (mesmo spot com intensidade **90**, sem `physicallyCorrectLights`): toda superfície difusa virada
-  para cima satura. Um alumínio preto anodizado com albedo 0x0d1013 (0,012 linear) sai do render
-  cinza-claro; um fio vermelho 0x4d130e sai rosa; uma placa com máscara de solda 0x05130c sai verde
-  berrante. Com esse ganho não existe albedo escuro: o material só volta a escurecer se for
-  metálico (`metalness >= .85`), porque aí não há difusa para estourar.
-- **O que isso já custou em `optics.js`:** o palette inteiro teve de virar metal (mesa, suportes,
-  motores, dissipadores) e as cores dos fios e das placas tiveram de ser escurecidas duas vezes só
-  para não brilhar mais que a mesa óptica. É contorno, não conserto — a peça está compensando a luz.
-- **O que o voto decide:** (a) baixar o spot e subir a `toneMappingExposure` em `app.js`/`bench.html`
-  até que albedo escuro leia escuro (é uma linha em cada arquivo, mas muda o visual de todas as
-  frentes de uma vez), ou (b) ligar `renderer.physicallyCorrectLights = true` e recalibrar as três
-  luzes em candela, ou (c) manter como está e assumir que todo material do interior é metálico.
-- Motivo: `app.js` e `bench.html` não são desta frente, e mexer na luz muda o corpo, o Pino e a
-  parede de uma vez. Fica registrado com número medido para quem for calibrar.
+- Measured on the bench (`bench.html?v=optica`, `sun` spot at intensity 50) and checked in `app.js`
+  (the same spot at intensity **90**, with no `physicallyCorrectLights`): every diffuse surface facing
+  up saturates. A black anodized aluminium with albedo 0x0d1013 (0.012 linear) comes out of the render
+  light gray; a red wire 0x4d130e comes out pink; a board with solder mask 0x05130c comes out a blaring
+  green. With that gain there is no such thing as a dark albedo: the material only goes dark again if it is
+  metallic (`metalness >= .85`), because then there is no diffuse to blow out.
+- **What this has already cost in `optics.js`:** the whole palette had to become metal (bench, mounts,
+  motors, heatsinks) and the colors of the wires and the boards had to be darkened twice just
+  so they would not shine more than the optical bench. It is a workaround, not a fix — the part is compensating for the light.
+- **What the vote decides:** (a) lower the spot and raise `toneMappingExposure` in `app.js`/`bench.html`
+  until a dark albedo reads dark (it is one line in each file, but it changes the look of every
+  workstream at once), or (b) turn on `renderer.physicallyCorrectLights = true` and recalibrate the three
+  lights in candela, or (c) keep it as it is and accept that every interior material is metallic.
+- Reason: `app.js` and `bench.html` are not part of this workstream, and touching the light changes the body, Pino and the
+  wall all at once. Recorded with a measured number for whoever calibrates it.

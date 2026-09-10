@@ -1,21 +1,21 @@
-# Áudio e vídeo — o áudio toca no engine, o vídeo toca na GUI
+# Audio and video — audio plays in the engine, video plays in the GUI
 
-Pedido do Matheus (09/09/2026): *"quero drag n drop de elementos e saídas e mídias e laser e áudio e vídeo"*, e antes *"nem como visualizar como essas coisas se mexem no tempo"*. Hoje o Spellcaster não toca som nem imagem: `spellcore/Cargo.toml` tem nove membros e nenhuma dependência de áudio, e nenhuma página tem `<audio>` ou `<video>`.
+Matheus's request (2026-09-09): *"I want drag n drop of elements and outputs and media and laser and audio and video"*, and before that *"nor any way to visualize how these things move in time"*. Today Spellcaster plays neither sound nor image: `spellcore/Cargo.toml` has nine members and no audio dependency, and no page has `<audio>` or `<video>`.
 
-Este arquivo diz **onde cada mídia toca** — e a resposta é diferente para as duas, por um motivo que não é preferência.
+This file says **where each medium plays** — and the answer is different for the two, for a reason that is not preference.
 
-Fontes: **Ableton Live 12** §27 (Working with Video) e §7 (Session View), citado por seção. **DaVinci Resolve 20**, forma de onda na timeline, citado por página. **Resolume Arena**, *Syphon & Spout* e *Screens*, para o caso da segunda saída.
+Sources: **Ableton Live 12** §27 (Working with Video) and §7 (Session View), cited by section. **DaVinci Resolve 20**, waveform on the timeline, cited by page. **Resolume Arena**, *Syphon & Spout* and *Screens*, for the second-output case.
 
-| Item | Quem resolveu melhor | Por quê |
+| Item | Who solved it best | Why |
 |---|---|---|
-| Onde o áudio toca | nenhum dos três (todos são o próprio host de áudio) | Nós somos um show-control com relógio próprio (`spellcore/engine/src/clock.rs`); a decisão é nossa e está em §3 |
-| Quem manda no relógio | Ableton §27.2.3 | *"video clips are usually set as tempo leaders, while audio clips are left as tempo followers"* — declarar quem lidera, em vez de esperar que fiquem juntos |
-| Janela de vídeo | Ableton §27.2.2 | Janela flutuante, sempre acima, duplo-clique vai a tela cheia num segundo monitor, `Ctrl+Alt+V` mostra/esconde |
-| Forma de onda | Resolve p.643 | Três opções declaradas (retificada ou não, cheia ou com divisória, contorno) — e o mais útil: a altura do track é independente do modo de desenho |
-| Segunda saída como "tela" | Resolume, *Screens* | Syphon/Spout/NDI *"can be treated like a separate physical screen"*: a saída de vídeo é um objeto do show, igual a um universo |
-| Formato de vídeo | nenhum | Ableton só aceita `.mov` (§27.1). Nós aceitamos o que o navegador aceita, que é mais |
+| Where audio plays | none of the three (all of them are the audio host themselves) | We are a show-control with our own clock (`spellcore/engine/src/clock.rs`); the decision is ours and it is in §3 |
+| Who owns the clock | Ableton §27.2.3 | *"video clips are usually set as tempo leaders, while audio clips are left as tempo followers"* — declare who leads, instead of hoping they stay together |
+| Video window | Ableton §27.2.2 | Floating window, always on top, double-click goes full screen on a second monitor, `Ctrl+Alt+V` shows/hides |
+| Waveform | Resolve p.643 | Three declared options (rectified or not, full or with a divider, outline) — and the most useful one: track height is independent of the drawing mode |
+| Second output as a "screen" | Resolume, *Screens* | Syphon/Spout/NDI *"can be treated like a separate physical screen"*: the video output is an object of the show, just like a universe |
+| Video format | none | Ableton only accepts `.mov` (§27.1). We accept what the browser accepts, which is more |
 
-## 1. Os dois tracks novos
+## 1. The two new tracks
 
 ```json
 {"type": "audio", "clips": [{"t0": 0, "len": 85.9, "src": "media/plenaria.mp3", "offset": 0}],
@@ -24,116 +24,116 @@ Fontes: **Ableton Live 12** §27 (Working with Video) e §7 (Session View), cita
  "screen": 1}
 ```
 
-- `clips[]` é o mesmo de `daw-arranjo.md §4.1`, sem exceção.
-- `gain` é uma lane de automação como qualquer outra: um `keys` de nome próprio, interpolado igual. Fade in/out é dois keyframes, e é por isso que `daw-arranjo.md` C13 não precisa de objeto de fade.
-- `clock: true` marca o track de áudio que **é** o relógio (§3). Um por show; o segundo dá erro na carga, não silêncio.
-- `screen` diz em que saída de vídeo o track aparece (§4). Ausente = viewer da GUI.
-- Sem `universe`, sem `address`: não são tracks de rede. `timeline.rs:376` (`resolvido`) não os reconhece, então `ignored()` os reporta — e é isso que `pontos-falhos.md` item 13 manda deixar de ser invisível.
+- `clips[]` is the same as `daw-arranjo.md §4.1`, with no exception.
+- `gain` is an automation lane like any other: a `keys` with its own name, interpolated the same way. Fade in/out is two keyframes, and that is why `daw-arranjo.md` C13 needs no fade object.
+- `clock: true` marks the audio track that **is** the clock (§3). One per show; the second one errors on load, not silence.
+- `screen` says on which video output the track appears (§4). Absent = GUI viewer.
+- No `universe`, no `address`: they are not network tracks. `timeline.rs:376` (`resolvido`) does not recognize them, so `ignored()` reports them — and that is what `pontos-falhos.md` item 13 demands stop being invisible.
 
-Formatos: áudio `.wav`, `.mp3`, `.flac`; vídeo `.mp4`, `.webm`. **Divergência declarada com o Ableton**, §27.1: *"Live can import movies in Apple QuickTime format (.mov)"*. Não copiamos: o vídeo toca num `<video>` de WebView, e `.mov` é justamente o que o WebView costuma não abrir. O critério é o do reprodutor, não o do concorrente.
+Formats: audio `.wav`, `.mp3`, `.flac`; video `.mp4`, `.webm`. **Declared divergence from Ableton**, §27.1: *"Live can import movies in Apple QuickTime format (.mov)"*. We do not copy it: video plays in a WebView `<video>`, and `.mov` is precisely what the WebView usually will not open. The criterion is the player's, not the competitor's.
 
-**Também divergimos do Ableton §27.1** em *"Live will only display video for video clips residing in the Arrangement View. Movie files that are loaded into the Session View are treated as audio clips"*. Aqui não há essa assimetria: a Session View é uma grade de cues (`daw-sessao.md`), não um segundo lugar onde a mídia mora.
+**We also diverge from Ableton §27.1** on *"Live will only display video for video clips residing in the Arrangement View. Movie files that are loaded into the Session View are treated as audio clips"*. Here there is no such asymmetry: the Session View is a grid of cues (`daw-sessao.md`), not a second place where the media lives.
 
-## 2. Áudio toca no engine
+## 2. Audio plays in the engine
 
-**Por quê no engine e não na GUI:** o áudio é o relógio (§3), e o relógio não pode depender de uma janela estar aberta. `spell play` por SSH num Raspberry Pi, sem GUI nenhuma, tem de tocar o som do show. Se o áudio morasse no `<audio>` da página, o show sem GUI ficaria mudo e o relógio sem referência.
+**Why in the engine and not in the GUI:** audio is the clock (§3), and the clock cannot depend on a window being open. `spell play` over SSH on a Raspberry Pi, with no GUI at all, has to play the show's sound. If the audio lived in the page's `<audio>`, a show with no GUI would be mute and the clock without a reference.
 
-**Dependência nova, e a escada de `CLAUDE.md`.** Não há áudio na stdlib do Rust, e nenhuma das dependências já instaladas (`serde`, `axum`, `tokio`, `socket2`, `clap`, `rmcp`, `schemars`, `criterion`) toca som. Só então: **`rodio`**, que decodifica `wav`, `mp3`, `flac` e `ogg` e abre o dispositivo padrão do sistema, e é a menor coisa que faz o trabalho inteiro. Entra como membro novo do workspace ou como dependência do `engine`, atrás de uma feature `audio` — para o build do Pi poder sair sem ela se não houver placa.
+**A new dependency, and the ladder of `CLAUDE.md`.** There is no audio in the Rust stdlib, and none of the already-installed dependencies (`serde`, `axum`, `tokio`, `socket2`, `clap`, `rmcp`, `schemars`, `criterion`) plays sound. Only then: **`rodio`**, which decodes `wav`, `mp3`, `flac` and `ogg` and opens the system default device, and is the smallest thing that does the whole job. It comes in as a new workspace member or as a dependency of the `engine`, behind an `audio` feature — so the Pi build can ship without it if there is no sound card.
 
-**Comandos novos:**
+**New commands:**
 
-| Comando | Argumentos | Faz |
+| Command | Arguments | Does |
 |---|---|---|
-| `audio_devices` | — | Lista os dispositivos de saída, com o padrão marcado |
-| `audio_open` | `device?` | Abre; sem argumento, o padrão |
-| `audio_close` | — | Fecha |
-| `audio_peaks` | `file, n` | Devolve `n` pares `[min, max]` normalizados do arquivo — é a forma de onda |
-| `audio_pos` | — | Posição real do dispositivo, em segundos (§3) |
+| `audio_devices` | — | Lists the output devices, with the default marked |
+| `audio_open` | `device?` | Opens; with no argument, the default |
+| `audio_close` | — | Closes |
+| `audio_peaks` | `file, n` | Returns `n` normalized `[min, max]` pairs from the file — this is the waveform |
+| `audio_pos` | — | Real device position, in seconds (§3) |
 
-`audio_peaks {file, n}` é lido **uma vez** pela GUI ao carregar o clipe e desenhado no canvas; não passa por WebSocket a cada quadro. `n` é o número de pixels do clipe na tela, então o custo não cresce com a duração do arquivo. Resolve p.643 dá as opções de desenho (retificada ou espelhada, com ou sem divisória) e a regra que importa: *"Track heights in the Edit page are independent of the Thumbnail and Waveform view settings"* — a forma de onda se ajusta à altura, não o contrário.
+`audio_peaks {file, n}` is read **once** by the GUI when loading the clip and drawn on the canvas; it does not go through the WebSocket every frame. `n` is the number of pixels of the clip on screen, so the cost does not grow with the file duration. Resolve p.643 gives the drawing options (rectified or mirrored, with or without a divider) and the rule that matters: *"Track heights in the Edit page are independent of the Thumbnail and Waveform view settings"* — the waveform adapts to the height, not the other way around.
 
-`play_show` (que mora na CLI, não no registry) passa a abrir o áudio junto com as saídas de rede, e a fechar junto.
+`play_show` (which lives in the CLI, not in the registry) now opens the audio together with the network outputs, and closes it together.
 
-## 3. O áudio é o relógio, e como isso se faz sem reescrever o relógio
+## 3. Audio is the clock, and how that is done without rewriting the clock
 
-Ableton §27.2.3 declara quem lidera: *"video clips are usually set as tempo leaders, while audio clips are left as tempo followers"*. Nós invertemos, e por motivo físico: **placa de som tem cristal próprio e não se pode empurrar; `<video>` de navegador tem `currentTime` que se pode empurrar.** Logo o áudio lidera e o vídeo segue.
+Ableton §27.2.3 declares who leads: *"video clips are usually set as tempo leaders, while audio clips are left as tempo followers"*. We invert it, for a physical reason: **a sound card has its own crystal and cannot be pushed; a browser `<video>` has a `currentTime` that can be pushed.** Therefore audio leads and video follows.
 
-O relógio do engine já existe e não precisa mudar de forma. `Clock` guarda `t0: Instant` e devolve `t0.elapsed()` (`clock.rs:26,63`); `locate` já sabe recolocar a origem: `tr.t0 = Instant::now() - Duration::from_secs_f64(t)` (`clock.rs:98`).
+The engine's clock already exists and does not need to change shape. `Clock` keeps `t0: Instant` and returns `t0.elapsed()` (`clock.rs:26,63`); `locate` already knows how to reposition the origin: `tr.t0 = Instant::now() - Duration::from_secs_f64(t)` (`clock.rs:98`).
 
-Então a correção de deriva é **o `locate` que já existe, chamado de vez em quando com o valor da placa**:
+So drift correction is **the `locate` that already exists, called now and then with the card's value**:
 
-1. Sem track `clock: true`, nada muda: o relógio é o `Instant`, como hoje.
-2. Com track `clock: true`, a cada segundo o engine compara `clock.time()` com `audio_pos()`.
-3. Diferença abaixo da tolerância: nada. Acima: recoloca a origem, sem pular nem repetir quadro (o próximo `frame()` já sai no lugar certo).
-4. **Tolerância: 20 ms**, com o número no comentário `ponytail:` e o critério escrito — 20 ms é abaixo do limiar em que o ouvido separa dois transientes, e acima do jitter que o próprio `Clock` já mede e reporta (`Stats { p50, p99, max, drift }`, `clock.rs:14-21`). Se a placa derivar mais que isso por segundo, o problema é a placa e o `drift` já aparece no painel.
+1. With no `clock: true` track, nothing changes: the clock is the `Instant`, as today.
+2. With a `clock: true` track, every second the engine compares `clock.time()` with `audio_pos()`.
+3. Difference below tolerance: nothing. Above: reposition the origin, without skipping or repeating a frame (the next `frame()` already comes out in the right place).
+4. **Tolerance: 20 ms**, with the number in the `ponytail:` comment and the criterion written down — 20 ms is below the threshold at which the ear separates two transients, and above the jitter that `Clock` itself already measures and reports (`Stats { p50, p99, max, drift }`, `clock.rs:14-21`). If the card drifts more than that per second, the problem is the card and `drift` already shows up in the panel.
 
-É uma função (`Clock::sync(pos)`), três linhas, reusando `locate`. Nenhum segundo relógio, que é o que a regra 9 de `FUNCOES/README.md` proíbe.
+It is one function (`Clock::sync(pos)`), three lines, reusing `locate`. No second clock, which is what rule 9 of `FUNCOES/README.md` forbids.
 
-## 4. Vídeo toca na GUI
+## 4. Video plays in the GUI
 
-**Por quê na GUI:** decodificar H.264 em Rust é uma dependência pesada (ou um `ffmpeg` do sistema) para entregar pixels que teriam de voltar para a tela. O WebView já tem decodificador de vídeo, aceleração de hardware e um elemento com `currentTime` escrevível. Escrever um decodificador ao lado dele é a definição de código que não precisa existir.
+**Why in the GUI:** decoding H.264 in Rust is a heavy dependency (or a system `ffmpeg`) to deliver pixels that would have to go back to the screen. The WebView already has a video decoder, hardware acceleration and an element with a writable `currentTime`. Writing a decoder next to it is the definition of code that does not need to exist.
 
-**Viewer, dentro da janela do editor.** Um `<video>` no lugar que `SHORTCUTS.md § Interface` já reservou (*"viewer central grande (aqui: previz ou VU dos universos)"*), dividindo espaço com o previz da frente `previz`.
+**Viewer, inside the editor window.** A `<video>` in the place `SHORTCUTS.md § Interface` has already reserved (*"large central viewer (here: previz or universe VUs)"*), sharing space with the previz of the `previz` workstream.
 
-**Sincronismo, o contrato:**
+**Sync, the contract:**
 
-- O `<video>` **não** toca sozinho seguindo o relógio dele. A cada evento `transport` do bus, a página compara `video.currentTime + clip.t0 - clip.offset` com `t` do engine.
-- Diferença abaixo da tolerância: deixa correr (deixar o vídeo correr sozinho é o que dá imagem fluida).
-- Diferença entre a tolerância e um limite maior: corrige com `playbackRate` (0,97 a 1,03) até fechar — é o que evita o solavanco visível de um `seek`.
-- Acima do limite maior: `currentTime = ...`, e o solavanco é aceito porque a alternativa é imagem errada.
-- **Tolerância 40 ms** (pouco mais de um quadro a 25 fps) e **limite 250 ms**, os dois com `ponytail:` e critério: abaixo de 40 ms ninguém vê; acima de 250 ms o `playbackRate` demoraria mais que o próprio salto para fechar.
-- Transporte parado: o vídeo fica pausado no quadro certo, e `locate` faz `seek`. Scrub na régua faz `seek` sem tocar.
+- The `<video>` does **not** play on its own following its own clock. On every `transport` event from the bus, the page compares `video.currentTime + clip.t0 - clip.offset` with the engine's `t`.
+- Difference below tolerance: let it run (letting the video run on its own is what gives a fluid image).
+- Difference between the tolerance and a larger limit: correct with `playbackRate` (0.97 to 1.03) until it closes — this is what avoids the visible jolt of a `seek`.
+- Above the larger limit: `currentTime = ...`, and the jolt is accepted because the alternative is a wrong image.
+- **Tolerance 40 ms** (a bit more than one frame at 25 fps) and **limit 250 ms**, both with `ponytail:` and a criterion: below 40 ms nobody sees it; above 250 ms the `playbackRate` would take longer than the jump itself to close the gap.
+- Transport stopped: the video stays paused on the right frame, and `locate` does a `seek`. Scrubbing the ruler does a `seek` without playing.
 
-**Segunda janela, no monitor do projetor.** Ableton §27.2.2: *"a separate, floating window that always remains above Live's main window"*, e *"The video can be shown in full screen (and optionally on a second monitor) by double-clicking in the Video Window"*, com `Ctrl+Alt+V` mostrando e escondendo (§41.1). Resolume, *Screens*: uma saída é um objeto do show e *"Every output can only have a single screen associated with it"*.
+**Second window, on the projector's monitor.** Ableton §27.2.2: *"a separate, floating window that always remains above Live's main window"*, and *"The video can be shown in full screen (and optionally on a second monitor) by double-clicking in the Video Window"*, with `Ctrl+Alt+V` showing and hiding (§41.1). Resolume, *Screens*: an output is an object of the show and *"Every output can only have a single screen associated with it"*.
 
-Aqui isso é: **uma segunda janela wry, sem barra, no monitor escolhido, mostrando só os tracks de vídeo cujo `screen` aponta para ela.** As duas janelas falam com o mesmo engine pelo mesmo bus, então o sincronismo é o mesmo contrato acima, rodando duas vezes. `show.outputs[]` ganha `{"type":"screen","monitor":1}`, e o `screen` do track (§1) é o índice dessa saída — quem arrasta a saída para o track é `browser-dnd.md §4`, sem gesto novo.
+Here that is: **a second wry window, with no bar, on the chosen monitor, showing only the video tracks whose `screen` points at it.** The two windows talk to the same engine over the same bus, so the sync is the same contract above, running twice. `show.outputs[]` gains `{"type":"screen","monitor":1}`, and the track's `screen` (§1) is the index of that output; whoever drags the output onto the track is `browser-dnd.md §4`, with no new gesture.
 
-**Isto depende inteiramente da frente `gui-janela`.** Hoje não há crate de janela nenhum (`spellcore/Cargo.toml:3`), então não há primeira janela, quanto mais segunda. O que entra **agora**, sem esperar: o track `video`, o clipe, o desenho na timeline e o viewer dentro da página. O que espera: a segunda janela e o `screen`.
+**This depends entirely on the `gui-janela` workstream.** Today there is no window crate at all (`spellcore/Cargo.toml:3`), so there is no first window, let alone a second. What comes in **now**, without waiting: the `video` track, the clip, the drawing on the timeline and the viewer inside the page. What waits: the second window and `screen`.
 
-## 5. NDI e Spout: o que trava, exatamente
+## 5. NDI and Spout: what blocks, exactly
 
-`ndi-ilda.md` já especifica a função NDI inteira (fonte, vetorização, saúde do link) e ela continua valendo. O que este arquivo acrescenta é por que ela não entra agora, e o que entra no lugar.
+`ndi-ilda.md` already specifies the whole NDI function (source, vectorization, link health) and it still holds. What this file adds is why it does not come in now, and what comes in instead.
 
-- **NDI** precisa do SDK da NewTek/Vizrt, que é download registrado e licença própria; não há crate que possa ser vendorizada no repo, e `FUNCOES/README.md §14` exige que tudo que carregamos seja texto versionável.
-- **Spout** (Windows) e **Syphon** (macOS) são compartilhamento de textura por GPU. Resolume, *Syphon & Spout*: entrada *"always enabled"*, saída ligada pelo Output Menu, e o nome anunciado é `App Name` + `Server Name`. Para nós isso exigiria contexto GPU compartilhado entre o wry e o processo — que é exatamente a coisa que o WebView não expõe.
-- **O que entra no lugar, e resolve o caso real:** a segunda janela wry em tela cheia no projetor (§4). A razão de existir NDI/Spout num show é levar imagem daqui para o projetor ou para outro software; para o projetor, a janela resolve, e sem SDK nenhum.
-- **O que continua bloqueado:** mandar imagem para *outro programa* (Resolume, OBS) e receber imagem *de* outro programa. Isso é NDI/Spout de verdade e fica escrito como bloqueio de licença, não de esforço.
+- **NDI** needs the NewTek/Vizrt SDK, which is a registered download with its own license; there is no crate that can be vendored into the repo, and `FUNCOES/README.md §14` requires everything we load to be versionable text.
+- **Spout** (Windows) and **Syphon** (macOS) are GPU texture sharing. Resolume, *Syphon & Spout*: input *"always enabled"*, output turned on through the Output Menu, and the announced name is `App Name` + `Server Name`. For us that would require a GPU context shared between wry and the process — which is exactly the thing the WebView does not expose.
+- **What comes in instead, and solves the real case:** the second wry window full screen on the projector (§4). The reason NDI/Spout exists in a show is to take an image from here to the projector or to another piece of software; for the projector, the window solves it, and with no SDK at all.
+- **What stays blocked:** sending an image to *another program* (Resolume, OBS) and receiving an image *from* another program. That is real NDI/Spout and it is written down as a license blocker, not an effort one.
 
-## 6. O que fica de fora
+## 6. What stays out
 
-- **`.mov`** (Ableton §27.1). Ver §1: o critério é o do reprodutor.
-- **Consolidate / Reverse / Crop trocando vídeo por áudio** (Ableton §27.2.1: *"This replacement only occurs internally — your original movie files are never altered"*). Não temos nenhum dos três; `daw-arranjo.md` C11 já recusou Consolidate pelo mesmo motivo — não renderizamos mídia.
-- **Warp markers no vídeo definindo hit points** (Ableton §27.2.3.1). É tempo musical, e `timeline-daw.md` item 38 já recusou compasso.
-- **Mixer de áudio, sends, retornos.** Um track de áudio com `gain` e um dispositivo de saída basta para um show. Mixer é outro produto.
-- **Entrada de áudio (gravar do microfone, detecção de batida).** Sem pedido. Quando houver, a porta é `input {key:"audio:level"}`, que o graph já sabe ler.
-- **Áudio por track com roteamento para saídas diferentes.** Um dispositivo, um par estéreo. O limite fica em `ponytail:` no `audio_open`.
+- **`.mov`** (Ableton §27.1). See §1: the criterion is the player's.
+- **Consolidate / Reverse / Crop swapping video for audio** (Ableton §27.2.1: *"This replacement only occurs internally — your original movie files are never altered"*). We have none of the three; `daw-arranjo.md` C11 already refused Consolidate for the same reason — we do not render media.
+- **Warp markers on the video defining hit points** (Ableton §27.2.3.1). That is musical time, and `timeline-daw.md` item 38 already refused bars.
+- **Audio mixer, sends, returns.** An audio track with `gain` and one output device is enough for a show. A mixer is another product.
+- **Audio input (recording from the microphone, beat detection).** No request. When there is one, the door is `input {key:"audio:level"}`, which the graph already knows how to read.
+- **Per-track audio with routing to different outputs.** One device, one stereo pair. The limit sits in a `ponytail:` on `audio_open`.
 
-## 7. Atalhos
+## 7. Shortcuts
 
-| Ação | Tecla | Origem | Conflito |
+| Action | Key | Origin | Conflict |
 |---|---|---|---|
-| Mostrar / esconder a janela de vídeo | `Ctrl+Alt+V` | Ableton §41.1 | nenhum |
-| Tela cheia da janela de vídeo | duplo-clique nela | Ableton §27.2.2 | gesto |
-| Voltar ao tamanho original | `Alt`+duplo-clique | Ableton §27.2.2 | gesto; e é o `Alt = variante` da nossa gramática |
+| Show / hide the video window | `Ctrl+Alt+V` | Ableton §41.1 | none |
+| Full screen for the video window | double-click on it | Ableton §27.2.2 | gesture |
+| Back to original size | `Alt`+double-click | Ableton §27.2.2 | gesture; and it is the `Alt = variant` of our grammar |
 
-## 8. Testes
+## 8. Tests
 
-Rust, ao lado dos testes que já existem em `engine/tests/`:
+Rust, next to the tests that already exist in `engine/tests/`:
 
-| O que prova | Como |
+| What it proves | How |
 |---|---|
-| `Clock::sync` corrige | relógio em `t=10.0`, `sync(10.030)` → `time()` passa a `≈10.030`; `sync(10.005)` → não mexe |
-| `Clock::sync` sem track `clock` | nunca é chamado; o `Instant` continua mandando |
-| Dois tracks com `clock: true` | erro na carga, com o índice dos dois |
-| `audio_peaks` | arquivo de 1 s com uma senoide, `n=10` → 10 pares, todos com `max > 0.9` e `min < -0.9` |
-| `audio_peaks` com `n` maior que o número de amostras | não estoura; devolve `n` pares |
-| Track `audio` sem dispositivo aberto | o show toca em silêncio e **avisa**, não falha (é o estado "sem feed" de `ilda-player.md §2`) |
+| `Clock::sync` corrects | clock at `t=10.0`, `sync(10.030)` → `time()` becomes `≈10.030`; `sync(10.005)` → does not move |
+| `Clock::sync` with no `clock` track | is never called; the `Instant` stays in charge |
+| Two tracks with `clock: true` | error on load, with the index of both |
+| `audio_peaks` | a 1 s file with a sine wave, `n=10` → 10 pairs, all with `max > 0.9` and `min < -0.9` |
+| `audio_peaks` with `n` larger than the number of samples | does not blow up; returns `n` pairs |
+| `audio` track with no device open | the show plays in silence and **warns**, it does not fail (it is the "no feed" state of `ilda-player.md §2`) |
 
-`node`, na GUI:
+`node`, in the GUI:
 
-| O que prova | Como |
+| What it proves | How |
 |---|---|
 | `AV.corrige(dt)` | `dt = 0.02` → `{acao:"nada"}`; `dt = 0.1` → `{acao:"rate", rate:1.03}`; `dt = 0.5` → `{acao:"seek"}` |
-| `AV.tempoDoVideo(clip, t)` | `t` fora do clipe → `null` (o `<video>` fica pausado, não em quadro errado) |
+| `AV.tempoDoVideo(clip, t)` | `t` outside the clip → `null` (the `<video>` stays paused, not on a wrong frame) |
 
-Prova visual: screenshot headless de `index.html` com um track `audio` mostrando a forma de onda e um track `video` mostrando o clipe, e o viewer com o quadro correspondente ao playhead.
+Visual proof: headless screenshot of `index.html` with an `audio` track showing the waveform and a `video` track showing the clip, and the viewer with the frame matching the playhead.

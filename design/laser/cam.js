@@ -1,7 +1,7 @@
-/* Câmera no padrão SolidWorks: botão do meio gira em torno do ponto clicado, Ctrl+meio pan, Shift+meio zoom,
-   roda dá zoom no cursor (sentido SolidWorks por padrão, com toggle), setas 15°, Shift+setas 90°, Ctrl+setas pan,
-   F enquadra, Ctrl+1..7 vistas padrão. Botão esquerdo no vazio também gira (notebook sem botão do meio).
-   ponytail: sem inércia; sem rotação "em torno do modelo" quando o clique cai no vazio (usa o alvo atual). */
+/* Camera in the SolidWorks standard: middle button orbits around the clicked point, Ctrl+middle pans, Shift+middle zooms,
+   the wheel zooms at the cursor (SolidWorks direction by default, with a toggle), arrows 15°, Shift+arrows 90°, Ctrl+arrows pan,
+   F frames, Ctrl+1..7 standard views. The left button on empty space orbits too (laptop with no middle button).
+   ponytail: no inertia; no "around the model" rotation when the click lands on empty space (it uses the current target). */
 window.SWCam = function (THREE, cam, dom, o) {
   "use strict";
   var goal = { t: new THREE.Vector3(0, .4, 0), d: 1, yaw: 0, pit: .3 }, cur = { t: goal.t.clone(), d: 1, yaw: 0, pit: .3 }, drag = null, api;
@@ -12,7 +12,7 @@ window.SWCam = function (THREE, cam, dom, o) {
   function clampPit(p) { return Math.max(-1.52, Math.min(1.52, p)); }
   function basis() { var f = goal.t.clone().sub(posOf(goal)).normalize(), r = new THREE.Vector3().crossVectors(f, Y).normalize(), u = new THREE.Vector3().crossVectors(r, f).normalize(); return { f: f, r: r, u: u }; }
   function pan(dx, dy) { var b = basis(), k = goal.d * .0016; goal.t.addScaledVector(b.r, -dx * k).addScaledVector(b.u, dy * k); }
-  function zoomAt(s, p) { // p: ponto do mundo sob o cursor (ou null) — câmera e alvo andam juntos para ele
+  function zoomAt(s, p) { // p: world point under the cursor (or null) — camera and target move toward it together
     if (p) { goal.t.copy(p).add(tmp.copy(goal.t).sub(p).multiplyScalar(s)); } goal.d = Math.max(.08, Math.min(14, goal.d * s)); }
   dom.addEventListener("pointerdown", function (e) { var mid = e.button === 1, left = e.button === 0; if (!mid && !left) return; if (left && (o.hit(e) || !o.emptyRotate)) return;
     var mode = e.ctrlKey ? "pan" : e.shiftKey ? "zoom" : "rot"; if (mode === "rot" && mid) { var p = o.pick(e); if (p) { var pos = posOf(goal); fromPos(goal, pos, p); fromPos(cur, cam.position.clone(), p); } }

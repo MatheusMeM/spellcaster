@@ -1,31 +1,31 @@
-/* Spellcaster DS — tokens. Starter: Feitiçaria DS (palco, Floral White, tracking). Ver design/DECISOES.md. */
+/* Spellcaster DS — tokens. Starter: Feitiçaria DS (stage, Floral White, tracking). See design/DECISOES.md. */
 :root {
-  /* palco e superfícies */
+  /* stage and surfaces */
   --sc-bg: #000000;
   --sc-panel: #0E0E0E;
   --sc-panel-2: #161616;
-  --sc-well: #070707;          /* poço de LCD, timeline, graph */
-  --sc-line: #262626;          /* divisor de áreas */
+  --sc-well: #070707;          /* well for LCD, timeline, graph */
+  --sc-line: #262626;          /* area divider */
   --sc-hair: rgba(247, 245, 235, 0.12);
 
-  /* texto */
-  --sc-fg: #F7F5EB;            /* Floral White, nunca #FFF */
+  /* text */
+  --sc-fg: #F7F5EB;            /* Floral White, never #FFF */
   --sc-fg-2: #B5B1A9;
   --sc-fg-3: #666361;
 
-  /* estado = cor. Nada disso é decorativo. */
-  --sc-accent: #FFB000;        /* seleção, foco, ativo */
-  --sc-go: #A8E05E;            /* GO, ok, saída armada e pronta */
-  --sc-live: #FF2D1F;          /* ao vivo, armado em saída real, erro */
-  --sc-rehearsal: #B7AED9;     /* modo ensaio: graph em saídas virtuais */
+  /* state = color. None of this is decorative. */
+  --sc-accent: #FFB000;        /* selection, focus, active */
+  --sc-go: #A8E05E;            /* GO, ok, output armed and ready */
+  --sc-live: #FF2D1F;          /* live, armed on a real output, error */
+  --sc-rehearsal: #B7AED9;     /* rehearsal mode: graph on virtual outputs */
 
-  /* famílias de nó do Graph */
+  /* Graph node families */
   --sc-node-in: var(--sc-accent);
   --sc-node-logic: #B5B1A9;
   --sc-node-cmd: #F7F5EB;
   --sc-node-out: var(--sc-rehearsal);
 
-  /* tipografia */
+  /* typography */
   --sc-mono: "JetBrains Mono", "IBM Plex Mono", Consolas, monospace;
   --sc-label: "Barlow Condensed", "Arial Narrow", sans-serif;
   --sc-text-xs: 11px;          /* overline, caps, tracking 0.12em */
@@ -33,16 +33,16 @@
   --sc-text-md: 14px;
   --sc-text-lg: 20px;
   --sc-text-xl: 32px;          /* timecode */
-  --sc-text-2xl: 56px;         /* GO, número de cue em performance */
+  --sc-text-2xl: 56px;         /* GO, cue number in performance */
   --sc-tracking: 0.12em;
 
-  /* grade de console */
+  /* console grid */
   --sc-u: 48px;                /* 1×1 */
   --sc-gap: 8px;
   --sc-radius: 0;
   --sc-radius-chip: 2px;
 
-  /* glow só em estado */
+  /* glow only on state */
   --sc-glow-accent: 0 0 12px rgba(255, 176, 0, 0.45);
   --sc-glow-go: 0 0 12px rgba(168, 224, 94, 0.45);
   --sc-glow-live: 0 0 12px rgba(255, 45, 31, 0.5);

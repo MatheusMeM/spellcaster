@@ -1,35 +1,35 @@
-# design/ — departamento de design do Spellcaster
+# design/ — Spellcaster design department
 
-## O que tem aqui
+## What lives here
 
-| | O que é |
+| | What it is |
 |---|---|
-| `PRINCIPIOS.md` | cinco princípios e o que cada um proíbe; checklist anti-slop antes de qualquer tela. |
-| `DECISOES.md` | decisões datadas. Nova decisão = linha nova; para mudar, linha que revoga a antiga. Nunca edição silenciosa. |
-| `TEMAS.md` | as cinco funções e o material (tema) que cada uma veste: LASER, FÓSFORO, PATCHBAY, TEATRO DE PAPEL, Pino. |
-| `SHORTCUTS.md` | mapa de atalhos, gramática Premiere/Resolve. |
-| `FUNCOES/` | a função antes da UI: um arquivo por função (`ilda-player.md`, `ndi-ilda.md`, `orquestrador.md`, `cenas-cues-dmx.md`, `cenario-interativo.md`, `aprendiz-menu.md`, `integracao-laser.md`), 14 regras transversais no `README.md` e as auditorias com `path:linha` em `fontes/`. |
-| `laser/` | a rodada viva: o projetor 10 W em 3D (`app.html` + módulos `.js`), design system da ferramenta (`tokens.css`, `SISTEMA.md`, `sistema.html`), `PEDIDOS.md`, `module.json` e `graph.json`. |
-| `tokens/spellcaster.css` | tokens `--sc-*` do produto (cor, fonte, escala, grade). |
-| `canvas/` | artboards `.dc.html` do Claude Design e `canvas.json`. |
-| `build.py` | inlina `<script src>` e `<link>` locais num HTML só, para publicar como artifact. |
+| `PRINCIPIOS.md` | five principles and what each one forbids; anti-slop checklist before any screen. |
+| `DECISOES.md` | dated decisions. New decision = new line; to change one, a line that revokes the old one. Never a silent edit. |
+| `TEMAS.md` | the five functions and the material (theme) each one wears: LASER, FÓSFORO, PATCHBAY, PAPER THEATER, Pino. |
+| `SHORTCUTS.md` | shortcut map, Premiere/Resolve grammar. |
+| `FUNCOES/` | function before UI: one file per function (`ilda-player.md`, `ndi-ilda.md`, `orquestrador.md`, `cenas-cues-dmx.md`, `cenario-interativo.md`, `aprendiz-menu.md`, `integracao-laser.md`), 14 cross-cutting rules in `README.md` and the audits with `path:line` in `fontes/`. |
+| `laser/` | the live round: the 10 W projector in 3D (`app.html` + `.js` modules), the tool's design system (`tokens.css`, `SISTEMA.md`, `sistema.html`), `PEDIDOS.md`, `module.json` and `graph.json`. |
+| `tokens/spellcaster.css` | the product's `--sc-*` tokens (color, font, scale, grid). |
+| `canvas/` | Claude Design `.dc.html` artboards and `canvas.json`. |
+| `build.py` | inlines local `<script src>` and `<link>` into a single HTML, to publish as an artifact. |
 
-Rodadas 2, 3 e 4 saíram da árvore (a 2 foi reprovada no voto, a 3 e a 4 foram absorvidas por `laser/`). O que elas decidiram está em `DECISOES.md`; os arquivos continuam no git.
+Rounds 2, 3 and 4 left the tree (2 was rejected in the vote, 3 and 4 were absorbed by `laser/`). What they decided is in `DECISOES.md`; the files remain in git.
 
-## Fluxo de rodada
+## Round flow
 
-Função em `FUNCOES/` → protótipo funcional (não prancha) → publicar como artifact → **voto dentro do protótipo** (`db`, coleção `moodboard/roundN`) → o voto vira linha em `DECISOES.md` → a próxima rodada parte daí. Pedido do Matheus entra literal em `laser/PEDIDOS.md`.
+Function in `FUNCOES/` → working prototype (not a drawing sheet) → publish as an artifact → **vote inside the prototype** (`db`, collection `moodboard/roundN`) → the vote becomes a line in `DECISOES.md` → the next round starts from there. A request from Matheus goes in verbatim in `laser/PEDIDOS.md`.
 
-Artifact atual: https://claude.ai/code/artifact/8a913f8b-8ea7-4621-b57a-88d7738dbafd
+Current artifact: https://claude.ai/code/artifact/8a913f8b-8ea7-4621-b57a-88d7738dbafd
 
-## Buildar e verificar
+## Build and verify
 
 ```
 C:/Python313/python.exe design/build.py design/laser/app.html <scratchpad>/spellcaster-laser.html
 node <scratchpad>/jscheck.js <scratchpad>/spellcaster-laser.html
 ```
 
-`jscheck.js` passa cada `<script>` sem `src` por `new Function` e conta erros. Runtime, uma passada só (não é loop):
+`jscheck.js` runs every `<script>` without `src` through `new Function` and counts the errors. Runtime, a single pass (not a loop):
 
 ```
 "C:/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --no-first-run
@@ -38,11 +38,11 @@ node <scratchpad>/jscheck.js <scratchpad>/spellcaster-laser.html
   "file:///<scratchpad>/spellcaster-laser.html#tras"
 ```
 
-Hashes `#tras`, `#dentro`, `#laser` pulam a splash. Contrato do módulo: `C:/Python313/python.exe -m unittest tests.test_laser_graph`.
+The `#tras`, `#dentro`, `#laser` hashes skip the splash. Module contract: `C:/Python313/python.exe -m unittest tests.test_laser_graph`.
 
-HTML e PNG ficam no scratchpad; binário não entra nesta pasta (Drive sync).
+HTML and PNG stay in the scratchpad; no binary goes into this folder (Drive sync).
 
-Canvas do Claude Design (regenerar):
+Claude Design canvas (regenerate):
 
 ```
 node "<base>/seed-canvas.mjs" --template "<base>/payload.template.html" --out "%TEMP%/spellcaster-faces.html" --title "Spellcaster Faces" --artboard Main.dc.html --artboard ThemeHeadspace.dc.html --artboard ThemeSignal.dc.html --artboard Editor.dc.html --canvas canvas.json

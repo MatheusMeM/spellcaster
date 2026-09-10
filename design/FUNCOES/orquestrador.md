@@ -1,117 +1,117 @@
-# Orquestrador — `spell graph` (tema PATCHBAY, "modo Chataigne")
+# Orchestrator — `spell graph` (PATCHBAY theme, "Chataigne mode")
 
-Ligar fontes (OSC, MIDI, NDI vetorizado, DMX de entrada, teclado, tempo) a destinos (universos, lasers, cues, player) por rotas com filtros, sem código. É o painel Graph de `SHORTCUTS.md` (`Shift+3`) e a realização de `PRINCIPIOS.md §1`: o graph é a interface.
+Connect sources (OSC, MIDI, vectorized NDI, incoming DMX, keyboard, time) to destinations (universes, lasers, cues, player) through routes with filters, without code. It is the Graph panel of `SHORTCUTS.md` (`Shift+3`) and the realization of `PRINCIPIOS.md §1`: the graph is the interface.
 
-| Item | Quem resolveu melhor | Por quê |
+| Item | Who solved it best | Why |
 |---|---|---|
-| Objetos e verbos | Chataigne | Módulo, rota, ação, multiplex e lista de cues são o mesmo `Processor` em quatro sabores; um comando aceita disparo, valor ou os dois por `CommandContext` |
-| Estados | Chataigne, com o cook do TouchDesigner | Dois piscas de atividade por módulo, alimentados por evento; `WarningReporter` central com o culpado clicável; o cabo tracejado animado diz que o dado está passando; erro e aviso são contagem por nó |
-| Zonas da tela | Chataigne | O layout padrão é exatamente Premiere/Resolve: lista à esquerda, canvas no centro, Inspector à direita, sequências e log embaixo |
-| Atalhos | Blender (editor de nós) | Entrar/sair de grupo, apagar religando, mutar cabo sem apagar, menu Add com busca ao digitar |
-| Arquivo | Chataigne `module.json`, com a externalização do TouchDesigner | Módulo declarado em texto (`parameters, values, commands, context, dependency`); referência externa com cópia de segurança e `relpath` declarado |
+| Objects and verbs | Chataigne | Module, route, action, multiplex and cue list are the same `Processor` in four flavors; a command accepts firing, a value, or both through `CommandContext` |
+| States | Chataigne, with the cook of TouchDesigner | Two activity blinkers per module, fed by event; a central `WarningReporter` with the culprit clickable; the animated dashed cable says the data is flowing; error and warning are a count per node |
+| Screen zones | Chataigne | The default layout is exactly Premiere/Resolve: list on the left, canvas in the center, Inspector on the right, sequences and log at the bottom |
+| Shortcuts | Blender (node editor) | Enter/leave group, delete and reconnect, mute a cable without deleting it, Add menu with search-as-you-type |
+| File | Chataigne `module.json`, with the externalization of TouchDesigner | Module declared in text (`parameters, values, commands, context, dependency`); external reference with a safety copy and `relpath` declared |
 
-## 1. Objetos e verbos
+## 1. Objects and verbs
 
-Toda a hierarquia desce de dois tipos: **container** (nó com filhos) e **controlável** (folha com valor), e todo controlável tem endereço [fontes/chataigne.md § Objetos e verbos]. No Spellcaster o endereço é o nome do registry (regra 2).
+The whole hierarchy descends from two types: **container** (node with children) and **controllable** (leaf with a value), and every controllable has an address [fontes/chataigne.md § Objects and verbs]. In Spellcaster the address is the registry name (rule 2).
 
-**Módulo** — uma fonte, um destino, ou os dois (`hasInput`/`hasOutput`). Tem `parâmetros` (configuração), `valores` (o que recebe, somente leitura), `comandos` (o que aceita), dois gatilhos de atividade (entrada, saída) e um estado de conexão [fontes/chataigne.md § Objetos e verbos]. Verbos: adicionar pelo menu, habilitar/desabilitar, logar entrada/saída, testar comando, rotear todos os valores para outro módulo (o Module Router: fonte, destino, "route all") [fontes/chataigne.md § Mappings e Actions]. O módulo DMX do Chataigne é multi-universo com `thru`, `sendRate` e `sendOnChangeOnly`; o DMX Out do TouchDesigner acrescenta o aviso "Rate ≤ 44 Hz" e, para sACN, `cid`, nome e **prioridade** para merge com outras fontes [fontes/touchdesigner.md § Laser e NDI].
+**Module** — a source, a destination, or both (`hasInput`/`hasOutput`). It has `parameters` (configuration), `values` (what it receives, read-only), `commands` (what it accepts), two activity triggers (input, output) and a connection state [fontes/chataigne.md § Objects and verbs]. Verbs: add from the menu, enable/disable, log input/output, test a command, route all values to another module (the Module Router: source, destination, "route all") [fontes/chataigne.md § Mappings and Actions]. Chataigne's DMX module is multi-universe with `thru`, `sendRate` and `sendOnChangeOnly`; TouchDesigner's DMX Out adds the warning "Rate ≤ 44 Hz" and, for sACN, `cid`, name and **priority** for merging with other sources [fontes/touchdesigner.md § Laser and NDI].
 
-**Comando** — o `@command`. Declara `context: action | mapping | both`: se aceita GO, valor contínuo, ou ambos [fontes/chataigne.md § Objetos e verbos]. O mesmo objeto serve "dispare isto" e "mande este valor para isto"; saída de rota e consequência de ação são a mesma classe, só muda o contexto.
+**Command** — the `@command`. It declares `context: action | mapping | both`: whether it accepts GO, a continuous value, or both [fontes/chataigne.md § Objects and verbs]. The same object serves "fire this" and "send this value to this"; the output of a route and the consequence of an action are the same class, only the context changes.
 
-**Rota** (mapping) — cadeia de quatro estágios: `entradas` (qualquer endereço; várias, só uma dispara o recálculo), `filtros`, `saídas` (comandos em contexto mapping), mais `modo` (`ao mudar | manual | timer`) e `reemitir ao ativar` [fontes/chataigne.md § Mappings e Actions]. O Resolume acrescenta ao mesmo objeto o que o Chataigne não tem: **escopo do alvo** (`Selecionado | Este | Por posição`), faixa de entrada e saída separadas do parâmetro (`in/out` vs `min/max`), e o **caminho de retorno** para LED de controlador no mesmo objeto (`OutputPath`, `NamedValues` = tabela de cor) [fontes/resolume.md § Atalhos e mapeamento]. Faixa útil separada da física é o que evita um nó de escala em cada rota [fontes/resolume.md § O que copiar].
+**Route** (mapping) — a chain of four stages: `inputs` (any address; several, only one triggers the recalculation), `filters`, `outputs` (commands in mapping context), plus `mode` (`on change | manual | timer`) and `re-emit on activation` [fontes/chataigne.md § Mappings and Actions]. Resolume adds to the same object what Chataigne does not have: **target scope** (`Selected | This | By position`), input and output ranges separate from the parameter (`in/out` vs `min/max`), and the **feedback path** for a controller LED in the same object (`OutputPath`, `NamedValues` = color table) [fontes/resolume.md § Shortcuts and mapping]. A useful range separate from the physical one is what avoids a scaling node in every route [fontes/resolume.md § What to copy].
 
-**Filtro** — nó de um só input e um só output que devolve `CHANGED | UNCHANGED | STOP_HERE`. Lista do Chataigne: Delay, Script, Time; ColorRemap, ColorShift; Condition; Conversion, Merge, SimpleConversion; Crop, CurveMap, Damping, Freeze, Inverse, Lag, Math, OneEuro, SimpleRemap, SimpleSmooth, Speed; String [fontes/chataigne.md § Mappings e Actions]. Mais os geradores do MadMapper, que são filtros entre controle e valor: `time_base` (integra velocidade; existe porque `sin(speed*TIME)` salta quando se mexe na velocidade), `damper`, `adsr`, `ease`, `incrementer`, `pass_thru` (lê qualquer endereço do app) [fontes/madmapper.md § Parâmetros de material/módulo]. `Condition` com `STOP_HERE` é o gate: não existe nó "if".
+**Filter** — a node with a single input and a single output that returns `CHANGED | UNCHANGED | STOP_HERE`. Chataigne's list: Delay, Script, Time; ColorRemap, ColorShift; Condition; Conversion, Merge, SimpleConversion; Crop, CurveMap, Damping, Freeze, Inverse, Lag, Math, OneEuro, SimpleRemap, SimpleSmooth, Speed; String [fontes/chataigne.md § Mappings and Actions]. Plus MadMapper's generators, which are filters between control and value: `time_base` (integrates speed; it exists because `sin(speed*TIME)` jumps when you move the speed), `damper`, `adsr`, `ease`, `incrementer`, `pass_thru` (reads any address of the app) [fontes/madmapper.md § Material/module parameters]. `Condition` with `STOP_HERE` is the gate: there is no "if" node.
 
-**Ação** — condições + consequências para verdadeiro e para falso + `papel: ao ativar | ao desativar` [fontes/chataigne.md § Mappings e Actions]. Condições: comparação por tipo, grupo E/OU, manual, script, índice de multiplex, ativação.
+**Action** — conditions + consequences for true and for false + `role: on activation | on deactivation` [fontes/chataigne.md § Mappings and Actions]. Conditions: comparison by type, AND/OR group, manual, script, multiplex index, activation.
 
-**Multiplex** — `count` + índice: uma rota ou ação instanciada N vezes. "Um mapeamento para 24 aparelhos em vez de 24 mapeamentos" [fontes/chataigne.md § O que copiar].
+**Multiplex** — `count` + index: a route or action instantiated N times. "One mapping for 24 fixtures instead of 24 mappings" [fontes/chataigne.md § What to copy].
 
-**Lista de cues** (Conductor) — cue atual, próximo, loop, gatilhos anterior/atual; cada cue pode amarrar uma sequência com `autoStart`, `forceStartFrom0`, `autoStop`, `autoNext` [fontes/chataigne.md § Objetos e verbos]. É a lista de GO de mesa de luz escrita como ação; detalhada em `cenas-cues-dmx.md`.
+**Cue list** (Conductor) — current cue, next, loop, previous/current triggers; each cue can bind a sequence with `autoStart`, `forceStartFrom0`, `autoStop`, `autoNext` [fontes/chataigne.md § Objects and verbs]. It is the GO list of a lighting console written as an action; detailed in `cenas-cues-dmx.md`.
 
-**Estado** (State) — container de rotas e ações com `ativo`, `ao carregar: restaurar | ativar | desativar`, `checar transições ao ativar`. Transição é uma ação com origem e destino; desliga a origem antes de ligar o destino; vários estados ativos ao mesmo tempo [fontes/chataigne.md § State Machine]. **O catálogo de nós do PRD §10 não tem nó de estado.** Sem ele, "quando entrar no segundo ato, este conjunto de rotas passa a valer e aquele para" exige gambiarra de condição em cada rota. Ponto aberto para `DECISOES.md`; a semântica proposta é a do Chataigne, inteira.
+**State** — a container of routes and actions with `active`, `on load: restore | activate | deactivate`, `check transitions on activation`. A transition is an action with a source and a destination; it turns the source off before turning the destination on; several states active at the same time [fontes/chataigne.md § State Machine]. **The node catalog of PRD §10 has no state node.** Without it, "when the second act starts, this set of routes takes effect and that one stops" requires a condition hack in every route. Open issue for `DECISOES.md`; the proposed semantics is Chataigne's, whole.
 
-**Cabo** — só liga portas de tipo compatível. O TouchDesigner só cabeia dentro da mesma família e usa Link/Export para cruzar [fontes/touchdesigner.md § Objetos e verbos]; aqui as famílias são os tipos de porta (`trigger`, `bool`, `number`, `color`, `xy`, `frame`, `dmx`) e a conversão é um nó de filtro visível, nunca coerção implícita.
+**Cable** — it only connects ports of compatible types. TouchDesigner only cables within the same family and uses Link/Export to cross over [fontes/touchdesigner.md § Objects and verbs]; here the families are the port types (`trigger`, `bool`, `number`, `color`, `xy`, `frame`, `dmx`) and the conversion is a visible filter node, never implicit coercion.
 
-**Grupo** — container navegável. `Tab` entra e sai no Blender (meta-strip, node group) [fontes/blender.md § O que copiar]; aqui é `Ctrl+]`/`Ctrl+[` (ver Atalhos).
+**Group** — a navigable container. `Tab` enters and leaves in Blender (meta-strip, node group) [fontes/blender.md § What to copy]; here it is `Ctrl+]`/`Ctrl+[` (see Shortcuts).
 
-Verbos de autoria que nascem no widget, não no painel: botão direito em qualquer parâmetro oferece "Adicionar e ligar a uma sequência" (cria a camada, o output e copia a faixa) e "Adicionar e ligar a uma variável" [fontes/chataigne.md § Mappings e Actions]; qualquer controlável sabe virar item de dashboard (`createDashboardItem()`) [fontes/chataigne.md § Objetos e verbos]; arrastar canal do CHOP até o parâmetro cria o export, e pousar sobre a aba troca de página no meio do arrasto [fontes/touchdesigner.md § Parâmetros].
+Authoring verbs that are born in the widget, not in the panel: right-click on any parameter offers "Add and link to a sequence" (creates the layer, the output and copies the track) and "Add and link to a variable" [fontes/chataigne.md § Mappings and Actions]; any controllable knows how to become a dashboard item (`createDashboardItem()`) [fontes/chataigne.md § Objects and verbs]; dragging a CHOP channel onto the parameter creates the export, and hovering over the tab switches page mid-drag [fontes/touchdesigner.md § Parameters].
 
-Parâmetro dirigido por cabo guarda a constante: o TouchDesigner guarda constante, expressão, export e bind ao mesmo tempo, com um quadradinho no botão do modo inativo que tem conteúdo [fontes/touchdesigner.md § Parâmetros]. Aqui: mutar o cabo (não apagar) devolve o parâmetro à constante, e o campo mostra o quadradinho "tem cabo". O que não entra: os quatro modos do Chataigne escondidos no menu de contexto, "lógica invisível no graph" [fontes/chataigne.md § O que NÃO copiar]; expressão é nó.
+A parameter driven by a cable keeps the constant: TouchDesigner keeps constant, expression, export and bind at the same time, with a little square on the button of the inactive mode that has content [fontes/touchdesigner.md § Parameters]. Here: muting the cable (not deleting it) returns the parameter to the constant, and the field shows the little "has a cable" square. What is not included: Chataigne's four modes hidden in the context menu, "invisible logic in the graph" [fontes/chataigne.md § What NOT to copy]; an expression is a node.
 
-## 2. Estados
+## 2. States
 
-- **Módulo**: habilitado/desabilitado; conectado/desconectado; pisca de entrada e de saída **por evento, não por polling** [fontes/chataigne.md § Estados visuais]. Capture: verde é atividade, "atividade não garante funcionamento", e a causa provável vem nomeada (`Potentially blocked by firewall`) [fontes/capture.md § Estados e mensagens].
-- **Cabo**: tracejado animado enquanto o dado passa (TouchDesigner: "wire com tracejado animado = a origem está cozinhando") [fontes/touchdesigner.md § Objetos e verbos]; botão do meio no cabo mostra o valor que está passando. Cabo mutado: apagado, presente.
-- **Nó**: `mute` (entrada passa direto, o Bypass do TD), `lock` (congela o valor de saída, o Lock do TD, salvo no arquivo), `solo` (só este emite; apaga o mute dos outros sem removê-los) [fontes/blender.md § O que copiar]. Um verbo por conceito (regra 9).
-- **Erro e aviso como número**: cada nó expõe `warnings` e `errors` como contagem [fontes/touchdesigner.md § Estados]; o painel de avisos lista todos e cada linha leva ao culpado (`WarningReporter`, `warningResolveInspectable`) [fontes/chataigne.md § Estados visuais]. Erro no campo do parâmetro, não só no nó (`parms.err.bg`).
-- **Estado ativo** (State): aceso; a última ação disparada pode rolar a vista até ela (`focusOnLastActionTriggered`) [fontes/chataigne.md § State Machine].
-- **Vigia** (Detective): "vigie este parâmetro e plote o histórico" [fontes/chataigne.md § Estados visuais]. Depurador de sinal, não de código.
-- **Pendente**: rota editada e não aplicada; vermelho [fontes/touchdesigner.md § Estados].
+- **Module**: enabled/disabled; connected/disconnected; input and output blinker **by event, not by polling** [fontes/chataigne.md § Visual states]. Capture: green is activity, "activity does not guarantee operation", and the probable cause comes named (`Potentially blocked by firewall`) [fontes/capture.md § States and messages].
+- **Cable**: animated dashes while the data flows (TouchDesigner: "a wire with animated dashes = the source is cooking") [fontes/touchdesigner.md § Objects and verbs]; middle button on the cable shows the value going through. Muted cable: dimmed, present.
+- **Node**: `mute` (input passes straight through, TD's Bypass), `lock` (freezes the output value, TD's Lock, saved in the file), `solo` (only this one emits; it clears the mute of the others without removing them) [fontes/blender.md § What to copy]. One verb per concept (rule 9).
+- **Error and warning as a number**: each node exposes `warnings` and `errors` as a count [fontes/touchdesigner.md § States]; the warnings panel lists them all and each line leads to the culprit (`WarningReporter`, `warningResolveInspectable`) [fontes/chataigne.md § Visual states]. Error on the parameter field, not only on the node (`parms.err.bg`).
+- **Active state** (State): lit; the last triggered action can scroll the view to it (`focusOnLastActionTriggered`) [fontes/chataigne.md § State Machine].
+- **Watch** (Detective): "watch this parameter and plot the history" [fontes/chataigne.md § Visual states]. A signal debugger, not a code debugger.
+- **Pending**: route edited and not applied; red [fontes/touchdesigner.md § States].
 
-Não entra: cor por família de nó (sete matizes dessaturados no TouchDesigner: "quando tudo é colorido, nada é estado") [fontes/touchdesigner.md § O que NÃO copiar]; família é forma ou rótulo. Nem `itemColor` gravado no item [fontes/chataigne.md § O que NÃO copiar].
+Not included: color by node family (seven desaturated hues in TouchDesigner: "when everything is colored, nothing is state") [fontes/touchdesigner.md § What NOT to copy]; family is shape or label. Nor `itemColor` saved in the item [fontes/chataigne.md § What NOT to copy].
 
-## 3. Zonas da tela
+## 3. Screen zones
 
-O `default.chalayout` do Chataigne, que já é o desenho de `SHORTCUTS.md § Interface` [fontes/chataigne.md § Anatomia da tela]:
+Chataigne's `default.chalayout`, which is already the design of `SHORTCUTS.md § Interface` [fontes/chataigne.md § Anatomy of the screen]:
 
-- **Esquerda**: lista de módulos (com os dois piscas por linha), e abaixo as variáveis do show.
-- **Centro**: canvas do graph. Abas do centro no Chataigne: State Machine, Dashboard, Router, Morpher; aqui uma só, o Graph, com estados como containers dentro dele.
-- **Direita**: Inspector genérico, "cada objeto responde `getEditor`", edição de N itens ao mesmo tempo é nativa [fontes/chataigne.md § Anatomia da tela]. Um Inspector, um lugar; não os três do TouchDesigner [fontes/touchdesigner.md § O que NÃO copiar].
-- **Embaixo**: sequências à esquerda, timeline no meio, abas `Ajuda | Log | Avisos` à direita. Log com 2 000 entradas e gravação opcional em arquivo [fontes/chataigne.md § Estados visuais].
+- **Left**: list of modules (with the two blinkers per line), and below it the show variables.
+- **Center**: graph canvas. Chataigne's center tabs: State Machine, Dashboard, Router, Morpher; here only one, the Graph, with states as containers inside it.
+- **Right**: generic Inspector, "each object answers `getEditor`", editing N items at the same time is native [fontes/chataigne.md § Anatomy of the screen]. One Inspector, one place; not the three of TouchDesigner [fontes/touchdesigner.md § What NOT to copy].
+- **Bottom**: sequences on the left, timeline in the middle, `Help | Log | Warnings` tabs on the right. Log with 2 000 entries and optional recording to file [fontes/chataigne.md § Visual states].
 
-Menu do painel: `View, Select, Add, Módulo`. `Add` abre com busca ao primeiro caractere (o Tab menu do TouchDesigner acende os tipos que casam enquanto se digita; o Blender faz o mesmo com `SEARCH_ON_KEY_PRESS`) [fontes/touchdesigner.md § Anatomia da tela], [fontes/blender.md § Paleta de comandos]. Nada de palette acoplável.
+Panel menu: `View, Select, Add, Module`. `Add` opens with search on the first character (TouchDesigner's Tab menu lights up the matching types as you type; Blender does the same with `SEARCH_ON_KEY_PRESS`) [fontes/touchdesigner.md § Anatomy of the screen], [fontes/blender.md § Command palette]. No dockable palette.
 
-Canvas: clique no vazio faz pan sem mudar zoom; `Shift`+arrasto é seleção em caixa; roda é zoom; botão do meio no nó abre o popup de info [fontes/touchdesigner.md § Atalhos]. Mapa de bordas da rede não é necessário; `Shift+Z` enquadra.
+Canvas: click on empty space pans without changing zoom; `Shift`+drag is box selection; the wheel is zoom; middle button on the node opens the info popup [fontes/touchdesigner.md § Shortcuts]. A network edge map is not necessary; `Shift+Z` frames.
 
-Face performance: sem canvas. Módulos como lista com piscas, avisos e o estado ativo.
+Performance Face: no canvas. Modules as a list with blinkers, warnings and the active state.
 
-## 4. Atalhos
+## 4. Shortcuts
 
-`SHORTCUTS.md` vale (`Shift+3` foca o Graph, `Shift+Z` enquadra, `Ctrl+C/V/X`, `Delete`, `Shift+D` mute, `Shift+S` solo, `Ctrl+A`). O que entra, do editor de nós do Blender [fontes/blender.md § Atalhos] e do Network Editor do TouchDesigner [fontes/touchdesigner.md § Atalhos]:
+`SHORTCUTS.md` applies (`Shift+3` focuses the Graph, `Shift+Z` frames, `Ctrl+C/V/X`, `Delete`, `Shift+D` mute, `Shift+S` solo, `Ctrl+A`). What is added, from Blender's node editor [fontes/blender.md § Shortcuts] and TouchDesigner's Network Editor [fontes/touchdesigner.md § Shortcuts]:
 
-| Ação | Tecla | Origem | Conflito |
+| Action | Key | Origin | Conflict |
 |---|---|---|---|
-| Adicionar nó (menu com busca) | `Shift+A` | Blender | nenhum |
-| Entrar no grupo / subir um nível | `Ctrl+]` / `Ctrl+[` | (nosso) | Blender usa `Tab`, que em `SHORTCUTS.md` é a troca de Face; TD usa `Enter`/`u`, e `Enter` é GO |
-| Apagar religando os dois lados | `Shift+Delete` | Blender `delete_reconnect` | Blender usa `Ctrl+X`, que é recortar |
-| Mutar cabo sem apagar | `Ctrl+Alt` + arrasto com botão direito sobre o cabo | Blender `links_mute` | gesto |
-| Cortar cabos | `Ctrl` + arrasto com botão direito | Blender `links_cut` | gesto |
-| Novo ramo de uma saída já ligada | botão do meio na saída | TD | gesto |
-| Inserir nó no meio do cabo | botão direito no cabo | TD | gesto |
-| Criar vários nós já cabeados em série | segurar `Shift` ao criar | TD | gesto |
-| Trocar a entrada de um nó | arrastar da saída de outro nó sobre o cabo existente | TD | gesto |
-| Lock do nó | `Shift+L` | (nosso) | nenhum |
-| Renomear | `F2` | Blender | nenhum |
-| Mostrar valor no cabo | botão do meio no cabo | TD | gesto |
-| Ligar/desligar cooking global | `Ctrl+Space` | TD | Blender usa `Ctrl+Space` para maximizar; `SHORTCUTS.md` maximiza com `` Ctrl+` ``, então livre |
+| Add node (menu with search) | `Shift+A` | Blender | none |
+| Enter the group / go up one level | `Ctrl+]` / `Ctrl+[` | (ours) | Blender uses `Tab`, which in `SHORTCUTS.md` is the Face switch; TD uses `Enter`/`u`, and `Enter` is GO |
+| Delete and reconnect both sides | `Shift+Delete` | Blender `delete_reconnect` | Blender uses `Ctrl+X`, which is cut |
+| Mute a cable without deleting it | `Ctrl+Alt` + right-button drag over the cable | Blender `links_mute` | gesture |
+| Cut cables | `Ctrl` + right-button drag | Blender `links_cut` | gesture |
+| New branch from an already connected output | middle button on the output | TD | gesture |
+| Insert a node in the middle of the cable | right button on the cable | TD | gesture |
+| Create several nodes already cabled in series | hold `Shift` while creating | TD | gesture |
+| Change the input of a node | drag from another node's output over the existing cable | TD | gesture |
+| Node lock | `Shift+L` | (ours) | none |
+| Rename | `F2` | Blender | none |
+| Show the value on the cable | middle button on the cable | TD | gesture |
+| Turn global cooking on/off | `Ctrl+Space` | TD | Blender uses `Ctrl+Space` to maximize; `SHORTCUTS.md` maximizes with `` Ctrl+` ``, so it is free |
 
-Gramática dos modificadores no canvas, do Blender: sem modificador = a ação; `Shift` = a mesma sobre o complemento; `Alt` = o inverso ou limpar; `Ctrl` = a variante forte [fontes/blender.md § Atalhos]. Bate com `SHORTCUTS.md § Gramática`.
+Grammar of the modifiers on the canvas, from Blender: no modifier = the action; `Shift` = the same over the complement; `Alt` = the inverse or clear; `Ctrl` = the strong variant [fontes/blender.md § Shortcuts]. It matches `SHORTCUTS.md § Grammar`.
 
-## 5. Arquivo
+## 5. File
 
-**Manifesto de módulo**, texto, um por pasta, o `module.json` do Chataigne [fontes/chataigne.md § Arquivo]:
+**Module manifest**, text, one per folder, Chataigne's `module.json` [fontes/chataigne.md § File]:
 
 ```json
 { "name": "...", "type": "osc", "version": "1.0.0",
   "hasInput": true, "hasOutput": true,
-  "parameters": { "porta": { "type": "int", "default": 9001 } },
-  "values":     { "nível": { "type": "float", "readOnly": true } },
+  "parameters": { "port": { "type": "int", "default": 9001 } },
+  "values":     { "level": { "type": "float", "readOnly": true } },
   "commands":   { "go": { "context": "action", "parameters": {} } },
-  "dependency": [ { "source": "modo", "check": "equals", "value": "avançado", "action": "show" } ] }
+  "dependency": [ { "source": "mode", "check": "equals", "value": "advanced", "action": "show" } ] }
 ```
 
-`dependency` mostra ou habilita um parâmetro conforme outro, sem script. Módulo cifrado (`main.ldat` do MadMapper) é o contra-exemplo: "quem compra o software não consegue ler nem versionar o que roda no show dele" [fontes/madmapper.md § O que NÃO copiar].
+`dependency` shows or enables a parameter according to another, without a script. An encrypted module (MadMapper's `main.ldat`) is the counter-example: "whoever buys the software cannot read or version what runs in their own show" [fontes/madmapper.md § What NOT to copy].
 
-**No `.spell`**, chave `graph`:
+**In the `.spell`**, key `graph`:
 
-- `nodes[]`: `{uid, type, name, params (completos), mute, lock, enabled}`. Referência entre nós por `uid`, nunca por nome curto (`sourceState`/`destState` do Chataigne quebram ao renomear) [fontes/chataigne.md § O que NÃO copiar].
+- `nodes[]`: `{uid, type, name, params (complete), mute, lock, enabled}`. Reference between nodes by `uid`, never by short name (Chataigne's `sourceState`/`destState` break on rename) [fontes/chataigne.md § What NOT to copy].
 - `wires[]`: `{from: uid.port, to: uid.port, muted}`.
 - `states[]`: `{uid, name, active, on_load: restore | activate | deactivate, check_on_activate, children[]}`.
-- `view`: `{uid: {x, y, collapsed}}`, em bloco separado dos nós, para o diff da lógica não carregar o diff da posição. Cor nunca; é do Theme (`PRINCIPIOS.md §5`).
-- Módulo externo: `{path, relpath: show | module, backup: <cópia embutida>}`. "Um show que referencia módulos externos precisa carregar uma cópia de segurança de cada um, senão morre num pendrive que não tem a pasta" [fontes/touchdesigner.md § O que copiar].
+- `view`: `{uid: {x, y, collapsed}}`, in a block separate from the nodes, so that the logic diff does not carry the position diff. Never color; that belongs to the Theme (`PRINCIPIOS.md §5`).
+- External module: `{path, relpath: show | module, backup: <embedded copy>}`. "A show that references external modules needs to carry a safety copy of each one, otherwise it dies on a thumb drive that does not have the folder" [fontes/touchdesigner.md § What to copy].
 
-Lock salva o valor congelado dentro do arquivo, como o Lock flag do TouchDesigner [fontes/touchdesigner.md § Arquivo].
+Lock saves the frozen value inside the file, like TouchDesigner's Lock flag [fontes/touchdesigner.md § File].
 
-Fora do `.spell`: log, avisos, valores recebidos, lista de dispositivos, estado dos piscas, layout dos docks (o Chataigne embute `layout` no `.noisette`; não) [fontes/chataigne.md § Arquivo].
+Outside the `.spell`: log, warnings, received values, device list, blinker state, dock layout (Chataigne embeds `layout` in the `.noisette`; no) [fontes/chataigne.md § File].
 
-Desempate de fontes concorrentes: o Cue Scheduler do MadMapper confere o relógio a 1 Hz e "o último módulo da lista vence" [fontes/madmapper.md § O que copiar]. Aqui: para trigger, o último da lista; para valor DMX, a política de merge declarada no patch (`cenas-cues-dmx.md § 1`).
+Tie-break between competing sources: MadMapper's Cue Scheduler checks the clock at 1 Hz and "the last module in the list wins" [fontes/madmapper.md § What to copy]. Here: for a trigger, the last in the list; for a DMX value, the merge policy declared in the patch (`cenas-cues-dmx.md § 1`).

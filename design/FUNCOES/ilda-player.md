@@ -1,113 +1,113 @@
-# ILDA player — `spell ilda play` (tema LASER)
+# ILDA player — `spell ilda play` (LASER theme)
 
-Tocar um `.ild` num DAC (EtherDream hoje, `spellcaster/protocols/ilda/etherdream.py`) com transporte, loop, calibração e segurança. O módulo Python já tem `Point(x,y,r,g,b,blank)`, `optimize(dwell, blank_gap, max_step, angle)` e `safety(min_size, max_intensity, zone)` em `frame.py`; este arquivo diz como isso vira interface.
+Play an `.ild` on a DAC (EtherDream today, `spellcaster/protocols/ilda/etherdream.py`) with transport, loop, calibration and safety. The Python module already has `Point(x,y,r,g,b,blank)`, `optimize(dwell, blank_gap, max_step, angle)` and `safety(min_size, max_intensity, zone)` in `frame.py`; this file says how that becomes an interface.
 
-| Item | Quem resolveu melhor | Por quê |
+| Item | Who solved it best | Why |
 |---|---|---|
-| Objetos e verbos | MadMapper, com o player-como-aparelho do Capture | O output laser e a superfície laser do MadMapper têm o conjunto completo e nomeado de parâmetros físicos; o Capture mostra que o player é um aparelho patcheado, com taxa de quadros própria e dois canais DMX |
-| Estados | TouchDesigner | `debugchan` dá o estado de cada ponto emitido; `PlayBarPending` dá o estado "mudou mas não aplicou"; e a omissão dele (nenhum estado de segurança) mostra o que não repetir |
-| Zonas da tela | Blender, com o "Arm your laser" do MadMapper | Transporte de seis botões num só `row`, com Pause maior quando toca; o armar fica no canto superior direito do preview, não em menu |
-| Atalhos | Blender, com a tabela de painel do TouchDesigner | Keymap "Frames" válido em toda janela; `I`/`Backspace` sobre o campo; `Shift+Space` como único play em performance |
-| Arquivo | MadMapper | Declara que o ILDA não carrega PPS, separa "gravar a FPS fixo" de "gravar como stream", e guarda tudo do laser em pares nome-valor legíveis |
+| Objects and verbs | MadMapper, with the player-as-device of Capture | The MadMapper laser output and laser surface have the complete, named set of physical parameters; Capture shows that the player is a patched device, with its own frame rate and two DMX channels |
+| States | TouchDesigner | `debugchan` gives the state of each emitted point; `PlayBarPending` gives the "changed but not applied" state; and its omission (no safety state at all) shows what not to repeat |
+| Screen zones | Blender, with MadMapper's "Arm your laser" | Six-button transport in a single `row`, with a bigger Pause while playing; the arming sits in the top right corner of the preview, not in a menu |
+| Shortcuts | Blender, with the panel table of TouchDesigner | "Frames" keymap valid in every window; `I`/`Backspace` over the field; `Shift+Space` as the only play in performance |
+| File | MadMapper | It declares that ILDA does not carry PPS, separates "record at fixed FPS" from "record as stream", and stores everything about the laser in readable name-value pairs |
 
-## 1. Objetos e verbos
+## 1. Objects and verbs
 
-**Clipe** — um `.ild` (formatos 0, 1, 2, 4, 5 já em `ild.py`). Verbos: adicionar, remover, renomear, duplicar. Um clipe não sabe seu PPS: o formato não carrega taxa de playback, "o hardware trata o arquivo como fluxo de pontos: um frame de 500 pontos dura menos que um de 700" [fontes/madmapper.md § Laser]. Logo taxa de quadros e PPS são do **player e da saída**, nunca do arquivo. O Capture confirma pelo outro lado: `ILDAFrameRate` é propriedade do `MediaPlayer`, não da mídia [fontes/capture.md § Patch e universos].
+**Clip** — an `.ild` (formats 0, 1, 2, 4, 5 already in `ild.py`). Verbs: add, remove, rename, duplicate. A clip does not know its PPS: the format does not carry a playback rate, "the hardware treats the file as a stream of points: a frame of 500 points lasts less than one of 700" [fontes/madmapper.md § Laser]. Therefore frame rate and PPS belong to the **player and the output**, never to the file. Capture confirms it from the other side: `ILDAFrameRate` is a property of the `MediaPlayer`, not of the media [fontes/capture.md § Patch and universes].
 
-**Frame** e **Ponto** — o que o clipe contém. Verbos sobre o frame: ir para, marcar In/Out, loop. Nenhum verbo sobre ponto isolado na GUI; ponto é dado de diagnóstico (ver Estados).
+**Frame** and **Point** — what the clip contains. Verbs on the frame: go to, mark In/Out, loop. No verb on an isolated point in the GUI; a point is diagnostic data (see States).
 
-**Player** — o transporte. Verbos: play, pause, stop, locate, loop no intervalo In/Out, velocidade, taxa de quadros pedida. É um **aparelho patcheado**: responde a dois canais DMX (controle play/pause/stop/replay e seleção de mídia) e a uma playlist de 256 entradas [fontes/capture.md § Patch e universos]. Isso é o que faz `spell cue` disparar um clipe laser como dispara um dimmer.
+**Player** — the transport. Verbs: play, pause, stop, locate, loop over the In/Out range, speed, requested frame rate. It is a **patched device**: it responds to two DMX channels (play/pause/stop/replay control and media selection) and to a playlist of 256 entries [fontes/capture.md § Patch and universes]. That is what makes `spell cue` fire a laser clip the way it fires a dimmer.
 
-**Saída laser** — o DAC. Parâmetros, com os nomes que o MadMapper grava em `customSettings` e o TouchDesigner expõe no Laser CHOP, agrupados por `/` no rótulo (regra transversal 1):
+**Laser output** — the DAC. Parameters, with the names MadMapper writes in `customSettings` and TouchDesigner exposes in the Laser CHOP, grouped by `/` in the label (cross-cutting rule 1):
 
-| Grupo/Parâmetro | Unidade | Origem | Nota |
+| Group/Parameter | Unit | Origin | Note |
 |---|---|---|---|
-| Dispositivo/Tipo | enum etherdream, helios, shownet | TD `type` | menu auto-populado com o que está na rede [fontes/touchdesigner.md § Laser e NDI] |
-| Dispositivo/Endereço | IP | TD `netaddress` | descoberta é problema conhecido; lista + campo |
-| Dispositivo/Fila | amostras, frames ou segundos | TD `queuetime` + `queueunits` | "costuma ser útil reduzir ao enviar poucos pontos" |
-| Dispositivo/PPS | pontos/s | MM `Device/PPS`, TD `outputrate` | clamp físico do galvo, faixa útil do show separada (`min/max` vs `norm`, regra 1) |
-| ILDA/FPS pedido | Hz | MM `ILDA/Desired FPS` | o que o operador quer |
-| ILDA/FPS real | Hz, somente leitura | MM `ILDA/ILDA FPS` | `= PPS / pontos por frame`; abaixo de 35 pisca, acima de 45 não se vê a varredura |
-| ILDA/Pontos por frame | contagem, somente leitura | MM `ILDA/Point Count` | a terceira variável da fórmula, sempre ao lado das outras duas |
-| ILDA/Atualização | enum tudo-desenhado, todo-frame | TD `updatemethod` | o parâmetro que explica o flicker por excesso de pontos |
-| Blanking/Passo com cor, Passo apagado | distância por amostra | TD `stepsize`, `bstepsize` | nosso `max_step` |
-| Blanking/Hold de canto mín, máx | amostras | TD `mincornerhold`, `maxcornerhold` | interpolado pelo ângulo; nosso `dwell` + `angle` |
-| Blanking/Pré-liga, Pós-liga, Pré-desliga, Pós-desliga | ms | TD `preblankoff`, `postblankoff`, `preblankon`, `postblankon` | nosso `blank_gap`; MM condensa em `Blank Delay/Smth/Curve` |
-| Blanking/Repetir início, fim | pontos | MM `Start Repeat`, `End Repeat` | "o software nunca sabe onde o feixe realmente está" |
-| Blanking/Fade entrada, saída | 0..1 | MM `In Fade`, `Out Fade` | evita o hot point do começo e do fim do path |
-| Cor/Escala R G B | 0..1 | TD `redscale`…, MM `Color Levels` | |
-| Cor/Tensão mínima R G B | 0..1 | MM `Min Voltage` | "para que um cinza escuro não vire vermelho" |
-| Cor/Deslocamento R G B | **pontos ILDA** | MM `Time Shift` | unidade certa: o atraso é de amostras, não de parede; TD usa ms (`colordelay`) e perde |
-| Cor/Curva R G B | curva | MM `Response` | |
-| Segurança/Área de varredura | 0..1 | MM `ILDA/Scan Area` | nosso `zone`; "ouvir o scanner: o som deve ser liso" |
-| Segurança/Máscaras | polígonos com opacidade e inversão | MM `Masks` | vale também para o cursor de teste |
-| Segurança/Tamanho mínimo, Intensidade máxima | | nosso `safety()` | TD não tem nenhum dos dois; herdar a omissão é proibido |
-| Geometria/Escala X Y, Rotação, Flip, Trocar XY | | TD `xscale yscale rotate swap`, MM `scale rotation flip` | |
-| Teste/Padrão de teste, Nível | | MM `Test Pattern` | |
+| Device/Type | enum etherdream, helios, shownet | TD `type` | menu auto-populated with what is on the network [fontes/touchdesigner.md § Laser and NDI] |
+| Device/Address | IP | TD `netaddress` | discovery is a known problem; list + field |
+| Device/Queue | samples, frames or seconds | TD `queuetime` + `queueunits` | "it is usually useful to reduce it when sending few points" |
+| Device/PPS | points/s | MM `Device/PPS`, TD `outputrate` | physical clamp of the galvo, useful show range kept separate (`min/max` vs `norm`, rule 1) |
+| ILDA/Requested FPS | Hz | MM `ILDA/Desired FPS` | what the operator wants |
+| ILDA/Actual FPS | Hz, read-only | MM `ILDA/ILDA FPS` | `= PPS / points per frame`; below 35 it flickers, above 45 the sweep is not visible |
+| ILDA/Points per frame | count, read-only | MM `ILDA/Point Count` | the third variable of the formula, always next to the other two |
+| ILDA/Update | enum all-drawn, every-frame | TD `updatemethod` | the parameter that explains flicker from too many points |
+| Blanking/Colored step, Blanked step | distance per sample | TD `stepsize`, `bstepsize` | our `max_step` |
+| Blanking/Corner hold min, max | samples | TD `mincornerhold`, `maxcornerhold` | interpolated by the angle; our `dwell` + `angle` |
+| Blanking/Pre-on, Post-on, Pre-off, Post-off | ms | TD `preblankoff`, `postblankoff`, `preblankon`, `postblankon` | our `blank_gap`; MM condenses it into `Blank Delay/Smth/Curve` |
+| Blanking/Start repeat, end repeat | points | MM `Start Repeat`, `End Repeat` | "the software never knows where the beam really is" |
+| Blanking/In fade, out fade | 0..1 | MM `In Fade`, `Out Fade` | avoids the hot point at the start and the end of the path |
+| Color/Scale R G B | 0..1 | TD `redscale`…, MM `Color Levels` | |
+| Color/Minimum voltage R G B | 0..1 | MM `Min Voltage` | "so a dark gray does not turn red" |
+| Color/Shift R G B | **ILDA points** | MM `Time Shift` | the right unit: the delay is in samples, not wall clock; TD uses ms (`colordelay`) and loses |
+| Color/Curve R G B | curve | MM `Response` | |
+| Safety/Scan area | 0..1 | MM `ILDA/Scan Area` | our `zone`; "listen to the scanner: the sound must be smooth" |
+| Safety/Masks | polygons with opacity and inversion | MM `Masks` | applies to the test cursor as well |
+| Safety/Minimum size, Maximum intensity | | our `safety()` | TD has neither of the two; inheriting the omission is forbidden |
+| Geometry/Scale X Y, Rotation, Flip, Swap XY | | TD `xscale yscale rotate swap`, MM `scale rotation flip` | |
+| Test/Test pattern, Level | | MM `Test Pattern` | |
 
-Cada linha dessas é um `@command` do registry com tipo declarado (regra 3): PPS é valor, Padrão de teste é toggle, Armar é trigger com confirmação.
+Each of those lines is a registry `@command` with a declared type (rule 3): PPS is a value, Test pattern is a toggle, Arm is a trigger with confirmation.
 
-**Calibração** — os `calib_*` já existentes; o MadMapper faz isso fotografando o que o laser desenha com câmera e deformando para o ponto de vista do laser [fontes/madmapper.md § Objetos e verbos]. Fica como verbo do painel Outputs, não do player.
+**Calibration** — the existing `calib_*`; MadMapper does it by photographing what the laser draws with a camera and warping it to the laser's point of view [fontes/madmapper.md § Objects and verbs]. It stays a verb of the Outputs panel, not of the player.
 
-**Shutter** — verbo próprio, com estado próprio. O TouchDesigner faz blanking implícito quando os três scales de cor são zero, "um estado que não aparece em lugar nenhum da UI" [fontes/touchdesigner.md § O que NÃO copiar]. Aqui shutter é nomeado. Segurar a tecla é shutter momentâneo, pelo mesmo mecanismo do `connect` booleano do Resolume: "análogo a estar com o mouse pressionado" [fontes/resolume.md § O que copiar].
+**Shutter** — its own verb, with its own state. TouchDesigner does implicit blanking when the three color scales are zero, "a state that appears nowhere in the UI" [fontes/touchdesigner.md § What NOT to copy]. Here the shutter is named. Holding the key is a momentary shutter, by the same mechanism as Resolume's boolean `connect`: "analogous to holding the mouse down" [fontes/resolume.md § What to copy].
 
-## 2. Estados
+## 2. States
 
-Um accent, misturado no fundo do campo (regra 4). Os estados que o player precisa mostrar, em ordem de gravidade:
+One accent, mixed into the background of the field (rule 4). The states the player must show, in order of severity:
 
-1. **Não armado / armado.** Sem equivalente em Resolume ("assim que um Lumiverse existe, ele envia") nem TouchDesigner. MadMapper tem "Arm your laser!" no canto superior direito dos previews [fontes/madmapper.md § Estados]. Aqui: `Ctrl+Shift+Enter` arma, e o estado é o único que troca a cor do frame inteiro do preview.
-2. **Shutter fechado / aberto.** Nomeado, indicador próprio, nunca inferido de cor zero.
-3. **DAC: sem dispositivo, procurando, conectado, erro.** Os três estados de universo do Capture, `(no)`, `Searching..`, `(auto)`, mais erro [fontes/capture.md § Estados e mensagens]; "atividade não garante funcionamento" vale aqui também.
-4. **Transporte: parado, tocando, pausado, em loop, e pendente.** Os quatro do TouchDesigner (`PlayBarOff`, `On`, `Reset`, `Pending` vermelho) [fontes/touchdesigner.md § Estados]. Pendente = mudou PPS ou fila e o DAC ainda não aplicou.
-5. **Galvo não acompanha.** FPS real abaixo de 35 Hz, ou pontos por frame acima de `PPS / FPS pedido`. É `warning`, não `error`: o laser continua, pisca. O Aprendiz fala por aqui (`aprendiz-menu.md`).
-6. **Fora da área segura.** Pontos cortados por `zone` ou máscara: contagem por frame, `warning` se maior que zero.
+1. **Not armed / armed.** No equivalent in Resolume ("as soon as a Lumiverse exists, it sends") or TouchDesigner. MadMapper has "Arm your laser!" in the top right corner of the previews [fontes/madmapper.md § States]. Here: `Ctrl+Shift+Enter` arms, and it is the only state that changes the color of the whole preview frame.
+2. **Shutter closed / open.** Named, with its own indicator, never inferred from zero color.
+3. **DAC: no device, searching, connected, error.** The three universe states of Capture, `(no)`, `Searching..`, `(auto)`, plus error [fontes/capture.md § States and messages]; "activity does not guarantee operation" applies here too.
+4. **Transport: stopped, playing, paused, looping, and pending.** The four from TouchDesigner (`PlayBarOff`, `On`, `Reset`, `Pending` red) [fontes/touchdesigner.md § States]. Pending = PPS or queue changed and the DAC has not applied it yet.
+5. **The galvo can't keep up.** Actual FPS below 35 Hz, or points per frame above `PPS / requested FPS`. It is a `warning`, not an `error`: the laser keeps going, it flickers. The Aprendiz speaks up here (`aprendiz-menu.md`).
+6. **Outside the safe area.** Points cut by `zone` or a mask: count per frame, `warning` if greater than zero.
 
-Diagnóstico por ponto: o engine emite, por amostra de saída, o mesmo enum do `debugchan` do Laser CHOP: `-1` início de frame, `0` cor, `1` hold de canto, `2` hold do primeiro ponto, `3`/`4` pré e pós blank-on, `5` blanking, `6`/`7` pré e pós blank-off [fontes/touchdesigner.md § Laser e NDI]. O preview pinta o ponto pelo estado quando o toggle "diagnóstico" está ligado; `spell ilda monitor` imprime o mesmo. É o que transforma "o traço está com rabo" em número.
+Per-point diagnostics: the engine emits, per output sample, the same enum as the Laser CHOP's `debugchan`: `-1` start of frame, `0` color, `1` corner hold, `2` hold of the first point, `3`/`4` pre and post blank-on, `5` blanking, `6`/`7` pre and post blank-off [fontes/touchdesigner.md § Laser and NDI]. The preview paints the point by state when the "diagnostics" toggle is on; `spell ilda monitor` prints the same. It is what turns "the stroke has a tail" into a number.
 
-Congelar: o MadMapper separa congelar o engine de congelar cada saída (`laserOutputsFrozen`) e avisa que congelar a saída não para o playback [fontes/madmapper.md § Estados]. Aqui: pausar o transporte é uma coisa; fechar o shutter é outra; as duas aparecem.
+Freezing: MadMapper separates freezing the engine from freezing each output (`laserOutputsFrozen`) and warns that freezing the output does not stop playback [fontes/madmapper.md § States]. Here: pausing the transport is one thing; closing the shutter is another; both are shown.
 
-## 3. Zonas da tela
+## 3. Screen zones
 
-Conforme `SHORTCUTS.md § Interface` (Media Pool à esquerda, viewer central, Inspector à direita, timeline embaixo), preenchido assim:
+As per `SHORTCUTS.md § Interface` (Media Pool on the left, viewer in the center, Inspector on the right, timeline at the bottom), filled in like this:
 
-- **Esquerda, Media Pool**: lista de clipes `.ild`, com frames e duração por clipe. Lista maior que 8 itens vira busca ao digitar (regra 10).
-- **Centro, viewer**: o frame atual. Preview e saída são **o mesmo widget parametrizado** (Resolume: `Monitor subject_type=Composition|Preview`) [fontes/resolume.md § Anatomia da tela]. Modos do viewer: frame do clipe, frame otimizado, diagnóstico por ponto. Máscaras e área de varredura desenhadas por cima. No canto superior direito: **Armar** e o indicador de shutter [fontes/madmapper.md § Estados].
-- **Direita, Inspector**: os grupos da tabela acima, dobráveis; o grupo `ILDA/` sempre aberto porque mostra a fórmula. Toggle com seta para blanking e cor: o botão liga, a seta abre o popover de ajuste, "nunca dois botões separados" [fontes/blender.md § Anatomia de um editor].
-- **Embaixo, Timeline**: régua de frames do clipe, In/Out, marcadores. Header de transporte = um único `row` com rewind, frame anterior, play reverso, play, frame seguinte, fast-forward; tocando, os dois plays viram um Pause com o dobro da largura [fontes/blender.md § Anatomia de um editor].
-- **Rodapé, status bar**: o que os botões do mouse fazem agora, último aviso, tarefa rodando, estatísticas (PPS, FPS real, pontos) [fontes/blender.md § Estados].
+- **Left, Media Pool**: list of `.ild` clips, with frames and duration per clip. A list longer than 8 items becomes a search-as-you-type (rule 10).
+- **Center, viewer**: the current frame. Preview and output are **the same parameterized widget** (Resolume: `Monitor subject_type=Composition|Preview`) [fontes/resolume.md § Anatomy of the screen]. Viewer modes: clip frame, optimized frame, per-point diagnostics. Masks and scan area drawn on top. In the top right corner: **Arm** and the shutter indicator [fontes/madmapper.md § States].
+- **Right, Inspector**: the groups of the table above, collapsible; the `ILDA/` group always open because it shows the formula. Toggle with an arrow for blanking and color: the button turns it on, the arrow opens the adjustment popover, "never two separate buttons" [fontes/blender.md § Anatomy of an editor].
+- **Bottom, Timeline**: frame ruler of the clip, In/Out, markers. Transport header = a single `row` with rewind, previous frame, reverse play, play, next frame, fast-forward; while playing, the two plays become a Pause of double the width [fontes/blender.md § Anatomy of an editor].
+- **Footer, status bar**: what the mouse buttons do right now, last warning, running task, statistics (PPS, actual FPS, points) [fontes/blender.md § States].
 
-Menu do painel: `View, Select, Add, Frame` (regra 6). Nada flutuante: a Palette do TouchDesigner que se fecha "para ganhar espaço" está no não-copiar [fontes/touchdesigner.md § O que NÃO copiar].
+Panel menu: `View, Select, Add, Frame` (rule 6). Nothing floating: TouchDesigner's Palette that closes itself "to gain space" is on the do-not-copy list [fontes/touchdesigner.md § What NOT to copy].
 
-Face performance: viewer grande, transporte, Armar, shutter, PPS e FPS real. Sem Inspector.
+Performance Face: big viewer, transport, Arm, shutter, PPS and actual FPS. No Inspector.
 
-## 4. Atalhos
+## 4. Shortcuts
 
-Tudo de `SHORTCUTS.md` vale (Space, J/K/L, setas, Home/End, I/O, `Ctrl+L` loop, `M` marcador, `Ctrl+Shift+Enter` armar, `Ctrl+Shift+R` ensaio, `Esc` segurado blackout). O que entra:
+Everything in `SHORTCUTS.md` applies (Space, J/K/L, arrows, Home/End, I/O, `Ctrl+L` loop, `M` marker, `Ctrl+Shift+Enter` arm, `Ctrl+Shift+R` rehearsal, `Esc` held blackout). What is added:
 
-| Ação | Tecla | Origem | Conflito |
+| Action | Key | Origin | Conflict |
 |---|---|---|---|
-| Play/pause na Face performance | `Shift+Space`; `Space` sozinho desabilitado | TD `PanelShortcuts.txt` [fontes/touchdesigner.md § Atalhos] | nenhum; é a coluna nova de `SHORTCUTS.md` (regra 8) |
-| Shutter momentâneo | segurar `Esc` fecha; `Esc` toque fecha painel | `SHORTCUTS.md` blackout, Resolume `connect` pressionado | nenhum |
-| Keyframe no campo sob o mouse | `I` | Blender keymap "User Interface" [fontes/blender.md § Atalhos] | `I` = In quando o mouse não está sobre campo; o keymap de UI só vale sobre campo, como no Blender |
-| Voltar o campo ao valor de cena | `Backspace` sobre o campo | Blender | `Backspace` = cue anterior fora de campo; desligado na Face performance |
-| Copiar o comando CLI do campo | `Shift+Ctrl+C` | Blender `copy_data_path` | nenhum |
-| Padrão de teste | `Shift+T` | (nosso; MadMapper tem o botão sem tecla) | nenhum |
-| Escolher ordem de grandeza e arrastar | segurar botão do meio sobre o número, mover vertical, arrastar horizontal | TD Value Ladder [fontes/touchdesigner.md § Parâmetros] | gesto, não tecla; `Alt+botão direito` sem botão do meio |
-| Ladder no rótulo move X e Y juntos; no campo, um só | idem | TD | |
+| Play/pause on the performance Face | `Shift+Space`; `Space` alone disabled | TD `PanelShortcuts.txt` [fontes/touchdesigner.md § Shortcuts] | none; it is the new column of `SHORTCUTS.md` (rule 8) |
+| Momentary shutter | holding `Esc` closes; tapping `Esc` closes the panel | `SHORTCUTS.md` blackout, Resolume `connect` held | none |
+| Keyframe on the field under the mouse | `I` | Blender keymap "User Interface" [fontes/blender.md § Shortcuts] | `I` = In when the mouse is not over a field; the UI keymap only applies over a field, as in Blender |
+| Return the field to the scene value | `Backspace` over the field | Blender | `Backspace` = previous cue outside a field; disabled on the performance Face |
+| Copy the CLI command of the field | `Shift+Ctrl+C` | Blender `copy_data_path` | none |
+| Test pattern | `Shift+T` | (ours; MadMapper has the button with no key) | none |
+| Choose the order of magnitude and drag | hold the middle button over the number, move vertically, drag horizontally | TD Value Ladder [fontes/touchdesigner.md § Parameters] | gesture, not key; `Alt+right button` with no middle button |
+| Ladder on the label moves X and Y together; on the field, only one | same | TD | |
 
-Gramática: sem modificador age no selecionado, `Shift` sobe um nível (Resolume: layer → composição) [fontes/resolume.md § Atalhos e mapeamento]; é o mesmo "Shift estende" de `SHORTCUTS.md`. Não entra: `Space` configurável, numpad, `X` apagar (regra 11).
+Grammar: no modifier acts on the selected item, `Shift` goes one level up (Resolume: layer → composition) [fontes/resolume.md § Shortcuts and mapping]; it is the same "Shift extends" of `SHORTCUTS.md`. Not included: configurable `Space`, numpad, `X` to delete (rule 11).
 
-## 5. Arquivo
+## 5. File
 
-No `.spell`:
+In the `.spell`:
 
-- `clips[]`: `{uid, name, path}` com `path` relativo ao show e `relpath` declarado; cópia de segurança do `.ild` dentro do pacote do show quando exportado (TD `savebackup`) [fontes/touchdesigner.md § Arquivo]. Nenhum PPS no clipe.
-- `player`: `{clip, fps, loop, in, out, speed, dmx: {universe, channel}}`. Os dois canais DMX do Capture.
-- `outputs[]` (compartilhado com `patch`): todos os parâmetros da tabela do §1, **completos**, não só o delta (regra 12), com enum por identificador estável, não pelo rótulo (`"ILDA/Mode": "Preserve Image Quality"` do MadMapper é o erro) [fontes/madmapper.md § O que NÃO copiar]. Máscaras como polígonos normalizados com opacidade e inversão.
-- `calibration` por saída, do `calib_*`.
+- `clips[]`: `{uid, name, path}` with `path` relative to the show and `relpath` declared; a safety copy of the `.ild` inside the show package when exported (TD `savebackup`) [fontes/touchdesigner.md § File]. No PPS in the clip.
+- `player`: `{clip, fps, loop, in, out, speed, dmx: {universe, channel}}`. The two DMX channels of Capture.
+- `outputs[]` (shared with `patch`): every parameter of the table in §1, **complete**, not only the delta (rule 12), with an enum by stable identifier, not by label (`"ILDA/Mode": "Preserve Image Quality"` of MadMapper is the mistake) [fontes/madmapper.md § What NOT to copy]. Masks as normalized polygons with opacity and inversion.
+- `calibration` per output, from `calib_*`.
 
-Fora do `.spell`: IP descoberto (vai para `config.json` do perfil), zoom do viewer, lista de dispositivos vista na rede, thumbnails de frame.
+Outside the `.spell`: discovered IP (goes to the profile's `config.json`), viewer zoom, list of devices seen on the network, frame thumbnails.
 
-Exportar: dois modos, os do "Movie Mode" do MadMapper, porque o ILDA não carrega PPS: **a FPS fixo** (para tocar de volta no Spellcaster) e **como stream** (para cartão SD do laser ou outro DAC) [fontes/madmapper.md § Laser]. O modo vira flag de `spell ilda export`.
+Export: two modes, MadMapper's "Movie Mode" ones, because ILDA does not carry PPS: **at fixed FPS** (to play back in Spellcaster) and **as stream** (for the laser's SD card or another DAC) [fontes/madmapper.md § Laser]. The mode becomes a flag of `spell ilda export`.
 
-Versão: abrir e tocar diferente é pior que recusar. O TouchDesigner 2025.30000 passou a gerar a 192 000 e reamostrar, removeu dois parâmetros, e avisou só no wiki [fontes/touchdesigner.md § O que NÃO copiar]. `"version"` no topo, migração local, falha alta.
+Version: opening and playing differently is worse than refusing. TouchDesigner 2025.30000 started generating at 192 000 and resampling, removed two parameters, and warned only in the wiki [fontes/touchdesigner.md § What NOT to copy]. `"version"` at the top, local migration, loud failure.

@@ -1,117 +1,117 @@
-# Cenas e cues DMX — `spell patch`, `spell scene`, `spell cue` (tema TEATRO DE PAPEL)
+# DMX scenes and cues — `spell patch`, `spell scene`, `spell cue` (PAPER THEATER theme)
 
-Patchear aparelhos em universos, gravar valores em cenas e cues, e disparar em ordem com fade. Cobre os painéis Patch (`Shift+1`), Outputs (`Shift+4`) e a lista de cues dentro da Timeline (`Shift+2`).
+Patching fixtures into universes, recording values into scenes and cues, and firing them in order with a fade. Covers the Patch (`Shift+1`) and Outputs (`Shift+4`) panels and the cue list inside the Timeline (`Shift+2`).
 
-| Item | Quem resolveu melhor | Por quê |
+| Item | Who solved it best | Why |
 |---|---|---|
-| Objetos e verbos | MadMapper para a cue, Capture para o patch, Chataigne para a lista | Cue = lista de pares (endereço, valor) com fade por entrada; aparelho tem quatro números e numeração sequencial em lote; o diálogo de patch diz quantos canais consome antes de gravar; Conductor é a lista de GO |
-| Estados | Resolume, com o pendente do TouchDesigner e o overlay do MadMapper | `connected` é enum de cinco estados, não booleano; `connect` é "botão pressionado", momentâneo e latch com uma primitiva; vermelho = está na cue, laranja = está mas com outro valor |
-| Zonas da tela | Capture, com o painel de saída do Resolume | Tabela de aparelhos navegável como planilha; vista do universo em Canais ou Aparelhos, níveis em % ou DMX; painel que mostra sobreposição de canal |
-| Atalhos | Chataigne, com a gramática do Resolume | `Ctrl+B` cue no playhead, `Shift+PageUp/Down` cue anterior/próximo; sem modificador age no selecionado, `Shift` sobe o escopo |
-| Arquivo | MadMapper, corrigido | O esquema da entrada de cue é o certo; a grade achatada, o thumbnail embutido e a cena como classe separada não entram; a personality do Resolume sem tipo de canal é o exemplo a evitar |
+| Objects and verbs | MadMapper for the cue, Capture for the patch, Chataigne for the list | Cue = a list of (address, value) pairs with a per-entry fade; a fixture has four numbers and sequential batch numbering; the patch dialog says how many channels it consumes before recording; Conductor is the GO list |
+| States | Resolume, with TouchDesigner's pending and MadMapper's overlay | `connected` is a five-state enum, not a boolean; `connect` is "button pressed", momentary and latch with one primitive; red = it is in the cue, orange = it is, but with another value |
+| Screen zones | Capture, with Resolume's output panel | Fixture table navigable like a spreadsheet; universe view in Channels or Fixtures, levels in % or DMX; a panel that shows channel overlap |
+| Shortcuts | Chataigne, with Resolume's grammar | `Ctrl+B` cue at the playhead, `Shift+PageUp/Down` previous/next cue; with no modifier it acts on the selected one, `Shift` raises the scope |
+| File | MadMapper, corrected | The cue entry schema is the right one; the flattened grid, the embedded thumbnail and the scene as a separate class do not come in; Resolume's personality with no channel type is the example to avoid |
 
-## 1. Objetos e verbos
+## 1. Objects and verbs
 
-Vocabulário em português, da tradução oficial do Capture com as correções da coluna Spellcaster [fontes/capture.md § Vocabulário EN → PT]: **Aparelho**, **Patch**, **Universo**, **Canal (ID)**, **Unidade**, **Endereço inicial**, **Canais necessários**, **Facas**, **Zoom** (não "Zum"), **Gel**, **Instantâneo**.
+Vocabulary in Portuguese, from Capture's official translation with the corrections in the Spellcaster column [fontes/capture.md § EN → PT vocabulary]: **Aparelho** (fixture), **Patch**, **Universo** (universe), **Canal (ID)** (channel ID), **Unidade** (unit), **Endereço inicial** (start address), **Canais necessários** (channels required), **Facas** (shutters), **Zoom** (not "Zum"), **Gel**, **Instantâneo** (snapshot).
 
-**Aparelho.** Quatro números, coisas diferentes [fontes/capture.md § Patch e universos]:
+**Fixture.** Four numbers, different things [fontes/capture.md § Patch and universes]:
 
-| Número | O que é |
+| Number | What it is |
 |---|---|
-| Patch | universo + canal inicial (endereço DMX) |
-| Canal (ID) | número do aparelho na mesa (identidade, não endereço) |
-| Unidade | número físico na vara ou no palco |
-| Circuito | circuito elétrico |
+| Patch | universe + start channel (DMX address) |
+| Channel (ID) | the fixture's number on the console (identity, not address) |
+| Unit | physical number on the bar or on the stage |
+| Circuit | electrical circuit |
 
-Mais `perfil` (personality) + `modo`, e overrides **por instância**: inverter pan/tilt/zoom/íris, limitar curso de pan e tilt, escala de intensidade [fontes/capture.md § Patch e universos]. "É assim que se corrige um aparelho pendurado de cabeça para baixo." Verbos: patch, unpatch, duplicar, substituir, numerar em lote (Sequential para Unidade, Circuito, Patch e Canal), agrupar.
+Plus `profile` (personality) + `mode`, and **per-instance** overrides: invert pan/tilt/zoom/iris, limit pan and tilt travel, intensity scale [fontes/capture.md § Patch and universes]. "That is how you fix a fixture hung upside down." Verbs: patch, unpatch, duplicate, replace, number in batch (Sequential for Unit, Circuit, Patch and Channel), group.
 
-**Perfil.** Lista de canais **com tipo**: dimmer, pan, tilt, cor, strobe, gobo, macro; 16 bits (coarse/fine); faixas com rótulo ("0–7 fechado, 8–134 strobe"). O Resolume não tem nada disso, só `ParamRange 0..255` com nome livre, e o resultado nos arquivos do usuário é `New Parameter 1..34` [fontes/resolume.md § O que NÃO copiar]. O tipo decide o fade (dimmer interpola, gobo salta), a resolução, e o que o Aprendiz confere. O Resolume também mostra que um aparelho precisa aceitar **dois caminhos**: valor por canal (cena) e amostragem de superfície (pixel map, o `DmxSlice/InputRect`) [fontes/resolume.md § O que NÃO copiar]; o bloco de pixels da personality (`largura, altura, formato de cor, distribuição, gama`) entra como tipo de canal `pixels`.
+**Profile.** A list of channels **with a type**: dimmer, pan, tilt, color, strobe, gobo, macro; 16 bits (coarse/fine); ranges with a label ("0-7 closed, 8-134 strobe"). Resolume has none of that, only `ParamRange 0..255` with a free name, and the result in the user's files is `New Parameter 1..34` [fontes/resolume.md § What NOT to copy]. The type decides the fade (a dimmer interpolates, a gobo jumps), the resolution, and what Aprendiz checks. Resolume also shows that a fixture has to accept **two paths**: value per channel (scene) and surface sampling (pixel map, the `DmxSlice/InputRect`) [fontes/resolume.md § What NOT to copy]; the personality's pixel block (`width, height, color format, distribution, gamma`) comes in as a `pixels` channel type.
 
-**Universo.** `nome`, `base do patch` (posição numérica independente do nome), `estilo: indexado | contínuo` (contínuo = faixa única 1–2048 no teatro) [fontes/capture.md § Patch e universos]; por saída: protocolo, `taxa ≤ 44 Hz` (TouchDesigner) [fontes/touchdesigner.md § Laser e NDI], `delay 0–150 ms` (Resolume) [fontes/resolume.md § Fixtures e DMX], `prioridade` sACN, ArtSync com timeout. Verbos: adicionar (um ou N com nome-base), zerar níveis, reiniciar universo externo. **Política de merge declarada** por tipo de canal (HTP para dimmer, LTP para o resto), porque "a última ganha por acidente de implementação" é o defeito do MadMapper [fontes/madmapper.md § O que NÃO copiar].
+**Universe.** `name`, `patch base` (numeric position independent of the name), `style: indexed | continuous` (continuous = a single 1-2048 range in theater) [fontes/capture.md § Patch and universes]; per output: protocol, `rate ≤ 44 Hz` (TouchDesigner) [fontes/touchdesigner.md § Laser and NDI], `delay 0-150 ms` (Resolume) [fontes/resolume.md § Fixtures and DMX], sACN `priority`, ArtSync with timeout. Verbs: add (one or N with a base name), zero the levels, restart an external universe. **Declared merge policy** per channel type (HTP for dimmer, LTP for the rest), because "the last one wins by accident of implementation" is MadMapper's defect [fontes/madmapper.md § What NOT to copy].
 
-**Diálogo de patch.** Mostra `canais necessários` antes de confirmar; transbordo de universo é pergunta com "continuar até completar", não erro [fontes/capture.md § O que copiar]. `spell patch` imprime o mesmo antes de escrever.
+**Patch dialog.** It shows `channels required` before confirming; universe overflow is a question with "continue until complete", not an error [fontes/capture.md § What to copy]. `spell patch` prints the same thing before writing.
 
-**Cue.** O achado central do MadMapper, confirmado no arquivo [fontes/madmapper.md § Cenas e cues]:
+**Cue.** MadMapper's central finding, confirmed in the file [fontes/madmapper.md § Scenes and cues]:
 
 ```
 cue = { uid, name, comment, fade: {type, duration},
         entries: [ { address, value, fade?: {type, duration} } ] }
 ```
 
-Uma cue é uma lista de pares (endereço do registry, valor) com fade por entrada, opcionalmente diferente do fade da cue ("faz fade da opacidade mas não do RGB"). O valor pode ser número ou referência a outro objeto (`/medias/9`). Se todo widget é um nó com endereço, a cue é um diff sobre o graph e não precisa de estrutura própria. Por tipo de canal, o modo de interpolação do Chataigne: `interpolar | mudar no fim | mudar no início | nenhum` [fontes/chataigne.md § Objetos e verbos].
+A cue is a list of (registry address, value) pairs with a per-entry fade, optionally different from the cue's fade ("fade the opacity but not the RGB"). The value can be a number or a reference to another object (`/medias/9`). If every widget is a node with an address, the cue is a diff over the graph and needs no structure of its own. Per channel type, Chataigne's interpolation mode: `interpolate | change at the end | change at the start | none` [fontes/chataigne.md § Objects and verbs].
 
-Verbos: gravar da situação atual ("Update from current values" em multisseleção; "CUE ALL" no aparelho) [fontes/madmapper.md § Cenas e cues]; entrar em modo de edição e clicar no widget para incluir/excluir; GO, voltar, ir para; `momentâneo` (a cue vale enquanto a tecla estiver pressionada, o `connect` do Resolume) [fontes/resolume.md § O que copiar]; `seguir` (auto-follow: o `auto_play` do MadMapper é global com override por coluna; o `ConductorCue` do Chataigne amarra sequência com `autoStart`, `autoNext`) [fontes/chataigne.md § Objetos e verbos]; `condição` (a `ChataigneCue` só está ativa se as condições baterem) [fontes/chataigne.md § Sequências]; `ação ao chegar: nada | pausar | saltar para` (o `TimeCue`).
+Verbs: record from the current situation ("Update from current values" in a multi-selection; "CUE ALL" on the fixture) [fontes/madmapper.md § Scenes and cues]; enter edit mode and click the widget to include/exclude; GO, go back, go to; `momentary` (the cue holds while the key is pressed, Resolume's `connect`) [fontes/resolume.md § What to copy]; `follow` (auto-follow: MadMapper's `auto_play` is global with a per-column override; Chataigne's `ConductorCue` ties a sequence with `autoStart`, `autoNext`) [fontes/chataigne.md § Objects and verbs]; `condition` (a `ChataigneCue` is only active if the conditions match) [fontes/chataigne.md § Sequences]; `action on arrival: nothing | pause | jump to` (the `TimeCue`).
 
-**Cena.** Cue com flag `exclusiva`: grava tudo e, ao disparar, o que não está nela vai a zero. Não uma classe separada com regras próprias na primeira linha da grade, como no MadMapper [fontes/madmapper.md § O que NÃO copiar]. E não a "Scene" do Capture, que guarda posição e visibilidade de objeto de cenário; isso é "posição de cenário" e mora em `cenario-interativo.md` [fontes/capture.md § O que NÃO copiar].
+**Scene.** A cue with the `exclusive` flag: it records everything and, when fired, whatever is not in it goes to zero. Not a separate class with its own rules on the first row of the grid, as in MadMapper [fontes/madmapper.md § What NOT to copy]. And not Capture's "Scene", which stores the position and visibility of a set object; that is a "set position" and lives in `cenario-interativo.md` [fontes/capture.md § What NOT to copy].
 
-**Lista de cues.** Conductor: cue atual, próximo, loop, gatilhos anterior/atual [fontes/chataigne.md § Objetos e verbos]. Uma lista por show ou várias; a grade 16×8 do MadMapper é uma Face sobre a mesma lista, não outro objeto.
+**Cue list.** Conductor: current cue, next, loop, previous/current triggers [fontes/chataigne.md § Objects and verbs]. One list per show or several; MadMapper's 16×8 grid is a Face over the same list, not another object.
 
-**Aplicar a N.** Multiplex: uma cue ou rota instanciada N vezes com índice [fontes/chataigne.md § O que copiar]. `spell cue set --fixtures 1-24 dimmer 80`.
+**Apply to N.** Multiplex: one cue or route instantiated N times with an index [fontes/chataigne.md § What to copy]. `spell cue set --fixtures 1-24 dimmer 80`.
 
-**Ensaio sem timeline.** Parrot: grava o que o operador mexer num conjunto de parâmetros e toca de volta (`IDLE | RECORDING | PLAYING`, loop, trims) [fontes/chataigne.md § Estados visuais]. Morpher: cenas como pontos num plano, peso por Voronoi, cursor X/Y mistura [fontes/chataigne.md § O que copiar]; é a maquete do TEATRO DE PAPEL misturando bastidores.
+**Rehearsal without a timeline.** Parrot: records whatever the operator touches in a set of parameters and plays it back (`IDLE | RECORDING | PLAYING`, loop, trims) [fontes/chataigne.md § Visual states]. Morpher: scenes as points on a plane, weight by Voronoi, X/Y cursor mixes [fontes/chataigne.md § What to copy]; it is the PAPER THEATER scale model mixing wing flats.
 
-**Parâmetro com três valores ao mesmo tempo.** Constante, valor da cue, valor do cabo/timeline, guardados juntos, com "tem conteúdo" no modo inativo [fontes/touchdesigner.md § O que copiar]. "Tirar um aparelho do controle do timeline para testar um valor fixo às 23h e devolver depois sem reprogramar." O Resolume faz a mesma coisa trocando o filho do parâmetro (`PhaseSourceStatic | Timeline | TransportTimeline | DashboardLink`) sem mudar tipo nem endereço [fontes/resolume.md § Tipos de parâmetro].
+**A parameter with three values at once.** Constant, cue value, cable/timeline value, stored together, with "has content" in the inactive mode [fontes/touchdesigner.md § What to copy]. "Take a fixture out of the timeline's control to test a fixed value at 11 pm and give it back later without reprogramming." Resolume does the same thing by swapping the parameter's child (`PhaseSourceStatic | Timeline | TransportTimeline | DashboardLink`) without changing type or address [fontes/resolume.md § Parameter types].
 
-## 2. Estados
+## 2. States
 
-**Universo / saída**: `sem sinal`, `procurando`, `conectado` (os `(no)`, `Searching..`, `(auto)` do Capture) [fontes/capture.md § O que copiar]; `bloqueado por firewall` como causa nomeada; **não armado / armado** (nenhum dos seis apps tem; Resolume envia assim que o Lumiverse existe) [fontes/resolume.md § Estados]; **ensaio** (o motor calcula, não envia). Dois níveis de habilitação como no Resolume: universo inteiro e aparelho [fontes/resolume.md § Estados].
+**Universe / output**: `no signal`, `searching`, `connected` (Capture's `(no)`, `Searching..`, `(auto)`) [fontes/capture.md § What to copy]; `blocked by firewall` as a named cause; **not armed / armed** (none of the six apps has it; Resolume sends as soon as the Lumiverse exists) [fontes/resolume.md § States]; **rehearsal** (the engine computes, it does not send). Two enable levels as in Resolume: the whole universe and the fixture [fontes/resolume.md § States].
 
-**Cue**: enum, não booleano. O `Clip.connected` do Resolume tem cinco estados e "cada estado tem cor própria de LED" [fontes/resolume.md § Estados]. Aqui: `vazia`, `carregada`, `próxima` (standby), `ao vivo`, `em fade` (barra de progresso na própria célula, refletindo a transição mais longa) [fontes/madmapper.md § Estados], `erro`. Transição nova no mesmo parâmetro descarta a anterior.
+**Cue**: an enum, not a boolean. Resolume's `Clip.connected` has five states and "each state has its own LED color" [fontes/resolume.md § States]. Here: `empty`, `loaded`, `next` (standby), `live`, `fading` (progress bar in the cell itself, reflecting the longest transition) [fontes/madmapper.md § States], `error`. A new transition on the same parameter discards the previous one.
 
-**Entrada em edição** (modo editar cue): contorno vermelho = está na cue; laranja = está, mas com valor diferente do atual, ou ausente em parte da multisseleção [fontes/madmapper.md § Cenas e cues]. Zero modal.
+**Entry in edit** (cue edit mode): a red outline = it is in the cue; orange = it is, but with a value different from the current one, or absent in part of the multi-selection [fontes/madmapper.md § Scenes and cues]. Zero modals.
 
-**Campo do aparelho**, tintas do bloco State do Blender [fontes/blender.md § Estados]: `sobrescrito por cue` (o `inner_overridden`), `com keyframe neste tempo` (`inner_key`), `animado, sem key aqui` (`inner_anim`), `dirigido por cabo` (`inner_driven`), `diferente da cena` (`inner_changed`), cada um com par selecionado. Três níveis de não-agir: aparelho com cue mutada = apagado e editável (`active`); saída não armada em ensaio = travado (`enabled`); universo que não responde = vermelho (`alert`) [fontes/blender.md § O que copiar]. Valores divergentes em multisseleção: `Valores mistos`, string própria [fontes/capture.md § Estados e mensagens].
+**Fixture field**, inks of Blender's State block [fontes/blender.md § States]: `overridden by a cue` (the `inner_overridden`), `with a keyframe at this time` (`inner_key`), `animated, no key here` (`inner_anim`), `driven by a cable` (`inner_driven`), `different from the scene` (`inner_changed`), each one with a selected pair. Three levels of not-acting: a fixture with a muted cue = dimmed and editable (`active`); an output not armed in rehearsal = locked (`enabled`); a universe that does not answer = red (`alert`) [fontes/blender.md § What to copy]. Divergent values in a multi-selection: `Mixed values`, a string of its own [fontes/capture.md § States and messages].
 
-**Pendente**: cue editada e não gravada, vermelho [fontes/touchdesigner.md § Estados].
+**Pending**: a cue edited and not recorded, red [fontes/touchdesigner.md § States].
 
-**Preview/blind** é modo do motor (ensaio × ao vivo), não caixinha por universo como o `BlindLevelsMode` do Capture [fontes/capture.md § O que NÃO copiar].
+**Preview/blind** is an engine mode (rehearsal × live), not a little box per universe like Capture's `BlindLevelsMode` [fontes/capture.md § What NOT to copy].
 
-## 3. Zonas da tela
+## 3. Screen zones
 
-- **Patch (`Shift+1`)**: tabela de aparelhos como planilha, "navegada e editada com setas e Enter", ordenável por cabeçalho, com busca [fontes/capture.md § Atalhos]. Colunas fixas: Nome, Perfil, Modo, Universo, Endereço, Canais, Canal (ID), Unidade, Circuito, Grupo. Não sete colunas configuráveis por preferência [fontes/blender.md § O que NÃO copiar]. Abaixo da tabela, a vista do universo: `Modo: Canais | Aparelhos`, `Níveis: % | DMX` [fontes/capture.md § Patch e universos], mostrando ocupação e **sobreposição** de canal, "o único jeito de o operador ver que patcheou duas fixtures em cima da outra antes do show" [fontes/resolume.md § O que copiar]. O usuário do Resolume escreveu "40 - 68" no nome do slice porque a UI não mostrava a faixa [fontes/resolume.md § Fixtures e DMX].
-- **Outputs (`Shift+4`)**: universos com estado, VU, taxa, delay, prioridade, armar por universo.
-- **Timeline (`Shift+2`)**: cues como marcadores com ação na régua (o `TimeCue`) e, no cabeçalho de tracks, a lista de cues com atual e próximo destacados (Conductor). Um painel só para grid de clips e tira de layers, como o `LayersAndClips` do Resolume [fontes/resolume.md § Anatomia da tela].
-- **Inspector (`Shift+7`)**: parâmetros do aparelho selecionado por grupo de tipo (Intensidade/, Posição/, Cor/, Feixe/); em modo editar cue, o overlay vermelho/laranja por cima; botão "gravar da situação atual".
-- **Viewer central**: VU dos universos ou a maquete (`cenario-interativo.md`).
-- **Status bar**: armado/ensaio, cue atual → próxima, master, blackout.
+- **Patch (`Shift+1`)**: a fixture table like a spreadsheet, "navigated and edited with the arrows and Enter", sortable by header, with search [fontes/capture.md § Shortcuts]. Fixed columns: Name, Profile, Mode, Universe, Address, Channels, Channel (ID), Unit, Circuit, Group. Not seven columns configurable by preference [fontes/blender.md § What NOT to copy]. Below the table, the universe view: `Mode: Channels | Fixtures`, `Levels: % | DMX` [fontes/capture.md § Patch and universes], showing occupancy and channel **overlap**, "the only way for the operator to see that they patched two fixtures on top of each other before the show" [fontes/resolume.md § What to copy]. The Resolume user wrote "40 - 68" in the slice name because the UI did not show the range [fontes/resolume.md § Fixtures and DMX].
+- **Outputs (`Shift+4`)**: universes with state, VU, rate, delay, priority, arm per universe.
+- **Timeline (`Shift+2`)**: cues as markers with an action on the ruler (the `TimeCue`) and, in the track header, the cue list with current and next highlighted (Conductor). A single panel for the clip grid and the layer strip, like Resolume's `LayersAndClips` [fontes/resolume.md § Screen anatomy].
+- **Inspector (`Shift+7`)**: parameters of the selected fixture grouped by type (Intensity/, Position/, Color/, Beam/); in cue edit mode, the red/orange overlay on top; a "record from the current situation" button.
+- **Central viewer**: universe VUs or the scale model (`cenario-interativo.md`).
+- **Status bar**: armed/rehearsal, current cue → next, master, blackout.
 
-Menus: `View, Select, Add, Aparelho` no Patch; `View, Select, Add, Cue` na Timeline. `Add` com busca ao digitar.
+Menus: `View, Select, Add, Fixture` in the Patch; `View, Select, Add, Cue` in the Timeline. `Add` with search on typing.
 
-Face performance: GO grande (o Pause do Blender com o dobro da largura) [fontes/blender.md § Anatomia de um editor], lista de cues, master, blackout, armado. Ou a grade de células em modo Live do MadMapper, "aperta a célula, sem edição, feito para touch screen" [fontes/madmapper.md § Cenas e cues]. Nada editável.
+Performance Face: a big GO (Blender's Pause at double the width) [fontes/blender.md § Anatomy of an editor], cue list, master, blackout, armed. Or MadMapper's cell grid in Live mode, "press the cell, no editing, made for a touch screen" [fontes/madmapper.md § Scenes and cues]. Nothing editable.
 
-## 4. Atalhos
+## 4. Shortcuts
 
-`SHORTCUTS.md` já tem `Enter` GO, `Backspace` voltar, `Ctrl+G` ir para cue, `Ctrl+Shift+Enter` armar, `Ctrl+Shift+R` ensaio, `Esc` segurado blackout, `Ctrl+K` keyframe, `R` record arm, `Shift+D`/`Shift+S` mute/solo. O que entra:
+`SHORTCUTS.md` already has `Enter` GO, `Backspace` go back, `Ctrl+G` go to cue, `Ctrl+Shift+Enter` arm, `Ctrl+Shift+R` rehearsal, `Esc` held blackout, `Ctrl+K` keyframe, `R` record arm, `Shift+D`/`Shift+S` mute/solo. What comes in:
 
-| Ação | Tecla | Origem | Conflito |
+| Action | Key | Origin | Conflict |
 |---|---|---|---|
-| Cue na posição do playhead | `Ctrl+B` | Chataigne `TimelineAppCommands.cpp:47` [fontes/chataigne.md § Atalhos] | nenhum |
-| Cue anterior / próxima (seleção, sem disparar) | `Shift+PageUp` / `Shift+PageDown` | Chataigne | nenhum; `Ctrl+Shift+←/→` continua sendo marcador |
-| Passo de tempo | `PageUp` / `PageDown` | Chataigne | nenhum |
-| Modo editar cue | `Shift+E` | (nosso; MadMapper usa `Cmd+Shift+C`, que colide com copiar comando CLI) | nenhum |
-| Mudar valor sem gravar na cue, em modo edição | segurar `Shift` ao mexer | MadMapper [fontes/madmapper.md § Cenas e cues] | gesto |
-| Remover parâmetro da cue selecionada | `Backspace` sobre o campo, em modo edição | MadMapper | `Backspace` fora de campo = cue anterior; keymap de UI só vale sobre campo |
-| Keyframe no campo sob o mouse / apagar / limpar animação | `I` / `Alt+I` / `Shift+Alt+I` | Blender keymap "User Interface" [fontes/blender.md § Atalhos] | `I` = In fora de campo |
-| Voltar campo ao valor da cena | `Backspace` sobre o campo, fora do modo edição | Blender | idem |
-| Copiar comando CLI do campo | `Shift+Ctrl+C` | Blender | nenhum |
-| Numerar em lote | comando de menu `Sequential`, sem tecla | Capture | |
-| Play/pause na Face performance | `Shift+Space` | TD | regra 8 |
-| Cue momentânea | segurar a tecla da cue | Resolume `connect`, Piano Mode | gesto |
-| Duplicar cue para outra posição | `Alt` + arrastar | MadMapper | gesto |
+| Cue at the playhead position | `Ctrl+B` | Chataigne `TimelineAppCommands.cpp:47` [fontes/chataigne.md § Shortcuts] | none |
+| Previous / next cue (selection, without firing) | `Shift+PageUp` / `Shift+PageDown` | Chataigne | none; `Ctrl+Shift+←/→` remains marker |
+| Time step | `PageUp` / `PageDown` | Chataigne | none |
+| Cue edit mode | `Shift+E` | (ours; MadMapper uses `Cmd+Shift+C`, which collides with copy CLI command) | none |
+| Change a value without recording it into the cue, in edit mode | hold `Shift` while moving it | MadMapper [fontes/madmapper.md § Scenes and cues] | gesture |
+| Remove a parameter from the selected cue | `Backspace` over the field, in edit mode | MadMapper | `Backspace` outside a field = previous cue; the UI keymap only holds over a field |
+| Keyframe on the field under the mouse / delete / clear animation | `I` / `Alt+I` / `Shift+Alt+I` | Blender keymap "User Interface" [fontes/blender.md § Shortcuts] | `I` = In outside a field |
+| Return the field to the scene value | `Backspace` over the field, outside edit mode | Blender | same |
+| Copy the field's CLI command | `Shift+Ctrl+C` | Blender | none |
+| Number in batch | menu command `Sequential`, no key | Capture | |
+| Play/pause in the performance Face | `Shift+Space` | TD | rule 8 |
+| Momentary cue | hold the cue's key | Resolume `connect`, Piano Mode | gesture |
+| Duplicate a cue to another position | `Alt` + drag | MadMapper | gesture |
 
-Gramática do Resolume: sem modificador age no selecionado (`B` bypass do layer selecionado), `Shift` sobe um nível (`Shift+B` bypass da composição) [fontes/resolume.md § Atalhos e mapeamento]. Aqui: `Shift+D` muta o track focado; `Ctrl+Shift+D` muta o universo do track (proposta, nosso). Mapeamento de controlador por posição na grade **ou** por identidade da cue (`by_cell` vs `by_name`); a segunda "sobrevive a reorganizar o show às 23h" [fontes/madmapper.md § O que copiar]; o mapeamento declara também o escopo do alvo (`Selecionado | Este | Por posição`) [fontes/resolume.md § O que copiar].
+Resolume's grammar: with no modifier it acts on the selected one (`B` bypasses the selected layer), `Shift` goes up one level (`Shift+B` bypasses the composition) [fontes/resolume.md § Shortcuts and mapping]. Here: `Shift+D` mutes the focused track; `Ctrl+Shift+D` mutes the track's universe (proposal, ours). Controller mapping by position in the grid **or** by cue identity (`by_cell` vs `by_name`); the second one "survives reorganizing the show at 11 pm" [fontes/madmapper.md § What to copy]; the mapping also declares the target's scope (`Selected | This | By position`) [fontes/resolume.md § What to copy].
 
-## 5. Arquivo
+## 5. File
 
-No `.spell`:
+In the `.spell`:
 
-- `profiles[]`: perfil com `{id, version, name, modes: {name: channels[]}}`, canal = `{name, type, bits, default, ranges[{from, to, label}]}`. Biblioteca do usuário em pasta de texto, referenciada por `id + version`. A cópia anônima do Resolume (`fixtureName=""`, uuid novo, "corrigir a personality não conserta o show") é o que não fazer [fontes/resolume.md § O que NÃO copiar].
+- `profiles[]`: a profile with `{id, version, name, modes: {name: channels[]}}`, channel = `{name, type, bits, default, ranges[{from, to, label}]}`. The user's library in a text folder, referenced by `id + version`. Resolume's anonymous copy (`fixtureName=""`, a new uuid, "fixing the personality does not fix the show") is what not to do [fontes/resolume.md § What NOT to copy].
 - `fixtures[]`: `{uid, name, profile, mode, universe, address, id, unit, circuit, group, overrides: {invert_pan, limit_pan, intensity_scale, …}}`.
 - `universes[]`: `{uid, name, base, style, outputs: [{protocol, rate, delay_ms, priority, artsync}], merge: {dimmer: htp, default: ltp}}`.
-- `cues[]`: o esquema do §1, com `uid` próprio e posição como atributo (`list`, `index`; ou `bank`, `col`, `row` para a Face grade). Não a grade achatada `cues[128]` com índice implícito [fontes/madmapper.md § O que NÃO copiar]. Sem thumbnail (uma cue do exemplo do MadMapper carrega 17 658 bytes de PNG). `exclusiva`, `momentânea`, `follow`, `conditions`, `action`.
+- `cues[]`: the schema of §1, with its own `uid` and position as an attribute (`list`, `index`; or `bank`, `col`, `row` for the grid Face). Not the flattened `cues[128]` grid with an implicit index [fontes/madmapper.md § What NOT to copy]. No thumbnail (one cue in MadMapper's example carries 17 658 bytes of PNG). `exclusive`, `momentary`, `follow`, `conditions`, `action`.
 - `cuelists[]`: `{uid, name, cues[uid], loop, current}`.
-- `mappings[]` com `target: {by: uid | cell, scope: selected | this | position}`.
+- `mappings[]` with `target: {by: uid | cell, scope: selected | this | position}`.
 
-Fora do `.spell`: níveis vivos, estado de conexão, o programador do operador (o Parrot grava em arquivo próprio quando pedido).
+Outside the `.spell`: live levels, connection state, the operator's programmer (Parrot records into its own file when asked).
 
-Salvar: cópia de segurança automática e oferta dela na abertura corrompida (`FileErrorUseBackup`, `ChecksumError`) [fontes/capture.md § Estados e mensagens]. Importar aparelhos de CSV com mapeamento de colunas e relatório `atualizados / adicionados / linhas puladas` [fontes/capture.md § Arquivo] vira `spell patch import`.
+Saving: automatic backup copy and an offer of it on a corrupted open (`FileErrorUseBackup`, `ChecksumError`) [fontes/capture.md § States and messages]. Importing fixtures from CSV with column mapping and a report of `updated / added / skipped rows` [fontes/capture.md § File] becomes `spell patch import`.

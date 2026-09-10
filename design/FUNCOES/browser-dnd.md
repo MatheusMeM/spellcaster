@@ -1,157 +1,157 @@
-# Browser e drag and drop — o painel da esquerda (`Alt+5`)
+# Browser and drag and drop — the left panel (`Alt+5`)
 
-Pedido do Matheus (09/09/2026): *"Quero drag n drop de elementos e saídas e mídias e laser e áudio e vídeo"*, e antes disso *"não tenho como inputar ou gravar DMX novo ou ILDA ou vídeo"*. Hoje não existe **nenhuma** entrada de mídia: nenhum `drop`/`dragover`/`dataTransfer` em `spellgui/web/*`, nenhuma rota de escrita em `spellcore/serve/src/lib.rs:338-345`, nenhum comando de arquivo entre os 30 do registry.
+Matheus's request (2026-09-09): *"I want drag n drop of elements and outputs and media and laser and audio and video"*, and before that *"I have no way to input or record new DMX or ILDA or video"*. Today there is **no** media input at all: no `drop`/`dragover`/`dataTransfer` in `spellgui/web/*`, no write route in `spellcore/serve/src/lib.rs:338-345`, no file command among the registry's 30.
 
-Fontes: **Ableton Live 12** §4 (Working with the Browser), §4.10 (Adding Content), §5.3 (Live Clips), §41.22 (atalhos), citado por seção. **DaVinci Resolve 20**, Media Pool, citado por página do manual local. **Resolume Arena**, manual online (Decks, Clips), para o que acontece ao soltar em cima do que já existe.
+Sources: **Ableton Live 12** §4 (Working with the Browser), §4.10 (Adding Content), §5.3 (Live Clips), §41.22 (shortcuts), cited by section. **DaVinci Resolve 20**, Media Pool, cited by page of the local manual. **Resolume Arena**, online manual (Decks, Clips), for what happens when you drop onto what already exists.
 
-| Item | Quem resolveu melhor | Por quê |
+| Item | Who solved it best | Why |
 |---|---|---|
-| Estrutura do painel | Ableton §4 | Três seções nomeadas — Collections, Library, Places — e Places é onde entram as pastas do usuário. O Media Pool do Resolve é um bin por projeto, e a nossa "biblioteca" é a pasta do show mais o que o operador apontar |
-| Onde o drop cria track | Ableton §4.10 | *"into the space to the right of Session View tracks or below Arrangement View tracks will create a new track"* — regra única, nas duas vistas |
-| Drop vindo do sistema de arquivos | ambos | Ableton §4.10: *"Files can also be dropped directly into Live from the Explorer (Win)/Finder (Mac)"*; Resolve p.690: *"You can also drag a clip directly from your file system to the Timeline"* |
-| Drop em cima de algo que já existe | Resolume (Decks) | É o único manual que declara os três casos: sobrepor troca de posição, soltar entre dois insere, `Ctrl` ao soltar copia. O Ableton não descreve, o Resolve manda usar "Set Path" |
-| Preview antes de usar | Ableton §4.9 | Toggle de preview, `Shift+Enter` audiciona sem ligar o toggle, e um botão `Raw` que separa "tocar no tempo do show" de "tocar como o arquivo é" |
-| Saídas no browser | nenhum | Nenhum dos três trata saída como item arrastável. É invenção nossa, justificada em §4 |
+| Panel structure | Ableton §4 | Three named sections — Collections, Library, Places — and Places is where the user's folders go. Resolve's Media Pool is one bin per project, and our "library" is the show folder plus whatever the operator points at |
+| Where a drop creates a track | Ableton §4.10 | *"into the space to the right of Session View tracks or below Arrangement View tracks will create a new track"* — a single rule, in both views |
+| Drop coming from the file system | both | Ableton §4.10: *"Files can also be dropped directly into Live from the Explorer (Win)/Finder (Mac)"*; Resolve p.690: *"You can also drag a clip directly from your file system to the Timeline"* |
+| Drop onto something that already exists | Resolume (Decks) | It is the only manual that declares the three cases: overlapping swaps position, dropping between two inserts, `Ctrl` on drop copies. Ableton does not describe it, Resolve tells you to use "Set Path" |
+| Preview before using | Ableton §4.9 | Preview toggle, `Shift+Enter` auditions without turning the toggle on, and a `Raw` button that separates "play in show time" from "play as the file is" |
+| Outputs in the browser | none | None of the three treats an output as a draggable item. It is our invention, justified in §4 |
 
-## 1. Objetos do browser
+## 1. Browser objects
 
-Uma árvore, três raízes, na ordem em que aparecem:
+One tree, three roots, in the order they appear:
 
-| Raiz | Contém | De onde vem |
+| Root | Contains | Where it comes from |
 |---|---|---|
-| **Show** | o que este `.spell` usa: mídia referenciada por `clips[]`, perfis do patch, módulos do graph, faces | lido do show aberto |
-| **Pasta** | a pasta do show e as pastas que o operador acrescentar | `Places` do Ableton §4.7: *"you must first add them to the browser, either by dropping them directly into the Places section from the Explorer (Win)/Finder (Mac), or by using the Add Folder option"*; §4.7.8: *"Adding a user folder does not actually move the folder to a new location"* |
-| **Saídas** | universos sACN/Art-Net, alvos OSC, DACs laser, janelas de vídeo | lido de `show.outputs[]` |
+| **Show** | what this `.spell` uses: media referenced by `clips[]`, patch profiles, graph modules, faces | read from the open show |
+| **Folder** | the show folder and the folders the operator adds | Ableton's `Places` §4.7: *"you must first add them to the browser, either by dropping them directly into the Places section from the Explorer (Win)/Finder (Mac), or by using the Add Folder option"*; §4.7.8: *"Adding a user folder does not actually move the folder to a new location"* |
+| **Outputs** | sACN/Art-Net universes, OSC targets, laser DACs, video windows | read from `show.outputs[]` |
 
-Tipos de item, com o que cada um vira ao ser solto:
+Item types, with what each one becomes when dropped:
 
-| Item | Extensão | Vira |
+| Item | Extension | Becomes |
 |---|---|---|
-| Clipe laser | `.ild` | track `laser` + clipe |
-| Áudio | `.wav`, `.mp3`, `.flac` | track `audio` + clipe (`audio-video.md §1`) |
-| Vídeo | `.mp4`, `.webm` | track `video` + clipe |
-| Efeito | `.rhai` | track `fx` |
-| Perfil de aparelho | `profiles/*.json` | `patch_add {name, profile, universe, address}` |
-| Módulo do graph | `modules/*.json` | nó `module` no PATCHBAY (`DECISOES.md`, aguarda voto) |
-| Face | `faces/*.json` | abre a Face |
-| Saída | — | ver §4 |
+| Laser clip | `.ild` | `laser` track + clip |
+| Audio | `.wav`, `.mp3`, `.flac` | `audio` track + clip (`audio-video.md §1`) |
+| Video | `.mp4`, `.webm` | `video` track + clip |
+| Effect | `.rhai` | `fx` track |
+| Fixture profile | `profiles/*.json` | `patch_add {name, profile, universe, address}` |
+| Graph module | `modules/*.json` | `module` node in the PATCHBAY (`DECISOES.md`, awaiting vote) |
+| Face | `faces/*.json` | opens the Face |
+| Output | — | see §4 |
 
-Cor por tipo é a mesma regra de `daw-arranjo.md` B7: derivada do tipo, nunca livre.
+Color by type is the same rule as `daw-arranjo.md` B7: derived from the type, never free.
 
 ## 2. Preview
 
-Ableton §4.9 tem três coisas e as três valem:
+Ableton §4.9 has three things and all three hold:
 
-1. **Toggle de preview** ao lado da aba. Ligado, clicar no item audiciona.
-2. **`Shift+Enter` audiciona mesmo com o toggle desligado** (*"You can preview files even when the Preview toggle is not enabled by pressing ShiftEnter or the right arrow key"*). É o atalho que salva quem desligou o preview para não estourar a PA no meio do show.
-3. **Botão `Raw`**: desligado, o preview espera o próximo compasso e roda em loop; ligado, toca no tempo original, sem loop, sem scrub. Nosso equivalente: desligado = o preview respeita o transporte (entra no próximo marcador); ligado = toca já. **O `Raw` entra**, porque é a diferença entre ouvir um arquivo e ensaiar uma entrada.
+1. **Preview toggle** next to the tab. On, clicking the item auditions it.
+2. **`Shift+Enter` auditions even with the toggle off** (*"You can preview files even when the Preview toggle is not enabled by pressing ShiftEnter or the right arrow key"*). It is the shortcut that saves whoever turned preview off so as not to blow the PA in the middle of the show.
+3. **`Raw` button**: off, the preview waits for the next bar and loops; on, it plays at the original tempo, no loop, no scrub. Our equivalent: off = the preview respects the transport (comes in at the next marker); on = plays right away. **`Raw` comes in**, because it is the difference between hearing a file and rehearsing a cue-in.
 
-Preview de `.ild` é o mesmo gesto no viewer de previz (frente `previz`); preview de `.rhai` não existe (script não se audiciona).
+Preview of `.ild` is the same gesture in the previz viewer (`previz` workstream); preview of `.rhai` does not exist (you do not audition a script).
 
-## 3. O que cada drop faz
+## 3. What each drop does
 
-Esta é a tabela que a implementação segue. `alvo` = onde o mouse solta.
+This is the table the implementation follows. `target` = where the mouse drops.
 
-| # | Item | Alvo | Efeito | Origem |
+| # | Item | Target | Effect | Origin |
 |---|---|---|---|---|
-| 1 | mídia | área vazia abaixo do último track | **cria track do tipo da mídia** e põe o clipe no tempo do ponto de soltura | Ableton §4.10 |
-| 2 | mídia | track compatível, num tempo | põe um clipe ali. Compatível = o tipo do track bate com a extensão | Ableton §4.10 ("Items can be dragged and dropped from the browser into tracks") |
-| 3 | mídia | track incompatível | recusa, com o cursor de recusa. Não converte, não cria track escondido | (nosso; a alternativa silenciosa é o defeito que `PRINCIPIOS.md` chama de mentira de widget) |
-| 4 | mídia | em cima de um clipe existente | **insere ao lado**, empurrando: soltar na metade esquerda insere antes, na direita insere depois | Resolume, Decks: *"You can also drag a clip just to the right or left of another clip. This will insert the dragged clip next to it, and shift over the others to make room for it."* Substituir por drop **não entra**: o Resolume também não tem (o caminho lá é o Media Manager, "Set Path") |
-| 5 | clipe já na timeline | outro lugar | move (é `daw-arranjo.md` C2) |
-| 6 | clipe já na timeline | outro lugar, com `Alt` | copia | `timeline-daw.md` item 15; o Resolume usa `Ctrl` ao soltar, nós já fixamos `Alt` |
-| 7 | múltiplos arquivos | qualquer alvo | **um track só**, empilhados no tempo, salvo se `Ctrl` estiver segurado ao soltar, que espalha em tracks | Ableton §7.4: *"Live defaults to arranging them in one track... Hold down Ctrl (Win) / Cmd (Mac) prior to dropping them so as to lay the clips out in multiple tracks instead"* |
-| 8 | perfil de aparelho | painel Patch | `patch_add` com o nome do arquivo como `name` | (nosso; `cenas-cues-dmx.md`) |
-| 9 | saída | cabeçalho de um track | **atribui a saída ao track**: escreve `universe`/`address` (sACN/Art-Net), `feed` (laser), `address` (OSC) | ver §4 |
-| 10 | saída | área vazia | **cria a saída no show** (`show.outputs[]`) | ver §4 |
-| 11 | arquivo do Explorer | qualquer alvo | idem 1–4, depois de subir o arquivo | ver §5 |
-| 12 | pasta do Explorer | raiz **Pasta** do browser | acrescenta a pasta ao browser, **sem copiar nada** | Ableton §4.7.8 |
+| 1 | media | empty area below the last track | **creates a track of the media's type** and puts the clip at the time of the drop point | Ableton §4.10 |
+| 2 | media | compatible track, at a time | puts a clip there. Compatible = the track type matches the extension | Ableton §4.10 ("Items can be dragged and dropped from the browser into tracks") |
+| 3 | media | incompatible track | refuses, with the refusal cursor. Does not convert, does not create a hidden track | (ours; the silent alternative is the defect `PRINCIPIOS.md` calls a widget lie) |
+| 4 | media | on top of an existing clip | **inserts alongside**, pushing: dropping on the left half inserts before, on the right inserts after | Resolume, Decks: *"You can also drag a clip just to the right or left of another clip. This will insert the dragged clip next to it, and shift over the others to make room for it."* Replacing by drop **does not come in**: Resolume does not have it either (the path there is the Media Manager, "Set Path") |
+| 5 | clip already on the timeline | elsewhere | moves (that is `daw-arranjo.md` C2) |
+| 6 | clip already on the timeline | elsewhere, with `Alt` | copies | `timeline-daw.md` item 15; Resolume uses `Ctrl` on drop, we already fixed `Alt` |
+| 7 | multiple files | any target | **a single track**, stacked in time, unless `Ctrl` is held on drop, which spreads them across tracks | Ableton §7.4: *"Live defaults to arranging them in one track... Hold down Ctrl (Win) / Cmd (Mac) prior to dropping them so as to lay the clips out in multiple tracks instead"* |
+| 8 | fixture profile | Patch panel | `patch_add` with the file name as `name` | (ours; `cenas-cues-dmx.md`) |
+| 9 | output | a track header | **assigns the output to the track**: writes `universe`/`address` (sACN/Art-Net), `feed` (laser), `address` (OSC) | see §4 |
+| 10 | output | empty area | **creates the output in the show** (`show.outputs[]`) | see §4 |
+| 11 | file from Explorer | any target | same as 1-4, after uploading the file | see §5 |
+| 12 | folder from Explorer | browser's **Folder** root | adds the folder to the browser, **copying nothing** | Ableton §4.7.8 |
 
-Regra transversal do drop, tirada do Ableton §4.10 e válida para todos: **duplo-clique ou `Enter` no item faz a mesma coisa que soltar no track selecionado.** Sem isso, o browser é inoperável por teclado.
+Cross-cutting drop rule, taken from Ableton §4.10 and valid for all of them: **double-click or `Enter` on the item does the same thing as dropping onto the selected track.** Without it, the browser is unusable from the keyboard.
 
-## 4. Saída arrastável: por que, e o contrato
+## 4. Draggable output: why, and the contract
 
-Nenhum dos três manuais tem isso — no Resolume a saída é um `screen` no Advanced Output (`Ctrl+Shift+A` lá), no Ableton é o roteamento no mixer, no Resolve é a página Deliver. Mas o pedido é literal (*"drag n drop de elementos e **saídas** e mídias"*) e a nossa saída **é** um objeto do show: `show.outputs[]` já existe e já tem forma (`shows/medgrupo.spell`: `{"type":"sacn","universes":[1],"priority":100,"source_name":"Spellcaster"}` e `{"type":"laser","dac":null,"port":7765,"pps":25000,"safety":{...}}`).
+None of the three manuals has it — in Resolume the output is a `screen` in the Advanced Output (`Ctrl+Shift+A` there), in Ableton it is the routing in the mixer, in Resolve it is the Deliver page. But the request is literal (*"drag n drop of elements and **outputs** and media"*) and our output **is** an object of the show: `show.outputs[]` already exists and already has a shape (`shows/medgrupo.spell`: `{"type":"sacn","universes":[1],"priority":100,"source_name":"Spellcaster"}` and `{"type":"laser","dac":null,"port":7765,"pps":25000,"safety":{...}}`).
 
-Contrato:
+Contract:
 
-- **Item de saída no browser = uma entrada de `show.outputs[]`**, mais os candidatos descobertos na rede que ainda não estão no show (DAC EtherDream que respondeu, nó Art-Net anunciado). Candidato aparece apagado; arrastar para a área vazia é o que o adiciona.
-- **Soltar saída em cabeçalho de track** escreve no track o que liga os dois. Para `dmx`/`artnet`: `universe` e `address`. Para `laser`: o `feed`. Para `osc`: o `address` base. É um `show_patch` de uma linha.
-- **Soltar saída em área vazia** acrescenta a `show.outputs[]`.
-- **Uma saída física serve um alvo só.** Resolume, Screens: *"Every output can only have a single screen associated with it"* — quando se escolhe uma saída já usada, o Resolume devolve a outra para virtual. Aqui: universo já atribuído a outro track é aviso, não erro (dois tracks no mesmo universo é uso legítimo com merge declarado, `cenas-cues-dmx.md § Universo`); DAC laser já aberto por outro track **é erro**, porque um DAC toca um fluxo.
-- **Um botão de pânico.** Resolume, Screens: `Ctrl+Shift+D` desabilita todas as saídas. `SHORTCUTS.md` já tem `Ctrl+Shift+Enter` (armar saídas reais) e `Ctrl+Shift+R` (modo ensaio); o par que falta é desarmar tudo, e é a mesma tecla de armar batida de novo.
+- **An output item in the browser = one entry of `show.outputs[]`**, plus the candidates discovered on the network that are not in the show yet (an EtherDream DAC that answered, an announced Art-Net node). A candidate shows up dimmed; dragging it into the empty area is what adds it.
+- **Dropping an output on a track header** writes into the track what links the two. For `dmx`/`artnet`: `universe` and `address`. For `laser`: the `feed`. For `osc`: the base `address`. It is a one-line `show_patch`.
+- **Dropping an output on an empty area** adds it to `show.outputs[]`.
+- **One physical output serves one target only.** Resolume, Screens: *"Every output can only have a single screen associated with it"* — when you pick an output already in use, Resolume sends the other one back to virtual. Here: a universe already assigned to another track is a warning, not an error (two tracks on the same universe is legitimate use with declared merge, `cenas-cues-dmx.md § Universe`); a laser DAC already opened by another track **is an error**, because one DAC plays one stream.
+- **One panic button.** Resolume, Screens: `Ctrl+Shift+D` disables all outputs. `SHORTCUTS.md` already has `Ctrl+Shift+Enter` (arm real outputs) and `Ctrl+Shift+R` (rehearsal mode); the missing half is disarming everything, and it is the same arm key hit again.
 
-**Faltam comandos no registry.** Saída hoje só se edita por `show_patch` com caminho `/outputs/0/pps`, o que obriga a GUI a saber o índice e o esquema:
+**Commands missing in the registry.** Today an output is only edited through `show_patch` with the path `/outputs/0/pps`, which forces the GUI to know the index and the schema:
 
-| Comando | Argumentos | Faz |
+| Command | Arguments | Does |
 |---|---|---|
-| `output_add` | `kind, ...` | Acrescenta a `show.outputs[]`; devolve o índice |
-| `output_set` | `index, <campos>` | Edita |
-| `output_del` | `index` | Remove |
-| `outputs` | — | Lista as do show **e** as descobertas na rede, com estado |
+| `output_add` | `kind, ...` | Adds to `show.outputs[]`; returns the index |
+| `output_set` | `index, <fields>` | Edits |
+| `output_del` | `index` | Removes |
+| `outputs` | — | Lists the show's **and** those discovered on the network, with state |
 
-`outputs` é o que enche o browser. Sem ele o painel de saídas é uma leitura de `/show` sem estado, que é o defeito 24 de `pontos-falhos.md` (o painel do laser tem oito sliders e nenhum DAC).
+`outputs` is what fills the browser. Without it the outputs panel is a read of `/show` with no state, which is defect 24 of `pontos-falhos.md` (the laser panel has eight sliders and no DAC).
 
-## 5. Arquivo do Explorer: o contrato de `POST /files`
+## 5. File from Explorer: the `POST /files` contract
 
-O drop de arquivo do sistema chega por HTML5: o evento `drop` traz `dataTransfer.files`, uma `FileList` de objetos `File`. **Na janela wry não há caminho** — `File.name` é o nome, `File.path` é extensão do Electron e não existe ali. Portanto o conteúdo tem de subir.
+A file drop from the system arrives through HTML5: the `drop` event carries `dataTransfer.files`, a `FileList` of `File` objects. **In the wry window there is no path** — `File.name` is the name, `File.path` is an Electron extension and does not exist there. Therefore the content has to be uploaded.
 
-Rota nova em `spellcore/serve/src/lib.rs`, ao lado das quatro que existem (`/commands`, `/show`, `/ws`, `/mcp`, `:338-345`):
+New route in `spellcore/serve/src/lib.rs`, next to the four that exist (`/commands`, `/show`, `/ws`, `/mcp`, `:338-345`):
 
 ```
-POST /files/<nome>
-  corpo: os bytes do arquivo
+POST /files/<name>
+  body: the file bytes
   200 -> {"path": "media/medgrupo_laser.ild", "bytes": 41232}
-  400 -> nome recusado
-  413 -> maior que o limite
-  409 -> ja existe
+  400 -> name refused
+  413 -> larger than the limit
+  409 -> already exists
 ```
 
-Regras, todas obrigatórias:
+Rules, all mandatory:
 
-1. **Destino é a pasta do show, subpasta `media/`.** Nunca `--dir`, nunca caminho vindo do cliente.
-2. **`<nome>` passa pelo mesmo filtro de `estatico()`** (`serve/src/lib.rs:102-108`): recusa `:`, `\`, segmento vazio, `.` e `..`, e não faz percent-decode. O filtro já existe e já está testado; reusar, não reescrever.
-3. **Extensão em lista branca**: `ild`, `wav`, `mp3`, `flac`, `mp4`, `webm`, `rhai`, `json`, `spell`. Fora da lista, 400. Sem lista branca, `POST /files/x.exe` na pasta do show é um vetor pronto.
-4. **Limite de tamanho**, com o valor no comentário `ponytail:`. Proposta: 512 MB, que cobre um vídeo de show e não cobre um disco. Acima, 413.
-5. **Já existe = 409**, e a GUI pergunta. Sobrescrever mídia usada por outro clipe é perda silenciosa.
-6. **Só `127.0.0.1`.** O `serve` já é local (`serve/src/lib.rs`), mas a rota de escrita é a primeira que torna isso uma decisão de segurança e não um acaso; um comentário `ponytail:` diz que ela cai quando o `--host` e o token existirem, junto com a leitura da raiz do repo que já está declarada em `:99-101`.
-7. **A resposta devolve o caminho relativo ao show**, que é exatamente o que vai em `clips[].src` (`daw-arranjo.md §4.1`).
+1. **The destination is the show folder, `media/` subfolder.** Never `--dir`, never a path coming from the client.
+2. **`<name>` goes through the same filter as `estatico()`** (`serve/src/lib.rs:102-108`): refuses `:`, `\`, an empty segment, `.` and `..`, and does no percent-decode. The filter already exists and is already tested; reuse it, do not rewrite it.
+3. **Extension on a whitelist**: `ild`, `wav`, `mp3`, `flac`, `mp4`, `webm`, `rhai`, `json`, `spell`. Off the list, 400. Without a whitelist, `POST /files/x.exe` into the show folder is a ready-made vector.
+4. **Size limit**, with the value in a `ponytail:` comment. Proposal: 512 MB, which covers a show video and does not cover a disk. Above it, 413.
+5. **Already exists = 409**, and the GUI asks. Overwriting media used by another clip is silent loss.
+6. **`127.0.0.1` only.** `serve` is already local (`serve/src/lib.rs`), but the write route is the first one that makes this a security decision and not an accident; a `ponytail:` comment says it falls when `--host` and the token exist, together with the read of the repo root already declared at `:99-101`.
+7. **The response returns the path relative to the show**, which is exactly what goes into `clips[].src` (`daw-arranjo.md §4.1`).
 
-**Bloqueio a resolver antes:** a GUI não sabe onde mora o show. `GET /show` chama `show_get {full:true}`, e esse ramo devolve só `serde_json::to_value(sh)` — sem o caminho (`registry.rs:221-223`; só o ramo não-`full` passa por `resumo(f, sh)`). Sem o caminho não há "pasta do show" para o `POST` nem para resolver `src`. Correção mínima: `show_get {full:true}` devolver `{"file": "<caminho>", "show": {...}}`, ou `GET /show` mandar o caminho num cabeçalho. É `pontos-falhos.md` item 16, e é pré-requisito desta função.
+**Blocker to solve first:** the GUI does not know where the show lives. `GET /show` calls `show_get {full:true}`, and that branch returns only `serde_json::to_value(sh)` — with no path (`registry.rs:221-223`; only the non-`full` branch goes through `resumo(f, sh)`). With no path there is no "show folder" for the `POST` nor for resolving `src`. Minimum fix: `show_get {full:true}` returning `{"file": "<caminho>", "show": {...}}`, or `GET /show` sending the path in a header. It is `pontos-falhos.md` item 16, and it is a prerequisite of this function.
 
-**Segundo bloqueio, menor:** `mime()` conhece quatro tipos (`serve/src/lib.rs:87-96`) e devolve `application/octet-stream` para todo o resto. Um `<audio src="media/x.mp3">` ou `<video src="media/x.mp4">` servido como octet-stream não toca em navegador nenhum. `mime()` ganha `mp3`, `wav`, `flac`, `mp4`, `webm` — cinco linhas, e o próprio `ponytail:` do arquivo já prevê ("imagem e fonte entram quando alguma pagina trouxer uma").
+**Second blocker, smaller:** `mime()` knows four types (`serve/src/lib.rs:87-96`) and returns `application/octet-stream` for everything else. An `<audio src="media/x.mp3">` or `<video src="media/x.mp4">` served as octet-stream plays in no browser at all. `mime()` gains `mp3`, `wav`, `flac`, `mp4`, `webm` — five lines, and the file's own `ponytail:` already anticipates it ("imagem e fonte entram quando alguma pagina trouxer uma").
 
-## 6. O que fica de fora
+## 6. What stays out
 
-- **Hot-swap** (Ableton §23.2.4, tecla `Q`). Trocar o arquivo de um clipe sem soltá-lo é útil, mas o gesto é "audicionar e trocar ao vivo", que só faz sentido com preview instantâneo de vídeo e áudio já rodando. Volta depois de `audio-video.md`.
-- **Favoritos e cores de coleção** (Ableton §4.5, teclas `1`–`7`). As teclas `1`–`7` são caras e `PRINCIPIOS.md §2` não deixa cor decorativa. Um item favorito é um item numa pasta.
-- **Media Manager / "Set Path"** (Resolume) e relink de mídia perdida. Entra quando existir show que viajou de máquina; hoje o caminho é relativo à pasta do show e a pasta viaja junto.
-- **Combinar áudio e vídeo num clipe só** (Resolume, Decks: soltar áudio sobre um slot com vídeo transpõe o vídeo para a duração do áudio). Nós temos dois tracks; combinar é sincronizar, e sincronizar é `audio-video.md §3`.
-- **Aritmética nos campos** (Resolume, Input Selection: digitar `/3` num campo de largura). Bom, e é do Inspector, não do browser.
+- **Hot-swap** (Ableton §23.2.4, key `Q`). Swapping a clip's file without dropping it is useful, but the gesture is "audition and swap live", which only makes sense with instant preview of video and audio already running. It comes back after `audio-video.md`.
+- **Favorites and collection colors** (Ableton §4.5, keys `1`-`7`). The keys `1`-`7` are expensive and `PRINCIPIOS.md §2` does not allow decorative color. A favorite item is an item in a folder.
+- **Media Manager / "Set Path"** (Resolume) and relinking lost media. It comes in when there is a show that traveled between machines; today the path is relative to the show folder and the folder travels with it.
+- **Combining audio and video in a single clip** (Resolume, Decks: dropping audio onto a slot with video transposes the video to the audio's duration). We have two tracks; combining is syncing, and syncing is `audio-video.md §3`.
+- **Arithmetic in fields** (Resolume, Input Selection: typing `/3` in a width field). Good, and it belongs to the Inspector, not the browser.
 
-## 7. Atalhos
+## 7. Shortcuts
 
-| Ação | Tecla | Origem | Conflito |
+| Action | Key | Origin | Conflict |
 |---|---|---|---|
-| Mostrar / esconder o browser | `Alt+5` | Ableton §41.2 ("Move Focus to the Browser \| Alt5") | nenhum; `SHORTCUTS.md` usa `Shift+1..7` para painéis e `Alt+Shift+1..9` para workspaces |
-| Buscar no browser | `Ctrl+F` | Ableton §41.22 | nenhum |
-| Carregar o item selecionado no track selecionado | `Enter` | Ableton §41.22 | `Enter` é GO na Face performance; aqui é painel focado |
-| Audicionar o item selecionado | `Shift+Enter` | Ableton §41.22 | nenhum |
-| Abrir/fechar pasta, ir para o conteúdo | `←` / `→` | Ableton §4.8 | painel focado |
-| Espalhar em vários tracks ao soltar | segurar `Ctrl` antes de soltar | Ableton §7.4 | gesto |
+| Show / hide the browser | `Alt+5` | Ableton §41.2 ("Move Focus to the Browser \| Alt5") | none; `SHORTCUTS.md` uses `Shift+1..7` for panels and `Alt+Shift+1..9` for workspaces |
+| Search in the browser | `Ctrl+F` | Ableton §41.22 | none |
+| Load the selected item into the selected track | `Enter` | Ableton §41.22 | `Enter` is GO in the performance Face; here it is the focused panel |
+| Audition the selected item | `Shift+Enter` | Ableton §41.22 | none |
+| Open/close folder, go into the content | `←` / `→` | Ableton §4.8 | focused panel |
+| Spread across several tracks on drop | hold `Ctrl` before dropping | Ableton §7.4 | gesture |
 
-## 8. Testes
+## 8. Tests
 
-Funções puras, `node`, um `assert` cada:
+Pure functions, `node`, one `assert` each:
 
-| Função | Entrada | Saída esperada |
+| Function | Input | Expected output |
 |---|---|---|
-| `BR.tipoDe("x.ILD")` | — | `"laser"` (extensão sem diferenciar caixa) |
+| `BR.tipoDe("x.ILD")` | — | `"laser"` (extension, case-insensitive) |
 | `BR.tipoDe("x.exe")` | — | `null` |
-| `BR.alvoDrop(y, tracks)` | `y` abaixo do último track | `{acao:"novo-track"}` |
-| `BR.alvoDrop(y, tracks)` | `y` sobre track `audio`, item `.ild` | `{acao:"recusa"}` (regra 3) |
-| `BR.alvoDrop` sobre clipe, x na metade esquerda | — | `{acao:"insere", lado:"antes"}` (regra 4) |
-| `BR.espalha(files, ctrl)` | 3 arquivos, `ctrl=false` | um track, três clipes em sequência |
-| `BR.espalha(files, ctrl)` | 3 arquivos, `ctrl=true` | três tracks |
+| `BR.alvoDrop(y, tracks)` | `y` below the last track | `{acao:"novo-track"}` |
+| `BR.alvoDrop(y, tracks)` | `y` over an `audio` track, item `.ild` | `{acao:"recusa"}` (rule 3) |
+| `BR.alvoDrop` over a clip, x on the left half | — | `{acao:"insere", lado:"antes"}` (rule 4) |
+| `BR.espalha(files, ctrl)` | 3 files, `ctrl=false` | one track, three clips in sequence |
+| `BR.espalha(files, ctrl)` | 3 files, `ctrl=true` | three tracks |
 
-Em Rust, ao lado dos testes de `serve`: `POST /files/../x.ild` → 400; `POST /files/x.exe` → 400; `POST /files/a.ild` duas vezes → 200 e 409; arquivo acima do limite → 413.
+In Rust, next to the `serve` tests: `POST /files/../x.ild` → 400; `POST /files/x.exe` → 400; `POST /files/a.ild` twice → 200 and 409; a file above the limit → 413.

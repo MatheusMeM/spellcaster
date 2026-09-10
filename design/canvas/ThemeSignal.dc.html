@@ -15,46 +15,46 @@
     .cond { font-family: "Barlow Condensed", "Arial Narrow", sans-serif; font-weight: 800; text-transform: uppercase; }
   </style>
 </helmet>
-<!-- mesma Face, Theme signal: janela cortada em diagonal, listra de perigo, tipografia gigante, scanlines. O "wild" está na forma e na escala, não em ornamento. -->
+<!-- the same Face, Theme signal: window cut on the diagonal, hazard stripe, giant typography, scanlines. The "wild" is in the shape and the scale, not in ornament. -->
 <div style="width: 1280px; height: 800px; background: #000000; position: relative; overflow: hidden;">
   <div style="position: absolute; inset: 0; background: #0A0A0A; clip-path: polygon(0 0, 1280px 0, 1280px 640px, 1040px 800px, 0 800px);"></div>
   <div style="position: absolute; left: 0; top: 0; width: 1280px; height: 800px; background: repeating-linear-gradient(0deg, rgba(0,0,0,0) 0 3px, rgba(0,0,0,0.22) 3px 4px); pointer-events: none;"></div>
 
-  <!-- listra de perigo diagonal: estado AO VIVO -->
+  <!-- diagonal hazard stripe: LIVE state -->
   <div style="position: absolute; left: -80px; top: 560px; width: 1500px; height: 40px; background: repeating-linear-gradient(-45deg, #FF2D1F 0 28px, #000000 28px 56px); transform: rotate(-33.7deg); transform-origin: left top;"></div>
 
-  <!-- cabeçalho -->
+  <!-- header -->
   <div class="lbl" style="position: absolute; left: 32px; top: 24px; right: 32px; display: flex; justify-content: space-between; font-size: 12px; color: #B5B1A9;">
     <span>SIGNAL · FACE operador_medgrupo</span>
-    <span style="color: #FF2D1F;">▮ AO VIVO · sACN U1 U2 · 30 Hz</span>
+    <span style="color: #FF2D1F;">▮ LIVE · sACN U1 U2 · 30 Hz</span>
   </div>
 
-  <!-- timecode gigante -->
+  <!-- giant timecode -->
   <div class="cond" style="position: absolute; left: 24px; top: 48px; font-size: 220px; line-height: 0.82; color: #F7F5EB; letter-spacing: -0.03em;">21<span style="color: #FF2D1F;">:09</span></div>
-  <div class="lbl" style="position: absolute; left: 32px; top: 236px; font-size: 14px; color: #B5B1A9;">00:00:21:09 · CUE 3 CIDADES · PRÓXIMA 4 PICO EM 11.9 s</div>
+  <div class="lbl" style="position: absolute; left: 32px; top: 236px; font-size: 14px; color: #B5B1A9;">00:00:21:09 · CUE 3 CITIES · NEXT 4 PEAK IN 11.9 s</div>
 
-  <!-- GO: bloco vermelho cortado -->
+  <!-- GO: cut red block -->
   <div style="position: absolute; left: 32px; top: 300px; width: 560px; height: 220px; background: #FF2D1F; clip-path: polygon(0 0, 100% 0, 100% 70%, 92% 100%, 0 100%); display: flex; align-items: flex-end; justify-content: space-between; padding: 16px 24px; box-sizing: border-box;">
     <div class="cond" style="font-size: 200px; line-height: 0.8; color: #000000; letter-spacing: -0.04em;">GO</div>
     <div class="lbl" style="font-size: 14px; color: #000000; text-align: right; line-height: 1.4;">SPACE<br>MIDI 36<br>/go</div>
   </div>
 
-  <!-- cue list: tipografia grande, sem caixa -->
+  <!-- cue list: large typography, no box -->
   <div style="position: absolute; left: 640px; top: 300px; width: 600px; display: flex; flex-direction: column; gap: 2px;">
-    <div class="cond" style="display: flex; justify-content: space-between; font-size: 32px; color: #333333; line-height: 1.1;"><span>1 DÍGITOS</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 14px; align-self: center;">02:00</span></div>
+    <div class="cond" style="display: flex; justify-content: space-between; font-size: 32px; color: #333333; line-height: 1.1;"><span>1 DIGITS</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 14px; align-self: center;">02:00</span></div>
     <div class="cond" style="display: flex; justify-content: space-between; font-size: 32px; color: #333333; line-height: 1.1;"><span>2 FLASH</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 14px; align-self: center;">10:15</span></div>
-    <div class="cond" style="display: flex; justify-content: space-between; font-size: 56px; color: #F7F5EB; line-height: 1; border-bottom: 4px solid #FF2D1F; padding-bottom: 4px;"><span>3 CIDADES</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 14px; align-self: center; color: #FF2D1F;">13:03</span></div>
-    <div class="cond" style="display: flex; justify-content: space-between; font-size: 32px; color: #B5B1A9; line-height: 1.1;"><span>4 PICO</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 14px; align-self: center;">33:04</span></div>
-    <div class="cond" style="display: flex; justify-content: space-between; font-size: 32px; color: #B5B1A9; line-height: 1.1;"><span>5 EPÍLOGO</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 14px; align-self: center;">46:24</span></div>
+    <div class="cond" style="display: flex; justify-content: space-between; font-size: 56px; color: #F7F5EB; line-height: 1; border-bottom: 4px solid #FF2D1F; padding-bottom: 4px;"><span>3 CITIES</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 14px; align-self: center; color: #FF2D1F;">13:03</span></div>
+    <div class="cond" style="display: flex; justify-content: space-between; font-size: 32px; color: #B5B1A9; line-height: 1.1;"><span>4 PEAK</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 14px; align-self: center;">33:04</span></div>
+    <div class="cond" style="display: flex; justify-content: space-between; font-size: 32px; color: #B5B1A9; line-height: 1.1;"><span>5 EPILOGUE</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 14px; align-self: center;">46:24</span></div>
   </div>
 
-  <!-- universos como barra de código -->
+  <!-- universes as a barcode -->
   <div style="position: absolute; left: 32px; top: 640px; width: 900px; height: 96px; display: flex; gap: 3px; align-items: flex-end;">
     <div style="flex: 1; height: 10%; background: #333;"></div><div style="flex: 1; height: 60%; background: #B5B1A9;"></div><div style="flex: 1; height: 100%; background: #FF2D1F;"></div><div style="flex: 1; height: 100%; background: #FF2D1F;"></div><div style="flex: 1; height: 100%; background: #FF2D1F;"></div><div style="flex: 1; height: 8%; background: #333;"></div><div style="flex: 1; height: 45%; background: #B5B1A9;"></div><div style="flex: 1; height: 88%; background: #F7F5EB;"></div><div style="flex: 1; height: 86%; background: #F7F5EB;"></div><div style="flex: 1; height: 84%; background: #F7F5EB;"></div><div style="flex: 1; height: 5%; background: #333;"></div><div style="flex: 1; height: 30%; background: #B5B1A9;"></div><div style="flex: 1; height: 100%; background: #FF2D1F;"></div><div style="flex: 1; height: 100%; background: #FF2D1F;"></div><div style="flex: 1; height: 100%; background: #FF2D1F;"></div><div style="flex: 1; height: 20%; background: #B5B1A9;"></div><div style="flex: 1; height: 70%; background: #F7F5EB;"></div><div style="flex: 1; height: 72%; background: #F7F5EB;"></div><div style="flex: 1; height: 4%; background: #333;"></div><div style="flex: 1; height: 50%; background: #B5B1A9;"></div><div style="flex: 1; height: 100%; background: #FF2D1F;"></div><div style="flex: 1; height: 40%; background: #A8E05E;"></div><div style="flex: 1; height: 3%; background: #333;"></div><div style="flex: 1; height: 90%; background: #F7F5EB;"></div><div style="flex: 1; height: 92%; background: #F7F5EB;"></div><div style="flex: 1; height: 94%; background: #F7F5EB;"></div><div style="flex: 1; height: 96%; background: #F7F5EB;"></div><div style="flex: 1; height: 12%; background: #333;"></div><div style="flex: 1; height: 55%; background: #B5B1A9;"></div><div style="flex: 1; height: 100%; background: #FF2D1F;"></div>
   </div>
-  <div class="lbl" style="position: absolute; left: 32px; top: 748px; font-size: 11px; color: #666361;">U1 · 512 CH · BSW FUNDO 300–367 · FRENTE 380–460 · VÍDEO 400</div>
+  <div class="lbl" style="position: absolute; left: 32px; top: 748px; font-size: 11px; color: #666361;">U1 · 512 CH · BSW BACK 300–367 · FRONT 380–460 · VIDEO 400</div>
 
-  <!-- transporte no canto cortado -->
+  <!-- transport in the cut corner -->
   <div style="position: absolute; left: 1064px; top: 660px; display: flex; gap: 8px;">
     <div style="width: 48px; height: 48px; background: #F7F5EB; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#000" stroke-width="1.8"><path d="M5 3 L16 10 L5 17 Z"/></svg></div>
     <div style="width: 48px; height: 48px; border: 1px solid #333; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#B5B1A9" stroke-width="1.5"><path d="M6 3 V17 M14 3 V17"/></svg></div>

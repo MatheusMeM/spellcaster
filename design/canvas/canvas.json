@@ -6,9 +6,9 @@
     { "file": "Editor.dc.html", "x": 0, "y": 960, "w": 1440, "h": 900, "title": "Editor · theme feiticaria" }
   ],
   "annotations": [
-    { "id": "face-vs-theme", "x": 0, "y": -200, "w": 640, "text": "Mesma Face (operador_medgrupo: GO, cues, transporte, universos) em três Themes.\nA Face fixa o que existe e onde; o Theme fixa forma da janela, cromo, LCD, tipografia.\nPrincípio 5 do design/PRINCIPIOS.md: um Theme veste qualquer Face." },
-    { "id": "cor-e-estado", "x": 1400, "y": -200, "w": 520, "text": "Cor = estado. Cinza parado; âmbar seleção/ativo; verde-lima só GO/ok; vermelho ao vivo/erro; wisteria ensaio.\nNada de cor decorativa. Tokens em design/tokens/spellcaster.css." },
-    { "id": "editor-nota", "x": 1520, "y": 960, "w": 560, "text": "Face editor: áreas divisíveis (Blender), graph ao centro (TouchDesigner: família de nó = cor fixa).\nPaleta de comandos no topo mostra o nome real do registry.\nPainel Agent: proposta da IA vira diff com Aplicar / Ensaiar / Descartar." }
+    { "id": "face-vs-theme", "x": 0, "y": -200, "w": 640, "text": "The same Face (operador_medgrupo: GO, cues, transport, universes) in three Themes.\nThe Face pins what exists and where; the Theme pins window shape, chrome, LCD, typography.\nPrinciple 5 of design/PRINCIPIOS.md: one Theme dresses any Face." },
+    { "id": "cor-e-estado", "x": 1400, "y": -200, "w": 520, "text": "Color = state. Gray idle; amber selection/active; lime green only GO/ok; red live/error; wisteria rehearsal.\nNo decorative color. Tokens in design/tokens/spellcaster.css." },
+    { "id": "editor-nota", "x": 1520, "y": 960, "w": 560, "text": "Face editor: splittable areas (Blender), graph in the center (TouchDesigner: node family = fixed color).\nThe command palette at the top shows the real registry name.\nAgent panel: the AI's proposal becomes a diff with Apply / Rehearse / Discard." }
   ],
   "launch": { "view": "canvas" }
 }
