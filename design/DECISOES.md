@@ -201,3 +201,21 @@ Seis documentos novos em `design/FUNCOES/` (`daw-arranjo`, `daw-sessao`, `browse
 - **Os cinco pinos continuam sendo as cinco telas** (1 laser · 2 fósforo · 3 patchbay · 4 teatro · 5 info). O balão ganhou **dois itens que não são pino**: o **GRAVADOR** (a timeline, `index.html`) e a **MESA** (a Face, `face.html`). Cada um leva a frase que justifica a peça: a timeline é a fita do aparelho, a Face são os botões grandes que o operador aperta no show.
 - **O que o voto decide:** se peça sem pino pode morar no balão, ou se cada uma precisa virar um pino — o que exigiria um Pino com sete pinos (XLR-7 não existe) ou um segundo cabo.
 - Motivo: a regra é "nada aparece por conveniência de software". Dois itens sem pino são a exceção que o balão está abrindo; ou ela é aceita com a justificativa, ou o aparelho precisa crescer um conector.
+
+## 10/09/2026 · A luz do interior estoura qualquer material — aguarda voto
+
+- Medido no bench (`bench.html?v=optica`, spot `sun` com intensidade 50) e conferido em `app.js`
+  (mesmo spot com intensidade **90**, sem `physicallyCorrectLights`): toda superfície difusa virada
+  para cima satura. Um alumínio preto anodizado com albedo 0x0d1013 (0,012 linear) sai do render
+  cinza-claro; um fio vermelho 0x4d130e sai rosa; uma placa com máscara de solda 0x05130c sai verde
+  berrante. Com esse ganho não existe albedo escuro: o material só volta a escurecer se for
+  metálico (`metalness >= .85`), porque aí não há difusa para estourar.
+- **O que isso já custou em `optics.js`:** o palette inteiro teve de virar metal (mesa, suportes,
+  motores, dissipadores) e as cores dos fios e das placas tiveram de ser escurecidas duas vezes só
+  para não brilhar mais que a mesa óptica. É contorno, não conserto — a peça está compensando a luz.
+- **O que o voto decide:** (a) baixar o spot e subir a `toneMappingExposure` em `app.js`/`bench.html`
+  até que albedo escuro leia escuro (é uma linha em cada arquivo, mas muda o visual de todas as
+  frentes de uma vez), ou (b) ligar `renderer.physicallyCorrectLights = true` e recalibrar as três
+  luzes em candela, ou (c) manter como está e assumir que todo material do interior é metálico.
+- Motivo: `app.js` e `bench.html` não são desta frente, e mexer na luz muda o corpo, o Pino e a
+  parede de uma vez. Fica registrado com número medido para quem for calibrar.

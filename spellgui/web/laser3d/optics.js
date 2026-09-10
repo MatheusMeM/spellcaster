@@ -42,11 +42,11 @@ window.OPTICS = function (THREE, X, body, pick) {
     conn: X.M(0x040506, { metalness: .04, roughness: .64 }),
     green: X.M(0x05120a, { metalness: .05, roughness: .62 }),
     fr4: X.M(0x171609, { metalness: .05, roughness: .82 }),
-    wK: X.M(0x020203, { metalness: 0, roughness: .86, roughnessMap: X.grainR }),
-    wR: X.M(0x160504, { metalness: 0, roughness: .82, roughnessMap: X.grainR }),
-    wG: X.M(0x0c1806, { metalness: 0, roughness: .82, roughnessMap: X.grainR }),
-    wS: X.M(0x08090b, { metalness: 0, roughness: .8, roughnessMap: X.grainR }),
-    clip: X.M(0x040506, { metalness: .05, roughness: .72 })
+    wK: X.M(0x0b0c0f, { metalness: 0, roughness: .86, roughnessMap: X.grainR }),      // negativo
+    wR: X.M(0x330b07, { metalness: 0, roughness: .82, roughnessMap: X.grainR }),      // positivo
+    wG: X.M(0x1d3a12, { metalness: 0, roughness: .82, roughnessMap: X.grainR }),
+    wS: X.M(0x161a1f, { metalness: 0, roughness: .8, roughnessMap: X.grainR }),      // sinal (ILDA)
+    clip: X.M(0x2b3036, { metalness: .9, roughness: .5 })
   };
   function bolts(parent, pts, y, r) { r = r || .003; pts.forEach(function (p) { var s = add(parent, cyl(r, .0028, 14), mm.steel, p[0], y, p[1]); add(s, X.hex(r * .52, .0018), mm.anod, 0, .0011, 0); }); }
   function label(w, h, txt, px) { return X.tex(w, h, function (x, cw, ch) { x.fillStyle = "#0a0b0d"; x.fillRect(0, 0, cw, ch); x.fillStyle = "#585d62"; x.font = "700 " + (px || 22) + "px 'Share Tech Mono'"; x.textBaseline = "middle"; x.fillText(txt, 8, ch / 2); }, true); }
@@ -257,7 +257,7 @@ window.OPTICS = function (THREE, X, body, pick) {
   var pcbEdge = X.M(0x120e05, { metalness: .04, roughness: .86 });
   function board(w, h, comps, title, x, y, z, ry, k) {
     var g = grp(x, y, z, k); g.rotation.y = ry;
-    var face = X.M(0x4d534f, { map: pcbTex(w, h, comps, title), metalness: .06, roughness: .6, envMapIntensity: .25 });   // cor escurece o mapa: placa nao pode competir com a mesa
+    var face = X.M(0x2f3330, { map: pcbTex(w, h, comps, title), metalness: .06, roughness: .6, envMapIntensity: .25 });   // cor escurece o mapa: placa nao pode competir com a mesa
     add(g, new THREE.BoxGeometry(w, h, .0016), [pcbEdge, pcbEdge, pcbEdge, pcbEdge, face, pcbEdge], 0, 0, 0);
     [[-w / 2 + .005, -h / 2 + .005], [w / 2 - .005, -h / 2 + .005], [-w / 2 + .005, h / 2 - .005], [w / 2 - .005, h / 2 - .005]].forEach(function (q) {
       add(g, X.hex(.0022, .0072), mm.brass, q[0], q[1], -.0044).rotation.x = PI / 2;   // espacador de latao apoiado na chapa
@@ -281,8 +281,83 @@ window.OPTICS = function (THREE, X, body, pick) {
   /* ---------- fonte ---------- (atrás da mesa, junto da traseira) */
   var psu = grp(-.115, .029, .115, "psu"); add(psu, X.rbox(.10, .042, .045, .002), mm.anod, 0, 0, 0);
   bolts(psu, [[-.04, -.016], [.04, .016]], .0235, .0025);
+  [[-.042, -.017], [.042, -.017], [-.042, .017], [.042, .017]].forEach(function (q) {
+    add(psu, X.hex(.0026, .0210), mm.brass, q[0], -.0315, q[1]); });                 // espacadores apoiados na chapa
+  add(psu, X.rbox(.014, .010, .006, .001), mm.conn, .034, -.016, -.0245);            // saida 48 V
+
   var psuL = X.tex(256, 128, function (x, w, h) { x.fillStyle = "#20242a"; x.fillRect(0, 0, w, h); x.fillStyle = "#111"; x.font = "700 22px 'Share Tech Mono'"; x.fillText("PSU 48V 5.2A", 12, 40); x.font = "16px 'Share Tech Mono'"; x.fillText("IN 100-240V~  OUT 48V", 12, 72); x.fillText("SPELLCASTER  SC-PS250", 12, 100); }, true);
   var lab = add(psu, new THREE.PlaneGeometry(.06, .03), X.M(0xffffff, { map: psuL, metalness: 0, roughness: .65 }), 0, .0215, 0); lab.rotation.x = -PI / 2; lab.castShadow = false;
+
+  /* ---------- cabos ----------
+     Cada cabo sai de um conector de verdade, desce rente a parede, corre pelo piso preso por abracadeiras e
+     sobe no destino. Os pontos sao passados a X.tube (CatmullRom), entao a curva ja sai com raio de dobra
+     minimo: nao ha vinco. As faixas livres do piso ficam fora da pegada da mesa (x = +-.185, z = +-.138), logo
+     nenhum cabo cruza a bancada, uma placa ou a chapa. Par trancado vermelho/preto para a potencia dos diodos,
+     feixe de 4 vias cinza para o ILDA do DAC ate os drivers de galvo e fio verde-amarelo de terra do AC IN ao
+     chassi. Referencia: chicote de projetor ILDA com abracadeiras P-clip M3. */
+  var earthT = X.tex(64, 64, function (x, w, h) { x.fillStyle = "#13260c"; x.fillRect(0, 0, w, h);
+    x.strokeStyle = "#5c5210"; x.lineWidth = 13; for (var i = -h; i < w + h; i += 30) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i + h, h); x.stroke(); } }, true);
+  earthT.wrapS = earthT.wrapT = THREE.RepeatWrapping; earthT.repeat.set(28, 1);
+  mm.earth = X.M(0xffffff, { map: earthT, metalness: 0, roughness: .82 });
+  function cable(pts, r, mat, clips) {                                   // tubo + abracadeiras nos indices pedidos
+    var t = X.tube(pts, r, mat); t.receiveShadow = true; body.add(t);
+    (clips || []).forEach(function (i) {
+      var a = pts[i], b = pts[i + 1] || pts[i - 1];
+      var c = new THREE.Mesh(X.ring(r * 4.2, r * 1.3, .0016), mm.clip);
+      c.position.set(a[0], a[1], a[2]); c.lookAt(b[0], b[1], b[2]); c.castShadow = true; body.add(c);
+      var s = new THREE.Mesh(cyl(r * .9, .0022, 10), mm.steel); s.position.set(a[0], a[1] - r * 2.6, a[2]); body.add(s);
+    });
+    return t;
+  }
+  function bundle(pts, n, ov, r, mats, clips) {                          // n vias paralelas (par trancado / fita)
+    for (var i = 0; i < n; i++) { var d = i - (n - 1) / 2;
+      cable(pts.map(function (q) { return [q[0] + d * ov[0], q[1] + d * ov[1], q[2] + d * ov[2]]; }),
+        r, mats[i % mats.length], i === 0 ? clips : null); }
+  }
+  var PWR = [mm.wR, mm.wK];
+  // potencia dos diodos: borne J1 de cada driver -> conector do modulo
+  bundle([[-.1776, .0885, -.030], [-.1840, .0830, -.036], [-.1855, .0550, -.038], [-.1855, .0180, -.034],
+    [-.1845, .0055, -.030], [-.1800, .0050, -.0285], [-.1760, .0300, -.0278], [-.1700, .0440, -.0270], [-.1600, .0460, -.0265]],
+    2, [0, 0, .0026], .0013, PWR, [3, 5]);
+  bundle([[-.1776, .0885, -.090], [-.1840, .0830, -.094], [-.1855, .0500, -.096], [-.1855, .0120, -.090],
+    [-.1855, .0050, -.060], [-.1855, .0045, .020], [-.1840, .0045, .090], [-.1750, .0055, .1250], [-.1400, .0050, .1360],
+    [-.0900, .0050, .1370], [-.0620, .0055, .1200], [-.0520, .0220, .1050], [-.0450, .0420, .0880], [-.0405, .0480, .0740], [-.0390, .0465, .0620]],
+    2, [0, .0026, 0], .0013, PWR, [3, 6, 9]);
+  bundle([[-.1776, .0885, .030], [-.1840, .0830, .026], [-.1855, .0500, .024], [-.1855, .0120, .030],
+    [-.1850, .0045, .060], [-.1800, .0045, .1100], [-.1500, .0045, .1380], [-.0800, .0045, .1400], [-.0100, .0050, .1400],
+    [.0140, .0055, .1300], [.0200, .0230, .1140], [.0235, .0430, .0900], [.0245, .0485, .0740], [.0235, .0465, .0620]],
+    2, [0, .0026, 0], .0013, PWR, [3, 6, 8]);
+  // ILDA: DAC -> drivers de galvo (feixe de 4 vias)
+  var ILDA = [mm.wS, mm.wK, mm.wS, mm.wR];
+  bundle([[.0100, .0870, .1320], [.0140, .0800, .1380], [.0200, .0400, .1400], [.0300, .0060, .1395],
+    [.0900, .0045, .1395], [.1500, .0045, .1370], [.1800, .0060, .1200], [.1855, .0045, .0800], [.1855, .0045, .0000],
+    [.1850, .0100, -.0300], [.1845, .0450, -.0400], [.1840, .0700, -.0380], [.1824, .0770, -.0360]],
+    4, [.0013, .0013, 0], .0010, ILDA, [3, 5, 8]);
+  bundle([[.0100, .1000, .1320], [.0160, .0920, .1385], [.0220, .0450, .1400], [.0320, .0075, .1400],
+    [.0900, .0060, .1400], [.1500, .0060, .1385], [.1810, .0075, .1250], [.1860, .0060, .0900], [.1860, .0060, .0600],
+    [.1850, .0200, .0480], [.1845, .0550, .0460], [.1824, .0770, .0440]],
+    4, [.0013, -.0013, 0], .0010, ILDA, [4, 7]);
+  // driver de galvo -> motor (par de sinal)
+  bundle([[.1776, .1023, -.0350], [.1830, .0980, -.0400], [.1855, .0700, -.0500], [.1855, .0300, -.0600],
+    [.1850, .0060, -.0750], [.1800, .0045, -.1100], [.1600, .0045, -.1330], [.1300, .0050, -.1385],
+    [.1150, .0300, -.1370], [.1050, .0700, -.1300], [.0900, .0950, -.1180], [.0790, .1000, -.1120], [.0750, .1005, -.1095]],
+    2, [0, 0, .0024], .0011, [mm.wS, mm.wK], [4, 6, 7]);
+  bundle([[.1776, .1023, .0450], [.1835, .0980, .0400], [.1860, .0700, .0300], [.1860, .0300, .0100],
+    [.1855, .0060, -.0200], [.1830, .0045, -.0600], [.1700, .0045, -.1000], [.1550, .0055, -.1250],
+    [.1450, .0200, -.1350], [.1380, .0450, -.1330], [.1300, .0620, -.1300], [.1215, .0662, -.1265]],
+    2, [0, .0024, 0], .0011, [mm.wS, mm.wK], [4, 6, 7]);
+  // fonte -> DAC e fonte -> drivers
+  bundle([[-.0810, .0140, .0905], [-.0800, .0080, .0880], [-.0760, .0050, .0950], [-.0700, .0045, .1050],
+    [-.0500, .0045, .1250], [-.0300, .0060, .1350], [-.0150, .0300, .1370], [-.0100, .0550, .1330], [-.0080, .0700, .1290]],
+    2, [0, .0027, 0], .0014, PWR, [3, 5]);
+  bundle([[-.1650, .0200, .1100], [-.1740, .0140, .1080], [-.1830, .0060, .1050], [-.1900, .0045, .0900],
+    [-.1900, .0045, .0400], [-.1900, .0100, .0280], [-.1880, .0400, .0300], [-.1850, .0580, .0320], [-.1824, .0620, .0320]],
+    2, [0, .0027, 0], .0014, PWR, [3, 4]);
+  // terra do AC IN ao chassi, com terminal de olhal parafusado na chapa
+  cable([[-.1750, .0200, .1420], [-.1760, .0120, .1400], [-.1750, .0060, .1350], [-.1700, .0045, .1200],
+    [-.1600, .0045, .1080], [-.1520, .0060, .1010], [-.1500, .0075, .1000]], .0016, mm.earth, [3]);
+  add(body, X.ring(.008, .0022, .0012), mm.brass, -.1500, .0012, .1000).rotation.x = -PI / 2;   // olhal de terra
+  add(body, cyl(.0026, .0030, 10), mm.steel, -.1500, .0028, .1000);
 
   /* ---------- caminho óptico ---------- (todo ponto é o centro de uma peça de verdade) */
   var P = { g0: [GX(3) + .0389, BY, GZ(7)], d1: [GX(9), BY, GZ(7)], r0: [GX(9), BY, GZ(12) - .0389],
