@@ -295,7 +295,13 @@
   /* ---------- tick ---------- */
   var last = performance.now(), W = 0, H = 0, T0 = performance.now(), lidT = 0, rearI = 0, segsW = [], tmpV = new THREE.Vector3();
   function size() { if (stage.clientWidth !== W || stage.clientHeight !== H) { W = stage.clientWidth; H = stage.clientHeight; var pr = R.getPixelRatio(); R.setSize(W, H, false); composer.setSize(W, H); bloom.resolution.set(W, H); fxaa.uniforms.resolution.value.set(1 / (W * pr), 1 / (H * pr)); cam.aspect = W / H; cam.updateProjectionMatrix(); } }
-  function tick(now) { size(); var dt = Math.min(.1, (now - last) / 1000); last = now; var t = (now - T0) / 1000;
+  /* dt nunca anda para trás. O `now` do requestAnimationFrame é o instante em que o QUADRO começou,
+     e ele pode ser anterior ao `performance.now()` guardado em `last` na carga da página: nos
+     primeiros quadros dt saía negativo (−0,23 s, medido no headless), `S.pos += S.kpps * dt` jogava
+     a posição do galvo para −6848 e `f[índice negativo]` virava `undefined` — TypeError na parede a
+     cada quadro até a posição voltar a subir, com a tarja vermelha de erro por cima da tela de quem
+     abre `app.html#laser`. Era também a animação inteira (câmera, tampa, ventoinha) andando de ré. */
+  function tick(now) { size(); var dt = Math.min(.1, Math.max(0, (now - last) / 1000)); last = now; var t = (now - T0) / 1000;
     if (S.mode === "splash") wallSplash(now, dt); else wallTick(now, dt); wallTex.needsUpdate = true;
     var want = S.cam === "inside" ? 1 : 0; lidT += (want - lidT) * Math.min(1, dt * 3); var sT = Math.min(1, lidT / .45), lT = Math.max(0, (lidT - .4) / .6); B.screws.forEach(function (s, i) { s.position.y = .004 + sT * .05; s.rotation.y = sT * 12 + i; }); B.lid.rotation.x = -lT * 1.9;
     CAM.update(dt * camSpeed / 5); rearI += (((S.cam === "rear" && S.mode === "play") ? 14 : 0) - rearI) * Math.min(1, dt * 3); B.rearLight.intensity = rearI; inLight.intensity = .35 * lidT; sun.intensity = 90 * S.dim; B.wallLight.intensity = 14 * S.dim;
